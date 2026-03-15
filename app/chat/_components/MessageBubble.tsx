@@ -21,11 +21,12 @@ export default function MessageBubble({ message }: Props) {
     <div
       style={{
         width: '100%',
-        maxWidth: 820,
+        maxWidth: 920,
         margin: '0 auto',
-        padding: '10px 0',
+        padding: '6px 0',
         display: 'flex',
         flexDirection: 'column',
+        alignItems: isUser ? 'flex-end' : 'flex-start',
         gap: 6,
       }}
     >
@@ -36,10 +37,11 @@ export default function MessageBubble({ message }: Props) {
           alignItems: 'center',
           gap: 8,
           fontSize: 12,
-          fontWeight: 600,
-          letterSpacing: '0.04em',
+          fontWeight: 700,
+          letterSpacing: '0.12em',
           textTransform: 'uppercase',
-          color: isUser ? 'rgba(80,120,255,0.85)' : 'rgba(25,195,125,0.9)',
+          color: isUser ? 'rgba(132, 198, 255, 0.95)' : 'rgba(117, 246, 216, 0.95)',
+          textAlign: isUser ? 'right' : 'left',
         }}
       >
         <span>{isUser ? 'Vous' : 'HexAstra'}</span>
@@ -47,9 +49,9 @@ export default function MessageBubble({ message }: Props) {
           <span
             style={{
               fontSize: 11,
-              fontWeight: 500,
-              letterSpacing: '0.02em',
-              color: 'rgba(255,255,255,0.7)',
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              color: 'rgba(255,255,255,0.72)',
             }}
           >
             {timeLabel}
@@ -59,12 +61,15 @@ export default function MessageBubble({ message }: Props) {
 
       {/* contenu */}
       <div
+        className={`hx-chat-message hx-chat-bubble ${isUser ? 'is-user' : 'is-assistant'}`}
         style={{
-          fontSize: 15,
-          lineHeight: 1.8,
+          fontSize: 15.5,
+          lineHeight: 1.72,
           color: '#ffffff',
           whiteSpace: 'pre-wrap',
-          opacity: 0.95,
+          maxWidth: '82%',
+          textAlign: isUser ? 'right' : 'left',
+          alignSelf: isUser ? 'flex-end' : 'flex-start',
         }}
       >
         {message.content}
