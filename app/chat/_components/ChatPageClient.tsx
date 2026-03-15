@@ -73,18 +73,68 @@ function IconMenu() {
   )
 }
 
-const WELCOME_MESSAGE: Msg = {
-  id: 'welcome',
-  role: 'assistant',
-  content:
-    "Bienvenue.\n\nJe suis HexAstra Coach.\nUn outil de lecture stratégique pour t'aider à comprendre ta situation, ton timing et la meilleure direction à prendre.",
-  created_at: new Date().toISOString(),
-}
-
 const API_TIMEOUT_MS = 30000
 const CONVERSATION_STORAGE_KEY = 'hexastra_conversation_id'
 const CACHE_LIMIT = 50
 const DUPLICATE_MESSAGE_WINDOW_MS = 1200
+
+function getWelcomeContent(language: string) {
+  switch (language) {
+    case 'en':
+      return `Hello.
+
+I'm HexAstra Coach.
+I'm here to help you clarify a situation, understand your current phase, or explore the angle that matters most right now.`
+    case 'es':
+      return `Hola.
+
+Soy HexAstra Coach.
+Estoy aquí para ayudarte a aclarar una situación, comprender tu momento actual o explorar el ángulo más útil para ti ahora.`
+    default:
+      return `Bonjour.
+
+Je suis HexAstra Coach.
+Je suis là pour t’aider à clarifier une situation, comprendre ton moment actuel, ou explorer l’angle le plus utile pour toi maintenant.`
+  }
+}
+
+function createWelcomeMessage(language: string): Msg {
+  return {
+    id: 'welcome',
+    role: 'assistant',
+    content: getWelcomeContent(language),
+    created_at: new Date().toISOString(),
+  }
+}
+
+function normalizeText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+function isSimpleGreeting(value: string) {
+  const text = normalizeText(value)
+  if (!text) return false
+
+  const greetings = new Set([
+    'bonjour',
+    'salut',
+    'bonsoir',
+    'hello',
+    'hi',
+    'hey',
+    'coucou',
+    'yo',
+    'bjr',
+    'slt',
+    'cc',
+  ])
+
+  return greetings.has(text)
+}
 
 function getInitials(email: string) {
   if (!email) return 'HX'
@@ -162,11 +212,13 @@ export default function ChatPageClient() {
   const chatLanguage = useChatLanguage()
   const { t } = useTranslation()
 
-  const [messages, setMessages] = useState<Msg[]>([WELCOME_MESSAGE])
+  const welcomeMessage = useMemo(() => createWelcomeMessage(chatLanguage), [chatLanguage])
+
+  const [messages, setMessages] = useState<Msg[]>([welcomeMessage])
   const [premiumLock, setPremiumLock] = useState<{
-  targetPlan: string
-  ctaLabel: string
-} | null>(null)
+    targetPlan: string
+    ctaLabel: string
+  } | null>(null)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -224,6 +276,20 @@ export default function ChatPageClient() {
     [messages]
   )
 
+  const userMessages = useMemo(
+    () => messages.filter((message) => message.role === 'user'),
+    [messages]
+  )
+
+  const userMessageCount = userMessages.length
+  const lastUserMessage = userMessages[userMessages.length - 1]?.content ?? ''
+  const shouldShowMenuDock =
+    step === 'conversation_ready' &&
+    menuItems.length > 0 &&
+    userMessageCount > 0 &&
+    !isTyping &&
+    !isSimpleGreeting(lastUserMessage)
+
   const desktopLeft = viewportWidth >= 1100
   const userInitials = getInitials(userEmail)
   const isLimitReached = isFreePlan(userPlan) && !canContinueChat(userPlan, freeMessagesUsed)
@@ -241,7 +307,12 @@ export default function ChatPageClient() {
           : "Je n’ai pas pu terminer la lecture pour le moment."
 
     if (data.conversationId) setConversationId(data.conversationId)
-    if (data.menu?.visible && Array.isArray(data.menu.items)) setMenuItems(data.menu.items)
+    if (data.menu?.visible && Array.isArray(data.menu.items)) {
+      setMenuItems(data.menu.items)
+    } else if (data.menu?.visible === false) {
+      setMenuItems([])
+    }
+
     if (data.metadata?.contextType) setActiveContextType(data.metadata.contextType)
     if (data.metadata?.selectedMenuKey !== undefined) {
       setSelectedMenuKey(data.metadata.selectedMenuKey ?? null)
@@ -261,6 +332,7 @@ export default function ChatPageClient() {
     } else {
       setPremiumLock(null)
     }
+
     return reply
   }, [])
 
@@ -429,6 +501,15 @@ export default function ChatPageClient() {
   }, [supabase])
 
   useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0]?.id === 'welcome') {
+        return [createWelcomeMessage(chatLanguage)]
+      }
+      return prev
+    })
+  }, [chatLanguage])
+
+  useEffect(() => {
     const handleResize = () => setViewportWidth(window.innerWidth)
     handleResize()
     window.addEventListener('resize', handleResize)
@@ -509,8 +590,8 @@ export default function ChatPageClient() {
   useEffect(() => {
     if (searchParams.get('payment') === 'success') {
       setPaymentSuccess(true)
-      const t = setTimeout(() => setPaymentSuccess(false), 6000)
-      return () => clearTimeout(t)
+      const timer = setTimeout(() => setPaymentSuccess(false), 6000)
+      return () => clearTimeout(timer)
     }
   }, [searchParams])
 
@@ -887,7 +968,7 @@ export default function ChatPageClient() {
   )
 
   const handleNewReading = useCallback(() => {
-    setMessages([WELCOME_MESSAGE])
+    setMessages([createWelcomeMessage(chatLanguage)])
     setConversationId(null)
     setInput('')
     setMenuItems([])
@@ -899,7 +980,7 @@ export default function ChatPageClient() {
     try {
       localStorage.removeItem(CONVERSATION_STORAGE_KEY)
     } catch {}
-  }, [])
+  }, [chatLanguage])
 
   const handleCreateProject = useCallback(
     (name: string) => {
@@ -979,7 +1060,7 @@ export default function ChatPageClient() {
     onChange: setInput,
     onSend: () => void handleSend(),
     onQuickPrompt: (v: string) => void handleSend(v),
-    showQuickPrompts: isWelcome,
+    showQuickPrompts: false,
     onAttach: (file: File) => setAttachedFile(file),
     attachedFileName: attachedFile?.name,
     onRemoveAttach: () => setAttachedFile(null),
@@ -1036,6 +1117,7 @@ export default function ChatPageClient() {
           <div className="hx-app-feed hx-scroll-soft">
             <div className="hx-app-feed-inner">
               <MessageList messages={messages} isTyping={isTyping} />
+
               {premiumLock && (
                 <div className="hx-premium-lock">
                   <div className="hx-premium-lock-inner">
@@ -1055,7 +1137,7 @@ export default function ChatPageClient() {
                 </div>
               )}
 
-              {step === 'conversation_ready' && menuItems.length > 0 && (
+              {shouldShowMenuDock && (
                 <MenuDock
                   items={menuItems}
                   onSelect={(item, parent) => {
