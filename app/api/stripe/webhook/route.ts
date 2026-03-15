@@ -1,319 +1,188 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
+import { planFromPriceKey, StripePriceKey } from '@/lib/billing/stripePlans'
+import { logger } from '@/lib/utils/logger'
 
 export const runtime = 'nodejs'
 
-type PlanType = 'free' | 'essentiel' | 'premium' | 'praticien'
+type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien'
 
-function getPlanFromPriceKey(priceKey?: string | null): PlanType {
-  if (priceKey === 'praticien_monthly') return 'praticien'
-  if (priceKey === 'premium_monthly') return 'premium'
-  if (priceKey === 'essentiel_monthly') return 'essentiel'
-  return 'free'
+const STRIPE_EVENTS_HANDLED = new Set([
+  'checkout.session.completed',
+  'customer.subscription.created',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+  'invoice.paid',
+  'invoice.payment_failed',
+])
+
+function supabaseServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseKey) return null
+  return createClient(supabaseUrl, supabaseKey, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
 export async function POST(req: NextRequest) {
   const stripeKey = process.env.STRIPE_SECRET_KEY
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!stripeKey || !webhookSecret) {
-    console.error('Stripe non configuré')
+    logger.error('Stripe non configuré')
     return NextResponse.json({ error: 'Stripe non configuré' }, { status: 503 })
   }
 
-  const stripe = new Stripe(stripeKey, {
-    apiVersion: '2024-06-20',
-  })
+  const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' })
 
   const rawBody = await req.text()
   const signature = req.headers.get('stripe-signature')
-
-  if (!signature) {
-    return NextResponse.json({ error: 'Signature manquante' }, { status: 400 })
-  }
+  if (!signature) return NextResponse.json({ error: 'Signature manquante' }, { status: 400 })
 
   let event: Stripe.Event
-
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret)
   } catch (err) {
-    console.error('Signature Stripe invalide', err)
+    logger.error('Signature Stripe invalide', { err })
     return NextResponse.json({ error: 'Signature invalide' }, { status: 400 })
   }
 
-  const supabase =
-    supabaseUrl && supabaseKey
-      ? createClient(supabaseUrl, supabaseKey)
-      : null
+  if (!STRIPE_EVENTS_HANDLED.has(event.type)) {
+    logger.info('Stripe event ignoré', { type: event.type })
+    return NextResponse.json({ received: true })
+  }
+
+  const supabase = supabaseServiceClient()
 
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
+        const userId = session.client_reference_id || session.metadata?.supabase_user_id || null
+        const priceKey = session.metadata?.price_key as StripePriceKey | undefined
+        const plan = planFromPriceKey(priceKey)
+        const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id || null
+        const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id || null
+        const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id || null
 
-        const userId =
-          session.client_reference_id ||
-          session.metadata?.supabase_user_id ||
-          null
+        logger.info('Checkout session completed', { sessionId: session.id, userId, priceKey, plan })
 
-        const priceKey = session.metadata?.price_key ?? null
-        const plan = getPlanFromPriceKey(priceKey)
+        if (supabase && userId) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({
+              plan: plan as DbPlan,
+              stripe_customer_id: customerId,
+              stripe_subscription_id: subscriptionId,
+              stripe_subscription_status: 'active',
+            })
+            .eq('id', userId)
 
-        const customerId =
-          typeof session.customer === 'string'
-            ? session.customer
-            : session.customer?.id || null
+          if (profileError) logger.error('Profile update after checkout failed', { profileError })
 
-        const subscriptionId =
-          typeof session.subscription === 'string'
-            ? session.subscription
-            : session.subscription?.id || null
-
-        const paymentIntentId =
-          typeof session.payment_intent === 'string'
-            ? session.payment_intent
-            : session.payment_intent?.id || null
-
-        console.log('Checkout Stripe terminé', {
-          sessionId: session.id,
-          userId,
-          priceKey,
-          plan,
-          customerId,
-          subscriptionId,
-        })
-
-        if (supabase) {
-          // Mise à jour orders si la table existe et si une ligne correspond
           const { error: orderError } = await supabase
             .from('orders')
-            .update({
-              status: 'paid',
-              stripe_payment_id: paymentIntentId,
-            })
+            .update({ status: 'paid', stripe_payment_id: paymentIntentId })
             .eq('stripe_session_id', session.id)
 
-          if (orderError) {
-            console.warn('Update orders ignoré ou échoué:', orderError.message)
-          }
-
-          if (userId) {
-            const { error: profileError } = await supabase
-              .from('profiles')
-              .update({
-                plan,
-                stripe_customer_id: customerId,
-                stripe_subscription_id: subscriptionId,
-                stripe_subscription_status: 'active',
-              })
-              .eq('id', userId)
-
-            if (profileError) {
-              console.error('Erreur update profiles après checkout:', profileError)
-            } else {
-              console.log(`Plan utilisateur mis à jour → ${plan}`)
-            }
-          } else {
-            console.warn('userId introuvable dans checkout.session.completed')
-          }
+          if (orderError) logger.warn('Order update ignored/failed', { orderError })
         }
-
         break
       }
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription
-
-        const customerId =
-          typeof subscription.customer === 'string'
-            ? subscription.customer
-            : subscription.customer?.id || null
-
+        const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id || null
         const subscriptionId = subscription.id
         const subscriptionStatus = subscription.status
-        const priceKey = subscription.metadata?.price_key ?? null
+        const priceKey = subscription.metadata?.price_key as StripePriceKey | undefined
         const userId = subscription.metadata?.supabase_user_id ?? null
-        const plan = getPlanFromPriceKey(priceKey)
+        const plan = planFromPriceKey(priceKey)
 
-        console.log('Subscription créée / mise à jour', {
-          eventType: event.type,
-          subscriptionId,
-          customerId,
-          userId,
-          priceKey,
-          plan,
-          subscriptionStatus,
-        })
+        logger.info('Subscription upsert', { event: event.type, subscriptionId, customerId, userId, priceKey, plan, subscriptionStatus })
 
         if (supabase) {
-          if (userId) {
-            const { error } = await supabase
-              .from('profiles')
-              .update({
-                plan,
-                stripe_customer_id: customerId,
-                stripe_subscription_id: subscriptionId,
-                stripe_subscription_status: subscriptionStatus,
-              })
-              .eq('id', userId)
-
-            if (error) {
-              console.error(`Erreur update profiles (${event.type}) par userId:`, error)
-            }
-          } else if (customerId) {
-            const { error } = await supabase
-              .from('profiles')
-              .update({
-                plan,
-                stripe_customer_id: customerId,
-                stripe_subscription_id: subscriptionId,
-                stripe_subscription_status: subscriptionStatus,
-              })
-              .eq('stripe_customer_id', customerId)
-
-            if (error) {
-              console.error(
-                `Erreur update profiles (${event.type}) par stripe_customer_id:`,
-                error
-              )
-            }
-          } else {
-            console.warn('Ni userId ni customerId trouvés sur subscription event')
+          const update = {
+            plan: plan as DbPlan,
+            stripe_customer_id: customerId,
+            stripe_subscription_id: subscriptionId,
+            stripe_subscription_status: subscriptionStatus,
           }
-        }
 
+          const { error } = userId
+            ? await supabase.from('profiles').update(update).eq('id', userId)
+            : await supabase.from('profiles').update(update).eq('stripe_customer_id', customerId)
+
+          if (error) logger.error('Profile update failed on subscription event', { error })
+        }
         break
       }
 
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
-
         const subscriptionId = subscription.id
-        const customerId =
-          typeof subscription.customer === 'string'
-            ? subscription.customer
-            : subscription.customer?.id || null
+        const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id || null
 
-        console.log('Subscription supprimée', {
-          subscriptionId,
-          customerId,
-        })
+        logger.info('Subscription deleted', { subscriptionId, customerId })
 
         if (supabase) {
-          if (subscriptionId) {
-            const { error } = await supabase
-              .from('profiles')
-              .update({
-                plan: 'free',
-                stripe_subscription_id: null,
-                stripe_subscription_status: 'canceled',
-              })
-              .eq('stripe_subscription_id', subscriptionId)
+          const update = {
+            plan: 'free' as DbPlan,
+            stripe_subscription_id: null,
+            stripe_subscription_status: 'canceled',
+          }
 
-            if (error) {
-              console.error(
-                'Erreur downgrade profile par stripe_subscription_id:',
-                error
-              )
-            }
+          if (subscriptionId) {
+            const { error } = await supabase.from('profiles').update(update).eq('stripe_subscription_id', subscriptionId)
+            if (error) logger.error('Downgrade by subscription_id failed', { error })
           }
 
           if (customerId) {
-            const { error } = await supabase
-              .from('profiles')
-              .update({
-                plan: 'free',
-                stripe_subscription_id: null,
-                stripe_subscription_status: 'canceled',
-              })
-              .eq('stripe_customer_id', customerId)
-
-            if (error) {
-              console.error(
-                'Erreur downgrade profile par stripe_customer_id:',
-                error
-              )
-            }
+            const { error } = await supabase.from('profiles').update(update).eq('stripe_customer_id', customerId)
+            if (error) logger.error('Downgrade by customer_id failed', { error })
           }
         }
-
         break
       }
 
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice
-
-        const customerId =
-          typeof invoice.customer === 'string'
-            ? invoice.customer
-            : invoice.customer?.id || null
-
-        console.log('Facture abonnement payée', {
-          invoiceId: invoice.id,
-          customerId,
-        })
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id || null
+        logger.info('Invoice paid', { invoiceId: invoice.id, customerId })
 
         if (supabase && customerId) {
           const { error } = await supabase
             .from('profiles')
-            .update({
-              stripe_subscription_status: 'active',
-            })
+            .update({ stripe_subscription_status: 'active' })
             .eq('stripe_customer_id', customerId)
-
-          if (error) {
-            console.error('Erreur update stripe_subscription_status=active:', error)
-          }
+          if (error) logger.error('Update status active failed', { error })
         }
-
         break
       }
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice
-
-        const customerId =
-          typeof invoice.customer === 'string'
-            ? invoice.customer
-            : invoice.customer?.id || null
-
-        console.warn('Paiement abonnement échoué', {
-          invoiceId: invoice.id,
-          customerId,
-        })
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id || null
+        logger.warn('Invoice payment failed', { invoiceId: invoice.id, customerId })
 
         if (supabase && customerId) {
           const { error } = await supabase
             .from('profiles')
-            .update({
-              stripe_subscription_status: 'past_due',
-            })
+            .update({ stripe_subscription_status: 'past_due' })
             .eq('stripe_customer_id', customerId)
-
-          if (error) {
-            console.error('Erreur update stripe_subscription_status=past_due:', error)
-          }
+          if (error) logger.error('Update status past_due failed', { error })
         }
-
         break
       }
 
       default:
-        console.log('Event Stripe ignoré:', event.type)
         break
     }
 
     return NextResponse.json({ received: true })
   } catch (err) {
-    console.error('Erreur webhook Stripe', err)
-
-    return NextResponse.json(
-      { error: 'Erreur webhook Stripe' },
-      { status: 500 }
-    )
+    logger.error('Erreur webhook Stripe', { error: err })
+    return NextResponse.json({ error: 'Erreur webhook Stripe' }, { status: 500 })
   }
 }

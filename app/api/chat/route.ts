@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
-import { createClient as createSupabaseServer } from '@/lib/supabase/server'
 import { runHexastraFlow } from '@/lib/hexastra/orchestrator/runHexastraFlow'
 import type {
   BirthProfile,
@@ -9,8 +8,13 @@ import type {
   PractitionerUsageHex,
   UiAction,
 } from '@/lib/hexastra/types'
-import type { PlanKey } from '@/lib/plans'
+import type { PlanKey } from '@/types/subscription'
 import type { ChatMessage } from '@/lib/chat/chatPayloadBuilder'
+import { mapDbPlanToPlanKey, downgradeIfInactive } from '@/lib/permissions/plan'
+import { logger } from '@/lib/utils/logger'
+import { createSupabaseServer } from '@/lib/auth/supabaseServer'
+import { validateEnv } from '@/lib/utils/env'
+import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
 
 export const runtime = 'nodejs'
 
@@ -23,6 +27,12 @@ const PLAN_LIMITS: Record<PlanKey, number | null> = {
   essential: 20,
   premium: null,
   practitioner: null,
+}
+
+const REQUIRED_ENV = {
+  NEXT_PUBLIC_SUPABASE_URL: {},
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: {},
+  SUPABASE_SERVICE_ROLE_KEY: {},
 }
 
 function getResponseDepth(plan: PlanKey): ResponseDepth {
@@ -42,10 +52,7 @@ function sanitizeMessages(messages: unknown): ChatMessage[] {
   if (!Array.isArray(messages)) return []
 
   return messages
-    .filter(
-      (m): m is { role?: unknown; content?: unknown } =>
-        Boolean(m && typeof m === 'object')
-    )
+    .filter((m): m is { role?: unknown; content?: unknown } => Boolean(m && typeof m === 'object'))
     .map(
       (m): ChatMessage => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
@@ -53,14 +60,7 @@ function sanitizeMessages(messages: unknown): ChatMessage[] {
       })
     )
     .filter((m) => m.content.length > 0)
-    .slice(-20)
-}
-
-function mapDbPlanToPlanKey(plan: unknown): PlanKey {
-  if (plan === 'essentiel') return 'essential'
-  if (plan === 'premium') return 'premium'
-  if (plan === 'praticien') return 'practitioner'
-  return 'free'
+    .slice(-30)
 }
 
 function normalizeContextType(value: unknown): ContextType {
@@ -92,10 +92,8 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
   const data = raw as Record<string, unknown>
 
   const birth: BirthProfile = {
-    firstName:
-      typeof data.firstName === 'string' ? data.firstName.trim() : undefined,
-    lastName:
-      typeof data.lastName === 'string' ? data.lastName.trim() : undefined,
+    firstName: typeof data.firstName === 'string' ? data.firstName.trim() : undefined,
+    lastName: typeof data.lastName === 'string' ? data.lastName.trim() : undefined,
     date:
       typeof data.date === 'string'
         ? data.date.trim()
@@ -141,10 +139,8 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
 
 function buildSafeErrorResponse() {
   return {
-    message:
-      'Je n’ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.',
-    reply:
-      'Je n’ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.',
+    message: "Je n'ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.",
+    reply: "Je n'ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.",
     mode: 'free',
     plan: 'free',
     flowState: { step: 'error', completed: false },
@@ -155,12 +151,7 @@ function buildSafeErrorResponse() {
   }
 }
 
-function buildQuotaErrorResponse(params: {
-  plan: PlanKey
-  used: number
-  limit: number
-  resetAt: string | null
-}) {
+function buildQuotaErrorResponse(params: { plan: PlanKey; used: number; limit: number; resetAt: string | null }) {
   const { plan, used, limit, resetAt } = params
 
   const planLabel =
@@ -210,9 +201,7 @@ function getTodayIsoDate() {
 }
 
 function getResetAtIso(windowStartedAt: string | Date) {
-  const startedAt =
-    windowStartedAt instanceof Date ? windowStartedAt : new Date(windowStartedAt)
-
+  const startedAt = windowStartedAt instanceof Date ? windowStartedAt : new Date(windowStartedAt)
   return new Date(startedAt.getTime() + 24 * 60 * 60 * 1000).toISOString()
 }
 
@@ -229,57 +218,17 @@ function detectLanguageFromText(text: string): string | null {
   const normalized = text.trim().toLowerCase()
   if (!normalized) return null
 
-  const frenchSignals = [
-    'bonjour',
-    'salut',
-    'bonsoir',
-    'merci',
-    'je veux',
-    'j’ai',
-    "j'ai",
-    'peux-tu',
-    'peut tu',
-    'pourquoi',
-    'comment',
-    'avec',
-    'sans',
-    'travail',
-    'amour',
-    'santé',
-  ]
+  const frenchSignals = ['bonjour', 'salut', 'bonsoir', 'merci', 'je veux', 'j’ai', "j'ai", 'peux-tu', 'peut tu', 'pourquoi', 'comment', 'avec', 'sans', 'travail', 'amour', 'santé']
+  const englishSignals = ['hello', 'hi', 'hey', 'thank you', 'please', 'i want', 'can you', 'how', 'why', 'love', 'work', 'health']
 
-  const englishSignals = [
-    'hello',
-    'hi',
-    'hey',
-    'thank you',
-    'please',
-    'i want',
-    'can you',
-    'how',
-    'why',
-    'love',
-    'work',
-    'health',
-  ]
-
-  const frenchScore = frenchSignals.reduce(
-    (score, signal) => score + (normalized.includes(signal) ? 1 : 0),
-    0
-  )
-  const englishScore = englishSignals.reduce(
-    (score, signal) => score + (normalized.includes(signal) ? 1 : 0),
-    0
-  )
+  const frenchScore = frenchSignals.reduce((score, signal) => score + (normalized.includes(signal) ? 1 : 0), 0)
+  const englishScore = englishSignals.reduce((score, signal) => score + (normalized.includes(signal) ? 1 : 0), 0)
 
   if (frenchScore === 0 && englishScore === 0) return null
   return frenchScore >= englishScore ? 'fr' : 'en'
 }
 
-function resolveRequestedLanguage(
-  body: Record<string, unknown>,
-  messages: ChatMessage[]
-) {
+function resolveRequestedLanguage(body: Record<string, unknown>, messages: ChatMessage[]) {
   const explicitLanguage =
     typeof body.language === 'string'
       ? body.language.trim()
@@ -287,14 +236,9 @@ function resolveRequestedLanguage(
         ? body.chatLanguage.trim()
         : ''
 
-  if (explicitLanguage) {
-    return explicitLanguage
-  }
+  if (explicitLanguage) return explicitLanguage
 
-  const lastUserMessage = [...messages]
-    .reverse()
-    .find((message) => message.role === 'user')?.content
-
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content
   const detected = lastUserMessage ? detectLanguageFromText(lastUserMessage) : null
   return detected ?? 'fr'
 }
@@ -303,80 +247,32 @@ function isGreetingOnlyMessage(text: string): boolean {
   return /^(bonjour|salut|hello|hey|bonsoir|coucou|yo|hi)$/i.test(text.trim())
 }
 
-async function resolveEffectivePlan(
-  req: NextRequest
-): Promise<{
-  plan: PlanKey
-  userId: string | null
-}> {
-  const supabase = await createSupabaseServer()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+async function resolveEffectivePlan(req: NextRequest): Promise<{ plan: PlanKey; userId: string | null }> {
+  try {
+    const supabase = createSupabaseServer()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) {
-    return {
-      plan: 'free',
-      userId: null,
-    }
-  }
+    if (!user) return { plan: 'free', userId: null }
 
-  const adminUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    const adminUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!adminUrl || !adminKey) return { plan: 'free', userId: user.id }
 
-  if (!adminUrl || !adminKey) {
-    return {
-      plan: 'free',
-      userId: user.id,
-    }
-  }
-
-  const admin = createAdminClient(adminUrl, adminKey)
-
-  const { data: profile, error } = await admin
-    .from('profiles')
-    .select('plan, stripe_subscription_status')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  if (error) {
-    console.error('[api/chat] profile lookup error', error)
-    return {
-      plan: 'free',
-      userId: user.id,
-    }
-  }
-
-  let resolvedPlan = mapDbPlanToPlanKey(profile?.plan as DbPlan | undefined)
-  const subscriptionStatus = profile?.stripe_subscription_status as
-    | string
-    | undefined
-
-  if (
-    resolvedPlan !== 'free' &&
-    subscriptionStatus &&
-    subscriptionStatus !== 'active' &&
-    subscriptionStatus !== 'trialing'
-  ) {
-    resolvedPlan = 'free'
-  }
-
-  return {
-    plan: resolvedPlan,
-    userId: user.id,
+    const { profile } = await getOrCreateProfile({ id: user.id, email: user.email, full_name: null })
+    const plan = downgradeIfInactive(mapDbPlanToPlanKey(profile.plan as DbPlan | undefined), profile.stripe_subscription_status ?? null)
+    return { plan, userId: user.id }
+  } catch (error) {
+    logger.error('[api/chat] resolveEffectivePlan failed', { error })
+    return { plan: 'free', userId: null }
   }
 }
 
-async function enforceDailyQuota(params: {
-  req: NextRequest
-  userId: string | null
-  plan: PlanKey
-  feature: UsageFeature
-}) {
+async function enforceDailyQuota(params: { req: NextRequest; userId: string | null; plan: PlanKey; feature: UsageFeature }) {
   const { req, userId, plan, feature } = params
 
   const limit = PLAN_LIMITS[plan]
-
   if (limit === null) {
     return {
       blocked: false as const,
@@ -390,9 +286,8 @@ async function enforceDailyQuota(params: {
 
   const adminUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const adminKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
   if (!adminUrl || !adminKey) {
-    console.warn('[api/chat] quota disabled: missing admin Supabase env')
+    logger.warn('[api/chat] quota disabled: missing admin Supabase env')
     return {
       blocked: false as const,
       used: 0,
@@ -415,7 +310,7 @@ async function enforceDailyQuota(params: {
     .maybeSingle()
 
   if (selectError) {
-    console.error('[api/chat] usage select error', selectError)
+    logger.error('[api/chat] usage select error', { selectError })
     return {
       blocked: false as const,
       used: 0,
@@ -445,10 +340,7 @@ async function enforceDailyQuota(params: {
       window_started_at: windowStartedAt,
       updated_at: windowStartedAt,
     })
-
-    if (insertError) {
-      console.error('[api/chat] usage insert error', insertError)
-    }
+    if (insertError) logger.error('[api/chat] usage insert error', { insertError })
 
     return {
       blocked: false as const,
@@ -462,7 +354,6 @@ async function enforceDailyQuota(params: {
 
   if (!hasActiveWindow) {
     const windowStartedAt = now.toISOString()
-
     const { error: resetError } = await admin
       .from('usage_daily')
       .update({
@@ -473,9 +364,7 @@ async function enforceDailyQuota(params: {
       })
       .eq('id', existing.id)
 
-    if (resetError) {
-      console.error('[api/chat] usage reset error', resetError)
-    }
+    if (resetError) logger.error('[api/chat] usage reset error', { resetError })
 
     return {
       blocked: false as const,
@@ -511,9 +400,7 @@ async function enforceDailyQuota(params: {
     })
     .eq('id', existing.id)
 
-  if (updateError) {
-    console.error('[api/chat] usage update error', updateError)
-  }
+  if (updateError) logger.error('[api/chat] usage update error', { updateError })
 
   return {
     blocked: false as const,
@@ -533,26 +420,15 @@ function truncateTextForPlan(text: string, plan: PlanKey) {
   const maxChars = plan === 'free' ? 550 : 1100
 
   if (!text || text.length <= maxChars) {
-    return {
-      truncated: text,
-      wasTrimmed: false,
-    }
+    return { truncated: text, wasTrimmed: false }
   }
 
   const sliced = text.slice(0, maxChars)
-  const lastSentence = Math.max(
-    sliced.lastIndexOf('. '),
-    sliced.lastIndexOf('! '),
-    sliced.lastIndexOf('? ')
-  )
+  const lastSentence = Math.max(sliced.lastIndexOf('. '), sliced.lastIndexOf('! '), sliced.lastIndexOf('? '))
 
-  const clean =
-    lastSentence > 120 ? sliced.slice(0, lastSentence + 1).trim() : `${sliced.trim()}...`
+  const clean = lastSentence > 120 ? sliced.slice(0, lastSentence + 1).trim() : `${sliced.trim()}...`
 
-  return {
-    truncated: clean,
-    wasTrimmed: true,
-  }
+  return { truncated: clean, wasTrimmed: true }
 }
 
 function buildPremiumLockBlock(plan: PlanKey) {
@@ -573,15 +449,10 @@ function buildPremiumLockBlock(plan: PlanKey) {
   }
 }
 
-function applyPremiumInsightLock(params: {
-  plan: PlanKey
-  response: any
-}) {
+function applyPremiumInsightLock(params: { plan: PlanKey; response: any }) {
   const { plan, response } = params
 
-  if (!shouldApplyPremiumLock(plan)) {
-    return response
-  }
+  if (!shouldApplyPremiumLock(plan)) return response
 
   const sourceText =
     typeof response?.reply === 'string'
@@ -590,15 +461,10 @@ function applyPremiumInsightLock(params: {
         ? response.message
         : ''
 
-  if (!sourceText) {
-    return response
-  }
+  if (!sourceText) return response
 
   const { truncated, wasTrimmed } = truncateTextForPlan(sourceText, plan)
-
-  if (!wasTrimmed) {
-    return response
-  }
+  if (!wasTrimmed) return response
 
   const lock = buildPremiumLockBlock(plan)
   const lockedReply = `${truncated}\n\n${lock.teaser}`
@@ -617,14 +483,16 @@ function applyPremiumInsightLock(params: {
 }
 
 export async function POST(req: NextRequest) {
-  console.log('[api/chat] POST hit')
+  logger.info('[api/chat] POST hit')
 
   try {
+    validateEnv(REQUIRED_ENV)
+
     const body = await req.json().catch(() => null)
-    console.log('[api/chat] body parsed =', Boolean(body))
+    logger.debug('[api/chat] body parsed', { hasBody: Boolean(body) })
 
     if (!body || typeof body !== 'object') {
-      console.error('[api/chat] invalid body')
+      logger.warn('[api/chat] invalid body')
       return NextResponse.json(buildSafeErrorResponse(), { status: 400 })
     }
 
@@ -632,26 +500,22 @@ export async function POST(req: NextRequest) {
       (body as Record<string, unknown>).requestType === 'micro_profile' ||
       (body as Record<string, unknown>).requestType === 'micro_year' ||
       (body as Record<string, unknown>).requestType === 'micro_month'
-        ? ((body as Record<string, unknown>).requestType as
-            | 'micro_profile'
-            | 'micro_year'
-            | 'micro_month')
+        ? ((body as Record<string, unknown>).requestType as 'micro_profile' | 'micro_year' | 'micro_month')
         : 'chat'
 
     const sanitizedMessages = sanitizeMessages((body as Record<string, unknown>).messages)
-
-    const lastUserMessage =
-      [...sanitizedMessages].reverse().find((m) => m.role === 'user')?.content?.trim() ?? ''
-
+    const lastUserMessage = [...sanitizedMessages].reverse().find((m) => m.role === 'user')?.content?.trim() ?? ''
     const isGreetingOnly = isGreetingOnlyMessage(lastUserMessage)
 
-    console.log('[api/chat] requestType =', requestType)
-    console.log('[api/chat] messages count =', sanitizedMessages.length)
-    console.log('[api/chat] last user message =', lastUserMessage || null)
-    console.log('[api/chat] isGreetingOnly =', isGreetingOnly)
+    logger.info('[api/chat] request summary', {
+      requestType,
+      messagesCount: sanitizedMessages.length,
+      lastUserMessage,
+      isGreetingOnly,
+    })
 
     const { plan: effectivePlan, userId } = await resolveEffectivePlan(req)
-    console.log('[api/chat] effectivePlan =', effectivePlan, 'userId =', userId)
+    logger.info('[api/chat] effective plan resolved', { effectivePlan, userId })
 
     const responseDepth = getResponseDepth(effectivePlan)
 
@@ -661,6 +525,8 @@ export async function POST(req: NextRequest) {
           used: 0,
           limit: PLAN_LIMITS[effectivePlan],
           remaining: PLAN_LIMITS[effectivePlan],
+          resetAt: null,
+          windowStartedAt: null,
         }
       : await enforceDailyQuota({
           req,
@@ -669,10 +535,10 @@ export async function POST(req: NextRequest) {
           feature: 'chat_api',
         })
 
-    console.log('[api/chat] quota =', quota)
+    logger.debug('[api/chat] quota', quota as any)
 
     if (quota.blocked && quota.limit !== null) {
-      console.warn('[api/chat] quota blocked')
+      logger.warn('[api/chat] quota blocked', { userId, plan: effectivePlan, used: quota.used })
       return NextResponse.json(
         buildQuotaErrorResponse({
           plan: effectivePlan,
@@ -684,23 +550,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log('[api/chat] calling runHexastraFlow')
+    logger.info('[api/chat] calling runHexastraFlow')
 
     const response = await runHexastraFlow({
       plan: effectivePlan,
       responseDepth,
-      language: resolveRequestedLanguage(
-        body as Record<string, unknown>,
-        sanitizedMessages
-      ),
+      language: resolveRequestedLanguage(body as Record<string, unknown>, sanitizedMessages),
       requestType,
       birthData: normalizeBirthData((body as Record<string, unknown>).birthData),
-      practitionerUsage: normalizePractitionerUsage(
-        (body as Record<string, unknown>).practitionerUsage
-      ),
-      contextType: normalizeContextType(
-        (body as Record<string, unknown>).contextType
-      ),
+      practitionerUsage: normalizePractitionerUsage((body as Record<string, unknown>).practitionerUsage),
+      contextType: normalizeContextType((body as Record<string, unknown>).contextType),
       selectedMenuKey:
         typeof (body as Record<string, unknown>).selectedMenuKey === 'string'
           ? ((body as Record<string, unknown>).selectedMenuKey as string)
@@ -718,20 +577,13 @@ export async function POST(req: NextRequest) {
       evolutionProfile:
         (body as Record<string, unknown>).evolutionProfile &&
         typeof (body as Record<string, unknown>).evolutionProfile === 'object'
-          ? ((body as Record<string, unknown>).evolutionProfile as Record<
-              string,
-              unknown
-            >)
+          ? ((body as Record<string, unknown>).evolutionProfile as Record<string, unknown>)
           : null,
     })
 
-    console.log('[api/chat] runHexastraFlow success')
-    console.log('[api/chat] response flowState =', response?.flowState ?? null)
+    logger.info('[api/chat] runHexastraFlow success', { flowState: response?.flowState ?? null })
 
-    const finalResponse = applyPremiumInsightLock({
-      plan: effectivePlan,
-      response,
-    })
+    const finalResponse = applyPremiumInsightLock({ plan: effectivePlan, response })
 
     return NextResponse.json(
       {
@@ -754,7 +606,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     )
   } catch (error) {
-    console.error('[api/chat] fatal error', error)
+    logger.error('[api/chat] fatal error', { error })
     return NextResponse.json(buildSafeErrorResponse(), { status: 500 })
   }
 }

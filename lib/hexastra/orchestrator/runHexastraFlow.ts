@@ -35,6 +35,7 @@ import { arbiter } from '@/lib/hexastra/fusion/arbiter'
 import { applySentinel } from '@/lib/hexastra/security/sentinel'
 import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
+import { logger } from '@/lib/utils/logger'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (
@@ -145,7 +146,7 @@ async function callOpenAI(payload: unknown): Promise<string> {
     const json = await res.json().catch(() => null)
 
     if (!res.ok || !json) {
-      console.error('[callOpenAI] OpenAI error', res.status, json)
+      logger.error('[callOpenAI] OpenAI error', { status: res.status, json })
       return 'Je n’ai pas pu terminer la lecture pour le moment.'
     }
 
@@ -159,7 +160,7 @@ async function callOpenAI(payload: unknown): Promise<string> {
 
     return text || 'Je n’ai pas pu finaliser la lecture pour le moment.'
   } catch (error) {
-    console.error('[callOpenAI] failed', error)
+    logger.error('[callOpenAI] failed', { error })
     return 'Le moteur HexAstra est temporairement indisponible.'
   }
 }
@@ -228,6 +229,11 @@ async function buildKnowledgeBlock({
   const openaiKey = process.env.OPENAI_API_KEY
 
   if (!VECTOR_STORE_ID || !openaiKey || !latestUserMessage.trim()) {
+    logger.warn('[runHexastraFlow] retrieval disabled', {
+      hasVectorStoreId: Boolean(VECTOR_STORE_ID),
+      hasOpenAIKey: Boolean(openaiKey),
+      hasQuery: Boolean(latestUserMessage.trim()),
+    })
     return { block: null, profile: 'disabled' }
   }
 
@@ -260,6 +266,11 @@ async function buildKnowledgeBlock({
   })
 
   if (!knowledgeResults.length) {
+    logger.info('[runHexastraFlow] retrieval returned 0 docs', {
+      query,
+      plan,
+      domainRoute,
+    })
     return { block: null, profile: retrievalPlan.profile }
   }
 
@@ -314,7 +325,7 @@ async function callRailway(path: string, payload: Record<string, unknown>) {
       cache: 'no-store',
     })
   } catch (error) {
-    console.error('[HexAstra][Railway] network/fetch error', error)
+    logger.error('[HexAstra][Railway] network/fetch error', { error })
     throw new Error(`Railway fetch failed for ${path}`)
   }
 
@@ -330,7 +341,7 @@ async function callRailway(path: string, payload: Record<string, unknown>) {
   try {
     return text ? JSON.parse(text) : {}
   } catch (error) {
-    console.error('[HexAstra][Railway] invalid JSON', error)
+    logger.error('[HexAstra][Railway] invalid JSON', { error })
     throw new Error(`Railway ${path} returned invalid JSON`)
   }
 }
@@ -378,7 +389,7 @@ async function runSpecializedModule({
         raw: kua && typeof kua === 'object' ? (kua as Record<string, unknown>) : null,
       }
     } catch (error) {
-      console.error('[runSpecializedModule:/kua] failed', {
+      logger.error('[runSpecializedModule:/kua] failed', {
         apiUrl: API_URL,
         hasApiKey: Boolean(API_KEY),
         error,
@@ -414,7 +425,7 @@ async function runSpecializedModule({
           fusion && typeof fusion === 'object' ? (fusion as Record<string, unknown>) : null,
       }
     } catch (error) {
-      console.error('[runSpecializedModule:/chart/fusion] failed', {
+      logger.error('[runSpecializedModule:/chart/fusion] failed', {
         apiUrl: API_URL,
         hasApiKey: Boolean(API_KEY),
         error,
@@ -542,6 +553,16 @@ export async function runHexastraFlow(input: {
   messages: ChatMessage[]
   evolutionProfile?: Record<string, unknown> | null
 }): Promise<HexastraApiResponse> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    logger.error('[runHexastraFlow] Supabase public env missing')
+    throw new Error('Supabase env missing')
+  }
+
+  if (!API_KEY || !API_URL) {
+    logger.error('[runHexastraFlow] HEXASTRA_API env missing')
+    throw new Error('HEXASTRA API env missing')
+  }
+
   const conversationId = input.conversationId ?? randomUUID()
   const fallbackLanguage = input.language ?? detectLanguageFromMessages(input.messages, 'fr')
   const fallbackPlan = normalizePlan(input.plan)
@@ -560,7 +581,7 @@ export async function runHexastraFlow(input: {
       const authResult = supabase?.auth ? await supabase.auth.getUser() : null
       user = authResult?.data?.user ?? null
     } catch (authError) {
-      console.error('[runHexastraFlow] supabase/auth unavailable', authError)
+      logger.error('[runHexastraFlow] supabase/auth unavailable', { error: authError })
     }
 
     let userContext: any = null
@@ -574,7 +595,7 @@ export async function runHexastraFlow(input: {
         practitionerUsage: input.practitionerUsage,
       })
     } catch (userContextError) {
-      console.error('[runHexastraFlow] buildUserContext failed', userContextError)
+      logger.error('[runHexastraFlow] buildUserContext failed', { error: userContextError })
 
       userContext = {
         plan: fallbackPlan,
@@ -628,7 +649,7 @@ export async function runHexastraFlow(input: {
         practitioner: mode === 'praticien',
       })
     } catch (sessionError) {
-      console.error('[runHexastraFlow] buildSessionContext failed', sessionError)
+      logger.error('[runHexastraFlow] buildSessionContext failed', { error: sessionError })
 
       sessionContext = {
         contextType: input.contextType ?? 'general',
@@ -973,7 +994,7 @@ export async function runHexastraFlow(input: {
         last_reading_level: sessionContext.readingLevel,
       })
     } catch (memoryError) {
-      console.error('[runHexastraFlow] memory/session persistence failed', memoryError)
+      logger.error('[runHexastraFlow] memory/session persistence failed', { error: memoryError })
     }
 
     const nowIso = new Date().toISOString()
@@ -1000,7 +1021,7 @@ export async function runHexastraFlow(input: {
 
         await writeUserMemory(supabase, user.id, memoryPatch)
       } catch (userMemoryError) {
-        console.error('[runHexastraFlow] writeUserMemory failed', userMemoryError)
+        logger.error('[runHexastraFlow] writeUserMemory failed', { error: userMemoryError })
       }
     }
 
@@ -1028,7 +1049,7 @@ export async function runHexastraFlow(input: {
       updatedEvolutionProfile: input.evolutionProfile ?? null,
     }
   } catch (error) {
-    console.error('[runHexastraFlow] fatal error', error)
+    logger.error('[runHexastraFlow] fatal error', { error })
 
     const mode = getModeForPlan(fallbackPlan)
 

@@ -1,8 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-
-type PlanType = 'free' | 'essentiel' | 'premium' | 'praticien'
+import type { PlanKey } from '@/types/subscription'
+import { mapDbPlanToPlanKey, downgradeIfInactive } from '@/lib/permissions/plan'
+import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
+import { logger } from '@/lib/utils/logger'
+import { logger } from '@/lib/utils/logger'
 
 const PUBLIC_PATHS = [
   '/',
@@ -43,7 +46,7 @@ function isPublicPath(pathname: string) {
   )
 }
 
-function hasRequiredPlan(userPlan: PlanType, pathname: string) {
+function hasRequiredPlan(userPlan: PlanKey, pathname: string) {
 
   if (startsWithAny(pathname, PRATICIEN_PATH_PREFIXES)) {
     return userPlan === 'praticien'
@@ -64,7 +67,7 @@ function hasRequiredPlan(userPlan: PlanType, pathname: string) {
   return true
 }
 
-function getRequiredPlan(pathname: string): PlanType | null {
+function getRequiredPlan(pathname: string): PlanKey | null {
 
   if (startsWithAny(pathname, PRATICIEN_PATH_PREFIXES)) return 'praticien'
   if (startsWithAny(pathname, PREMIUM_PATH_PREFIXES)) return 'premium'
@@ -138,40 +141,12 @@ export async function middleware(req: NextRequest) {
    * récupération profil
    */
 
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('plan, stripe_subscription_status')
-    .eq('id', user.id)
-    .maybeSingle()
+  const { profile } = await getOrCreateProfile({ id: user.id, email: user.email, full_name: null })
 
-  if (error) {
-    console.error('Middleware profile error:', error)
-  }
-
-  let userPlan: PlanType =
-    profile?.plan === 'essentiel' ||
-    profile?.plan === 'premium' ||
-    profile?.plan === 'praticien'
-      ? profile.plan
-      : 'free'
-
-  const subscriptionStatus = profile?.stripe_subscription_status
-
-  /**
-   * sécurité abonnement Stripe
-   */
-
-  if (
-    userPlan !== 'free' &&
-    subscriptionStatus &&
-    subscriptionStatus !== 'active' &&
-    subscriptionStatus !== 'trialing'
-  ) {
-
-    console.log('Subscription inactive → downgrade free')
-
-    userPlan = 'free'
-  }
+  const userPlan = downgradeIfInactive(
+    mapDbPlanToPlanKey(profile?.plan),
+    profile?.stripe_subscription_status ?? null
+  )
 
   /**
    * vérification accès plan

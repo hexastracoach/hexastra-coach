@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@/lib/supabase/server'
+import { createSupabaseServer } from '@/lib/auth/supabaseServer'
+import { STRIPE_PRICE_MAP } from '@/lib/billing/stripePlans'
+import { logger } from '@/lib/utils/logger'
 
 export const runtime = 'nodejs'
 
@@ -11,15 +13,7 @@ if (!stripeKey) {
   throw new Error('STRIPE_SECRET_KEY manquante')
 }
 
-const stripe = new Stripe(stripeKey, {
-  apiVersion: '2024-06-20',
-})
-
-const PRICE_MAP: Record<string, string | undefined> = {
-  essentiel_monthly: process.env.STRIPE_ESSENTIEL_MONTHLY,
-  premium_monthly: process.env.STRIPE_PRICE_PREMIUM_MONTHLY,
-  praticien_monthly: process.env.STRIPE_PRICE_PRATICIEN_MONTHLY,
-}
+const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' })
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,36 +21,25 @@ export async function POST(req: NextRequest) {
     const priceKey = body?.priceKey as string | undefined
 
     if (!priceKey) {
-      return NextResponse.json(
-        { error: 'priceKey manquant' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'priceKey manquant' }, { status: 400 })
     }
 
-    const priceId = PRICE_MAP[priceKey]
-
+    const priceId = STRIPE_PRICE_MAP[priceKey as keyof typeof STRIPE_PRICE_MAP]
     if (!priceId) {
-      return NextResponse.json(
-        { error: 'Prix invalide ou non configuré' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Prix invalide ou non configuré' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = createSupabaseServer()
     const {
       data: { user },
       error: userError,
     } = await supabase.auth.getUser()
 
     if (userError || !user) {
-      return NextResponse.json(
-        { error: 'Utilisateur non authentifié' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 })
     }
 
     let customerId: string | undefined
-
     const { data: profile } = await supabase
       .from('profiles')
       .select('stripe_customer_id')
@@ -66,28 +49,19 @@ export async function POST(req: NextRequest) {
     if (profile?.stripe_customer_id) {
       customerId = profile.stripe_customer_id
     } else if (user.email) {
-      const existing = await stripe.customers.list({
-        email: user.email,
-        limit: 1,
-      })
-
+      const existing = await stripe.customers.list({ email: user.email, limit: 1 })
       if (existing.data.length > 0) {
         customerId = existing.data[0].id
       } else {
         const createdCustomer = await stripe.customers.create({
           email: user.email,
-          metadata: {
-            supabase_user_id: user.id,
-          },
+          metadata: { supabase_user_id: user.id },
         })
         customerId = createdCustomer.id
       }
 
       if (customerId) {
-        await supabase
-          .from('profiles')
-          .update({ stripe_customer_id: customerId })
-          .eq('id', user.id)
+        await supabase.from('profiles').update({ stripe_customer_id: customerId }).eq('id', user.id)
       }
     }
 
@@ -95,44 +69,27 @@ export async function POST(req: NextRequest) {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
-
       customer: customerId,
       customer_email: customerId ? undefined : user.email ?? undefined,
-
       success_url: `${appUrl}/chat?payment=success`,
       cancel_url: `${appUrl}/pricing`,
       locale: 'fr',
-
       client_reference_id: user.id,
-
-      metadata: {
-        supabase_user_id: user.id,
-        price_key: priceKey,
-      },
-
+      metadata: { supabase_user_id: user.id, price_key: priceKey },
       subscription_data: {
-        metadata: {
-          supabase_user_id: user.id,
-          price_key: priceKey,
-        },
+        metadata: { supabase_user_id: user.id, price_key: priceKey },
       },
-
       allow_promotion_codes: true,
     })
 
     if (!session.url) {
-      return NextResponse.json(
-        { error: 'Impossible de créer l’URL Stripe Checkout' },
-        { status: 500 }
-      )
+      logger.error('Stripe session created without URL', { priceKey })
+      return NextResponse.json({ error: "Impossible de créer l’URL Stripe Checkout" }, { status: 500 })
     }
 
     return NextResponse.json({ url: session.url })
   } catch (err: any) {
-    console.error('Checkout error:', err)
-    return NextResponse.json(
-      { error: err?.message ?? 'Erreur interne checkout' },
-      { status: 500 }
-    )
+    logger.error('Checkout error', { error: err })
+    return NextResponse.json({ error: err?.message ?? 'Erreur interne checkout' }, { status: 500 })
   }
 }

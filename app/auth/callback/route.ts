@@ -1,5 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
+import { logger } from '@/lib/utils/logger'
 
 export async function GET(request: NextRequest) {
 
@@ -35,6 +37,20 @@ export async function GET(request: NextRequest) {
   if (error) {
     console.error('Supabase auth error:', error.message)
     return NextResponse.redirect(new URL('/auth', requestUrl.origin))
+  }
+
+  // Ensure profile exists
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (!userError && userData.user) {
+    try {
+      await getOrCreateProfile({
+        id: userData.user.id,
+        email: userData.user.email,
+        full_name: (userData.user.user_metadata as any)?.full_name ?? null,
+      })
+    } catch (profileError) {
+      logger.error('auth/callback: getOrCreateProfile failed', { profileError })
+    }
   }
 
   return response
