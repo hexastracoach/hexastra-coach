@@ -163,6 +163,10 @@ export default function ChatPageClient() {
   const { t } = useTranslation()
 
   const [messages, setMessages] = useState<Msg[]>([WELCOME_MESSAGE])
+  const [premiumLock, setPremiumLock] = useState<{
+  targetPlan: string
+  ctaLabel: string
+} | null>(null)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [conversationId, setConversationId] = useState<string | null>(null)
@@ -249,7 +253,14 @@ export default function ChatPageClient() {
       setEvolutionProfile(data.updatedEvolutionProfile as UserEvolutionProfile)
       saveEvolutionProfile(data.updatedEvolutionProfile as UserEvolutionProfile)
     }
-
+    if (data?.metadata?.premiumPreviewLocked) {
+      setPremiumLock({
+        targetPlan: data.metadata.upgradeTargetPlan ?? 'premium',
+        ctaLabel: data.metadata.upgradeCtaLabel ?? 'Passer à Premium',
+      })
+    } else {
+      setPremiumLock(null)
+    }
     return reply
   }, [])
 
@@ -1025,6 +1036,24 @@ export default function ChatPageClient() {
           <div className="hx-app-feed hx-scroll-soft">
             <div className="hx-app-feed-inner">
               <MessageList messages={messages} isTyping={isTyping} />
+              {premiumLock && (
+                <div className="hx-premium-lock">
+                  <div className="hx-premium-lock-inner">
+                    <div className="hx-premium-lock-text">
+                      La suite de l’analyse complète est disponible dans le plan supérieur.
+                    </div>
+
+                    <button
+                      className="hx-premium-lock-btn"
+                      onClick={() => {
+                        window.location.href = `/pricing?upgrade=${premiumLock.targetPlan}`
+                      }}
+                    >
+                      {premiumLock.ctaLabel}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {step === 'conversation_ready' && menuItems.length > 0 && (
                 <MenuDock

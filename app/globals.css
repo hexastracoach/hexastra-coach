@@ -6442,3 +6442,35 @@ select {
 .hx-menu-dock-title { display:block; font-weight:600; margin-bottom:4px; }
 .hx-menu-dock-desc, .hx-menu-dock-subbutton small { display:block; color: rgba(20,33,26,0.68); line-height:1.45; }
 .hx-menu-dock-subgrid { display:grid; gap:8px; }
+
+.hx-premium-lock {
+  margin-top: 18px;
+  display: flex;
+  justify-content: center;
+}
+
+.hx-premium-lock-inner {
+  backdrop-filter: blur(12px);
+  background: rgba(20,25,40,0.65);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px 18px;
+  max-width: 520px;
+  text-align: center;
+}
+
+.hx-premium-lock-text {
+  font-size: 14px;
+  opacity: 0.8;
+  margin-bottom: 10px;
+}
+
+.hx-premium-lock-btn {
+  background: linear-gradient(135deg,#5f8cff,#7b5fff);
+  border: none;
+  padding: 9px 16px;
+  border-radius: 10px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
