@@ -8,6 +8,10 @@ import { unauthorized, internalError, ok } from '@/lib/utils/apiResponse'
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
+  const requestId = randomUUID()
+  const log = (level: 'info' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) =>
+    logger[level](`[stripe:portal][${requestId}] ${msg}`, meta)
+
   validateEnv({
     STRIPE_SECRET_KEY: {},
     NEXT_PUBLIC_APP_URL: {},
@@ -59,5 +63,6 @@ export async function POST(req: NextRequest) {
     return_url: `${appUrl}/account`,
   })
 
+  log('info', 'Portal session created', { userId: user.id, customerId })
   return ok({ url: portalSession.url })
 }

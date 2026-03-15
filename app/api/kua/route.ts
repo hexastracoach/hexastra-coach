@@ -1,32 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { validateEnv } from '@/lib/utils/env'
+import { badRequest, internalError, ok } from '@/lib/utils/apiResponse'
+import { logger } from '@/lib/utils/logger'
 
 export const runtime = 'nodejs'
 
 const API_URL = (process.env.HEXASTRA_API_URL || 'https://hexastra-api-production.up.railway.app').replace(/\/$/, '')
-const API_KEY = process.env.HEXASTRA_API_KEY || ''
 
 export async function POST(req: NextRequest) {
-  try {
-    const payload = await req.json()
+  validateEnv({
+    HEXASTRA_API_URL: {},
+    HEXASTRA_API_KEY: {},
+  })
 
+  const apiKey = process.env.HEXASTRA_API_KEY!
+
+  let payload: unknown
+  try {
+    payload = await req.json()
+  } catch {
+    return badRequest('Corps invalide')
+  }
+
+  try {
     const response = await fetch(`${API_URL}/kua`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
+        'x-api-key': apiKey,
       },
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(8000),
     })
 
     if (!response.ok) {
-      return NextResponse.json({ error: 'Service temporairement indisponible' }, { status: 502 })
+      const err = await response.text().catch(() => '')
+      logger.error('[kua] backend error', { status: response.status, err })
+      return internalError('Service temporairement indisponible')
     }
 
     const data = await response.json()
-    return NextResponse.json(data)
+    return ok(data)
   } catch (e) {
-    console.error('Kua proxy error:', e)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    logger.error('Kua proxy error', { error: e })
+    return internalError('Erreur serveur')
   }
 }

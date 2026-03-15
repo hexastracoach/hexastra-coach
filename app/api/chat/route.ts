@@ -483,16 +483,20 @@ function applyPremiumInsightLock(params: { plan: PlanKey; response: any }) {
 }
 
 export async function POST(req: NextRequest) {
-  logger.info('[api/chat] POST hit')
+  const requestId = randomUUID()
+  const log = (level: 'info' | 'debug' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) =>
+    logger[level](`[api/chat][${requestId}] ${msg}`, meta)
+
+  log('info', 'POST hit')
 
   try {
     validateEnv(REQUIRED_ENV)
 
     const body = await req.json().catch(() => null)
-    logger.debug('[api/chat] body parsed', { hasBody: Boolean(body) })
+    log('debug', 'body parsed', { hasBody: Boolean(body) })
 
     if (!body || typeof body !== 'object') {
-      logger.warn('[api/chat] invalid body')
+      log('warn', 'invalid body')
       return NextResponse.json(buildSafeErrorResponse(), { status: 400 })
     }
 
@@ -507,7 +511,7 @@ export async function POST(req: NextRequest) {
     const lastUserMessage = [...sanitizedMessages].reverse().find((m) => m.role === 'user')?.content?.trim() ?? ''
     const isGreetingOnly = isGreetingOnlyMessage(lastUserMessage)
 
-    logger.info('[api/chat] request summary', {
+    log('info', 'request summary', {
       requestType,
       messagesCount: sanitizedMessages.length,
       lastUserMessage,
@@ -515,7 +519,7 @@ export async function POST(req: NextRequest) {
     })
 
     const { plan: effectivePlan, userId } = await resolveEffectivePlan(req)
-    logger.info('[api/chat] effective plan resolved', { effectivePlan, userId })
+    log('info', 'effective plan resolved', { effectivePlan, userId })
 
     const responseDepth = getResponseDepth(effectivePlan)
 
@@ -535,10 +539,10 @@ export async function POST(req: NextRequest) {
           feature: 'chat_api',
         })
 
-    logger.debug('[api/chat] quota', quota as any)
+    log('debug', 'quota', quota as any)
 
     if (quota.blocked && quota.limit !== null) {
-      logger.warn('[api/chat] quota blocked', { userId, plan: effectivePlan, used: quota.used })
+      log('warn', 'quota blocked', { userId, plan: effectivePlan, used: quota.used })
       return NextResponse.json(
         buildQuotaErrorResponse({
           plan: effectivePlan,
@@ -550,7 +554,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    logger.info('[api/chat] calling runHexastraFlow')
+    log('info', 'calling runHexastraFlow')
 
     const response = await runHexastraFlow({
       plan: effectivePlan,
@@ -581,7 +585,7 @@ export async function POST(req: NextRequest) {
           : null,
     })
 
-    logger.info('[api/chat] runHexastraFlow success', { flowState: response?.flowState ?? null })
+    log('info', 'runHexastraFlow success', { flowState: response?.flowState ?? null })
 
     const finalResponse = applyPremiumInsightLock({ plan: effectivePlan, response })
 
@@ -606,7 +610,7 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     )
   } catch (error) {
-    logger.error('[api/chat] fatal error', { error })
+    log('error', 'fatal error', { error })
     return NextResponse.json(buildSafeErrorResponse(), { status: 500 })
   }
 }

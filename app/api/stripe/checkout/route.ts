@@ -19,6 +19,10 @@ const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' })
 
 export async function POST(req: NextRequest) {
   try {
+    const requestId = randomUUID()
+    const log = (level: 'info' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) =>
+      logger[level](`[stripe:checkout][${requestId}] ${msg}`, meta)
+
     validateEnv({
       STRIPE_SECRET_KEY: {},
       NEXT_PUBLIC_APP_URL: {},
@@ -92,10 +96,11 @@ export async function POST(req: NextRequest) {
     })
 
     if (!session.url) {
-      logger.error('Stripe session created without URL', { priceKey })
+      log('error', 'Stripe session created without URL', { priceKey })
       return internalError("Impossible de créer l’URL Stripe Checkout")
     }
 
+    log('info', 'Checkout session created', { sessionId: session.id, priceKey, userId: user.id })
     return ok({ url: session.url })
   } catch (err: any) {
     logger.error('Checkout error', { error: err })

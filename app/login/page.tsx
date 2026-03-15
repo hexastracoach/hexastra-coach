@@ -23,7 +23,10 @@ export default function LoginPage() {
     if (mode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError('Email ou mot de passe incorrect.')
-      else { router.replace('/chat'); router.refresh() }
+      else {
+        await fetch('/api/auth/sync-profile', { method: 'POST' }).catch(() => {})
+        router.replace('/chat'); router.refresh()
+      }
     } else {
       const { error } = await supabase.auth.signUp({
         email, password,
