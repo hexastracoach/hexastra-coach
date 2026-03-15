@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createSupabaseServer } from '@/lib/auth/supabaseServer'
+import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
+import { logger } from '@/lib/utils/logger'
+import { ok, unauthorized, internalError } from '@/lib/utils/apiResponse'
 
 export async function POST() {
-  const supabase = await createClient()
+  const supabase = createSupabaseServer()
 
   const {
     data: { user },
@@ -10,7 +13,7 @@ export async function POST() {
   } = await supabase.auth.getUser()
 
   if (userError || !user) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+    return unauthorized('Unauthorized')
   }
 
   const fullName =
@@ -18,20 +21,27 @@ export async function POST() {
     (user.user_metadata?.name as string | undefined) ||
     ''
 
-  const { error } = await supabase.from('profiles').upsert(
-    {
+  try {
+    const { profile } = await getOrCreateProfile({
       id: user.id,
-      email: user.email ?? '',
+      email: user.email,
       full_name: fullName,
-      plan: 'free',
-      is_premium: false,
-    },
-    { onConflict: 'id' }
-  )
+    })
 
-  if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    // Ensure name/email up to date
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ email: user.email ?? profile.email, full_name: fullName || profile.full_name })
+      .eq('id', user.id)
+
+    if (updateError) {
+      logger.error('[sync-profile] update failed', { updateError })
+      return internalError('Profile update failed')
+    }
+
+    return ok({ ok: true })
+  } catch (error) {
+    logger.error('[sync-profile] fatal', { error })
+    return internalError('Erreur interne profil')
   }
-
-  return NextResponse.json({ ok: true })
 }
