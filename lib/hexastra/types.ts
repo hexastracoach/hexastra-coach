@@ -148,4 +148,7 @@ export type BuildPromptInput = {
   emotionalState?: EmotionalState
   precision?: PrecisionLevel
   retrievalProfile?: string
+
+  /** profondeur de réponse selon le plan */
+  responseDepth?: 'short' | 'medium' | 'long' | 'expert'
 }

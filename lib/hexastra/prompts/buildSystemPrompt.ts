@@ -6,8 +6,12 @@ function modeDirective(mode: BuildPromptInput['mode']): string {
   if (mode === 'praticien') {
     return 'Mode Praticien : structure obligatoire = Situation / Phase / Dynamique / Risques / Levier / Recommandation. Vocabulaire technique autorisé si utile.'
   }
-  if (mode === 'libre_approfondi') return 'Mode Libre approfondi : plus de profondeur, mais langage simple, humain et stable.'
-  if (mode === 'libre_avance') return 'Mode Libre avancé : accessible, concret, avec plus de continuité et de précision.'
+  if (mode === 'libre_approfondi') {
+    return 'Mode Libre approfondi : plus de profondeur, mais langage simple, humain et stable.'
+  }
+  if (mode === 'libre_avance') {
+    return 'Mode Libre avancé : accessible, concret, avec plus de continuité et de précision.'
+  }
   return 'Mode Libre : simple, fluide, concret, humain, sans jargon.'
 }
 
@@ -43,15 +47,18 @@ function stepDirective(input: BuildPromptInput): string {
 
 function ksDirective(input: BuildPromptInput): string {
   const route = input.domainRoute ?? 'general'
-  const source = input.specializedSource ? `Source métier prioritaire disponible : ${input.specializedSource}.` : 'Aucune source métier structurée reçue.'
+  const source = input.specializedSource
+    ? `Source métier prioritaire disponible : ${input.specializedSource}.`
+    : 'Aucune source métier structurée reçue.'
+
   const routeRule =
     route === 'gps_kua'
       ? 'Question Kua/GPS : si les données de naissance sont suffisantes, utiliser la logique directionnelle reçue comme source de vérité, puis reformuler en langage HexAstra.'
       : route === 'neurokua'
-      ? 'Question NeuroKua : utiliser en priorité les signaux d’équilibre, rythme, récupération, clarté et stabilisation.'
-      : route === 'fusion'
-      ? 'Question Fusion : agir comme Narrative Composer d’un orchestrateur KS. Les signaux reçus sont prioritaires.'
-      : 'S’il n’existe pas de module métier spécialisé, utiliser les ressources du vector store comme enrichissement silencieux.'
+        ? 'Question NeuroKua : utiliser en priorité les signaux d’équilibre, rythme, récupération, clarté et stabilisation.'
+        : route === 'fusion'
+          ? 'Question Fusion : agir comme Narrative Composer d’un orchestrateur KS. Les signaux reçus sont prioritaires.'
+          : 'S’il n’existe pas de module métier spécialisé, utiliser les ressources du vector store comme enrichissement silencieux.'
 
   return `
 Architecture KS active :
@@ -65,9 +72,28 @@ ${routeRule}
 `.trim()
 }
 
+function depthDirective(depth?: string): string {
+  if (!depth) return ''
+
+  switch (depth) {
+    case 'short':
+      return 'Profondeur attendue : réponse courte, directe, maximum 5 à 6 lignes.'
+    case 'medium':
+      return 'Profondeur attendue : réponse structurée avec explications, environ 8 à 12 lignes.'
+    case 'long':
+      return 'Profondeur attendue : analyse complète avec contexte et leviers, environ 15 à 20 lignes.'
+    case 'expert':
+      return 'Profondeur attendue : analyse approfondie avec structure stratégique claire, nuances, priorités et implications.'
+    default:
+      return ''
+  }
+}
+
 export function buildSystemPrompt(input: BuildPromptInput): string {
   const planConfig = PLAN_MODE_MAP[input.plan]
-  const labels = [input.selectedMenuLabel, input.selectedSubmenuLabel].filter(Boolean).join(' → ')
+  const labels = [input.selectedMenuLabel, input.selectedSubmenuLabel]
+    .filter(Boolean)
+    .join(' → ')
 
   const base = `
 Tu es HexAstra Coach, outil d'analyse stratégique humaine et d'alignement personnel.
@@ -97,6 +123,7 @@ Plan : ${input.plan}
 Mode : ${input.mode}
 Langue cible : ${input.language}
 Niveau de profondeur maximum : ${planConfig.maxDepth}
+Profondeur de réponse demandée : ${input.responseDepth ?? 'non définie'}
 Contexte d'analyse : ${input.contextType}
 Usage praticien : ${input.practitionerUsage ?? 'non renseigné'}
 Entrée UI : ${labels || 'aucune'}
@@ -106,10 +133,11 @@ Step de session : ${input.flowStep ?? 'analysis'}
 Précision détectée : ${input.precision ?? 'medium'}
 Profil de retrieval : ${input.retrievalProfile ?? 'balanced'}
 
-${modeDirective(input)}
+${modeDirective(input.mode)}
 ${requestDirective(input)}
 ${stepDirective(input)}
 ${ksDirective(input)}
+${depthDirective(input.responseDepth)}
 `
 
   return applySafetySuffix(base)
