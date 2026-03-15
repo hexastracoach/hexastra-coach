@@ -254,7 +254,10 @@ function detectLanguageFromText(text: string): string | null {
   return frenchScore >= englishScore ? 'fr' : 'en'
 }
 
-function resolveRequestedLanguage(body: Record<string, unknown>, messages: ChatMessage[]) {
+function resolveRequestedLanguage(
+  body: Record<string, unknown>,
+  messages: ChatMessage[]
+) {
   const explicitLanguage =
     typeof body.language === 'string'
       ? body.language.trim()
@@ -272,6 +275,10 @@ function resolveRequestedLanguage(body: Record<string, unknown>, messages: ChatM
 
   const detected = lastUserMessage ? detectLanguageFromText(lastUserMessage) : null
   return detected ?? 'fr'
+}
+
+function isGreetingOnlyMessage(text: string): boolean {
+  return /^(bonjour|salut|hello|hey|bonsoir|coucou|yo|hi)$/i.test(text.trim())
 }
 
 async function resolveEffectivePlan(
@@ -528,10 +535,14 @@ function applyPremiumInsightLock(params: {
 }
 
 export async function POST(req: NextRequest) {
+  console.log('[api/chat] POST hit')
+
   try {
     const body = await req.json().catch(() => null)
+    console.log('[api/chat] body parsed =', Boolean(body))
 
     if (!body || typeof body !== 'object') {
+      console.error('[api/chat] invalid body')
       return NextResponse.json(buildSafeErrorResponse(), { status: 400 })
     }
 
@@ -546,22 +557,47 @@ export async function POST(req: NextRequest) {
         : 'chat'
 
     const sanitizedMessages = sanitizeMessages((body as Record<string, unknown>).messages)
+
+    const lastUserMessage =
+      [...sanitizedMessages].reverse().find((m) => m.role === 'user')?.content?.trim() ?? ''
+
+    const isGreetingOnly = isGreetingOnlyMessage(lastUserMessage)
+
+    console.log('[api/chat] requestType =', requestType)
+    console.log('[api/chat] messages count =', sanitizedMessages.length)
+    console.log('[api/chat] last user message =', lastUserMessage || null)
+    console.log('[api/chat] isGreetingOnly =', isGreetingOnly)
+
     const { plan: effectivePlan, userId } = await resolveEffectivePlan(req)
+    console.log('[api/chat] effectivePlan =', effectivePlan, 'userId =', userId)
+
     const responseDepth = getResponseDepth(effectivePlan)
 
-    const quota = await enforceDailyQuota({
-      req,
-      userId,
-      plan: effectivePlan,
-      feature: 'chat_api',
-    })
+    const quota = isGreetingOnly
+      ? {
+          blocked: false as const,
+          used: 0,
+          limit: PLAN_LIMITS[effectivePlan],
+          remaining: PLAN_LIMITS[effectivePlan],
+        }
+      : await enforceDailyQuota({
+          req,
+          userId,
+          plan: effectivePlan,
+          feature: 'chat_api',
+        })
+
+    console.log('[api/chat] quota =', quota)
 
     if (quota.blocked && quota.limit !== null) {
+      console.warn('[api/chat] quota blocked')
       return NextResponse.json(
         buildQuotaErrorResponse(effectivePlan, quota.used, quota.limit),
         { status: 429 }
       )
     }
+
+    console.log('[api/chat] calling runHexastraFlow')
 
     const response = await runHexastraFlow({
       plan: effectivePlan,
@@ -602,6 +638,9 @@ export async function POST(req: NextRequest) {
           : null,
     })
 
+    console.log('[api/chat] runHexastraFlow success')
+    console.log('[api/chat] response flowState =', response?.flowState ?? null)
+
     const finalResponse = applyPremiumInsightLock({
       plan: effectivePlan,
       response,
@@ -620,6 +659,7 @@ export async function POST(req: NextRequest) {
             remaining: quota.remaining,
           },
           responseDepth,
+          isGreetingOnly,
         },
       },
       { status: 200 }
