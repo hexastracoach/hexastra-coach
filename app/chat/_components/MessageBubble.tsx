@@ -12,26 +12,18 @@ export default function MessageBubble({ message }: Props) {
   return (
     <div
       style={{
-        display: 'flex',
-        justifyContent: isUser ? 'flex-end' : 'flex-start',
+        width: '100%',
+        maxWidth: 820,
+        margin: '0 auto',
+        padding: '6px 0',
+        color: DS.text,
+        fontSize: 15,
+        lineHeight: 1.8,
+        whiteSpace: 'pre-wrap',
+        opacity: isUser ? 0.96 : 0.9,
       }}
     >
-      <div
-        style={{
-          maxWidth: 'min(760px, 86%)',
-          padding: '16px 18px',
-          borderRadius: 24,
-          background: isUser ? 'rgba(25,195,125,0.12)' : 'rgba(255,255,255,0.86)',
-          border: `1px solid ${isUser ? 'rgba(25,195,125,0.20)' : DS.line}`,
-          boxShadow: isUser ? '0 10px 28px rgba(25,195,125,0.10)' : DS.shadowSoft,
-          color: DS.text,
-          lineHeight: 1.8,
-          fontSize: 15,
-          whiteSpace: 'pre-wrap',
-        }}
-      >
-        {message.content}
-      </div>
+      {message.content}
     </div>
   )
 }
