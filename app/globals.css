@@ -2415,6 +2415,8 @@ transition: all 0.35s ease;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 0 8px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 .hx-app-disclaimer {
@@ -5606,10 +5608,18 @@ select {
 /* ── Composer ── */
 @media (max-width: 767px) {
   .hx-composer { padding: 10px 12px; gap: 8px; }
-  .hx-composer-box { border-radius: 18px; padding: 10px 10px 10px 14px; }
-  .hx-composer-textarea { font-size: 16px; min-height: 24px; max-height: 120px; }
+  .hx-composer-box { border-radius: 18px; padding: 10px 10px 10px 14px; width: 100%; }
+  .hx-composer-textarea { font-size: 16px; min-height: 24px; max-height: 120px; width: 100%; }
   .hx-composer-send { width: 40px; height: 40px; border-radius: 12px; min-height: 40px; }
   .hx-composer-actions { gap: 6px; }
+}
+
+@media (max-width: 600px) {
+  .hx-app-bottom { padding: 8px 8px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom, 10px)); }
+  .hx-app-composer-wrap { padding: 0 8px; gap: 6px; }
+  .hx-composer-box { padding: 10px 12px; border-radius: 16px; gap: 8px; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .hx-composer-actions-left { gap: 4px; }
+  .hx-composer-textarea { font-size: 15px; line-height: 1.5; padding: 6px 0; max-width: 100%; }
 }
 
 /* ── Messages ── */
