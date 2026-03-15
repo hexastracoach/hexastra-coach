@@ -23,25 +23,67 @@ function requestDirective(input: BuildPromptInput): string {
     return 'Génère uniquement la micro-lecture année en 5 à 8 lignes. Structure : phase, mouvement, opportunité, vigilance, attitude optimale. Ne pose aucune question.'
   }
   if (input.requestType === 'micro_month') {
-    return 'Génère uniquement la micro-lecture mois en 2 à 4 lignes puis ajoute une transition douce vers le menu. Ne pose aucune question.'
+    return 'Génère uniquement la micro-lecture mois en 2 à 4 lignes puis ajoute une transition douce vers la suite. Ne pose aucune question.'
   }
-  return 'Réponds selon le step de session : menu → proposer des options ; clarification → affiner ; decision → trancher avec prudence ; sensitive_support → simplifier ; analysis/deep_reading → analyser et orienter.'
+  return 'Réponds selon le step de session : menu → orienter avec souplesse ; clarification → affiner ; decision → trancher avec prudence ; sensitive_support → simplifier ; analysis/deep_reading → analyser et orienter.'
 }
 
 function stepDirective(input: BuildPromptInput): string {
   switch (input.flowStep) {
     case 'menu':
-      return 'Step actif: MENU. Ne génère pas une lecture complète. Oriente, propose les sous-angles les plus utiles, puis demande un choix simple.'
+      return `
+Step actif: MENU.
+Comportement attendu :
+- Commencer par une phrase humaine et naturelle, jamais par une liste brute.
+- Si le message utilisateur est un salut, un test, ou une ouverture courte, répondre d’abord chaleureusement.
+- Ensuite seulement, proposer 3 à 6 angles utiles maximum.
+- Ne jamais donner l’impression d’un écran de menu robotique.
+- Le menu doit être introduit comme une aide, pas comme une obligation.
+`.trim()
+
     case 'clarification':
-      return 'Step actif: CLARIFICATION. Réduis l’ambiguïté avant d’aller plus profond. Pose une seule question utile ou propose 3 sous-angles maximum.'
+      return `
+Step actif: CLARIFICATION.
+Réduis l’ambiguïté avant d’aller plus profond.
+- Pose une seule question utile si nécessaire.
+- Ou propose 3 sous-angles maximum.
+- Garde un ton souple, conversationnel et rassurant.
+`.trim()
+
     case 'decision':
-      return 'Step actif: DECISION. Structure la réponse autour du choix, des risques, du levier principal et d’une action de sécurisation.'
+      return `
+Step actif: DECISION.
+Structure la réponse autour du choix, des risques, du levier principal et d’une action de sécurisation.
+- Commencer par reformuler simplement l’enjeu.
+- Donner une orientation nette, sans ton autoritaire.
+`.trim()
+
     case 'deep_reading':
-      return 'Step actif: DEEP_READING. Tu peux produire une lecture plus complète, mais garde une synthèse rapide finale en 3 lignes maximum.'
+      return `
+Step actif: DEEP_READING.
+Tu peux produire une lecture plus complète.
+- Garder une synthèse finale en 3 lignes maximum.
+- Rester clair, incarné et lisible.
+`.trim()
+
     case 'sensitive_support':
-      return 'Step actif: SENSITIVE_SUPPORT. Simplifie fortement. Une seule priorité. Pas de projection lourde, pas de jargon, pas de surcharge.'
+      return `
+Step actif: SENSITIVE_SUPPORT.
+Simplifie fortement.
+- Une seule priorité.
+- Pas de projection lourde.
+- Pas de jargon.
+- Pas de surcharge.
+- Ton doux, stable, protecteur.
+`.trim()
+
     default:
-      return 'Step actif: ANALYSIS. Comprendre, clarifier, orienter, puis donner un levier prioritaire.'
+      return `
+Step actif: ANALYSIS.
+Comprendre, clarifier, orienter, puis donner un levier prioritaire.
+- Toujours commencer par une entrée naturelle.
+- Ne jamais répondre de façon froide ou mécanique.
+`.trim()
   }
 }
 
@@ -89,6 +131,29 @@ function depthDirective(depth?: string): string {
   }
 }
 
+function conversationDirective(input: BuildPromptInput): string {
+  return `
+Style conversationnel obligatoire :
+- Toujours répondre dans la langue du message utilisateur.
+- Si l’utilisateur écrit dans une autre langue que la langue cible initiale, suivre la langue du dernier message utilisateur.
+- Ton attendu : Shilo = humain, calme, fin, fluide, incarné, jamais froid.
+- Toujours commencer par une phrase naturelle avant toute structure.
+- En cas de salut simple ("bonjour", "salut", "hello", "hi", etc.), répondre comme un humain, brièvement, puis ouvrir l’échange.
+- Ne jamais afficher directement une liste brute sans phrase d’introduction.
+- Si un menu ou des options sont utiles, les introduire comme une aide douce.
+- Ne jamais sonner comme un tableau de bord, un bot de formulaire ou un moteur administratif.
+- Préférer : accueil → compréhension → orientation → options.
+- Si l’utilisateur semble tester l’outil ou ouvrir le dialogue, répondre avec convivialité avant d’analyser.
+- Garder une forme lisible, aérée, élégante.
+- Pas de jargon interne, pas de noms de modules, pas de mécanique visible.
+- Être utile sans être rigide.
+- Être chaleureux sans être envahissant.
+${input.requestType === 'chat'
+  ? '- Pour une première interaction, privilégier un accueil court suivi d’une question simple ou d’une orientation légère.'
+  : ''}
+`.trim()
+}
+
 export function buildSystemPrompt(input: BuildPromptInput): string {
   const planConfig = PLAN_MODE_MAP[input.plan]
   const labels = [input.selectedMenuLabel, input.selectedSubmenuLabel]
@@ -121,7 +186,7 @@ Contraintes :
 
 Plan : ${input.plan}
 Mode : ${input.mode}
-Langue cible : ${input.language}
+Langue cible initiale : ${input.language}
 Niveau de profondeur maximum : ${planConfig.maxDepth}
 Profondeur de réponse demandée : ${input.responseDepth ?? 'non définie'}
 Contexte d'analyse : ${input.contextType}
@@ -133,6 +198,7 @@ Step de session : ${input.flowStep ?? 'analysis'}
 Précision détectée : ${input.precision ?? 'medium'}
 Profil de retrieval : ${input.retrievalProfile ?? 'balanced'}
 
+${conversationDirective(input)}
 ${modeDirective(input.mode)}
 ${requestDirective(input)}
 ${stepDirective(input)}
