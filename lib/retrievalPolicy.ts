@@ -17,32 +17,32 @@ export type RetrievalConfig = {
 
 const BASE_CONFIGS: Record<PlanKey, RetrievalConfig> = {
   free: {
-    topK: 8,
-    scoreThreshold: 0.42,
-    maxDocsAfterDedup: 5,
-    maxCharsPerDoc: 1400,
-    maxContextChars: 7500,
+    topK: 4,
+    scoreThreshold: 0.45,
+    maxDocsAfterDedup: 3,
+    maxCharsPerDoc: 900,
+    maxContextChars: 3200,
   },
   essential: {
-    topK: 12,
-    scoreThreshold: 0.38,
-    maxDocsAfterDedup: 7,
-    maxCharsPerDoc: 1700,
-    maxContextChars: 11000,
+    topK: 8,
+    scoreThreshold: 0.4,
+    maxDocsAfterDedup: 5,
+    maxCharsPerDoc: 1300,
+    maxContextChars: 7000,
   },
   premium: {
-    topK: 18,
-    scoreThreshold: 0.34,
-    maxDocsAfterDedup: 9,
-    maxCharsPerDoc: 2200,
-    maxContextChars: 16000,
+    topK: 12,
+    scoreThreshold: 0.35,
+    maxDocsAfterDedup: 7,
+    maxCharsPerDoc: 1600,
+    maxContextChars: 11000,
   },
   practitioner: {
-    topK: 24,
-    scoreThreshold: 0.28,
-    maxDocsAfterDedup: 12,
-    maxCharsPerDoc: 2600,
-    maxContextChars: 24000,
+    topK: 16,
+    scoreThreshold: 0.3,
+    maxDocsAfterDedup: 9,
+    maxCharsPerDoc: 2000,
+    maxContextChars: 15000,
   },
 }
 
@@ -69,14 +69,14 @@ export function getAdaptiveRetrievalConfig({
   const base = getRetrievalConfig(plan)
   const domain = domainRoute ? DOMAIN_MULTIPLIERS[domainRoute] : undefined
   const queryLength = (query ?? '').trim().length
-  const complexityBoost = queryLength > 450 ? 6 : queryLength > 220 ? 3 : 0
+  const complexityBoost = queryLength > 450 ? 4 : queryLength > 220 ? 2 : 0
 
   return {
-    topK: Math.min(base.topK + (domain?.topK ?? 0) + complexityBoost, 36),
+    topK: Math.min(base.topK + (domain?.topK ?? 0) + complexityBoost, 20),
     scoreThreshold: base.scoreThreshold,
-    maxDocsAfterDedup: Math.min(base.maxDocsAfterDedup + (domain?.docs ?? 0), 16),
-    maxCharsPerDoc: Math.min(base.maxCharsPerDoc + Math.floor((domain?.chars ?? 0) / 4), 3200),
-    maxContextChars: Math.min(base.maxContextChars + (domain?.chars ?? 0), 32000),
+    maxDocsAfterDedup: Math.min(base.maxDocsAfterDedup + (domain?.docs ?? 0), 12),
+    maxCharsPerDoc: Math.min(base.maxCharsPerDoc + Math.floor((domain?.chars ?? 0) / 4), 2600),
+    maxContextChars: Math.min(base.maxContextChars + (domain?.chars ?? 0), 20000),
   }
 }
 

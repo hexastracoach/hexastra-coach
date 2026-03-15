@@ -553,6 +553,9 @@ export async function runHexastraFlow(input: {
   messages: ChatMessage[]
   evolutionProfile?: Record<string, unknown> | null
 }): Promise<HexastraApiResponse> {
+  const controller = new AbortController()
+  const globalTimeout = setTimeout(() => controller.abort(), 18000) // 18s fail-fast for Vercel
+
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     logger.error('[runHexastraFlow] Supabase public env missing')
     throw new Error('Supabase env missing')
@@ -566,6 +569,11 @@ export async function runHexastraFlow(input: {
   const conversationId = input.conversationId ?? randomUUID()
   const fallbackLanguage = input.language ?? detectLanguageFromMessages(input.messages, 'fr')
   const fallbackPlan = normalizePlan(input.plan)
+
+  if (!VECTOR_STORE_ID) {
+    logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing — retrieval disabled')
+  }
+
   const latestUserMessage =
     input.messages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
   const isGreeting = /^(bonjour|salut|hello|hey|bonsoir|coucou|yo)\s*$/i.test(
@@ -1087,5 +1095,7 @@ export async function runHexastraFlow(input: {
       },
       updatedEvolutionProfile: input.evolutionProfile ?? null,
     } as unknown as HexastraApiResponse
+  } finally {
+    clearTimeout(globalTimeout)
   }
 }

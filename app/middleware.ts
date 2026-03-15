@@ -49,18 +49,18 @@ function isPublicPath(pathname: string) {
 function hasRequiredPlan(userPlan: PlanKey, pathname: string) {
 
   if (startsWithAny(pathname, PRATICIEN_PATH_PREFIXES)) {
-    return userPlan === 'praticien'
+    return userPlan === 'practitioner'
   }
 
   if (startsWithAny(pathname, PREMIUM_PATH_PREFIXES)) {
-    return userPlan === 'premium' || userPlan === 'praticien'
+    return userPlan === 'premium' || userPlan === 'practitioner'
   }
 
   if (startsWithAny(pathname, ESSENTIEL_PATH_PREFIXES)) {
     return (
-      userPlan === 'essentiel' ||
+      userPlan === 'essential' ||
       userPlan === 'premium' ||
-      userPlan === 'praticien'
+      userPlan === 'practitioner'
     )
   }
 
@@ -69,9 +69,9 @@ function hasRequiredPlan(userPlan: PlanKey, pathname: string) {
 
 function getRequiredPlan(pathname: string): PlanKey | null {
 
-  if (startsWithAny(pathname, PRATICIEN_PATH_PREFIXES)) return 'praticien'
+  if (startsWithAny(pathname, PRATICIEN_PATH_PREFIXES)) return 'practitioner'
   if (startsWithAny(pathname, PREMIUM_PATH_PREFIXES)) return 'premium'
-  if (startsWithAny(pathname, ESSENTIEL_PATH_PREFIXES)) return 'essentiel'
+  if (startsWithAny(pathname, ESSENTIEL_PATH_PREFIXES)) return 'essential'
 
   return null
 }

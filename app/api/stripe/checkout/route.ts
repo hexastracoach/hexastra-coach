@@ -3,6 +3,8 @@ import Stripe from 'stripe'
 import { createSupabaseServer } from '@/lib/auth/supabaseServer'
 import { STRIPE_PRICE_MAP } from '@/lib/billing/stripePlans'
 import { logger } from '@/lib/utils/logger'
+import { validateEnv } from '@/lib/utils/env'
+import { badRequest, internalError, unauthorized, ok } from '@/lib/utils/apiResponse'
 
 export const runtime = 'nodejs'
 
@@ -17,16 +19,23 @@ const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' })
 
 export async function POST(req: NextRequest) {
   try {
+    validateEnv({
+      STRIPE_SECRET_KEY: {},
+      NEXT_PUBLIC_APP_URL: {},
+      NEXT_PUBLIC_SUPABASE_URL: {},
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: {},
+    })
+
     const body = await req.json().catch(() => null)
     const priceKey = body?.priceKey as string | undefined
 
     if (!priceKey) {
-      return NextResponse.json({ error: 'priceKey manquant' }, { status: 400 })
+      return badRequest('priceKey manquant')
     }
 
     const priceId = STRIPE_PRICE_MAP[priceKey as keyof typeof STRIPE_PRICE_MAP]
     if (!priceId) {
-      return NextResponse.json({ error: 'Prix invalide ou non configuré' }, { status: 400 })
+      return badRequest('Prix invalide ou non configuré')
     }
 
     const supabase = createSupabaseServer()
@@ -36,7 +45,7 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser()
 
     if (userError || !user) {
-      return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 })
+      return unauthorized()
     }
 
     let customerId: string | undefined
@@ -84,12 +93,12 @@ export async function POST(req: NextRequest) {
 
     if (!session.url) {
       logger.error('Stripe session created without URL', { priceKey })
-      return NextResponse.json({ error: "Impossible de créer l’URL Stripe Checkout" }, { status: 500 })
+      return internalError("Impossible de créer l’URL Stripe Checkout")
     }
 
-    return NextResponse.json({ url: session.url })
+    return ok({ url: session.url })
   } catch (err: any) {
     logger.error('Checkout error', { error: err })
-    return NextResponse.json({ error: err?.message ?? 'Erreur interne checkout' }, { status: 500 })
+    return internalError(err?.message ?? 'Erreur interne checkout')
   }
 }

@@ -20,6 +20,9 @@ export async function multiLayerRetrieval({
   domainRoute?: string
 }) {
 
+  const isFree = plan === 'free'
+  const isEssential = plan === 'essential'
+
   const layers: LayerResult[] = []
 
   // Layer 1 — Knowledge principal
@@ -39,10 +42,10 @@ export async function multiLayerRetrieval({
     }))
   )
 
-  // Layer 2 — KS Fusion
+  // Layer 2 — KS Fusion (réservé premium/praticien ou requête explicite)
   if (
-    query.toLowerCase().includes("ks") ||
-    query.toLowerCase().includes("fusion")
+    !isFree &&
+    (plan === 'premium' || plan === 'practitioner' || query.toLowerCase().includes("ks") || query.toLowerCase().includes("fusion"))
   ) {
 
     const fusion = await retrieveKnowledge({
@@ -62,8 +65,8 @@ export async function multiLayerRetrieval({
     )
   }
 
-  // Layer 3 — Domaine spécialisé
-  if (domainRoute) {
+  // Layer 3 — Domaine spécialisé (pas pour free)
+  if (domainRoute && !isFree) {
 
     const domain = await retrieveKnowledge({
       query,
@@ -82,7 +85,12 @@ export async function multiLayerRetrieval({
     )
   }
 
+  const cap =
+    isFree ? 6 :
+    isEssential ? 8 :
+    plan === 'premium' ? 10 : 12
+
   return layers
     .sort((a, b) => b.score - a.score)
-    .slice(0, 10)
+    .slice(0, cap)
 }

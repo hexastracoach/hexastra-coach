@@ -1,32 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { validateEnv } from '@/lib/utils/env'
+import { badRequest, internalError, ok } from '@/lib/utils/apiResponse'
+import { logger } from '@/lib/utils/logger'
 
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
-  const resendKey = process.env.RESEND_API_KEY
-  const toEmail   = process.env.CONTACT_EMAIL_TO
-  const fromEmail = process.env.EMAIL_FROM ?? 'noreply@hexastra.coach'
+  validateEnv({
+    RESEND_API_KEY: {},
+    CONTACT_EMAIL_TO: {},
+  })
 
-  if (!resendKey || !toEmail) {
-    return NextResponse.json({ error: 'Email non configuré' }, { status: 503 })
-  }
+  const resendKey = process.env.RESEND_API_KEY!
+  const toEmail = process.env.CONTACT_EMAIL_TO!
+  const fromEmail = process.env.EMAIL_FROM ?? 'noreply@hexastra.coach'
 
   let body: { name?: string; email?: string; subject?: string; message?: string }
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'Corps invalide' }, { status: 400 })
+    return badRequest('Corps invalide')
   }
 
   const { name, email, subject, message } = body
 
   if (!email || !message) {
-    return NextResponse.json({ error: 'Email et message requis' }, { status: 422 })
+    return badRequest('Email et message requis')
   }
 
-  const subjectLabel = subject
-    ? `[${subject.toUpperCase()}] `
-    : ''
+  const subjectLabel = subject ? `[${subject.toUpperCase()}] ` : ''
 
   const html = `
     <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
@@ -44,7 +46,7 @@ export async function POST(req: NextRequest) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${resendKey}`,
+      Authorization: `Bearer ${resendKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -54,13 +56,14 @@ export async function POST(req: NextRequest) {
       subject: `${subjectLabel}Message de ${name ?? email}`,
       html,
     }),
+    signal: AbortSignal.timeout(8000),
   })
 
   if (!res.ok) {
     const err = await res.text()
-    console.error('Resend error:', err)
-    return NextResponse.json({ error: 'Échec envoi email' }, { status: 500 })
+    logger.error('Resend error', { err, status: res.status })
+    return internalError('Échec envoi email')
   }
 
-  return NextResponse.json({ ok: true })
+  return ok({ ok: true })
 }

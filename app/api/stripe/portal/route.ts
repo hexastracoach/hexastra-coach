@@ -2,11 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createSupabaseServer } from '@/lib/auth/supabaseServer'
 import { logger } from '@/lib/utils/logger'
+import { validateEnv } from '@/lib/utils/env'
+import { unauthorized, internalError, ok } from '@/lib/utils/apiResponse'
 
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
-  const stripeKey = process.env.STRIPE_SECRET_KEY
+  validateEnv({
+    STRIPE_SECRET_KEY: {},
+    NEXT_PUBLIC_APP_URL: {},
+    NEXT_PUBLIC_SUPABASE_URL: {},
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: {},
+  })
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY!
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 
   if (!stripeKey) {
@@ -21,7 +30,7 @@ export async function POST(req: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json({ error: 'Utilisateur non authentifié' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: profile } = await supabase
@@ -50,5 +59,5 @@ export async function POST(req: NextRequest) {
     return_url: `${appUrl}/account`,
   })
 
-  return NextResponse.json({ url: portalSession.url })
+  return ok({ url: portalSession.url })
 }

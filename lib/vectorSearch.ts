@@ -102,7 +102,7 @@ export async function retrieveKnowledge({
           max_num_results: config.topK,
           reranking: { ranker: 'auto' },
         }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(8000),
       },
     )
 

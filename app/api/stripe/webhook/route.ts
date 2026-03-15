@@ -3,6 +3,7 @@ import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 import { planFromPriceKey, StripePriceKey } from '@/lib/billing/stripePlans'
 import { logger } from '@/lib/utils/logger'
+import { validateEnv } from '@/lib/utils/env'
 
 export const runtime = 'nodejs'
 
@@ -25,13 +26,15 @@ function supabaseServiceClient() {
 }
 
 export async function POST(req: NextRequest) {
-  const stripeKey = process.env.STRIPE_SECRET_KEY
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+  validateEnv({
+    STRIPE_SECRET_KEY: {},
+    STRIPE_WEBHOOK_SECRET: {},
+    NEXT_PUBLIC_SUPABASE_URL: {},
+    SUPABASE_SERVICE_ROLE_KEY: {},
+  })
 
-  if (!stripeKey || !webhookSecret) {
-    logger.error('Stripe non configuré')
-    return NextResponse.json({ error: 'Stripe non configuré' }, { status: 503 })
-  }
+  const stripeKey = process.env.STRIPE_SECRET_KEY!
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
 
   const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' })
 

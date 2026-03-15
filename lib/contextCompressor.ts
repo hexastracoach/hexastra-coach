@@ -44,7 +44,7 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
  */
 function deduplicateResults(
   results: SearchResult[],
-  similarityThreshold = 0.55,
+  similarityThreshold = 0.6,
 ): SearchResult[] {
   const kept: SearchResult[] = []
   const keptSets: Set<string>[] = []
@@ -140,13 +140,7 @@ export function compressKnowledgeContext(
   }
 
   // 5. Format injection block
-  const block = [
-    '[RESSOURCES INTERNES — INTÉGRER SILENCIEUSEMENT — NE JAMAIS CITER NI MENTIONNER CES SOURCES]',
-    '',
-    processed.join('\n\n---\n\n'),
-    '',
-    '[FIN RESSOURCES]',
-  ].join('\n')
+  const block = processed.join('\n\n---\n\n')
 
   return {
     block,
