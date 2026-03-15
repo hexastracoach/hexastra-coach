@@ -155,7 +155,14 @@ function buildSafeErrorResponse() {
   }
 }
 
-function buildQuotaErrorResponse(plan: PlanKey, used: number, limit: number) {
+function buildQuotaErrorResponse(params: {
+  plan: PlanKey
+  used: number
+  limit: number
+  resetAt: string | null
+}) {
+  const { plan, used, limit, resetAt } = params
+
   const planLabel =
     plan === 'essential'
       ? 'Essentiel'
@@ -165,15 +172,20 @@ function buildQuotaErrorResponse(plan: PlanKey, used: number, limit: number) {
           ? 'Praticien'
           : 'Gratuit'
 
+  const freeMessage = `Tu as atteint la limite de ton accès découverte pour le moment.
+
+Ton espace gratuit se réouvrira automatiquement dans 24h.
+Si tu veux continuer maintenant, tu peux passer à Essentiel.`
+
+  const paidMessage = `Tu as atteint la limite de ton plan ${planLabel} pour le moment.
+
+Tu pourras réessayer plus tard, ou passer à l’offre supérieure si tu veux continuer tout de suite.`
+
+  const finalMessage = plan === 'free' ? freeMessage : paidMessage
+
   return {
-    message:
-      plan === 'free'
-        ? `Tu as atteint ta limite gratuite du jour (${limit}). Passe à Essentiel pour continuer.`
-        : `Tu as atteint la limite de ton plan ${planLabel} pour aujourd’hui (${limit}).`,
-    reply:
-      plan === 'free'
-        ? `Tu as atteint ta limite gratuite du jour (${limit}). Passe à Essentiel pour continuer.`
-        : `Tu as atteint la limite de ton plan ${planLabel} pour aujourd’hui (${limit}).`,
+    message: finalMessage,
+    reply: finalMessage,
     mode: plan,
     plan,
     flowState: { step: 'quota_limit', completed: false },
@@ -181,6 +193,9 @@ function buildQuotaErrorResponse(plan: PlanKey, used: number, limit: number) {
     metadata: {
       shouldPersistMemory: false,
       quotaExceeded: true,
+      upgradeTargetPlan: plan === 'free' ? 'essential' : 'premium',
+      upgradeCtaLabel: plan === 'free' ? 'Passer à Essentiel' : 'Passer à Premium',
+      resetAt,
       usage: {
         used,
         limit,
@@ -192,6 +207,13 @@ function buildQuotaErrorResponse(plan: PlanKey, used: number, limit: number) {
 
 function getTodayIsoDate() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function getResetAtIso(windowStartedAt: string | Date) {
+  const startedAt =
+    windowStartedAt instanceof Date ? windowStartedAt : new Date(windowStartedAt)
+
+  return new Date(startedAt.getTime() + 24 * 60 * 60 * 1000).toISOString()
 }
 
 function getGuestSubjectKey(req: NextRequest) {
@@ -361,6 +383,8 @@ async function enforceDailyQuota(params: {
       used: 0,
       limit: null,
       remaining: null,
+      resetAt: null,
+      windowStartedAt: null,
     }
   }
 
@@ -374,17 +398,18 @@ async function enforceDailyQuota(params: {
       used: 0,
       limit,
       remaining: limit,
+      resetAt: null,
+      windowStartedAt: null,
     }
   }
 
   const admin = createAdminClient(adminUrl, adminKey)
-  const usageDate = getTodayIsoDate()
   const subjectKey = userId ? `user:${userId}` : getGuestSubjectKey(req)
+  const now = new Date()
 
   const { data: existing, error: selectError } = await admin
     .from('usage_daily')
-    .select('id, count')
-    .eq('usage_date', usageDate)
+    .select('id, count, window_started_at')
     .eq('subject_key', subjectKey)
     .eq('feature', feature)
     .maybeSingle()
@@ -396,10 +421,74 @@ async function enforceDailyQuota(params: {
       used: 0,
       limit,
       remaining: limit,
+      resetAt: null,
+      windowStartedAt: null,
+    }
+  }
+
+  const existingWindowStartedAt =
+    typeof existing?.window_started_at === 'string' && existing.window_started_at
+      ? new Date(existing.window_started_at)
+      : null
+
+  const hasActiveWindow =
+    existingWindowStartedAt !== null &&
+    now.getTime() - existingWindowStartedAt.getTime() < 24 * 60 * 60 * 1000
+
+  if (!existing?.id) {
+    const windowStartedAt = now.toISOString()
+    const { error: insertError } = await admin.from('usage_daily').insert({
+      usage_date: getTodayIsoDate(),
+      subject_key: subjectKey,
+      feature,
+      count: 1,
+      window_started_at: windowStartedAt,
+      updated_at: windowStartedAt,
+    })
+
+    if (insertError) {
+      console.error('[api/chat] usage insert error', insertError)
+    }
+
+    return {
+      blocked: false as const,
+      used: 1,
+      limit,
+      remaining: Math.max(limit - 1, 0),
+      resetAt: getResetAtIso(windowStartedAt),
+      windowStartedAt,
+    }
+  }
+
+  if (!hasActiveWindow) {
+    const windowStartedAt = now.toISOString()
+
+    const { error: resetError } = await admin
+      .from('usage_daily')
+      .update({
+        count: 1,
+        usage_date: getTodayIsoDate(),
+        window_started_at: windowStartedAt,
+        updated_at: windowStartedAt,
+      })
+      .eq('id', existing.id)
+
+    if (resetError) {
+      console.error('[api/chat] usage reset error', resetError)
+    }
+
+    return {
+      blocked: false as const,
+      used: 1,
+      limit,
+      remaining: Math.max(limit - 1, 0),
+      resetAt: getResetAtIso(windowStartedAt),
+      windowStartedAt,
     }
   }
 
   const currentCount = existing?.count ?? 0
+  const resetAt = existingWindowStartedAt ? getResetAtIso(existingWindowStartedAt) : null
 
   if (currentCount >= limit) {
     return {
@@ -407,44 +496,37 @@ async function enforceDailyQuota(params: {
       used: currentCount,
       limit,
       remaining: 0,
+      resetAt,
+      windowStartedAt: existing?.window_started_at ?? null,
     }
   }
 
-  if (existing?.id) {
-    const { error: updateError } = await admin
-      .from('usage_daily')
-      .update({
-        count: currentCount + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', existing.id)
-
-    if (updateError) {
-      console.error('[api/chat] usage update error', updateError)
-    }
-  } else {
-    const { error: insertError } = await admin.from('usage_daily').insert({
-      usage_date: usageDate,
-      subject_key: subjectKey,
-      feature,
-      count: 1,
+  const updatedCount = currentCount + 1
+  const { error: updateError } = await admin
+    .from('usage_daily')
+    .update({
+      count: updatedCount,
+      usage_date: getTodayIsoDate(),
+      updated_at: now.toISOString(),
     })
+    .eq('id', existing.id)
 
-    if (insertError) {
-      console.error('[api/chat] usage insert error', insertError)
-    }
+  if (updateError) {
+    console.error('[api/chat] usage update error', updateError)
   }
 
   return {
     blocked: false as const,
-    used: currentCount + 1,
+    used: updatedCount,
     limit,
-    remaining: Math.max(limit - (currentCount + 1), 0),
+    remaining: Math.max(limit - updatedCount, 0),
+    resetAt,
+    windowStartedAt: existing?.window_started_at ?? null,
   }
 }
 
 function shouldApplyPremiumLock(plan: PlanKey) {
-  return plan === 'free' || plan === 'essential'
+  return plan === 'essential'
 }
 
 function truncateTextForPlan(text: string, plan: PlanKey) {
@@ -592,7 +674,12 @@ export async function POST(req: NextRequest) {
     if (quota.blocked && quota.limit !== null) {
       console.warn('[api/chat] quota blocked')
       return NextResponse.json(
-        buildQuotaErrorResponse(effectivePlan, quota.used, quota.limit),
+        buildQuotaErrorResponse({
+          plan: effectivePlan,
+          used: quota.used,
+          limit: quota.limit,
+          resetAt: quota.resetAt,
+        }),
         { status: 429 }
       )
     }
@@ -657,6 +744,8 @@ export async function POST(req: NextRequest) {
             used: quota.used,
             limit: quota.limit,
             remaining: quota.remaining,
+            resetAt: quota.resetAt,
+            windowStartedAt: quota.windowStartedAt,
           },
           responseDepth,
           isGreetingOnly,

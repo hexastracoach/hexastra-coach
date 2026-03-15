@@ -218,6 +218,7 @@ export default function ChatPageClient() {
   const [premiumLock, setPremiumLock] = useState<{
     targetPlan: string
     ctaLabel: string
+    text: string
   } | null>(null)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -307,6 +308,7 @@ export default function ChatPageClient() {
           : "Je n’ai pas pu terminer la lecture pour le moment."
 
     if (data.conversationId) setConversationId(data.conversationId)
+
     if (data.menu?.visible && Array.isArray(data.menu.items)) {
       setMenuItems(data.menu.items)
     } else if (data.menu?.visible === false) {
@@ -314,27 +316,84 @@ export default function ChatPageClient() {
     }
 
     if (data.metadata?.contextType) setActiveContextType(data.metadata.contextType)
+
     if (data.metadata?.selectedMenuKey !== undefined) {
       setSelectedMenuKey(data.metadata.selectedMenuKey ?? null)
     }
+
     if (data.metadata?.selectedSubmenuKey !== undefined) {
       setSelectedSubmenuKey(data.metadata.selectedSubmenuKey ?? null)
     }
+
     if (data.updatedEvolutionProfile) {
       setEvolutionProfile(data.updatedEvolutionProfile as UserEvolutionProfile)
       saveEvolutionProfile(data.updatedEvolutionProfile as UserEvolutionProfile)
     }
+
+    const quotaMeta = data?.metadata?.quota
+    if (isFreePlan(userPlan) && quotaMeta) {
+      const used =
+        typeof quotaMeta.used === 'number' && Number.isFinite(quotaMeta.used)
+          ? quotaMeta.used
+          : 0
+
+      setFreeMessagesUsed(used)
+
+      const resetAtValue =
+        typeof quotaMeta.resetAt === 'string' && quotaMeta.resetAt
+          ? new Date(quotaMeta.resetAt)
+          : null
+
+      setFreeResetAt(resetAtValue)
+
+      try {
+        localStorage.setItem(FREE_USAGE_STORAGE_KEY, String(used))
+
+        if (typeof quotaMeta.windowStartedAt === 'string' && quotaMeta.windowStartedAt) {
+          localStorage.setItem(FREE_USAGE_FIRST_MSG_KEY, quotaMeta.windowStartedAt)
+        } else if (used <= 0) {
+          localStorage.removeItem(FREE_USAGE_FIRST_MSG_KEY)
+        }
+      } catch {}
+    }
+
+    if (data?.metadata?.quotaExceeded) {
+      const resetAtValue =
+        typeof data?.metadata?.resetAt === 'string' && data.metadata.resetAt
+          ? new Date(data.metadata.resetAt)
+          : null
+
+      if (isFreePlan(userPlan)) {
+        setFreeMessagesUsed(
+          typeof data?.metadata?.usage?.limit === 'number' ? data.metadata.usage.limit : 3
+        )
+        setFreeResetAt(resetAtValue)
+      }
+
+      setPremiumLock({
+        targetPlan: data.metadata.upgradeTargetPlan ?? 'essential',
+        ctaLabel: data.metadata.upgradeCtaLabel ?? 'Passer à Essentiel',
+        text:
+          typeof data?.message === 'string'
+            ? data.message
+            : 'Ton accès gratuit a atteint sa limite pour le moment.',
+      })
+
+      return reply
+    }
+
     if (data?.metadata?.premiumPreviewLocked) {
       setPremiumLock({
         targetPlan: data.metadata.upgradeTargetPlan ?? 'premium',
         ctaLabel: data.metadata.upgradeCtaLabel ?? 'Passer à Premium',
+        text: 'La suite de l’analyse complète est disponible dans le plan supérieur.',
       })
     } else {
       setPremiumLock(null)
     }
 
     return reply
-  }, [])
+  }, [userPlan])
 
   const postChatPayload = useCallback(
     async (payload: unknown): Promise<HexastraApiResponse> => {
@@ -362,6 +421,10 @@ export default function ChatPageClient() {
         const data = await safeJson(response)
 
         if (!response.ok) {
+          if (response.status === 429 && data && typeof data === 'object') {
+            return data as HexastraApiResponse
+          }
+
           console.error('[ChatPageClient] /api/chat error', response.status, data)
           throw new Error(`API error ${response.status}`)
         }
@@ -803,7 +866,32 @@ export default function ChatPageClient() {
       if (!content.trim() || isTyping) return
       if (isDuplicateMessage(lastMessageRef, content)) return
       if (step !== 'conversation_ready') return
-      if (!canContinueChat(userPlan, freeMessagesUsed)) return
+
+      if (!canContinueChat(userPlan, freeMessagesUsed)) {
+        const baseMessages = isWelcome ? [] : messages
+
+        setMessages([
+          ...baseMessages,
+          {
+            id: `${Date.now()}-limit`,
+            role: 'assistant',
+            content: `Tu as atteint la limite de ton accès découverte pour le moment.
+
+Ton espace gratuit se réouvrira automatiquement dans 24h.
+Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
+            created_at: new Date().toISOString(),
+          },
+        ])
+
+        setPremiumLock({
+          targetPlan: 'essential',
+          ctaLabel: 'Passer à Essentiel',
+          text:
+            'Ton accès gratuit est temporairement arrivé à sa limite. Reviens dans 24h ou passe à Essentiel pour continuer maintenant.',
+        })
+
+        return
+      }
 
       const routeResult = routeUserQuery(baseContent)
       if (routeResult.decision !== 'allowed') {
@@ -913,18 +1001,7 @@ export default function ChatPageClient() {
         setCacheEntry(cacheRef.current, cacheKey, reply)
         saveReading(final)
 
-        if (isFreePlan(userPlan)) {
-          const next = freeMessagesUsed + 1
-          setFreeMessagesUsed(next)
 
-          try {
-            localStorage.setItem(FREE_USAGE_STORAGE_KEY, String(next))
-            if (!localStorage.getItem(FREE_USAGE_FIRST_MSG_KEY)) {
-              localStorage.setItem(FREE_USAGE_FIRST_MSG_KEY, new Date().toISOString())
-              setFreeResetAt(new Date(Date.now() + 24 * 60 * 60 * 1000))
-            }
-          } catch {}
-        }
       } catch (error) {
         console.error('[handleSend] failed', error)
 
@@ -1121,9 +1198,7 @@ export default function ChatPageClient() {
               {premiumLock && (
                 <div className="hx-premium-lock">
                   <div className="hx-premium-lock-inner">
-                    <div className="hx-premium-lock-text">
-                      La suite de l’analyse complète est disponible dans le plan supérieur.
-                    </div>
+                    <div className="hx-premium-lock-text">{premiumLock.text}</div>
 
                     <button
                       className="hx-premium-lock-btn"
