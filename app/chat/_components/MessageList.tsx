@@ -40,7 +40,7 @@ export default function MessageList({ messages, isTyping }: Props) {
             textAlign: 'left',
           }}
         >
-          HexAstra Ã©critâ€¦
+          HexAstra écrit…
         </div>
       )}
     </div>

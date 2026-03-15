@@ -238,14 +238,14 @@ export default function Composer({
 
       {/* Keyboard hint */}
       <div className="hx-composer-hint">
-        <span className="hx-composer-hint-enter">↵</span>
+        <span className="hx-composer-hint-enter">⌅</span>
         Entrée pour envoyer · Maj + Entrée pour aller à la ligne
       </div>
     </div>
   )
 }
 
-/* ── Icons ── */
+/* -- Icons -- */
 
 function AvatarIcon() {
   return (

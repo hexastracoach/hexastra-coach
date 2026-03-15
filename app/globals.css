@@ -99,6 +99,7 @@ button {
   border: 0;
   background: none;
   color: inherit;
+  cursor: pointer;
 }
 
 textarea {
@@ -886,13 +887,13 @@ transition: all 0.35s ease;
 
 .hx-home-hero-grid {
   max-width: var(--hx-max-width-wide);
-  width: calc(100% - 48px);
+  width: min(calc(100% - 32px), 1200px);
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(340px, 420px);
-  gap: 48px;
+  gap: 42px;
   align-items: center;
-  padding: 32px 0 72px;
+  padding: 36px 0 82px;
 }
 
 .hx-home-kicker {
@@ -1044,10 +1045,10 @@ transition: all 0.35s ease;
 }
 
 .hx-home-hero-actions {
-  margin-top: 24px;
+  margin-top: 22px;
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 12px;
 }
 
 .hx-home-hero-actions.is-centered {
@@ -1099,7 +1100,7 @@ transition: all 0.35s ease;
 .hx-home-preview-card {
   position: relative;
   padding: 24px;
-  border-radius: 22px;
+  border-radius: 20px;
   border: 1px solid rgba(216, 232, 247, 0.07);
   background: linear-gradient(160deg, rgba(10, 18, 30, 0.72) 0%, rgba(7, 13, 22, 0.8) 100%);
   box-shadow:
@@ -1111,6 +1112,12 @@ transition: all 0.35s ease;
 
 .hx-chat-message {
   animation: hxMessageFade 0.25s ease;
+}
+
+/* Accessible focus states */
+:focus-visible {
+  outline: 2px solid rgba(102, 235, 208, 0.8);
+  outline-offset: 2px;
 }
 
 .hx-chat-bubble {
@@ -1156,12 +1163,13 @@ transition: all 0.35s ease;
 
 .hx-home-section {
   position: relative;
-  padding: 112px 24px;
+  padding: 96px 24px;
 }
 
 .hx-home-section-wrap {
   max-width: var(--hx-max-width);
   margin: 0 auto;
+  padding: 0 8px;
 }
 
 .hx-home-section-darkfusion {
@@ -1210,6 +1218,7 @@ transition: all 0.35s ease;
 
 .hx-home-dimension-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
 }
 
 .hx-home-grid-compact {
@@ -4020,10 +4029,10 @@ transition: all 0.35s ease;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 28px;
-  padding: 44px 40px 40px;
+  padding: 32px 26px 30px;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 14px;
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   box-shadow:
@@ -4082,11 +4091,11 @@ transition: all 0.35s ease;
 
 .hx-pricing-feature-list {
   list-style: none;
-  margin: 0;
+  margin: 16px 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .hx-pricing-feature-item {
