@@ -79,7 +79,7 @@ export default function AuthPage() {
       sessionStorage.removeItem('hx.noremember')
     }
     router.refresh()
-    router.push('/chat')
+    router.replace('/chat')
   }
 
   async function handleSignup() {
@@ -93,6 +93,7 @@ export default function AuthPage() {
       password,
       options: {
         data: { first_name: firstName, last_name: lastName },
+        emailRedirectTo: `${location.origin}/auth/callback`,
       },
     })
     if (error) {
@@ -101,15 +102,15 @@ export default function AuthPage() {
       return
     }
     /* If email confirmation is disabled in Supabase, redirect immediately */
-    const { data: sessionData } = await supabase.auth.getSession()
-    if (sessionData.session) {
-      router.refresh()
-      router.push('/chat')
-    } else {
-      notify('Compte créé ! Vérifiez votre e-mail pour confirmer votre inscription.', false)
-      setLoading(false)
-    }
+  const { data: sessionData } = await supabase.auth.getSession()
+  if (sessionData.session) {
+    router.refresh()
+    router.replace('/chat')
+  } else {
+    notify('Compte créé ! Vérifiez votre e-mail pour confirmer votre inscription.', false)
+    setLoading(false)
   }
+}
 
   function handlePasswordChange(val: string) {
     setPassword(val)

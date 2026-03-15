@@ -205,7 +205,7 @@ export default function Composer({
           placeholder={
             transcribing
               ? 'Transcription en cours…'
-              : 'Décris ta situation, ton dilemme ou la zone que tu veux éclaircir…'
+              : 'Écrit...'
           }
           disabled={disabled || transcribing}
         />

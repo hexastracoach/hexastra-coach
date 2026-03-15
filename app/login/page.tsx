@@ -23,11 +23,11 @@ export default function LoginPage() {
     if (mode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError('Email ou mot de passe incorrect.')
-      else { router.push('/chat'); router.refresh() }
+      else { router.replace('/chat'); router.refresh() }
     } else {
       const { error } = await supabase.auth.signUp({
         email, password,
-        options: { emailRedirectTo: `${window.location.origin}/chat` },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       })
       if (error) setError(error.message)
       else setMessage('Vérifie ta boîte mail pour confirmer ton compte.')

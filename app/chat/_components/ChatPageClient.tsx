@@ -287,7 +287,6 @@ export default function ChatPageClient() {
   const shouldShowMenuDock =
     step === 'conversation_ready' &&
     menuItems.length > 0 &&
-    userMessageCount > 0 &&
     !isTyping &&
     !isSimpleGreeting(lastUserMessage)
 
