@@ -1,13 +1,21 @@
 'use client'
 
-import { DS, type Msg } from '../_lib/chat'
+import { type Msg } from '../_lib/chat'
 
 type Props = {
   message: Msg
 }
 
+function formatTime(value?: string) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
 export default function MessageBubble({ message }: Props) {
   const isUser = message.role === 'user'
+  const timeLabel = formatTime(message.created_at)
 
   return (
     <div
@@ -21,29 +29,42 @@ export default function MessageBubble({ message }: Props) {
         gap: 6,
       }}
     >
-      {/* nom du locuteur */}
-
+      {/* nom du locuteur + heure */}
       <div
         style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
           fontSize: 12,
           fontWeight: 600,
           letterSpacing: '0.04em',
           textTransform: 'uppercase',
-          color: isUser ? 'rgba(80,120,255,0.75)' : 'rgba(25,195,125,0.8)',
+          color: isUser ? 'rgba(80,120,255,0.85)' : 'rgba(25,195,125,0.9)',
         }}
       >
-        {isUser ? 'Vous' : 'HexAstra'}
+        <span>{isUser ? 'Vous' : 'HexAstra'}</span>
+        {timeLabel && (
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              letterSpacing: '0.02em',
+              color: 'rgba(255,255,255,0.7)',
+            }}
+          >
+            {timeLabel}
+          </span>
+        )}
       </div>
 
       {/* contenu */}
-
       <div
         style={{
           fontSize: 15,
           lineHeight: 1.8,
-          color: DS.text,
+          color: '#ffffff',
           whiteSpace: 'pre-wrap',
-          opacity: isUser ? 0.95 : 0.92,
+          opacity: 0.95,
         }}
       >
         {message.content}
