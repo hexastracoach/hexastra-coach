@@ -203,6 +203,77 @@ function getGuestSubjectKey(req: NextRequest) {
   return `guest:${hash}`
 }
 
+function detectLanguageFromText(text: string): string | null {
+  const normalized = text.trim().toLowerCase()
+  if (!normalized) return null
+
+  const frenchSignals = [
+    'bonjour',
+    'salut',
+    'bonsoir',
+    'merci',
+    'je veux',
+    'j’ai',
+    "j'ai",
+    'peux-tu',
+    'peut tu',
+    'pourquoi',
+    'comment',
+    'avec',
+    'sans',
+    'travail',
+    'amour',
+    'santé',
+  ]
+
+  const englishSignals = [
+    'hello',
+    'hi',
+    'hey',
+    'thank you',
+    'please',
+    'i want',
+    'can you',
+    'how',
+    'why',
+    'love',
+    'work',
+    'health',
+  ]
+
+  const frenchScore = frenchSignals.reduce(
+    (score, signal) => score + (normalized.includes(signal) ? 1 : 0),
+    0
+  )
+  const englishScore = englishSignals.reduce(
+    (score, signal) => score + (normalized.includes(signal) ? 1 : 0),
+    0
+  )
+
+  if (frenchScore === 0 && englishScore === 0) return null
+  return frenchScore >= englishScore ? 'fr' : 'en'
+}
+
+function resolveRequestedLanguage(body: Record<string, unknown>, messages: ChatMessage[]) {
+  const explicitLanguage =
+    typeof body.language === 'string'
+      ? body.language.trim()
+      : typeof body.chatLanguage === 'string'
+        ? body.chatLanguage.trim()
+        : ''
+
+  if (explicitLanguage) {
+    return explicitLanguage
+  }
+
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'user')?.content
+
+  const detected = lastUserMessage ? detectLanguageFromText(lastUserMessage) : null
+  return detected ?? 'fr'
+}
+
 async function resolveEffectivePlan(
   req: NextRequest
 ): Promise<{
@@ -365,6 +436,97 @@ async function enforceDailyQuota(params: {
   }
 }
 
+function shouldApplyPremiumLock(plan: PlanKey) {
+  return plan === 'free' || plan === 'essential'
+}
+
+function truncateTextForPlan(text: string, plan: PlanKey) {
+  const maxChars = plan === 'free' ? 550 : 1100
+
+  if (!text || text.length <= maxChars) {
+    return {
+      truncated: text,
+      wasTrimmed: false,
+    }
+  }
+
+  const sliced = text.slice(0, maxChars)
+  const lastSentence = Math.max(
+    sliced.lastIndexOf('. '),
+    sliced.lastIndexOf('! '),
+    sliced.lastIndexOf('? ')
+  )
+
+  const clean =
+    lastSentence > 120 ? sliced.slice(0, lastSentence + 1).trim() : `${sliced.trim()}...`
+
+  return {
+    truncated: clean,
+    wasTrimmed: true,
+  }
+}
+
+function buildPremiumLockBlock(plan: PlanKey) {
+  if (plan === 'free') {
+    return {
+      teaser:
+        'Aperçu disponible. La suite de l’analyse complète, les nuances et les leviers prioritaires sont réservés aux plans supérieurs.',
+      ctaLabel: 'Passer à Essentiel',
+      targetPlan: 'essential',
+    }
+  }
+
+  return {
+    teaser:
+      'La base est visible ici. La lecture complète, plus profonde et plus stratégique, est réservée aux plans Premium et Praticien.',
+    ctaLabel: 'Passer à Premium',
+    targetPlan: 'premium',
+  }
+}
+
+function applyPremiumInsightLock(params: {
+  plan: PlanKey
+  response: any
+}) {
+  const { plan, response } = params
+
+  if (!shouldApplyPremiumLock(plan)) {
+    return response
+  }
+
+  const sourceText =
+    typeof response?.reply === 'string'
+      ? response.reply
+      : typeof response?.message === 'string'
+        ? response.message
+        : ''
+
+  if (!sourceText) {
+    return response
+  }
+
+  const { truncated, wasTrimmed } = truncateTextForPlan(sourceText, plan)
+
+  if (!wasTrimmed) {
+    return response
+  }
+
+  const lock = buildPremiumLockBlock(plan)
+  const lockedReply = `${truncated}\n\n${lock.teaser}`
+
+  return {
+    ...response,
+    message: lockedReply,
+    reply: lockedReply,
+    metadata: {
+      ...(response?.metadata ?? {}),
+      premiumPreviewLocked: true,
+      upgradeTargetPlan: lock.targetPlan,
+      upgradeCtaLabel: lock.ctaLabel,
+    },
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null)
@@ -383,6 +545,7 @@ export async function POST(req: NextRequest) {
             | 'micro_month')
         : 'chat'
 
+    const sanitizedMessages = sanitizeMessages((body as Record<string, unknown>).messages)
     const { plan: effectivePlan, userId } = await resolveEffectivePlan(req)
     const responseDepth = getResponseDepth(effectivePlan)
 
@@ -400,106 +563,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    function shouldApplyPremiumLock(plan: PlanKey) {
-    return plan === 'free' || plan === 'essential'
-  }
-
-  function truncateTextForPlan(text: string, plan: PlanKey) {
-    const maxChars = plan === 'free' ? 550 : 1100
-
-    if (!text || text.length <= maxChars) {
-      return {
-        truncated: text,
-        wasTrimmed: false,
-      }
-    }
-
-    const sliced = text.slice(0, maxChars)
-    const lastSentence =
-      Math.max(sliced.lastIndexOf('. '), sliced.lastIndexOf('! '), sliced.lastIndexOf('? ')) || maxChars
-
-    const clean =
-      lastSentence > 120 ? sliced.slice(0, lastSentence + 1).trim() : `${sliced.trim()}...`
-
-    return {
-      truncated: clean,
-      wasTrimmed: true,
-    }
-  }
-
-  function buildPremiumLockBlock(plan: PlanKey) {
-    if (plan === 'free') {
-      return {
-        teaser:
-          'Aperçu disponible. La suite de l’analyse complète, les nuances et les leviers prioritaires sont réservés aux plans supérieurs.',
-        ctaLabel: 'Passer à Essentiel',
-        targetPlan: 'essential',
-      }
-    }
-
-    return {
-      teaser:
-        'La base est visible ici. La lecture complète, plus profonde et plus stratégique, est réservée aux plans Premium et Praticien.',
-      ctaLabel: 'Passer à Premium',
-      targetPlan: 'premium',
-    }
-  }
-
-  function applyPremiumInsightLock(params: {
-    plan: PlanKey
-    response: any
-  }) {
-    const { plan, response } = params
-
-    if (!shouldApplyPremiumLock(plan)) {
-      return response
-    }
-
-    const sourceText =
-      typeof response?.reply === 'string'
-        ? response.reply
-        : typeof response?.message === 'string'
-          ? response.message
-          : ''
-
-    if (!sourceText) {
-      return response
-    }
-
-    const { truncated, wasTrimmed } = truncateTextForPlan(sourceText, plan)
-
-    if (!wasTrimmed) {
-      return response
-    }
-
-    const lock = buildPremiumLockBlock(plan)
-
-    const lockedReply = `${truncated}
-
-  ${lock.teaser}`
-
-    return {
-      ...response,
-      message: lockedReply,
-      reply: lockedReply,
-      metadata: {
-        ...(response?.metadata ?? {}),
-        premiumPreviewLocked: true,
-        upgradeTargetPlan: lock.targetPlan,
-        upgradeCtaLabel: lock.ctaLabel,
-      },
-    }
-  }
-
     const response = await runHexastraFlow({
       plan: effectivePlan,
       responseDepth,
-      language:
-        typeof (body as Record<string, unknown>).language === 'string'
-          ? ((body as Record<string, unknown>).language as string)
-          : typeof (body as Record<string, unknown>).chatLanguage === 'string'
-            ? ((body as Record<string, unknown>).chatLanguage as string)
-            : 'fr',
+      language: resolveRequestedLanguage(
+        body as Record<string, unknown>,
+        sanitizedMessages
+      ),
       requestType,
       birthData: normalizeBirthData((body as Record<string, unknown>).birthData),
       practitionerUsage: normalizePractitionerUsage(
@@ -521,7 +591,7 @@ export async function POST(req: NextRequest) {
         typeof (body as Record<string, unknown>).conversationId === 'string'
           ? ((body as Record<string, unknown>).conversationId as string)
           : null,
-      messages: sanitizeMessages((body as Record<string, unknown>).messages),
+      messages: sanitizedMessages,
       evolutionProfile:
         (body as Record<string, unknown>).evolutionProfile &&
         typeof (body as Record<string, unknown>).evolutionProfile === 'object'
@@ -531,27 +601,29 @@ export async function POST(req: NextRequest) {
             >)
           : null,
     })
-      const finalResponse = applyPremiumInsightLock({
+
+    const finalResponse = applyPremiumInsightLock({
       plan: effectivePlan,
       response,
     })
-   return NextResponse.json(
-    {
-      ...finalResponse,
-      plan: effectivePlan,
-      mode: effectivePlan,
-      metadata: {
-        ...(finalResponse?.metadata ?? {}),
-        quota: {
-          used: quota.used,
-          limit: quota.limit,
-          remaining: quota.remaining,
+
+    return NextResponse.json(
+      {
+        ...finalResponse,
+        plan: effectivePlan,
+        mode: effectivePlan,
+        metadata: {
+          ...(finalResponse?.metadata ?? {}),
+          quota: {
+            used: quota.used,
+            limit: quota.limit,
+            remaining: quota.remaining,
+          },
+          responseDepth,
         },
-        responseDepth,
       },
-    },
-    { status: 200 }
-  )
+      { status: 200 }
+    )
   } catch (error) {
     console.error('[api/chat] fatal error', error)
     return NextResponse.json(buildSafeErrorResponse(), { status: 500 })
