@@ -34,7 +34,7 @@ export default function MessageList({ messages, isTyping }: Props) {
             padding: '4px 0',
             fontSize: 14,
             lineHeight: 1.6,
-            color: 'rgba(245, 249, 255, 0.76)',
+            color: '#fefefefe',
             fontStyle: 'italic',
             letterSpacing: '0.02em',
             textAlign: 'left',
