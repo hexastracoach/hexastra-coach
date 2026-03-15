@@ -205,7 +205,7 @@ export default function Composer({
           placeholder={
             transcribing
               ? 'Transcription en cours…'
-              : 'Écrit...'
+              : 'Pose ta question...'
           }
           disabled={disabled || transcribing}
         />
@@ -239,7 +239,7 @@ export default function Composer({
       {/* Keyboard hint */}
       <div className="hx-composer-hint">
         <span className="hx-composer-hint-enter">⌅</span>
-        Entrée pour envoyer · Maj + Entrée pour aller à la ligne
+        Les réponses d’Hexastra Coach sont informatives et ne remplacent pas l’avis d’un professionnel.
       </div>
     </div>
   )

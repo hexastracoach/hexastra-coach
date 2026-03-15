@@ -1621,11 +1621,11 @@ transition: all 0.35s ease;
 
 .hx-composer-box {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 10px;
-  padding: 10px 10px 10px 14px;
-  border-radius: 20px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 18px;
   border: 1px solid rgba(220, 232, 244, 0.1);
   background: rgba(8, 15, 24, 0.68);
   box-shadow:
@@ -1645,16 +1645,16 @@ transition: all 0.35s ease;
 }
 
 .hx-composer-textarea {
-  min-height: 26px;
+  min-height: 22px;
   max-height: 120px;
   width: 100%;
   border: 0;
   outline: none;
   background: transparent;
   color: #f5f9ff;
-  font-size: 0.98rem;
-  line-height: 1.56;
-  padding: 8px 0;
+  font-size: 0.96rem;
+  line-height: 1.48;
+  padding: 6px 0;
 }
 
 .hx-composer-textarea::placeholder {
