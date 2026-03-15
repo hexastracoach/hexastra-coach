@@ -27,9 +27,12 @@ export default function LanguageSwitcher({ variant = 'flag', className = '' }: P
   useEffect(() => {
     if (!open || !dropRef.current) return
     const rect = triggerRef.current?.getBoundingClientRect()
+    const dropdown = dropRef.current
     if (rect) {
-      dropRef.current.style.top = `${rect.bottom + 6}px`
-      dropRef.current.style.right = `${window.innerWidth - rect.right}px`
+      const height = dropdown.offsetHeight || 0
+      const top = Math.max(8, rect.top - height - 8) // open upward with small margin
+      dropdown.style.top = `${top}px`
+      dropdown.style.right = `${window.innerWidth - rect.right}px`
     }
   }, [open])
 

@@ -21,6 +21,8 @@ export const runtime = 'nodejs'
 type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien'
 type UsageFeature = 'chat_api'
 type ResponseDepth = 'short' | 'medium' | 'long' | 'expert'
+const SUPPORTED_LANGUAGES = ['fr', 'en', 'es', 'pt', 'de', 'it'] as const
+type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 
 const PLAN_LIMITS: Record<PlanKey, number | null> = {
   free: 3,
@@ -214,27 +216,44 @@ function getGuestSubjectKey(req: NextRequest) {
   return `guest:${hash}`
 }
 
-function detectLanguageFromText(text: string): string | null {
+function normalizeLanguage(lang: string | null | undefined): SupportedLanguage | null {
+  if (!lang) return null
+  const code = lang.slice(0, 2).toLowerCase()
+  return SUPPORTED_LANGUAGES.includes(code as SupportedLanguage) ? (code as SupportedLanguage) : null
+}
+
+function detectLanguageFromText(text: string): SupportedLanguage | null {
   const normalized = text.trim().toLowerCase()
   if (!normalized) return null
 
-  const frenchSignals = ['bonjour', 'salut', 'bonsoir', 'merci', 'je veux', 'j’ai', "j'ai", 'peux-tu', 'peut tu', 'pourquoi', 'comment', 'avec', 'sans', 'travail', 'amour', 'santé']
+  const frenchSignals = ['bonjour', 'salut', 'bonsoir', 'merci', 'je veux', 'j’ai', "j'ai", 'peux-tu', 'peut tu', 'pourquoi', 'comment', 'travail', 'amour', 'santé']
   const englishSignals = ['hello', 'hi', 'hey', 'thank you', 'please', 'i want', 'can you', 'how', 'why', 'love', 'work', 'health']
+  const spanishSignals = ['hola', 'buenas', 'gracias', 'por favor', 'ayuda', 'salud', 'trabajo', 'amor', 'como', 'qué', 'porque']
+  const portugueseSignals = ['olá', 'obrigado', 'por favor', 'saúde', 'trabalho', 'amor', 'porquê', 'como', 'podes', 'ajuda']
+  const germanSignals = ['hallo', 'danke', 'bitte', 'gesundheit', 'arbeit', 'liebe', 'warum', 'wie', 'kannst', 'hilfe']
+  const italianSignals = ['ciao', 'grazie', 'per favore', 'salute', 'lavoro', 'amore', 'perché', 'come', 'puoi', 'aiuto']
 
-  const frenchScore = frenchSignals.reduce((score, signal) => score + (normalized.includes(signal) ? 1 : 0), 0)
-  const englishScore = englishSignals.reduce((score, signal) => score + (normalized.includes(signal) ? 1 : 0), 0)
+  const scores = [
+    { lang: 'fr' as SupportedLanguage, score: frenchSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
+    { lang: 'en' as SupportedLanguage, score: englishSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
+    { lang: 'es' as SupportedLanguage, score: spanishSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
+    { lang: 'pt' as SupportedLanguage, score: portugueseSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
+    { lang: 'de' as SupportedLanguage, score: germanSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
+    { lang: 'it' as SupportedLanguage, score: italianSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
+  ]
 
-  if (frenchScore === 0 && englishScore === 0) return null
-  return frenchScore >= englishScore ? 'fr' : 'en'
+  const best = scores.reduce((max, current) => (current.score > max.score ? current : max), { lang: 'fr' as SupportedLanguage, score: 0 })
+  return best.score === 0 ? null : best.lang
 }
 
 function resolveRequestedLanguage(body: Record<string, unknown>, messages: ChatMessage[]) {
-  const explicitLanguage =
+  const explicitLanguage = normalizeLanguage(
     typeof body.language === 'string'
       ? body.language.trim()
       : typeof body.chatLanguage === 'string'
         ? body.chatLanguage.trim()
-        : ''
+        : undefined
+  )
 
   if (explicitLanguage) return explicitLanguage
 
