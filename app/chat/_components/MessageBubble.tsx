@@ -67,7 +67,7 @@ export default function MessageBubble({ message }: Props) {
           lineHeight: 1.72,
           color: '#fefefefe',
           whiteSpace: 'pre-wrap',
-          maxWidth: '82%',
+          maxWidth: 'min(780px, 92vw)',
           textAlign: isUser ? 'right' : 'left',
           alignSelf: isUser ? 'flex-end' : 'flex-start',
         }}
