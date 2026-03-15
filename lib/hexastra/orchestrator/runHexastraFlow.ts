@@ -255,22 +255,45 @@ async function buildKnowledgeBlock({
 }
 
 async function callRailway(path: string, payload: Record<string, unknown>) {
-  const res = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
-    },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(12000),
-  })
+  const url = `${API_URL}${path}`
+
+  console.log('[HexAstra][Railway] URL =', url)
+  console.log('[HexAstra][Railway] API key present =', Boolean(API_KEY))
+  console.log('[HexAstra][Railway] Payload keys =', Object.keys(payload))
+
+  let res: Response
+
+  try {
+    res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(20000),
+      cache: 'no-store',
+    })
+  } catch (error) {
+    console.error('[HexAstra][Railway] network/fetch error', error)
+    throw new Error(`Railway fetch failed for ${path}`)
+  }
+
+  const text = await res.text().catch(() => '')
+
+  console.log('[HexAstra][Railway] status =', res.status)
+  console.log('[HexAstra][Railway] body =', text)
 
   if (!res.ok) {
-    const text = await res.text().catch(() => '')
     throw new Error(`Railway ${path} failed: ${res.status} ${text}`)
   }
 
-  return res.json()
+  try {
+    return text ? JSON.parse(text) : {}
+  } catch (error) {
+    console.error('[HexAstra][Railway] invalid JSON', error)
+    throw new Error(`Railway ${path} returned invalid JSON`)
+  }
 }
 
 async function runSpecializedModule({
@@ -311,9 +334,14 @@ async function runSpecializedModule({
         raw: kua && typeof kua === 'object' ? (kua as Record<string, unknown>) : null,
       }
     } catch (error) {
-      console.error('[runSpecializedModule:/kua] failed', error)
+      console.error('[runSpecializedModule:/chart/fusion] failed', {
+        apiUrl: API_URL,
+        hasApiKey: Boolean(API_KEY),
+        error,
+        birthData,
+        latestUserMessage,
+      })
     }
-  }
 
   if (domainRoute === 'fusion' && birthData?.date && birthData?.place) {
     try {
