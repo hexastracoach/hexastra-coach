@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { createClient as createSupabaseServer } from '@/lib/supabase/server'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import { buildSystemPrompt } from '@/lib/hexastra/prompts/buildSystemPrompt'
@@ -7,7 +8,10 @@ import { buildChatPayload } from '@/lib/hexastra/payload/buildChatPayload'
 import { compressKnowledgeContext } from '@/lib/contextCompressor'
 import { getAdaptiveRetrievalConfig } from '@/lib/retrievalPolicy'
 import { getMenuForMode, findMenuItem } from '@/lib/hexastra/menus/getMenuForMode'
-import { persistConversationMessage, writeSessionState } from '@/lib/hexastra/memory/sessionMemory'
+import {
+  persistConversationMessage,
+  writeSessionState,
+} from '@/lib/hexastra/memory/sessionMemory'
 import { writeUserMemory } from '@/lib/hexastra/memory/userMemory'
 import { multiLayerRetrieval } from '@/lib/hexastra/retrieval/multiLayerRetrieval'
 
@@ -38,6 +42,8 @@ const API_URL = (
 ).replace(/\/$/, '')
 const API_KEY = process.env.HEXASTRA_API_KEY || ''
 
+type ResponseDepth = 'short' | 'medium' | 'long' | 'expert'
+
 type SpecializedModuleResult = {
   source: 'gps_kua' | 'neurokua' | 'fusion'
   publicSummary: string
@@ -45,7 +51,9 @@ type SpecializedModuleResult = {
 }
 
 function normalizePlan(plan: unknown): PlanKey {
-  return plan === 'essential' || plan === 'premium' || plan === 'practitioner' ? plan : 'free'
+  return plan === 'essential' || plan === 'premium' || plan === 'practitioner'
+    ? plan
+    : 'free'
 }
 
 function isBirthComplete(birth: BirthProfile | null): boolean {
@@ -72,7 +80,10 @@ function monthKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
-function shouldGenerateMicroProfile(lastAt?: string | null, birthData?: BirthProfile | null): boolean {
+function shouldGenerateMicroProfile(
+  lastAt?: string | null,
+  birthData?: BirthProfile | null
+): boolean {
   return Boolean(birthData?.date) && !lastAt
 }
 
@@ -90,7 +101,7 @@ async function callOpenAI(payload: unknown): Promise<string> {
   try {
     const openaiKey = process.env.OPENAI_API_KEY
     if (!openaiKey) {
-      return 'OPENAI_API_KEY manquante. Configure la variable d’environnement pour activer HexAstra.'
+      return "OPENAI_API_KEY manquante. Configure la variable d’environnement pour activer HexAstra."
     }
 
     const res = await fetch('https://api.openai.com/v1/responses', {
@@ -307,9 +318,14 @@ async function runSpecializedModule({
   practitionerUsage: PractitionerUsageHex
   messages: ChatMessage[]
 }): Promise<SpecializedModuleResult | null> {
-  const latestUserMessage = messages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
+  const latestUserMessage =
+    messages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
 
-  if ((domainRoute === 'gps_kua' || domainRoute === 'neurokua') && birthData?.date && birthData?.place) {
+  if (
+    (domainRoute === 'gps_kua' || domainRoute === 'neurokua') &&
+    birthData?.date &&
+    birthData?.place
+  ) {
     try {
       const kua = await callRailway('/kua', {
         birth_date: birthData.date,
@@ -334,7 +350,7 @@ async function runSpecializedModule({
         raw: kua && typeof kua === 'object' ? (kua as Record<string, unknown>) : null,
       }
     } catch (error) {
-      console.error('[runSpecializedModule:/chart/fusion] failed', {
+      console.error('[runSpecializedModule:/kua] failed', {
         apiUrl: API_URL,
         hasApiKey: Boolean(API_KEY),
         error,
@@ -342,6 +358,7 @@ async function runSpecializedModule({
         latestUserMessage,
       })
     }
+  }
 
   if (domainRoute === 'fusion' && birthData?.date && birthData?.place) {
     try {
@@ -365,10 +382,17 @@ async function runSpecializedModule({
       return {
         source: 'fusion',
         publicSummary: summary,
-        raw: fusion && typeof fusion === 'object' ? (fusion as Record<string, unknown>) : null,
+        raw:
+          fusion && typeof fusion === 'object' ? (fusion as Record<string, unknown>) : null,
       }
     } catch (error) {
-      console.error('[runSpecializedModule:/chart/fusion] failed', error)
+      console.error('[runSpecializedModule:/chart/fusion] failed', {
+        apiUrl: API_URL,
+        hasApiKey: Boolean(API_KEY),
+        error,
+        birthData,
+        latestUserMessage,
+      })
     }
   }
 
@@ -434,15 +458,18 @@ function buildFusionInstruction(input: {
   return lines.join('\n')
 }
 
-function buildMenuOnlyMessage(mode: ReturnType<typeof getModeForPlan>, language: string): string {
+function buildMenuOnlyMessage(
+  mode: ReturnType<typeof getModeForPlan>,
+  language: string
+): string {
   const items = getMenuForMode(mode)
   const intro = language.startsWith('en')
     ? 'Choose the angle you want to explore:'
     : 'Choisis l’angle que tu veux explorer :'
 
-  const lines = items.slice(0, 9).map(
-    (item, index) => `${index + 1} — ${item.label} : ${item.description}`
-  )
+  const lines = items
+    .slice(0, 9)
+    .map((item, index) => `${index + 1} — ${item.label} : ${item.description}`)
 
   return [intro, '', ...lines].join('\n')
 }
@@ -474,6 +501,7 @@ function isReadingRequest(args: {
 
 export async function runHexastraFlow(input: {
   plan?: PlanKey
+  responseDepth?: ResponseDepth
   language?: string
   requestType: 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
   birthData: BirthProfile | null
@@ -508,7 +536,7 @@ export async function runHexastraFlow(input: {
 
     const plan = userContext.plan
     const mode = getModeForPlan(plan)
-    const conversationId = input.conversationId ?? crypto.randomUUID()
+    const conversationId = input.conversationId ?? randomUUID()
 
     const latestUserMessage =
       input.messages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
@@ -623,12 +651,10 @@ export async function runHexastraFlow(input: {
     })
 
     if (
-      (
-        flowStep === 'menu' &&
+      (flowStep === 'menu' &&
         !latestUserMessage.trim() &&
         !input.selectedMenuKey &&
-        !input.selectedSubmenuKey
-      ) ||
+        !input.selectedSubmenuKey) ||
       (isGreeting && !input.selectedMenuKey && !input.selectedSubmenuKey)
     ) {
       const message = buildMenuOnlyMessage(mode, userContext.language)
@@ -641,7 +667,9 @@ export async function runHexastraFlow(input: {
         conversationId,
         flowState: { step: 'menu', completed: true },
         menu: { visible: true, items: getMenuForMode(mode) },
-        suggestions: getMenuForMode(mode).slice(0, 4).map((item) => item.label),
+        suggestions: getMenuForMode(mode)
+          .slice(0, 4)
+          .map((item) => item.label),
         metadata: {
           contextType: sessionContext.contextType,
           practitionerUsage: userContext.practitionerUsage,
@@ -731,7 +759,8 @@ export async function runHexastraFlow(input: {
       emotionalState: sessionContext.emotionalState,
       precision: sessionContext.precision,
       retrievalProfile: knowledgePayload.profile,
-    })
+      responseDepth: input.responseDepth,
+    } as any)
 
     const signalInputs = []
 
@@ -816,29 +845,25 @@ export async function runHexastraFlow(input: {
       latestUserMessage || menuInstruction || `[${effectiveRequestType}]`
     )
 
-    await persistConversationMessage(
-      supabase,
-      conversationId,
-      'assistant',
-      message,
-      {
-        flowStep,
-        mode,
-        contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-        domainRoute: resolvedDomainRoute,
-        activeModule: specializedResult?.source ?? activeModules[0] ?? sessionContext.activeModule,
-        emotionalState: sessionContext.emotionalState,
-        timing: sessionContext.timing,
-        precision: sessionContext.precision,
-      }
-    )
+    await persistConversationMessage(supabase, conversationId, 'assistant', message, {
+      flowStep,
+      mode,
+      contextType: selectedMenu?.contextType ?? sessionContext.contextType,
+      domainRoute: resolvedDomainRoute,
+      activeModule:
+        specializedResult?.source ?? activeModules[0] ?? sessionContext.activeModule,
+      emotionalState: sessionContext.emotionalState,
+      timing: sessionContext.timing,
+      precision: sessionContext.precision,
+    })
 
     await writeSessionState(supabase, conversationId, {
       current_theme: selectedMenu?.label ?? sessionContext.currentTheme ?? null,
       current_context_type: selectedMenu?.contextType ?? sessionContext.contextType,
       menu_level: input.selectedSubmenuKey ? 'submenu' : 'main',
       last_selected_menu_key: input.selectedMenuKey ?? sessionContext.selectedMenuKey,
-      last_selected_submenu_key: input.selectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
+      last_selected_submenu_key:
+        input.selectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
       active_flow: flowStep,
       current_domain_route: resolvedDomainRoute,
       active_module: specializedResult?.source ?? activeModules[0] ?? null,
@@ -903,11 +928,13 @@ export async function runHexastraFlow(input: {
     console.error('[runHexastraFlow] fatal error', error)
 
     return {
-      message: 'Je n’ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.',
-      reply: 'Je n’ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.',
+      message:
+        'Je n’ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.',
+      reply:
+        'Je n’ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.',
       mode: 'free',
       plan: 'free' as PlanKey,
-      conversationId: input.conversationId ?? crypto.randomUUID(),
+      conversationId: input.conversationId ?? randomUUID(),
       flowState: { step: 'error', completed: false },
       metadata: {
         shouldPersistMemory: false,
