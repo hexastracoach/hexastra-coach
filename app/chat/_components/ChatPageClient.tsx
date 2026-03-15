@@ -7,7 +7,6 @@ import { createClient } from '@/lib/supabase/client'
 import Composer from './Composer'
 import LeftSidebar from './LeftSidebar'
 import MessageList from './MessageList'
-import BirthFormModal from './BirthFormModal'
 import BirthDataInlineForm from './BirthDataInlineForm'
 import PractitionerUsageStep from './PractitionerUsageStep'
 import PaywallBanner from './PaywallBanner'
@@ -237,7 +236,6 @@ export default function ChatPageClient() {
   const [userEmail, setUserEmail] = useState('')
 
   const [birthData, setBirthData] = useState<BirthData>(EMPTY_BIRTH_DATA)
-  const [showBirthForm, setShowBirthForm] = useState(false)
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
 
   const [userPlan, setUserPlan] = useState<PlanKey>('free')
@@ -250,6 +248,7 @@ export default function ChatPageClient() {
     yearKey: null,
     monthKey: null,
   })
+  const [showInlineBirthForm, setShowInlineBirthForm] = useState(false)
 
   const [evolutionProfile, setEvolutionProfile] = useState<UserEvolutionProfile | null>(null)
 
@@ -271,6 +270,13 @@ export default function ChatPageClient() {
     birthData,
     microReadings,
   })
+  const chatStep = step === 'birthdata_missing' ? 'conversation_ready' : step
+
+  useEffect(() => {
+    if (isBirthDataComplete(birthData)) {
+      setShowInlineBirthForm(false)
+    }
+  }, [birthData])
 
   const isWelcome = useMemo(
     () => messages.length === 1 && messages[0]?.id === 'welcome',
@@ -285,7 +291,7 @@ export default function ChatPageClient() {
   const userMessageCount = userMessages.length
   const lastUserMessage = userMessages[userMessages.length - 1]?.content ?? ''
   const shouldShowMenuDock =
-    step === 'conversation_ready' &&
+    chatStep === 'conversation_ready' &&
     menuItems.length > 0 &&
     !isTyping &&
     !isSimpleGreeting(lastUserMessage)
@@ -738,8 +744,24 @@ export default function ChatPageClient() {
           return updated
         })
       }
+
+      const parts: string[] = []
+      if (next.firstName) parts.push(`prénom ${next.firstName}`)
+      if (next.lastName) parts.push(`nom ${next.lastName}`)
+      if (next.birthDate) parts.push(`né(e) le ${next.birthDate}`)
+      if (next.birthTime) parts.push(`à ${next.birthTime}`)
+      if (next.birthCity) parts.push(`à ${next.birthCity}`)
+      if (next.birthCountryName) parts.push(next.birthCountryName)
+
+      if (parts.length) {
+        void sendStructuredAction({
+          message: `Données de naissance mises à jour : ${parts.join(', ')}.`,
+          contextType: activeContextType,
+          uiAction: 'restart_flow',
+        })
+      }
     },
-    [handleBirthDataChange]
+    [activeContextType, handleBirthDataChange, sendStructuredAction]
   )
 
   const handlePractitionerUsageSelect = useCallback((usage: PractitionerUsage) => {
@@ -864,7 +886,7 @@ export default function ChatPageClient() {
 
       if (!content.trim() || isTyping) return
       if (isDuplicateMessage(lastMessageRef, content)) return
-      if (step !== 'conversation_ready') return
+      if (chatStep !== 'conversation_ready') return
 
       if (!canContinueChat(userPlan, freeMessagesUsed)) {
         const baseMessages = isWelcome ? [] : messages
@@ -1037,7 +1059,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
       saveReading,
       selectedMenuKey,
       selectedSubmenuKey,
-      step,
+      chatStep,
       userPlan,
       postChatPayload,
     ]
@@ -1113,11 +1135,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
     if (step === 'loading') return null
 
     if (step === 'birthdata_missing') {
-      return (
-        <div className="hx-bootstrap-overlay">
-          <BirthDataInlineForm data={birthData} onSave={handleBirthDataSave} />
-        </div>
-      )
+      return null
     }
 
     if (step === 'practitioner_usage_needed') {
@@ -1140,9 +1158,9 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
     onAttach: (file: File) => setAttachedFile(file),
     attachedFileName: attachedFile?.name,
     onRemoveAttach: () => setAttachedFile(null),
-    onBirthFormOpen: () => setShowBirthForm(true),
+    onBirthFormOpen: () => setShowInlineBirthForm((v) => !v),
     highlightBirth: isWelcome && !isBirthDataComplete(birthData),
-    disabled: step !== 'conversation_ready' || isLimitReached || isTyping,
+    disabled: chatStep !== 'conversation_ready' || isLimitReached || isTyping,
   }
 
   return (
@@ -1160,14 +1178,6 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
       )}
 
       {mobileOverlay}
-
-      {showBirthForm && (
-        <BirthFormModal
-          data={birthData}
-          onChange={handleBirthDataChange}
-          onClose={() => setShowBirthForm(false)}
-        />
-      )}
 
       <div className="hx-app-layout">
         {desktopLeft && <aside className="hx-app-sidebar">{sidebar}</aside>}
@@ -1235,6 +1245,18 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
 
           <div className="hx-app-bottom">
             <div className="hx-app-composer-wrap">
+              {showInlineBirthForm && (
+                <div className="hx-inline-birth">
+                  <BirthDataInlineForm
+                    data={birthData}
+                    onSave={(next) => {
+                      handleBirthDataSave(next)
+                      setShowInlineBirthForm(false)
+                    }}
+                  />
+                </div>
+              )}
+
               {bootstrapOverlay ??
                 (isLimitReached ? (
                   <PaywallBanner plan={userPlan} resetAt={freeResetAt} />
