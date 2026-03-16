@@ -37,7 +37,7 @@ import { applySentinel } from '@/lib/hexastra/security/sentinel'
 import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
 import { logger } from '@/lib/utils/logger'
-import { buildConversationSystemPrompt } from '@/lib/hexastra/prompts/conversationSystemPrompt'
+import { SHILO_CONVERSATION_PROMPT, SHILO_ANALYSIS_PROMPT } from '@/lib/hexastra/prompts'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (
@@ -705,7 +705,7 @@ export async function runHexastraFlow(input: {
     }
 
     if ((route === 'greeting' || route === 'small_talk') && !input.selectedMenuKey && !input.selectedSubmenuKey) {
-      const system = buildConversationSystemPrompt(userContext.language ?? fallbackLanguage)
+      const system = SHILO_CONVERSATION_PROMPT
       const message = await callOpenAIChat({ system, user: latestUserMessage })
 
       return {
@@ -1046,7 +1046,7 @@ export async function runHexastraFlow(input: {
     })
 
     const rawMessage = await callOpenAI(payload)
-    const message = applySentinel(rawMessage)
+    let message = applySentinel(rawMessage)
 
     const menuVisible =
       effectiveRequestType === 'micro_month' ||
@@ -1124,6 +1124,23 @@ export async function runHexastraFlow(input: {
         await writeUserMemory(supabase, user.id, memoryPatch)
       } catch (userMemoryError) {
         logger.error('[runHexastraFlow] writeUserMemory failed', { error: userMemoryError })
+      }
+    }
+
+    // Reformulation Shilo post-analyse si on n'est pas en navigation
+    const shouldRephrase =
+      input.requestType === 'chat' &&
+      !menuVisible &&
+      !isGreeting &&
+      route !== 'navigation'
+
+    if (shouldRephrase) {
+      const rephrased = await callOpenAIChat({
+        system: SHILO_ANALYSIS_PROMPT,
+        user: message,
+      })
+      if (rephrased) {
+        message = rephrased
       }
     }
 
