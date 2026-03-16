@@ -25,10 +25,10 @@ const SUPPORTED_LANGUAGES = ['fr', 'en', 'es', 'pt', 'de', 'it'] as const
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 
 const PLAN_LIMITS: Record<PlanKey, number | null> = {
-  free: 3,
-  essential: 20,
-  premium: null,
-  practitioner: null,
+  free: 10,        // précédemment 3
+  essential: 60,   // précédemment 20
+  premium: null,   // illimité
+  practitioner: null, // illimité
 }
 
 const REQUIRED_ENV = {
