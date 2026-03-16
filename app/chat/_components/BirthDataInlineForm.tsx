@@ -59,6 +59,7 @@ export default function BirthDataInlineForm({ data, partnerData, onSave }: Props
   const [partnerCitySelected, setPartnerCitySelected] = useState(false)
   const partnerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const partnerWrapperRef = useRef<HTMLDivElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     const freshKnown = data.birthTimeKnown ?? Boolean(data.birthTime)
@@ -76,6 +77,12 @@ export default function BirthDataInlineForm({ data, partnerData, onSave }: Props
     setPartnerCitySelected(!!partnerData.birthCity)
     setDualMode(Boolean(partnerData.firstName || partnerData.birthCity || partnerData.birthDate))
   }, [partnerData])
+
+  useEffect(() => {
+    if (dualMode && formRef.current) {
+      formRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [dualMode])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -255,6 +262,7 @@ export default function BirthDataInlineForm({ data, partnerData, onSave }: Props
 
   return (
     <form
+      ref={formRef}
       className="hx-birth-inline-form"
       onSubmit={handleSubmit}
       aria-label="Données de naissance"

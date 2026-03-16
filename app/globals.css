@@ -1521,18 +1521,29 @@ transition: all 0.35s ease;
   max-width: min(640px, 78%);
   padding: 12px 18px;
   border-radius: 20px 20px 5px 20px;
-  background: linear-gradient(135deg, rgba(102, 235, 208, 0.92) 0%, rgba(70, 209, 255, 0.86) 100%);
-  color: #06201c;
-  box-shadow: 0 4px 20px rgba(43, 198, 170, 0.14);
+  background: linear-gradient(145deg, rgba(10, 22, 30, 0.78), rgba(10, 24, 36, 0.68));
+  border: 1px solid rgba(113, 227, 212, 0.14);
+  color: #f3fbff;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 
 /* Assistant — no box, clean text layout */
 .hx-message-bubble.is-assistant {
   max-width: min(820px, 92%);
-  padding: 4px 0;
-  background: none;
-  border: none;
-  color: rgba(230, 242, 250, 0.92);
+  padding: 10px 16px;
+  border-radius: 18px 18px 18px 6px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  border: 1px solid rgba(220, 232, 244, 0.12);
+  color: rgba(230, 242, 250, 0.94);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .hx-message-content p:first-child,
@@ -2436,6 +2447,9 @@ transition: all 0.35s ease;
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  max-height: 78vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .hx-inline-birth .hx-birth-inline-form {

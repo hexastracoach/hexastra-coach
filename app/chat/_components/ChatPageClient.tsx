@@ -1329,15 +1329,19 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
         const data = await postChatPayload(payload)
         const reply = applyApiResponse(data)
         const isReading = isReadingFlowStep(data?.flowState?.step)
+        const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
+        const actionIntent = detectUserIntent(baseContent)
+        const finalReply = formatAssistantReply(reply, {
+          intent: actionIntent,
+          userMessage: baseContent,
+          isReading,
+          depthLevel,
+        })
 
         const assistantMessage: Msg = {
           id: `${Date.now()}-assistant`,
           role: 'assistant',
-          content: applyHumanTone(tonedReply, {
-            intent: actionIntent,
-            userMessage: content,
-            isReading,
-          }),
+          content: finalReply,
           created_at: new Date().toISOString(),
           isReading,
         }
