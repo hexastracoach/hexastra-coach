@@ -14,7 +14,6 @@ import { ensureHexAstraTone } from '@/lib/chat/conversationToneEngine'
 import { composeResponse } from '@/lib/chat/responseComposer'
 import { predictNextIntents } from '@/lib/hexastra/predictive/predictiveEngine'
 import { buildNavigationReply } from './navigationEngine'
-import { buildResponse } from './responseBuilder'
 
 export type ConversationContext = {
   shortTerm: ShortTermMemory
