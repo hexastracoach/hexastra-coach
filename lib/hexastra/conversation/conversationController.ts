@@ -7,11 +7,14 @@ import { runReasoning } from './reasoningEngine'
 import { addHumanTone } from './humanToneEngine'
 import { applySilence } from './silenceEngine'
 import { buildResponse } from './responseBuilder'
-import { chooseResponseType } from '@/lib/conversation/responseTypeEngine'
+import { chooseResponseType } from './responseTypeEngine'
 import { analyzeAgentState } from '@/lib/hexastra/agent/agentBrain'
 import { detectUserDepthLevel } from '@/lib/chat/adaptiveDepthEngine'
 import { ensureHexAstraTone } from '@/lib/chat/conversationToneEngine'
 import { composeResponse } from '@/lib/chat/responseComposer'
+import { predictNextIntents } from '@/lib/hexastra/predictive/predictiveEngine'
+import { buildNavigationReply } from './navigationEngine'
+import { buildResponse } from './responseBuilder'
 
 export type ConversationContext = {
   shortTerm: ShortTermMemory
@@ -37,6 +40,14 @@ export function runConversationController({
   const entities = extractEntities(message)
   const brain = analyzeAgentState({ message, intent: intentResult.intent, entities })
   const state = updateConversationState(intentResult.intent, ctx.state)
+  const prediction = predictNextIntents({
+    message,
+    intent: intentResult.intent,
+    emotion_state: brain.emotion_state,
+    conversation_state: state,
+    entities,
+    memory: ctx,
+  })
 
   const updatedShort = updateShortTermMemory(ctx.shortTerm, message)
   const updatedLong = mergeLongTermMemory(ctx.longTerm, entities)
@@ -45,16 +56,30 @@ export function runConversationController({
   const depthLevel = detectUserDepthLevel(message, history.map((h) => ({ role: 'user', content: h } as any)), userPlan as any)
 
   let base = ''
-  if (route === 'analysis' || route === 'hexastra_reading') {
+  if (route === 'navigation') {
+    base = buildNavigationReply()
+  } else if (route === 'analysis' || route === 'hexastra_reading') {
     base = runReasoning({ intent: intentResult.intent, entities, message })
   } else if (route === 'decision_support') {
     base = runReasoning({ intent: 'decision', entities, message })
+  } else if (route === 'small_reply') {
+    const kindMap: Record<string, any> = {
+      greeting: 'greeting',
+      small_talk: 'small_talk',
+      gratitude: 'gratitude',
+    }
+    base = buildResponse(kindMap[intentResult.intent] ?? 'greeting')
   } else {
     const responseKind = chooseResponseType(intentResult.intent)
-    base = buildResponse(
-      responseKind === 'structured' ? 'analysis' : responseKind === 'empathetic' ? 'conversation' : responseKind,
-      intentResult.intent
-    )
+    const mapped =
+      responseKind === 'structured'
+        ? 'analysis'
+        : responseKind === 'empathetic'
+          ? 'conversation'
+          : responseKind === 'light'
+            ? 'small_talk'
+            : 'conversation'
+    base = buildResponse(mapped as any)
   }
 
   const toned = ensureHexAstraTone(base, { intent: intentResult.intent, isReading: false, maxLines: 8 })

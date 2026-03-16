@@ -3,12 +3,14 @@ export type ResponseType = 'short' | 'light' | 'structured' | 'empathetic' | 'co
 export function chooseResponseType(intent: string): ResponseType {
   switch (intent) {
     case 'greeting':
-      return 'short'
+    case 'small_talk':
     case 'gratitude':
-      return 'light'
+      return 'short'
     case 'analysis':
+    case 'hexastra_reading':
       return 'structured'
     case 'emotion':
+    case 'decision':
       return 'empathetic'
     default:
       return 'conversation'
