@@ -29,6 +29,7 @@ export function buildChatPayload({
     practitionerUsage: userContext.practitionerUsage,
     birthData: userContext.birthData,
     memory: userContext.memory,
+    journeyEnabled: Boolean(userContext.journeyEnabled),
     session: {
       currentTheme: sessionContext.currentTheme,
       contextType: sessionContext.contextType,

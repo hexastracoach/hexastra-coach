@@ -576,6 +576,7 @@ export async function runHexastraFlow(input: {
   conversationId?: string | null
   messages: ChatMessage[]
   evolutionProfile?: Record<string, unknown> | null
+  journeyEnabled?: boolean
 }): Promise<HexastraApiResponse> {
   const controller = new AbortController()
   const globalTimeout = setTimeout(() => controller.abort(), 18000) // 18s fail-fast for Vercel
@@ -593,6 +594,7 @@ export async function runHexastraFlow(input: {
   const conversationId = input.conversationId ?? randomUUID()
   const fallbackLanguage = input.language ?? detectLanguageFromMessages(input.messages, 'fr')
   const fallbackPlan = normalizePlan(input.plan)
+  const journeyToggle = typeof input.journeyEnabled === 'boolean' ? input.journeyEnabled : undefined
 
   if (!VECTOR_STORE_ID) {
     logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing — retrieval disabled')
@@ -635,11 +637,14 @@ export async function runHexastraFlow(input: {
         birthData: input.birthData,
         practitionerUsage: input.practitionerUsage,
         memory: null,
+        journeyEnabled: journeyToggle ?? false,
       }
     }
 
     const plan = normalizePlan(userContext.plan)
     const mode = getModeForPlan(plan)
+    const journeyEnabled = journeyToggle ?? userContext.journeyEnabled ?? false
+    userContext = { ...userContext, journeyEnabled }
 
     if (isGreeting && !input.selectedMenuKey && !input.selectedSubmenuKey) {
       const message = buildGreetingMessage(mode, userContext.language ?? fallbackLanguage)
@@ -664,6 +669,7 @@ export async function runHexastraFlow(input: {
           sessionStep: 'menu',
           emotionalState: null,
           timing: null,
+          journeyEnabled,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -719,6 +725,7 @@ export async function runHexastraFlow(input: {
           practitionerUsage: null,
           contextType: sessionContext.contextType,
           shouldPersistMemory: false,
+          journeyEnabled,
         },
       }
     }
@@ -737,6 +744,7 @@ export async function runHexastraFlow(input: {
           practitionerUsage: userContext.practitionerUsage,
           contextType: sessionContext.contextType,
           shouldPersistMemory: false,
+          journeyEnabled,
         },
       }
     }
@@ -829,6 +837,7 @@ export async function runHexastraFlow(input: {
           sessionStep: 'menu',
           emotionalState: sessionContext.emotionalState,
           timing: sessionContext.timing,
+          journeyEnabled,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -867,6 +876,7 @@ export async function runHexastraFlow(input: {
           sessionStep: flowStep,
           emotionalState: sessionContext.emotionalState,
           timing: sessionContext.timing,
+          journeyEnabled,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -1080,6 +1090,7 @@ export async function runHexastraFlow(input: {
         sessionStep: flowStep,
         emotionalState: sessionContext.emotionalState,
         timing: sessionContext.timing,
+        journeyEnabled,
       },
       updatedEvolutionProfile: input.evolutionProfile ?? null,
     }
@@ -1102,12 +1113,13 @@ export async function runHexastraFlow(input: {
         suggestions: getMenuForMode(mode)
           .slice(0, 4)
           .map((item) => item.label),
-        metadata: {
-          shouldPersistMemory: false,
-          contextType: input.contextType ?? 'general',
-        },
-        updatedEvolutionProfile: input.evolutionProfile ?? null,
-      } as HexastraApiResponse
+      metadata: {
+        shouldPersistMemory: false,
+        contextType: input.contextType ?? 'general',
+        journeyEnabled,
+      },
+      updatedEvolutionProfile: input.evolutionProfile ?? null,
+    } as HexastraApiResponse
     }
 
     return {
@@ -1119,6 +1131,7 @@ export async function runHexastraFlow(input: {
       flowState: { step: 'error', completed: false },
       metadata: {
         shouldPersistMemory: false,
+        journeyEnabled,
       },
       updatedEvolutionProfile: input.evolutionProfile ?? null,
     } as unknown as HexastraApiResponse

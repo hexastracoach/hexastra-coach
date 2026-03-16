@@ -100,6 +100,7 @@ export type HexastraApiResponse = {
     sessionStep?: FlowStep
     emotionalState?: EmotionalState
     timing?: TimingIntensity
+    journeyEnabled?: boolean
   }
   updatedEvolutionProfile?: Record<string, unknown> | null
 }

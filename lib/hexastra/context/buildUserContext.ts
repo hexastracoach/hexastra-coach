@@ -11,6 +11,7 @@ export type HexastraUserContext = {
   birthData: BirthProfile | null
   practitionerUsage: PractitionerUsageHex
   memory: UserMemoryRecord | null
+  journeyEnabled: boolean
   profileRow: Record<string, unknown> | null
 }
 
@@ -60,6 +61,12 @@ export async function buildUserContext({
 
   const mergedBirth = birthData ?? normalizeProfileBirth(profileRow)
   const memory = await readUserMemory(supabase, user?.id)
+  const journeyEnabled =
+    typeof profileRow?.journey_enabled === 'boolean'
+      ? (profileRow.journey_enabled as boolean)
+      : typeof profileRow?.journeyEnabled === 'boolean'
+        ? (profileRow.journeyEnabled as boolean)
+        : false
 
   return {
     userId: user?.id ?? null,
@@ -69,6 +76,7 @@ export async function buildUserContext({
     birthData: mergedBirth,
     practitionerUsage: practitionerUsage ?? ((profileRow?.practitioner_usage as PractitionerUsageHex | undefined) ?? null),
     memory,
+    journeyEnabled,
     profileRow,
   }
 }

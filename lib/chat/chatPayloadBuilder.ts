@@ -97,6 +97,7 @@ export type ChatPayload = {
   selectedMenuKey?: string | null
   selectedSubmenuKey?: string | null
   uiAction?: UiAction
+  journeyEnabled?: boolean
 }
 
 export function buildChatPayload({
@@ -112,6 +113,7 @@ export function buildChatPayload({
   selectedMenuKey = null,
   selectedSubmenuKey = null,
   uiAction = 'send_message',
+  journeyEnabled = false,
 }: {
   requestType: RequestType
   plan: PlanKey
@@ -125,6 +127,7 @@ export function buildChatPayload({
   selectedMenuKey?: string | null
   selectedSubmenuKey?: string | null
   uiAction?: UiAction
+  journeyEnabled?: boolean
 }): ChatPayload {
   const planCtx = buildPlanApiContext(plan)
   const ents = getEntitlements(plan)
@@ -155,5 +158,6 @@ export function buildChatPayload({
     selectedMenuKey,
     selectedSubmenuKey,
     uiAction,
+    journeyEnabled,
   }
 }

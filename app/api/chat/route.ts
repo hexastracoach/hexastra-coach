@@ -556,6 +556,10 @@ export async function POST(req: NextRequest) {
     log('info', 'effective plan resolved', { effectivePlan, userId })
 
     const responseDepth = getResponseDepth(effectivePlan)
+    const journeyEnabled =
+      typeof (body as Record<string, unknown>).journeyEnabled === 'boolean'
+        ? ((body as Record<string, unknown>).journeyEnabled as boolean)
+        : false
 
     const quota = isGreetingOnly
       ? {
@@ -617,6 +621,7 @@ export async function POST(req: NextRequest) {
         typeof (body as Record<string, unknown>).evolutionProfile === 'object'
           ? ((body as Record<string, unknown>).evolutionProfile as Record<string, unknown>)
           : null,
+      journeyEnabled,
     })
 
     log('info', 'runHexastraFlow success', { flowState: response?.flowState ?? null })
@@ -637,6 +642,7 @@ export async function POST(req: NextRequest) {
         (finalResponse?.metadata as any)?.selectedSubmenuKey ??
         (body as any)?.selectedSubmenuKey ??
         null,
+      journeyEnabled,
     })
 
     return NextResponse.json(
@@ -655,6 +661,7 @@ export async function POST(req: NextRequest) {
           },
           responseDepth,
           isGreetingOnly,
+          journeyEnabled,
         },
       },
       { status: 200 }

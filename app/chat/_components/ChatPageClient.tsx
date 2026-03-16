@@ -238,7 +238,6 @@ export default function ChatPageClient() {
   const [selectedSubmenuKey, setSelectedSubmenuKey] = useState<string | null>(null)
   const [journeyEnabled, setJourneyEnabled] = useState<boolean>(false)
   const [journeyBanner, setJourneyBanner] = useState<'on' | 'off' | null>(null)
-  const [journeyEnabled, setJourneyEnabled] = useState<boolean>(false)
 
   const [readings, setReadings] = useState<Reading[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -511,6 +510,7 @@ export default function ChatPageClient() {
         selectedMenuKey: menuKey ?? null,
         selectedSubmenuKey: submenuKey ?? null,
         uiAction,
+        journeyEnabled,
       })
 
       try {
@@ -556,6 +556,7 @@ export default function ChatPageClient() {
       practitionerUsage,
       userPlan,
       postChatPayload,
+      journeyEnabled,
     ]
   )
 
@@ -873,6 +874,7 @@ export default function ChatPageClient() {
       selectedMenuKey,
       selectedSubmenuKey,
       uiAction: 'send_message',
+      journeyEnabled,
     })
 
     try {
@@ -1036,6 +1038,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
         selectedMenuKey,
         selectedSubmenuKey,
         uiAction: 'send_message',
+        journeyEnabled,
       })
 
       try {
@@ -1096,6 +1099,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
       chatStep,
       userPlan,
       postChatPayload,
+      journeyEnabled,
     ]
   )
 
