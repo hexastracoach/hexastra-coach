@@ -236,6 +236,9 @@ export default function ChatPageClient() {
   const [activeContextType, setActiveContextType] = useState<ContextType>('general')
   const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null)
   const [selectedSubmenuKey, setSelectedSubmenuKey] = useState<string | null>(null)
+  const [journeyEnabled, setJourneyEnabled] = useState<boolean>(false)
+  const [journeyBanner, setJourneyBanner] = useState<'on' | 'off' | null>(null)
+  const [journeyEnabled, setJourneyEnabled] = useState<boolean>(false)
 
   const [readings, setReadings] = useState<Reading[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -595,6 +598,20 @@ export default function ChatPageClient() {
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('hexastra.journey_enabled')
+      if (stored !== null) setJourneyEnabled(stored === '1')
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hexastra.journey_enabled', journeyEnabled ? '1' : '0')
+    } catch {}
+    setJourneyBanner(journeyEnabled ? 'on' : 'off')
+  }, [journeyEnabled])
 
   useEffect(() => {
     try {
@@ -1237,6 +1254,36 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
                   </div>
                 </div>
               )}
+
+              <div className="hx-journey-toggle">
+                <label className="hx-journey-label">
+                  <input
+                    type="checkbox"
+                    checked={journeyEnabled}
+                    onChange={(e) => setJourneyEnabled(e.target.checked)}
+                  />
+                  <span className="hx-journey-text">Suivre mon parcours HexAstra</span>
+                </label>
+                <p className="hx-journey-help">
+                  HexAstra peut garder le fil de ton exploration et te guider étape par étape.
+                </p>
+                {journeyBanner === 'on' && (
+                  <div className="hx-journey-banner hx-journey-banner-on">
+                    <div className="hx-journey-banner-title">Ton parcours HexAstra est activé</div>
+                    <div className="hx-journey-banner-desc">
+                      HexAstra pourra proposer les prochaines étapes les plus utiles. Tu peux désactiver à tout moment.
+                    </div>
+                  </div>
+                )}
+                {journeyBanner === 'off' && (
+                  <div className="hx-journey-banner hx-journey-banner-off">
+                    <div className="hx-journey-banner-title">Parcours HexAstra désactivé</div>
+                    <div className="hx-journey-banner-desc">
+                      HexAstra continue de répondre normalement, sans suivre un parcours explicite.
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {shouldShowMenuDock && (
                 <MenuDock
