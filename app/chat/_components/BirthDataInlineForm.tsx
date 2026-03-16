@@ -54,17 +54,15 @@ async function searchCities(query: string): Promise<CityResult[]> {
   }
 }
 
-function formatCoord(lat: string, lng: string): string {
-  const latN = parseFloat(lat)
-  const lngN = parseFloat(lng)
-  const latStr = `${Math.abs(latN).toFixed(1)}°${latN >= 0 ? 'N' : 'S'}`
-  const lngStr = `${Math.abs(lngN).toFixed(1)}°${lngN >= 0 ? 'E' : 'W'}`
-  return `${latStr}  ${lngStr}`
-}
-
 export default function BirthDataInlineForm({ data, onSave }: Props) {
-  const [form, setForm] = useState<BirthData>({ ...EMPTY_BIRTH_DATA, ...data })
-  const [timeUnknown, setTimeUnknown] = useState(false)
+  const initialTimeKnown = data.birthTimeKnown ?? Boolean(data.birthTime)
+  const [form, setForm] = useState<BirthData>({
+    ...EMPTY_BIRTH_DATA,
+    ...data,
+    birthTimeKnown: initialTimeKnown,
+  })
+  const [timeKnown, setTimeKnown] = useState<boolean>(initialTimeKnown)
+  const [showErrors, setShowErrors] = useState(false)
 
   // City autocomplete state
   const [cityQuery, setCityQuery] = useState(data.birthCity ?? '')
@@ -132,9 +130,10 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
     }))
   }
 
-  function handleTimeUnknown(checked: boolean) {
-    setTimeUnknown(checked)
-    if (checked) setForm((prev) => ({ ...prev, birthTime: '' }))
+  function handleTimeKnown(checked: boolean) {
+    setTimeKnown(checked)
+    setForm((prev) => ({ ...prev, birthTimeKnown: checked }))
+    if (!checked) setForm((prev) => ({ ...prev, birthTime: '' }))
   }
 
   function set(field: keyof BirthData, value: string) {
@@ -143,24 +142,32 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!isValid) {
+      setShowErrors(true)
+      return
+    }
+
+    const birthTimeValue = timeKnown ? form.birthTime.trim() : ''
+
     const trimmed: BirthData = {
       ...form,
       firstName: form.firstName.trim(),
-      lastName: form.lastName.trim(),
       birthDate: form.birthDate.trim(),
       birthCity: form.birthCity.trim(),
-      birthTime: timeUnknown ? '' : form.birthTime.trim(),
+      birthTime: birthTimeValue,
+      birthTimeKnown: timeKnown,
     }
     onSave(trimmed)
   }
 
   const isValid =
     form.firstName.trim().length > 0 &&
-    form.lastName.trim().length > 0 &&
     form.birthDate.trim().length > 0 &&
     form.birthCountryName.trim().length > 0 &&
     form.birthCity.trim().length > 0 &&
-    (timeUnknown || form.birthTime.trim().length > 0)
+    (timeKnown ? form.birthTime.trim().length > 0 : true)
+
+  const fieldError = (condition: boolean, message: string) => (showErrors && !condition ? message : '')
 
   return (
     <form
@@ -169,7 +176,7 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
       aria-label="Données de naissance"
     >
       <p className="hx-birth-inline-hint">
-        Pour personnaliser ta lecture, j&apos;ai besoin de quelques informations.
+        Pour personnaliser ta lecture, j'ai besoin de quelques informations.
         Les champs marqués <span aria-hidden="true">*</span> sont obligatoires.
       </p>
 
@@ -186,21 +193,26 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
             onChange={(e) => set('firstName', e.target.value)}
             required
             autoComplete="given-name"
+            aria-invalid={showErrors && !form.firstName.trim()}
           />
+          {fieldError(!!form.firstName.trim(), 'Prénom requis.') && (
+            <p className="hx-birth-time-unknown-note">{fieldError(!!form.firstName.trim(), 'Prénom requis.')}</p>
+          )}
         </label>
 
-        {/* Nom */}
+        {/* Genre */}
         <label className="hx-birth-inline-field">
-          <span className="hx-birth-inline-label">Nom <span aria-hidden="true">*</span></span>
-          <input
+          <span className="hx-birth-inline-label">Genre (optionnel)</span>
+          <select
             className="hx-birth-inline-input"
-            type="text"
-            placeholder="Nom de famille"
-            value={form.lastName}
-            onChange={(e) => set('lastName', e.target.value)}
-            required
-            autoComplete="family-name"
-          />
+            value={form.gender ?? ''}
+            onChange={(e) => set('gender', e.target.value)}
+          >
+            <option value="">Préciser si utile</option>
+            <option value="feminin">Féminin</option>
+            <option value="masculin">Masculin</option>
+            <option value="autre">Autre / préfère ne pas dire</option>
+          </select>
         </label>
 
         {/* Date */}
@@ -212,34 +224,53 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
             value={form.birthDate}
             onChange={(e) => set('birthDate', e.target.value)}
             required
+            aria-invalid={showErrors && !form.birthDate.trim()}
           />
+          {fieldError(!!form.birthDate.trim(), 'Date requise.') && (
+            <p className="hx-birth-time-unknown-note">{fieldError(!!form.birthDate.trim(), 'Date requise.')}</p>
+          )}
         </label>
 
         {/* Heure */}
         <div className="hx-birth-inline-field">
           <span className="hx-birth-inline-label">
-            Heure de naissance <span aria-hidden="true">*</span>
+            Heure de naissance {timeKnown && <span aria-hidden="true">*</span>}
           </span>
-          <input
-            className="hx-birth-inline-input"
-            type="time"
-            placeholder="HH:MM"
-            value={form.birthTime}
-            onChange={(e) => set('birthTime', e.target.value)}
-            disabled={timeUnknown}
-            required={!timeUnknown}
-          />
+          {timeKnown ? (
+            <input
+              className="hx-birth-inline-input"
+              type="time"
+              placeholder="HH:MM"
+              value={form.birthTime}
+              onChange={(e) => set('birthTime', e.target.value)}
+              required={timeKnown}
+              aria-invalid={showErrors && timeKnown && !form.birthTime.trim()}
+            />
+          ) : (
+            <input
+              className="hx-birth-inline-input"
+              type="text"
+              value="Heure non renseignée — 12:00 sera utilisée par défaut."
+              readOnly
+              tabIndex={-1}
+            />
+          )}
           <label className="hx-birth-inline-unknown">
             <input
               type="checkbox"
-              checked={timeUnknown}
-              onChange={(e) => handleTimeUnknown(e.target.checked)}
+              checked={timeKnown}
+              onChange={(e) => handleTimeKnown(e.target.checked)}
             />
-            <span>Heure inconnue</span>
+            <span>Je connais mon heure de naissance</span>
           </label>
-          {timeUnknown && (
+          {!timeKnown && (
             <p className="hx-birth-time-unknown-note">
-              ⚠ Sans heure de naissance, la lecture sera généralisée — certains éléments comme l&apos;Ascendant ne pourront pas être calculés avec précision.
+              Une heure exacte améliore la précision du scan.
+            </p>
+          )}
+          {fieldError(!timeKnown || !!form.birthTime.trim(), 'Heure requise ou désactive la case.') && (
+            <p className="hx-birth-time-unknown-note">
+              {fieldError(!timeKnown || !!form.birthTime.trim(), 'Heure requise ou désactive la case.')}
             </p>
           )}
         </div>
@@ -256,7 +287,12 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
             value={form.birthCountryName}
             onChange={(e) => set('birthCountryName', e.target.value)}
             autoComplete="country-name"
+            required
+            aria-invalid={showErrors && !form.birthCountryName.trim()}
           />
+          {fieldError(!!form.birthCountryName.trim(), 'Pays requis.') && (
+            <p className="hx-birth-time-unknown-note">{fieldError(!!form.birthCountryName.trim(), 'Pays requis.')}</p>
+          )}
         </div>
 
         {/* Ville avec autocomplete — occupe toute la largeur */}
@@ -275,15 +311,10 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
               autoComplete="off"
               spellCheck={false}
               required
+              aria-invalid={showErrors && !form.birthCity.trim()}
             />
             {isSearching && <span className="hx-birth-city-spinner" aria-hidden="true" />}
           </div>
-
-          {citySelected && form.birthLat && (
-            <span className="hx-birth-city-coords">
-              {form.birthCountryName} · {formatCoord(form.birthLat, form.birthLng)}
-            </span>
-          )}
 
           {showDropdown && (
             <ul className="hx-birth-city-dropdown" role="listbox" aria-label="Suggestions de villes">
@@ -297,11 +328,13 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
                   <span className="hx-birth-city-name">{r.city}</span>
                   <span className="hx-birth-city-meta">
                     {r.country}
-                    {r.lat && r.lng && <> · {formatCoord(r.lat, r.lng)}</>}
                   </span>
                 </li>
               ))}
             </ul>
+          )}
+          {fieldError(!!form.birthCity.trim(), 'Ville requise.') && (
+            <p className="hx-birth-time-unknown-note">{fieldError(!!form.birthCity.trim(), 'Ville requise.')}</p>
           )}
         </div>
 
@@ -314,6 +347,10 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
       >
         Commencer ma lecture →
       </button>
+
+      <p className="hx-birth-time-unknown-note" style={{ marginTop: 10 }}>
+        HexAstra utilise vos données de naissance pour générer une analyse personnalisée. Une heure de naissance précise améliore la qualité du résultat.
+      </p>
     </form>
   )
 }

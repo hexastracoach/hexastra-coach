@@ -30,6 +30,7 @@ export type BirthData = {
   lastName: string
   birthDate: string
   birthTime: string
+  birthTimeKnown?: boolean
   birthCity: string
   birthLat: string
   birthLng: string
@@ -43,6 +44,7 @@ export const EMPTY_BIRTH_DATA: BirthData = {
   lastName: '',
   birthDate: '',
   birthTime: '',
+  birthTimeKnown: true,
   birthCity: '',
   birthLat: '',
   birthLng: '',

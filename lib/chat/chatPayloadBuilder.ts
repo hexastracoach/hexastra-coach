@@ -14,6 +14,7 @@ export type ChatMessage = {
 }
 
 type ApiBirthData = {
+  name?: string
   firstName?: string
   lastName?: string
   date?: string
@@ -23,19 +24,41 @@ type ApiBirthData = {
   lat?: number
   lon?: number
   gender?: string
+  birthDateISO?: string
+  birthTimeKnown?: boolean
+}
+
+function buildBirthDateIso(date?: string, time?: string): string | undefined {
+  if (!date) return undefined
+  const safeTime = time && time.trim() ? time.trim() : '12:00'
+  const isoCandidate = `${date}T${safeTime}`
+  const ts = Date.parse(isoCandidate)
+  if (Number.isNaN(ts)) return undefined
+  return new Date(ts).toISOString()
 }
 
 function toApiBirthData(bd: BirthData): ApiBirthData {
+  const cleanDate = bd.birthDate ? bd.birthDate.trim() : ''
+  const timeKnown = bd.birthTimeKnown ?? Boolean(bd.birthTime)
+  const time = timeKnown ? (bd.birthTime || '').trim() : '12:00'
+  const place = [bd.birthCity?.trim(), (bd.birthCountryName || bd.birthCountryCode || '').trim()]
+    .filter(Boolean)
+    .join(', ')
+    || (bd.birthCity || '').trim()
+
   return {
+    name: bd.firstName || undefined,
     firstName: bd.firstName || undefined,
     lastName: bd.lastName || undefined,
-    date: bd.birthDate || undefined,
-    time: bd.birthTime || undefined,
-    place: bd.birthCity || undefined,
+    date: cleanDate || undefined,
+    time: time || undefined,
+    place: place || undefined,
     country: bd.birthCountryName || bd.birthCountryCode || undefined,
     lat: bd.birthLat ? Number(bd.birthLat) : undefined,
     lon: bd.birthLng ? Number(bd.birthLng) : undefined,
     gender: bd.gender || undefined,
+    birthDateISO: buildBirthDateIso(cleanDate, time),
+    birthTimeKnown: timeKnown,
   }
 }
 

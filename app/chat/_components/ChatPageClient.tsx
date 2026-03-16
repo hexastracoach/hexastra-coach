@@ -205,6 +205,15 @@ function isDuplicateMessage(
   return false
 }
 
+function mergeBirthData(data: Partial<BirthData>): BirthData {
+  return {
+    ...EMPTY_BIRTH_DATA,
+    ...data,
+    birthTimeKnown:
+      data.birthTimeKnown ?? EMPTY_BIRTH_DATA.birthTimeKnown ?? Boolean(data.birthTime ?? EMPTY_BIRTH_DATA.birthTime),
+  }
+}
+
 export default function ChatPageClient() {
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -605,7 +614,7 @@ export default function ChatPageClient() {
       const stored = localStorage.getItem(STORAGE_KEYS.birthData)
       if (stored) {
         const parsed = JSON.parse(stored) as BirthData
-        if (parsed && typeof parsed === 'object') setBirthData(parsed)
+        if (parsed && typeof parsed === 'object') setBirthData(mergeBirthData(parsed))
       }
     } catch {}
   }, [])
@@ -723,35 +732,40 @@ export default function ChatPageClient() {
   }, [])
 
   const handleBirthDataChange = useCallback((next: BirthData) => {
-    setBirthData(next)
+    const normalized = mergeBirthData(next)
+    setBirthData(normalized)
     try {
-      localStorage.setItem(STORAGE_KEYS.birthData, JSON.stringify(next))
+      localStorage.setItem(STORAGE_KEYS.birthData, JSON.stringify(normalized))
     } catch {}
   }, [])
 
   const handleBirthDataSave = useCallback(
     (next: BirthData) => {
-      handleBirthDataChange(next)
+      const normalized = mergeBirthData(next)
+      handleBirthDataChange(normalized)
 
       const reset = loadMicroReadings()
       setMicroReadings({ ...reset, profileKey: null })
       microTriggerRef.current = null
 
-      if (next.firstName) {
+      if (normalized.firstName) {
         setEvolutionProfile((prev) => {
-          const updated = { ...(prev ?? {}), firstName: next.firstName }
+          const updated = { ...(prev ?? {}), firstName: normalized.firstName }
           saveEvolutionProfile(updated)
           return updated
         })
       }
 
       const parts: string[] = []
-      if (next.firstName) parts.push(`prénom ${next.firstName}`)
-      if (next.lastName) parts.push(`nom ${next.lastName}`)
-      if (next.birthDate) parts.push(`né(e) le ${next.birthDate}`)
-      if (next.birthTime) parts.push(`à ${next.birthTime}`)
-      if (next.birthCity) parts.push(`à ${next.birthCity}`)
-      if (next.birthCountryName) parts.push(next.birthCountryName)
+      if (normalized.firstName) parts.push(`prénom ${normalized.firstName}`)
+      if (normalized.birthDate) parts.push(`né(e) le ${normalized.birthDate}`)
+      if (normalized.birthTimeKnown === false) {
+        parts.push('heure non fournie (12:00 par défaut)')
+      } else if (normalized.birthTime) {
+        parts.push(`à ${normalized.birthTime}`)
+      }
+      if (normalized.birthCity) parts.push(`à ${normalized.birthCity}`)
+      if (normalized.birthCountryName) parts.push(normalized.birthCountryName)
 
       if (parts.length) {
         void sendStructuredAction({
@@ -1274,3 +1288,4 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
     </div>
   )
 }
+

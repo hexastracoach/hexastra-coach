@@ -92,8 +92,20 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
   if (!raw || typeof raw !== 'object') return null
 
   const data = raw as Record<string, unknown>
+  const isoRaw = typeof data.birthDateISO === 'string' ? data.birthDateISO.trim() : ''
+  let isoDate: string | undefined
+  let isoTime: string | undefined
+  if (isoRaw && isoRaw.includes('T')) {
+    const [d, t] = isoRaw.split('T')
+    isoDate = d
+    isoTime = (t || '').replace('Z', '').slice(0, 5)
+  }
+
+  const birthTimeKnown =
+    typeof data.birthTimeKnown === 'boolean' ? data.birthTimeKnown : undefined
 
   const birth: BirthProfile = {
+    name: typeof data.name === 'string' ? data.name.trim() : undefined,
     firstName: typeof data.firstName === 'string' ? data.firstName.trim() : undefined,
     lastName: typeof data.lastName === 'string' ? data.lastName.trim() : undefined,
     date:
@@ -101,13 +113,13 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
         ? data.date.trim()
         : typeof data.birthDate === 'string'
           ? data.birthDate.trim()
-          : undefined,
+          : isoDate,
     time:
       typeof data.time === 'string'
         ? data.time.trim()
         : typeof data.birthTime === 'string'
           ? data.birthTime.trim()
-          : undefined,
+          : isoTime,
     place:
       typeof data.place === 'string'
         ? data.place.trim()
@@ -123,6 +135,8 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
     lat: toOptionalNumber(data.lat ?? data.birthLat),
     lon: toOptionalNumber(data.lon ?? data.birthLng),
     gender: typeof data.gender === 'string' ? data.gender.trim() : undefined,
+    birthDateISO: isoRaw || undefined,
+    birthTimeKnown,
   }
 
   const hasUsefulData = Boolean(

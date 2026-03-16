@@ -38,6 +38,7 @@ export type UiAction =
 export type PractitionerUsageHex = 'self' | 'client' | null
 
 export type BirthProfile = {
+  name?: string
   firstName?: string
   lastName?: string
   date?: string
@@ -47,6 +48,8 @@ export type BirthProfile = {
   lat?: number
   lon?: number
   gender?: string
+  birthDateISO?: string
+  birthTimeKnown?: boolean
 }
 
 export type DomainRoute =
