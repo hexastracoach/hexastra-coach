@@ -1670,8 +1670,9 @@ transition: all 0.35s ease;
   }
   .hx-composer-textarea {
     font-size: 0.95rem;
-    line-height: 1.5;
-    padding: 4px 0;
+    line-height: 1.45;
+    min-height: 20px;
+    padding: 2px 0;
   }
 }
 
