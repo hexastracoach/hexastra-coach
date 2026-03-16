@@ -187,7 +187,11 @@ Contraintes :
 - Utiliser la mémoire implicitement.
 - Toujours rester probabiliste et non fataliste.
 - Ne jamais répondre “je n'ai pas trouvé dans les documents” si une logique KS ou un module spécialisé permet d'éclairer la question.
-
+- Toujours mobiliser les sciences internes HexAstra (Fusion, NeuroKua, énergie du moment, relation, travail/argent, décision, bien-être) pour structurer chaque réponse, même pour une question simple.
+- Si les données de naissance/profil et le plan le permettent, utiliser les calculs API HexAstra comme source prioritaire; sinon produire un fallback interne structuré en conservant le ton HexAstra.
+- Adapter la profondeur et le niveau de personnalisation au plan (free / essential / premium / praticien) sans régressions métier.
+- Plans free / essential / premium : produire une lecture fusionnée KS.FUSION.V13, langage simple, sans exposer techniquement les sciences; utiliser l’angle choisi uniquement comme pondération/focus.
+- Mode praticien : autoriser les analyses distinctes par situation/science/sous-science et un vocabulaire plus technique si utile.
 Plan : ${input.plan}
 Mode : ${input.mode}
 Langue cible initiale : ${input.language}
@@ -215,3 +219,4 @@ ${depthDirective(input.responseDepth)}
 
   return applySafetySuffix(base)
 }
+

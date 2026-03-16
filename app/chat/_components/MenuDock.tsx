@@ -2,11 +2,14 @@
 
 import { useMemo, useState } from 'react'
 import type { HexastraMenuItem } from '@/lib/hexastra/types'
+import { createClient } from '@/lib/supabase/client'
 
 type Props = {
   items: HexastraMenuItem[]
   title?: string
   onSelect: (item: HexastraMenuItem, parent?: HexastraMenuItem) => void
+  userPlan?: string
+  lastUserMessage?: string
 }
 
 function IconSpark() {
@@ -48,12 +51,29 @@ export default function MenuDock({
   items,
   title = 'Explorer un angle',
   onSelect,
+  userPlan,
+  lastUserMessage,
 }: Props) {
   const [openParentKey, setOpenParentKey] = useState<string | null>(null)
 
   const safeItems = useMemo(() => {
     return Array.isArray(items) ? items.filter(Boolean) : []
   }, [items])
+
+  async function trackAngle(angle: HexastraMenuItem, parent?: HexastraMenuItem) {
+    try {
+      const supabase = createClient()
+      await supabase.from('exploration_usage').insert({
+        angle_id: angle.key,
+        theme: angle.contextType ?? parent?.contextType ?? null,
+        science: angle.domainRoute ?? parent?.domainRoute ?? null,
+        plan: userPlan ?? null,
+        question_context: lastUserMessage ?? null,
+      })
+    } catch (e) {
+      console.warn('[MenuDock] tracking failed', e)
+    }
+  }
 
   if (!safeItems.length) {
     return null
@@ -95,6 +115,7 @@ export default function MenuDock({
                       setOpenParentKey(isOpen ? null : item.key)
                       return
                     }
+                    void trackAngle(item)
                     onSelect(item)
                   }}
                   aria-expanded={hasSubmenu ? isOpen : undefined}
@@ -125,7 +146,10 @@ export default function MenuDock({
                       key={sub.key}
                       type="button"
                       className="hx-menu-dock-inline-subbutton"
-                      onClick={() => onSelect(sub, item)}
+                      onClick={() => {
+                        void trackAngle(sub, item)
+                        onSelect(sub, item)
+                      }}
                     >
                       <span className="hx-menu-dock-inline-subbutton-title">
                         {sub.label}

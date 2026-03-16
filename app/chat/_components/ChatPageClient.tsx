@@ -1241,6 +1241,8 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
               {shouldShowMenuDock && (
                 <MenuDock
                   items={menuItems}
+                  userPlan={userPlan}
+                  lastUserMessage={lastUserMessage}
                   onSelect={(item, parent) => {
                     const context = item.contextType ?? parent?.contextType ?? 'general'
                     setActiveContextType(context)

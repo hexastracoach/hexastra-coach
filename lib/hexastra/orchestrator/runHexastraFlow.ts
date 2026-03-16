@@ -777,8 +777,10 @@ export async function runHexastraFlow(input: {
       latestUserMessage,
     })
 
+    const isPractitionerMode = mode === 'praticien'
+
     const resolvedDomainRoute: DomainRoute = readingRequest
-      ? 'fusion'
+      ? (isPractitionerMode ? initialResolvedDomainRoute : 'fusion')
       : initialResolvedDomainRoute
 
     const activeModules = getModulesForDomain(resolvedDomainRoute)

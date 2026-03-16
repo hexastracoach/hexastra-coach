@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { runHexastraFlow } from '@/lib/hexastra/orchestrator/runHexastraFlow'
+import { enrichReadingResponse } from '@/lib/hexastra/response/enrichReadingResponse'
 import type {
   BirthProfile,
   ContextType,
@@ -621,14 +622,30 @@ export async function POST(req: NextRequest) {
     log('info', 'runHexastraFlow success', { flowState: response?.flowState ?? null })
 
     const finalResponse = applyPremiumInsightLock({ plan: effectivePlan, response })
+    const enriched = enrichReadingResponse({
+      response: finalResponse,
+      plan: effectivePlan,
+      birthDate: (finalResponse as any)?.birthData?.date ?? (body as any)?.birthData?.date,
+      solarSign: (finalResponse as any)?.birthData?.solarSign ?? (body as any)?.birthData?.solarSign,
+      contextType: finalResponse?.metadata?.contextType ?? (body as any)?.contextType,
+      domainRoute: (finalResponse as any)?.domainRoute ?? (body as any)?.domainRoute,
+      selectedMenuKey:
+        (finalResponse?.metadata as any)?.selectedMenuKey ??
+        (body as any)?.selectedMenuKey ??
+        null,
+      selectedSubmenuKey:
+        (finalResponse?.metadata as any)?.selectedSubmenuKey ??
+        (body as any)?.selectedSubmenuKey ??
+        null,
+    })
 
     return NextResponse.json(
       {
-        ...finalResponse,
+        ...enriched,
         plan: effectivePlan,
         mode: effectivePlan,
         metadata: {
-          ...(finalResponse?.metadata ?? {}),
+          ...(enriched?.metadata ?? finalResponse?.metadata ?? {}),
           quota: {
             used: quota.used,
             limit: quota.limit,
