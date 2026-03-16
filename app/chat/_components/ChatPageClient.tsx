@@ -1100,7 +1100,8 @@ const finalReply = formatAssistantReply(reply, {
       if (isDuplicateMessage(lastMessageRef, content)) return
       if (chatStep !== 'conversation_ready') return
 
-      const moderation = moderateMessage(baseContent)      const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
+      const moderation = moderateMessage(baseContent)
+      const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
       const memorySignals = detectMemorySignals(baseContent)
       setUserMemory((prev) => {
         const next = updateUserMemory(prev, memorySignals)
@@ -1579,6 +1580,8 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
     </div>
   )
 }
+
+
 
 
 
