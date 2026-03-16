@@ -1,14 +1,24 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import type { Msg } from '../_lib/chat'
 import MessageBubble from './MessageBubble'
 
 type Props = {
   messages: Msg[]
   isTyping: boolean
+  lastUserMessage?: string
+  onRetry?: (fallbackMessage?: string) => void
 }
 
-export default function MessageList({ messages, isTyping }: Props) {
+export default function MessageList({ messages, isTyping, lastUserMessage, onRetry }: Props) {
+  const bottomRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!bottomRef.current) return
+    bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
+  }, [messages, isTyping])
+
   return (
     <div
       style={{
@@ -22,7 +32,12 @@ export default function MessageList({ messages, isTyping }: Props) {
       }}
     >
       {messages.map((message) => (
-        <MessageBubble key={message.id} message={message} />
+        <MessageBubble
+          key={message.id}
+          message={message}
+          lastUserMessage={lastUserMessage}
+          onRetry={onRetry}
+        />
       ))}
 
       {isTyping && (
@@ -43,6 +58,7 @@ export default function MessageList({ messages, isTyping }: Props) {
           HexAstra écrit...
         </div>
       )}
+      <div ref={bottomRef} />
     </div>
   )
 }

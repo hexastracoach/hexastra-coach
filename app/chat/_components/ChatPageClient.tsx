@@ -314,6 +314,19 @@ export default function ChatPageClient() {
   const userInitials = getInitials(userEmail)
   const isLimitReached = isFreePlan(userPlan) && !canContinueChat(userPlan, freeMessagesUsed)
 
+  const isReadingFlowStep = useCallback((step?: string | null) => {
+    if (!step) return false
+    return (
+      step === 'analysis' ||
+      step === 'decision' ||
+      step === 'deep_reading' ||
+      step === 'sensitive_support' ||
+      step === 'micro_profile' ||
+      step === 'micro_year' ||
+      step === 'micro_month'
+    )
+  }, [])
+
   const applyApiResponse = useCallback((data: HexastraApiResponse | null | undefined) => {
     if (!data) {
       return "Je n’ai pas pu terminer la lecture pour le moment."
@@ -516,6 +529,7 @@ export default function ChatPageClient() {
       try {
         const data = await postChatPayload(payload)
         const reply = applyApiResponse(data)
+        const isReading = isReadingFlowStep(data?.flowState?.step)
 
         setMessages([
           ...nextConversation,
@@ -524,6 +538,7 @@ export default function ChatPageClient() {
             role: 'assistant',
             content: reply,
             created_at: new Date().toISOString(),
+            isReading,
           },
         ])
       } catch (error) {
@@ -557,6 +572,7 @@ export default function ChatPageClient() {
       userPlan,
       postChatPayload,
       journeyEnabled,
+      isReadingFlowStep,
     ]
   )
 
@@ -880,6 +896,7 @@ export default function ChatPageClient() {
     try {
       const data = await postChatPayload(payload)
       const reply = applyApiResponse(data)
+      const isReading = isReadingFlowStep(data?.flowState?.step)
 
       setMessages((prev) => {
         const without = prev.filter((m) => m.id !== loadingId)
@@ -891,6 +908,7 @@ export default function ChatPageClient() {
             role: 'assistant' as const,
             content: reply,
             created_at: new Date().toISOString(),
+            isReading,
           },
         ]
       })
@@ -1002,12 +1020,16 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
 
       const cachedReply = cacheRef.current.get(cacheKey)
       if (cachedReply) {
+        const cachedIsReading =
+          cachedReply.includes('────────────────────') ||
+          cachedReply.toLowerCase().includes('pour aller plus loin')
         const assistantMessage: Msg = {
           id: `${Date.now()}-cached`,
           role: 'assistant',
           content: cachedReply,
           created_at: new Date().toISOString(),
           cached: true,
+          isReading: cachedIsReading,
         }
 
         setTimeout(() => {
@@ -1044,12 +1066,14 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
       try {
         const data = await postChatPayload(payload)
         const reply = applyApiResponse(data)
+        const isReading = isReadingFlowStep(data?.flowState?.step)
 
         const assistantMessage: Msg = {
           id: `${Date.now()}-assistant`,
           role: 'assistant',
           content: reply,
           created_at: new Date().toISOString(),
+          isReading,
         }
 
         const final = [...nextConversation, assistantMessage]
@@ -1100,6 +1124,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
       userPlan,
       postChatPayload,
       journeyEnabled,
+      isReadingFlowStep,
     ]
   )
 
@@ -1240,7 +1265,18 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
 
           <div className="hx-app-feed hx-scroll-soft">
             <div className="hx-app-feed-inner">
-              <MessageList messages={messages} isTyping={isTyping} />
+              <MessageList
+                messages={messages}
+                isTyping={isTyping}
+                lastUserMessage={lastUserMessage}
+                onRetry={(fallback) => {
+                  if (fallback) {
+                    void handleSend(fallback)
+                  } else {
+                    void handleSend(lastUserMessage)
+                  }
+                }}
+              />
 
               {premiumLock && (
                 <div className="hx-premium-lock">

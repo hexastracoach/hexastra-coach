@@ -14,14 +14,15 @@ type EnrichInput = {
   selectedSubmenuKey?: string | null
 }
 
-const TECH_STEPS = ['quota_limit', 'error', 'birthdata', 'practitioner_usage', 'loading']
+const TECH_STEPS = ['quota_limit', 'error', 'birthdata', 'practitioner_usage', 'loading', 'menu', 'clarification']
+const READING_STEPS = ['analysis', 'decision', 'deep_reading', 'sensitive_support', 'micro_profile', 'micro_year', 'micro_month']
 
 function shouldEnrich(response: HexastraApiResponse): boolean {
   if (!response?.reply && !response?.message) return false
   const step = response?.flowState?.step
   if (!step) return false
   if (TECH_STEPS.includes(step)) return false
-  return true
+  return READING_STEPS.includes(step)
 }
 
 function pickSign(birthDate?: string | null, solar?: string | null): SolarSign | 'Neutre' {
@@ -51,11 +52,15 @@ export function enrichReadingResponse(input: EnrichInput): HexastraApiResponse {
     lastUserMessage: response?.metadata?.lastUserMessage ?? undefined,
   })
   const text = response.reply || response.message || ''
+
+  const alreadyHasClosure = text.includes(closure.slice(0, 22))
   const suggestionBlock = suggestions.length
-    ? `\n\nPour aller plus loin, tu peux :\n- ${suggestions.join('\n- ')}`
+    ? `\n────────────────────\nPour aller plus loin, tu peux :\n- ${suggestions.join('\n- ')}`
     : ''
 
-  const enrichedText = `${text}\n\n${closure}${suggestionBlock}`
+  const enrichedText = alreadyHasClosure
+    ? text
+    : `${text}\n────────────────────\n${closure}${suggestionBlock}`
 
   return {
     ...response,

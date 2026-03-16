@@ -1,9 +1,12 @@
 'use client'
 
+import { useMemo, useState } from 'react'
 import { type Msg } from '../_lib/chat'
 
 type Props = {
   message: Msg
+  lastUserMessage?: string
+  onRetry?: (fallbackMessage?: string) => void
 }
 
 function formatTime(value?: string) {
@@ -13,9 +16,78 @@ function formatTime(value?: string) {
   return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function MessageBubble({ message }: Props) {
+function splitReadingSections(content: string) {
+  const segments = content.split('\n────────────────────\n')
+  if (segments.length < 2) return null
+
+  const main = segments[0].trim()
+  const closure = segments[1]?.trim()
+  const suggestions = segments.slice(2).join('\n').trim()
+
+  return { main, closure, suggestions }
+}
+
+export default function MessageBubble({ message, lastUserMessage, onRetry }: Props) {
   const isUser = message.role === 'user'
   const timeLabel = formatTime(message.created_at)
+  const readingSections = useMemo(
+    () => (message.isReading ? splitReadingSections(message.content) : null),
+    [message.content, message.isReading]
+  )
+  const [copied, setCopied] = useState(false)
+  const [shared, setShared] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setCopied(false)
+    }
+  }
+
+  const handleShare = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: message.content })
+      } else {
+        await navigator.clipboard.writeText(message.content)
+      }
+      setShared(true)
+      setTimeout(() => setShared(false), 1800)
+    } catch {
+      setShared(false)
+    }
+  }
+
+  const handleRetry = () => {
+    if (onRetry) onRetry(lastUserMessage)
+  }
+
+  const renderContent = () => {
+    if (!readingSections) {
+      return <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ whiteSpace: 'pre-wrap' }}>{readingSections.main}</div>
+        <div style={{ height: 1, background: 'rgba(255,255,255,0.08)' }} />
+        <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,0.9)' }}>
+          {readingSections.closure}
+        </div>
+        {readingSections.suggestions && (
+          <>
+            <div style={{ height: 1, background: 'rgba(255,255,255,0.08)' }} />
+            <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,0.86)' }}>
+              {readingSections.suggestions}
+            </div>
+          </>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div
@@ -30,7 +102,6 @@ export default function MessageBubble({ message }: Props) {
         gap: 6,
       }}
     >
-      {/* nom du locuteur + heure */}
       <div
         style={{
           display: 'flex',
@@ -59,7 +130,6 @@ export default function MessageBubble({ message }: Props) {
         )}
       </div>
 
-      {/* contenu */}
       <div
         className={`hx-chat-message hx-chat-bubble ${isUser ? 'is-user' : 'is-assistant'}`}
         style={{
@@ -72,8 +142,68 @@ export default function MessageBubble({ message }: Props) {
           alignSelf: isUser ? 'flex-end' : 'flex-start',
         }}
       >
-        {message.content}
+        {renderContent()}
       </div>
+
+      {!isUser && message.isReading && (
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            alignItems: 'center',
+            marginTop: 4,
+            color: 'rgba(255,255,255,0.82)',
+            fontSize: 13,
+          }}
+        >
+          <button
+            className="hx-action-btn"
+            onClick={handleCopy}
+            type="button"
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: 14,
+              padding: '6px 12px',
+              color: '#fefefe',
+              cursor: 'pointer',
+            }}
+          >
+            {copied ? 'Copié' : 'Copier'}
+          </button>
+          <button
+            className="hx-action-btn"
+            onClick={handleShare}
+            type="button"
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: 14,
+              padding: '6px 12px',
+              color: '#fefefe',
+              cursor: 'pointer',
+            }}
+          >
+            {shared ? 'Partagé' : 'Partager'}
+          </button>
+          <button
+            className="hx-action-btn"
+            onClick={handleRetry}
+            type="button"
+            disabled={!onRetry}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.14)',
+              borderRadius: 14,
+              padding: '6px 12px',
+              color: onRetry ? '#fefefe' : 'rgba(255,255,255,0.4)',
+              cursor: onRetry ? 'pointer' : 'not-allowed',
+            }}
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
     </div>
   )
 }

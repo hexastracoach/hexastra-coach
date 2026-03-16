@@ -6,6 +6,7 @@ export type Msg = {
   content: string
   created_at: string
   cached?: boolean
+  isReading?: boolean
 }
 
 export type Mode = 'essentiel' | 'premium' | 'praticien'
