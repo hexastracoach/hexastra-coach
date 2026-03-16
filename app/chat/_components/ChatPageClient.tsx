@@ -84,6 +84,8 @@ import {
   updateConversationState,
   type ConversationState,
 } from '@/lib/conversation'
+import { runConversationController, type ConversationContext } from '@/lib/hexastra/conversation/conversationController'
+import { analyzeAgentState } from '@/lib/hexastra/agent/agentBrain'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
 import type {
@@ -304,6 +306,11 @@ export default function ChatPageClient() {
   const lastMessageRef = useRef<string | null>(null)
   const journeyHydratedRef = useRef(false)
   const conversationStateRef = useRef<ConversationState>('start')
+  const conversationContextRef = useRef<ConversationContext>({
+    shortTerm: { history: [], state: 'start' },
+    longTerm: {},
+    state: 'start',
+  })
 
   const mode = planLoaded ? getEntitlements(userPlan).chatMode : 'essentiel'
 
@@ -1165,15 +1172,25 @@ export default function ChatPageClient() {
           content,
           created_at: new Date().toISOString(),
         }
-        const formatted = formatAssistantReply(
-          buildShiloReply({ intent: convIntent, message: baseContent }),
-          {
-            intent: intentV2 ?? convIntent,
-            isReading: false,
-            userMessage: baseContent,
-            depthLevel,
-          }
-        )
+        const brain = analyzeAgentState({
+          message: baseContent,
+          intent: intentV2 ?? convIntent,
+          entities: memorySignals as any,
+          memory: conversationContextRef.current,
+        })
+        const convoResult = runConversationController({
+          message: baseContent,
+          history: messages.filter((m) => m.role === 'user').map((m) => m.content),
+          userPlan,
+          ctx: conversationContextRef.current,
+        })
+        conversationContextRef.current = convoResult.ctx
+        const formatted = formatAssistantReply(convoResult.reply, {
+          intent: brain.intent ?? intentV2 ?? convIntent,
+          isReading: false,
+          userMessage: baseContent,
+          depthLevel,
+        })
         const assistantMessage: Msg = {
           id: `${Date.now()}-assistant-conv`,
           role: 'assistant',
