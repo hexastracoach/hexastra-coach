@@ -35,16 +35,16 @@ export function PaywallInline({ userPlan, onUpgrade }: PaywallProps) {
           </div>
           <div>
             <div style={p.gateTitle}>Lecture complete disponible</div>
-            <div style={p.gateSubtitle}>Debloquez votre analyse Premium</div>
+            <div style={p.gateSubtitle}>Débloquez votre analyse Premium</div>
           </div>
         </div>
 
         <div style={p.gateFeatures}>
           {[
-            { icon: 'PDF', label: "L'analyse detaillee" },
-            { icon: '*', label: 'Les conseils personnalises' },
+            { icon: 'PDF', label: "L'analyse détaillée" },
+            { icon: '*', label: 'Les conseils personnalisés' },
             { icon: 'MP3', label: 'La version audio' },
-            { icon: 'DL', label: 'Le PDF telechargeable' },
+            { icon: 'DL', label: 'Le PDF téléchargeable' },
           ].map((f, i) => (
             <div key={i} style={p.gateFeature}>
               <span style={p.gateFeatureIcon}>{f.icon}</span>
@@ -57,14 +57,14 @@ export function PaywallInline({ userPlan, onUpgrade }: PaywallProps) {
           onClick={onUpgrade || (() => router.push('/pricing'))}
           style={p.upgradeBtn}
         >
-          Debloquer ma lecture
+          Débloquer ma lecture
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
             <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
           </svg>
         </button>
 
         <p style={p.upgradeNote}>
-          Premium - 19 EUR/mois - Sans engagement
+          Premium - 19 €/mois - Sans engagement
         </p>
       </div>
     </div>
@@ -79,13 +79,13 @@ export function DailyLimitReached({ onUpgrade }: { onUpgrade?: () => void }) {
       <div style={d.icon}></div>
       <div style={d.title}>Limite quotidienne atteinte</div>
       <p style={d.desc}>
-        Vous avez utilise votre lecture gratuite du jour. Revenez demain - ou passez en Premium pour des lectures illimitees.
+        Vous avez utilisé votre lecture gratuite du jour. Revenez demain — ou passez en Premium pour des lectures illimitées.
       </p>
       <button
         onClick={onUpgrade || (() => router.push('/pricing'))}
         style={d.btn}
       >
-        Lectures illimitees - 19 EUR/mois
+        Lectures illimitées - 19 €/mois
       </button>
       <p style={d.note}>Ou revenez demain pour votre prochaine lecture gratuite</p>
     </div>
@@ -100,13 +100,13 @@ export function StorageLimitReached({ onUpgrade }: { onUpgrade?: () => void }) {
       <div style={d.icon}></div>
       <div style={d.title}>Bibliotheque pleine</div>
       <p style={d.desc}>
-        Vous avez atteint la limite de 3 lectures sauvegardees. Supprimez une ancienne lecture ou passez en Premium pour un historique illimite.
+        Vous avez atteint la limite de 3 lectures sauvegardées. Supprimez une ancienne lecture ou passez en Premium pour un historique illimité.
       </p>
       <button
         onClick={onUpgrade || (() => router.push('/pricing'))}
         style={d.btn}
       >
-        Historique illimite - 19 EUR/mois
+        Historique illimité - 19 €/mois
       </button>
     </div>
   )

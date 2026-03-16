@@ -79,6 +79,11 @@ import {
 import { applyHumanTone } from '@/lib/chat/humanToneEngine'
 import { composeResponse } from '@/lib/chat/responseComposer'
 import { applyIntelligentSilence } from '@/lib/chat/intelligentSilenceEngine'
+import {
+  detectIntent as detectIntentV2,
+  updateConversationState,
+  type ConversationState,
+} from '@/lib/conversation'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
 import type {
@@ -298,6 +303,7 @@ export default function ChatPageClient() {
   const requestAbortRef = useRef<AbortController | null>(null)
   const lastMessageRef = useRef<string | null>(null)
   const journeyHydratedRef = useRef(false)
+  const conversationStateRef = useRef<ConversationState>('start')
 
   const mode = planLoaded ? getEntitlements(userPlan).chatMode : 'essentiel'
 
@@ -643,8 +649,10 @@ export default function ChatPageClient() {
         const reply = applyApiResponse(data)
         const depthLevel = detectUserDepthLevel(message, messages, userPlan)
         const actionIntent = detectUserIntent(message)
+        const intentV2 = detectIntentV2(message)
+        conversationStateRef.current = updateConversationState(intentV2, conversationStateRef.current)
         const finalReply = formatAssistantReply(reply, {
-          intent: actionIntent,
+          intent: intentV2 ?? actionIntent,
           userMessage: message,
           isReading,
           depthLevel,
@@ -692,6 +700,7 @@ export default function ChatPageClient() {
       postChatPayload,
       journeyEnabled,
       isReadingFlowStep,
+      formatAssistantReply,
     ]
   )
 
@@ -1115,6 +1124,8 @@ export default function ChatPageClient() {
 
       const moderation = moderateMessage(baseContent)
       const convIntent: ConversationIntent = detectUserIntent(baseContent)
+      const intentV2 = detectIntentV2(baseContent)
+      conversationStateRef.current = updateConversationState(intentV2, conversationStateRef.current)
       const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
       const memorySignals = detectMemorySignals(baseContent)
       setUserMemory((prev) => {
@@ -1157,7 +1168,7 @@ export default function ChatPageClient() {
         const formatted = formatAssistantReply(
           buildShiloReply({ intent: convIntent, message: baseContent }),
           {
-            intent: convIntent,
+            intent: intentV2 ?? convIntent,
             isReading: false,
             userMessage: baseContent,
             depthLevel,
@@ -1331,8 +1342,10 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
         const actionIntent = detectUserIntent(baseContent)
+        const intentV2 = detectIntentV2(baseContent)
+        conversationStateRef.current = updateConversationState(intentV2, conversationStateRef.current)
         const finalReply = formatAssistantReply(reply, {
-          intent: actionIntent,
+          intent: intentV2 ?? actionIntent,
           userMessage: baseContent,
           isReading,
           depthLevel,
@@ -1396,6 +1409,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
       postChatPayload,
       journeyEnabled,
       isReadingFlowStep,
+      formatAssistantReply,
     ]
   )
 

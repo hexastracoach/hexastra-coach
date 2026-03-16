@@ -1510,14 +1510,16 @@ transition: all 0.35s ease;
 }
 
 /* User bubble */
-.hx-message-bubble {
+.hx-message-bubble,
+.hx-chat-bubble {
   font-size: 0.97rem;
   line-height: 1.72;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.hx-message-bubble.is-user {
+.hx-message-bubble.is-user,
+.hx-chat-bubble.is-user {
   max-width: min(640px, 78%);
   padding: 12px 18px;
   border-radius: 20px 20px 5px 20px;
@@ -1532,7 +1534,8 @@ transition: all 0.35s ease;
 }
 
 /* Assistant — no box, clean text layout */
-.hx-message-bubble.is-assistant {
+.hx-message-bubble.is-assistant,
+.hx-chat-bubble.is-assistant {
   max-width: min(820px, 92%);
   padding: 10px 16px;
   border-radius: 18px 18px 18px 6px;
