@@ -1,5 +1,3 @@
-'use server'
-
 import { NextResponse } from 'next/server'
 import { normalizeOpenCageResult, type NormalizedPlace } from '@/lib/location/normalizeOpenCageResult'
 import { formatLocationLabel } from '@/lib/location/formatLocationLabel'
