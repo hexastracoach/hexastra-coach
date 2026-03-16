@@ -77,6 +77,8 @@ import {
   type UserMemory,
 } from '@/lib/chat/userMemoryEngine'
 import { applyHumanTone } from '@/lib/chat/humanToneEngine'
+import { composeResponse } from '@/lib/chat/responseComposer'
+import { applyIntelligentSilence } from '@/lib/chat/intelligentSilenceEngine'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
 import type {
@@ -327,6 +329,38 @@ export default function ChatPageClient() {
 
   // Memory hint used sparingly
   const memoryHint = useMemo(() => getUserMemoryContext(userMemory), [userMemory])
+
+  // Final formatting pipeline: Depth/Tone -> Composer -> HumanTone
+  const formatAssistantReply = useCallback(
+    (base: string, {
+      intent,
+      isReading,
+      userMessage,
+      depthLevel,
+    }: {
+      intent: ConversationIntent | string | undefined
+      isReading: boolean
+      userMessage: string
+      depthLevel: string
+    }) => {
+      const withMemory = !isReading && memoryHint ? `${base}\n\n${memoryHint}` : base
+      const depthAdjusted = adjustResponseDepth(withMemory, {
+        level: depthLevel as any,
+        plan: userPlan,
+        isReading,
+      })
+      const toned = ensureHexAstraTone(depthAdjusted, {
+        intent,
+        isReading,
+        maxLines: isReading ? undefined : 8,
+      })
+      const composed = composeResponse(toned, { intent, isReading })
+      const human = applyHumanTone(composed, { intent, userMessage, isReading })
+      const silent = applyIntelligentSilence(human, { intent, userMessage, isReading })
+      return silent
+    },
+    [memoryHint, userPlan]
+  )
 
   const userMessages = useMemo(
     () => messages.filter((message) => message.role === 'user'),
@@ -608,22 +642,12 @@ export default function ChatPageClient() {
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const reply = applyApiResponse(data)
         const depthLevel = detectUserDepthLevel(message, messages, userPlan)
-        const memoryPreface = memoryHint && !isReading ? `${reply}\n\n${memoryHint}` : reply
-        const depthReply = adjustResponseDepth(memoryPreface, {
-          level: depthLevel,
-          plan: userPlan,
-          isReading,
-        })
         const actionIntent = detectUserIntent(message)
-        const tonedReply = ensureHexAstraTone(depthReply, {
-          intent: actionIntent,
-          isReading,
-          maxLines: isReading ? undefined : 8,
-        })
-        const humanReply = applyHumanTone(tonedReply, {
+        const finalReply = formatAssistantReply(reply, {
           intent: actionIntent,
           userMessage: message,
           isReading,
+          depthLevel,
         })
 
         setMessages([
@@ -631,7 +655,7 @@ export default function ChatPageClient() {
           {
             id: `${Date.now()}-assistant`,
             role: 'assistant',
-            content: humanReply,
+            content: finalReply,
             created_at: new Date().toISOString(),
             isReading,
           },
@@ -1036,6 +1060,14 @@ export default function ChatPageClient() {
       const data = await postChatPayload(payload)
       const reply = applyApiResponse(data)
       const isReading = isReadingFlowStep(data?.flowState?.step)
+      const depthLevel = detectUserDepthLevel(lastUserMessage || reply, messages, userPlan)
+      const microIntent = detectUserIntent(lastUserMessage || reply)
+      const finalReply = formatAssistantReply(reply, {
+        intent: microIntent,
+        userMessage: lastUserMessage || reply,
+        isReading,
+        depthLevel,
+      })
 
       setMessages((prev) => {
         const without = prev.filter((m) => m.id !== loadingId)
@@ -1045,7 +1077,7 @@ export default function ChatPageClient() {
           {
             id: `${Date.now()}-micro`,
             role: 'assistant' as const,
-            content: reply,
+            content: finalReply,
             created_at: new Date().toISOString(),
             isReading,
           },
@@ -1122,25 +1154,19 @@ export default function ChatPageClient() {
           content,
           created_at: new Date().toISOString(),
         }
-
+        const formatted = formatAssistantReply(
+          buildShiloReply({ intent: convIntent, message: baseContent }),
+          {
+            intent: convIntent,
+            isReading: false,
+            userMessage: baseContent,
+            depthLevel,
+          }
+        )
         const assistantMessage: Msg = {
           id: `${Date.now()}-assistant-conv`,
           role: 'assistant',
-          content: applyHumanTone(
-            ensureHexAstraTone(
-              adjustResponseDepth(buildShiloReply({ intent: convIntent, message: baseContent }), {
-                level: depthLevel,
-                plan: userPlan,
-                isReading: false,
-              }),
-              {
-                intent: convIntent,
-                isReading: false,
-                maxLines: 8,
-              }
-            ),
-            { intent: convIntent, userMessage: baseContent, isReading: false }
-          ),
+          content: formatted,
           created_at: new Date().toISOString(),
           isReading: false,
         }
@@ -1252,28 +1278,16 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
           cachedReply.includes('────────────────────') ||
           cachedReply.toLowerCase().includes('pour aller plus loin')
         const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
-        const depthCached = adjustResponseDepth(
-          memoryHint ? `${cachedReply}\n\n${memoryHint}` : cachedReply,
-          {
-            level: depthLevel,
-            plan: userPlan,
-            isReading: cachedIsReading,
-          }
-        )
-        const tonedCached = ensureHexAstraTone(depthCached, {
+        const composedCached = formatAssistantReply(cachedReply, {
           intent: convIntent,
           isReading: cachedIsReading,
-          maxLines: cachedIsReading ? undefined : 8,
-        })
-        const humanCached = applyHumanTone(tonedCached, {
-          intent: convIntent,
           userMessage: baseContent,
-          isReading: cachedIsReading,
+          depthLevel,
         })
         const assistantMessage: Msg = {
           id: `${Date.now()}-cached`,
           role: 'assistant',
-          content: humanCached,
+          content: composedCached,
           created_at: new Date().toISOString(),
           cached: true,
           isReading: cachedIsReading,
