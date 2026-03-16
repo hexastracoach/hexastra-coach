@@ -89,8 +89,6 @@ function buildPractitionerUsageMessage(language: string): string {
 }
 
 function buildGreetingMessage(mode: ReturnType<typeof getModeForPlan>, language: string): string {
-  const items = getMenuForMode(mode).slice(0, 6)
-
   const intro = tr(language, {
     en: 'Hello, I’m HexAstra. I can help you clarify a situation, explore a life theme, or start a personalized reading.',
     fr: 'Bonjour, je suis HexAstra. Je peux t’aider à clarifier une situation, explorer un thème de vie, ou lancer une lecture personnalisée.',
@@ -101,17 +99,15 @@ function buildGreetingMessage(mode: ReturnType<typeof getModeForPlan>, language:
   })
 
   const invite = tr(language, {
-    en: 'Choose the angle you want to explore:',
-    fr: 'Choisis l’angle que tu veux explorer :',
-    es: 'Elige el ángulo que quieres explorar:',
-    pt: 'Escolhe o ângulo que queres explorar:',
-    de: 'Wähle den Blickwinkel, den du erkunden möchtest:',
-    it: 'Scegli l’angolo che vuoi esplorare:',
+    en: 'I’m here to help. Ask your question or explore an angle below.',
+    fr: 'Je suis là pour t’accompagner. Pose ta question ou explore un angle ci-dessous.',
+    es: 'Estoy aquí para acompañarte. Haz tu pregunta o explora un ángulo justo debajo.',
+    pt: 'Estou aqui para acompanhar-te. Faz a tua pergunta ou explora um ângulo abaixo.',
+    de: 'Ich begleite dich: Stelle deine Frage oder wähle einen Blickwinkel unten.',
+    it: 'Sono qui per accompagnarti. Fai la tua domanda o esplora un angolo qui sotto.',
   })
 
-  const lines = items.map((item, index) => `${index + 1} — ${item.label} : ${item.description}`)
-
-  return [intro, '', invite, '', ...lines].join('\n')
+  return [intro, '', invite].join('\n')
 }
 
 function yearKey(date = new Date()): string {
