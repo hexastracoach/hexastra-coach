@@ -303,7 +303,10 @@ export default function ChatPageClient() {
     chatStep === 'conversation_ready' &&
     menuItems.length > 0 &&
     !isTyping &&
-    !isSimpleGreeting(lastUserMessage)
+    (
+      isSimpleGreeting(lastUserMessage) ||
+      userMessageCount <= 1
+    )
 
   const desktopLeft = viewportWidth >= 1100
   const userInitials = getInitials(userEmail)
