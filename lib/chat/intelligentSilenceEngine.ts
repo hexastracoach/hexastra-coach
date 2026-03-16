@@ -1,4 +1,4 @@
-type Energy = 'stress' | 'lost' | 'fatigue' | 'curious' | 'neutral'
+﻿type Energy = 'stress' | 'lost' | 'fatigue' | 'curious' | 'neutral'
 
 type SilenceCtx = {
   intent?: string
@@ -12,23 +12,24 @@ const SHORT_UTTERANCES = [
   /^hey\b/i,
   /^coucou\b/i,
   /^merci\b/i,
-  /^(ok|oui|non|d'accord|je vois|intéressant)\b/i,
-  /^ça va\b/i,
+  /^(ok|oui|non|d'accord|je vois|intÃ©ressant)\b/i,
+  /^Ã§a va\b/i,
 ]
 
 const MINIMAL_SHAPES = {
-  A: "Je suis là.\nQu’est-ce qui te pèse le plus en ce moment ?",
-  B: "Je vois.\nQuelque chose semble demander à être clarifié ici.",
-  C: "Oui, ça arrive.\nOn peut regarder ça simplement.",
-  D: "Merci.\nContinue, je te suis.",
-  E: "Je comprends.\nOù sens-tu que ça bloque le plus ?",
+  A: 'Salut. Je suis là.\nComment tu te sens maintenant ?',
+  B: 'Je vois.\nQu’est-ce qui demande à être clarifié ici ?',
+  C: 'D’accord.\nOn peut regarder ça simplement.',
+  D: 'Merci.\nJe te suis.',
+  E: 'Je comprends.\nOù est-ce que ça bloque le plus ?',
 }
 
 function pickShape(intent?: string, energy?: Energy): string {
+  const i = intent?.toLowerCase()
   if (energy === 'stress' || energy === 'fatigue') return MINIMAL_SHAPES.E
-  if (intent === 'GREETING' || intent === 'SMALL_TALK') return MINIMAL_SHAPES.A
-  if (intent === 'EMOTIONAL') return MINIMAL_SHAPES.B
-  if (intent === 'DECISION' || intent === 'EXPLORATION' || intent === 'QUESTION') return MINIMAL_SHAPES.E
+  if (i === 'greeting' || i === 'small_talk') return MINIMAL_SHAPES.A
+  if (i === 'emotional' || i === 'emotion') return MINIMAL_SHAPES.B
+  if (i === 'decision' || i === 'exploration' || i === 'question') return MINIMAL_SHAPES.E
   return MINIMAL_SHAPES.C
 }
 
@@ -36,8 +37,8 @@ function detectEnergy(msg?: string): Energy {
   if (!msg) return 'neutral'
   const t = msg.toLowerCase()
   if (/stress|tendu|angoiss|peur|pression/.test(t)) return 'stress'
-  if (/fatigu|épuis|vidé|lassé|marre/.test(t)) return 'fatigue'
-  if (/perdu|flou|ne sais pas|hésite|doute/.test(t)) return 'lost'
+  if (/fatigu|Ã©puis|vidÃ©|lassÃ©|marre/.test(t)) return 'fatigue'
+  if (/perdu|flou|ne sais pas|hÃ©site|doute/.test(t)) return 'lost'
   if (/curieux|pourquoi|comment|envie de comprendre/.test(t)) return 'curious'
   return 'neutral'
 }
@@ -100,3 +101,4 @@ export function applyIntelligentSilence(reply: string, ctx: SilenceCtx = {}): st
   // Compress to a minimal, calm shape
   return pickShape(ctx.intent, energy)
 }
+
