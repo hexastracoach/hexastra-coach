@@ -58,6 +58,7 @@ export const STORAGE_KEYS = {
   readings: 'hexastra.readings.v2',
   projects: 'hexastra.projects.v2',
   birthData: 'hexastra.birthData.v1',
+  partnerBirthData: 'hexastra.birthData.partner.v1',
 } as const
 
 export const QUICK_PROMPTS = [

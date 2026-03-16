@@ -246,6 +246,7 @@ export default function ChatPageClient() {
   const [userEmail, setUserEmail] = useState('')
 
   const [birthData, setBirthData] = useState<BirthData>(EMPTY_BIRTH_DATA)
+  const [partnerBirthData, setPartnerBirthData] = useState<BirthData>(EMPTY_BIRTH_DATA)
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
 
   const [userPlan, setUserPlan] = useState<PlanKey>('free')
@@ -286,6 +287,12 @@ export default function ChatPageClient() {
   useEffect(() => {
     if (isBirthDataComplete(birthData)) {
       setShowInlineBirthForm(false)
+    }
+  }, [birthData])
+
+  useEffect(() => {
+    if (!isBirthDataComplete(birthData)) {
+      setShowInlineBirthForm(true)
     }
   }, [birthData])
 
@@ -683,6 +690,16 @@ export default function ChatPageClient() {
   }, [])
 
   useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.partnerBirthData)
+      if (stored) {
+        const parsed = JSON.parse(stored) as BirthData
+        if (parsed && typeof parsed === 'object') setPartnerBirthData(mergeBirthData(parsed))
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
     setMicroReadings(loadMicroReadings())
   }, [])
 
@@ -802,10 +819,20 @@ export default function ChatPageClient() {
     } catch {}
   }, [])
 
-  const handleBirthDataSave = useCallback(
-    (next: BirthData) => {
+  const handlePartnerBirthDataChange = useCallback((next: BirthData) => {
+    const normalized = mergeBirthData(next)
+    setPartnerBirthData(normalized)
+    try {
+      localStorage.setItem(STORAGE_KEYS.partnerBirthData, JSON.stringify(normalized))
+    } catch {}
+  }, [])
+
+    const handleBirthDataSave = useCallback(
+    (next: BirthData, partnerNext: BirthData) => {
       const normalized = mergeBirthData(next)
+      const normalizedPartner = mergeBirthData(partnerNext)
       handleBirthDataChange(normalized)
+      handlePartnerBirthDataChange(normalizedPartner)
 
       const reset = loadMicroReadings()
       setMicroReadings({ ...reset, profileKey: null })
@@ -837,8 +864,27 @@ export default function ChatPageClient() {
           uiAction: 'restart_flow',
         })
       }
+
+      const partnerParts: string[] = []
+      if (normalizedPartner.firstName) partnerParts.push(`prénom ${normalizedPartner.firstName}`)
+      if (normalizedPartner.birthDate) partnerParts.push(`né(e) le ${normalizedPartner.birthDate}`)
+      if (normalizedPartner.birthTimeKnown === false) {
+        partnerParts.push('heure non fournie (12:00 par défaut)')
+      } else if (normalizedPartner.birthTime) {
+        partnerParts.push(`à ${normalizedPartner.birthTime}`)
+      }
+      if (normalizedPartner.birthCity) partnerParts.push(`à ${normalizedPartner.birthCity}`)
+      if (normalizedPartner.birthCountryName) partnerParts.push(normalizedPartner.birthCountryName)
+
+      if (partnerParts.length) {
+        void sendStructuredAction({
+          message: `Lecture croisée — données de l'autre personne mises à jour : ${partnerParts.join(', ')}.`,
+          contextType: activeContextType,
+          uiAction: 'restart_flow',
+        })
+      }
     },
-    [activeContextType, handleBirthDataChange, sendStructuredAction]
+    [activeContextType, handleBirthDataChange, handlePartnerBirthDataChange, sendStructuredAction]
   )
 
   const handlePractitionerUsageSelect = useCallback((usage: PractitionerUsage) => {
@@ -908,6 +954,7 @@ export default function ChatPageClient() {
       requestType,
       plan: userPlan,
       birthData,
+      partnerBirthData,
       practitionerUsage,
       chatLanguage,
       conversationId,
@@ -967,6 +1014,22 @@ export default function ChatPageClient() {
       if (!content.trim() || isTyping) return
       if (isDuplicateMessage(lastMessageRef, content)) return
       if (chatStep !== 'conversation_ready') return
+
+      if (!isBirthDataComplete(birthData)) {
+        setShowInlineBirthForm(true)
+        const baseMessages = isWelcome ? [] : messages
+        setMessages([
+          ...baseMessages,
+          {
+            id: `${Date.now()}-birthdata`,
+            role: 'assistant',
+            content:
+              "Pour commencer la lecture, renseigne tes donnÃ©es de naissance dans le formulaire situÃ© juste sous la barre de chat. Tu peux aussi ajouter celles de la seconde personne pour une lecture croisÃ©e.",
+            created_at: new Date().toISOString(),
+          },
+        ])
+        return
+      }
 
       if (!canContinueChat(userPlan, freeMessagesUsed)) {
         const baseMessages = isWelcome ? [] : messages
@@ -1077,6 +1140,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
         requestType: 'chat',
         plan: userPlan,
         birthData,
+        partnerBirthData,
         practitionerUsage,
         chatLanguage,
         conversationId,
@@ -1134,6 +1198,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
       applyApiResponse,
       attachedFile,
       birthData,
+      partnerBirthData,
       chatLanguage,
       conversationId,
       evolutionProfile,
@@ -1372,8 +1437,9 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
                 <div className="hx-inline-birth">
                   <BirthDataInlineForm
                     data={birthData}
-                    onSave={(next) => {
-                      handleBirthDataSave(next)
+                    partnerData={partnerBirthData}
+                    onSave={(next, partner) => {
+                      handleBirthDataSave(next, partner)
                       setShowInlineBirthForm(false)
                     }}
                   />

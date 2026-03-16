@@ -91,6 +91,7 @@ export type ChatPayload = {
   professionalUseAllowed: boolean
   practitionerUsage: PractitionerUsage | 'self' | 'client'
   birthData: ApiBirthData | null
+  partnerBirthData?: ApiBirthData | null
   messages: ChatMessage[]
   evolutionProfile: UserEvolutionProfile | null
   contextType: ContextType
@@ -104,6 +105,7 @@ export function buildChatPayload({
   requestType,
   plan,
   birthData,
+  partnerBirthData = null,
   practitionerUsage,
   chatLanguage,
   conversationId,
@@ -118,6 +120,7 @@ export function buildChatPayload({
   requestType: RequestType
   plan: PlanKey
   birthData: BirthData
+  partnerBirthData?: BirthData | null
   practitionerUsage: PractitionerUsage
   chatLanguage: string | undefined
   conversationId: string | null
@@ -132,6 +135,7 @@ export function buildChatPayload({
   const planCtx = buildPlanApiContext(plan)
   const ents = getEntitlements(plan)
   const apiBirthData = toApiBirthData(birthData)
+  const apiPartnerBirthData = partnerBirthData ? toApiBirthData(partnerBirthData) : null
 
   let finalMessages = messages
   if (requestType !== 'chat') {
@@ -152,6 +156,7 @@ export function buildChatPayload({
     professionalUseAllowed: planCtx.professionalUseAllowed,
     practitionerUsage: practitionerUsage ?? null,
     birthData: apiBirthData,
+    partnerBirthData: apiPartnerBirthData,
     messages: finalMessages,
     evolutionProfile,
     contextType,
