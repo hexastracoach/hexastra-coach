@@ -19,11 +19,10 @@ export type ConversationIntent =
   | 'SMALL_TALK'
   | 'EMOTIONAL'
   | 'QUESTION'
-  | 'EXPLORATION'
+  | 'ANALYSIS_REQUEST'
   | 'DECISION'
-  | 'RELATION'
-  | 'WORK'
-  | 'WELLBEING'
+  | 'EXPLORATION'
+  | 'MENU_NAVIGATION'
   | 'RANDOM'
   | 'HOSTILE'
   | 'SPAM'
@@ -52,22 +51,27 @@ export function detectUserIntent(message: string): ConversationIntent {
   if (/(salut|bonjour|bonsoir|coucou|hello|hey|yo)\b/.test(text)) return 'GREETING'
   if (/(merci|thanks|thx|top|parfait)\b/.test(text)) return 'SMALL_TALK'
   if (/(ça va|ca va|comment tu vas|tu vas bien)\b/.test(text)) return 'SMALL_TALK'
+
   if (/(je suis (perdu|fatigu|épuis|vidé|stress|angoiss|triste|blasé)|j'en peux plus|marre)/i.test(message)) {
     return 'EMOTIONAL'
   }
-  if (/(j'hésite|j\u00e9site|je doute|je ne sais pas quoi faire)/i.test(message)) return 'DECISION'
-  if (/(relation|couple|amour|sentiment|ami|famille)/i.test(message)) return 'RELATION'
-  if (/(travail|taf|boulot|job|boss|manager|coll\u00e8gue|entreprise|projet)/i.test(message)) return 'WORK'
-  if (/(sant\u00e9 mentale|bien-\u00eatre|fatigue|stress|burn ?out|sommeil)/i.test(message)) return 'WELLBEING'
-  if (/(pourquoi|comment|que faire|qu'est-ce que|peux-tu)/i.test(message)) return 'QUESTION'
-  if (/(j'ai besoin d'un conseil|peux-tu m'aider|besoin d'aide)/i.test(message)) return 'EXPLORATION'
+  if (/(menu|choisir un menu|ouvrir le menu|voir les options)/i.test(text)) return 'MENU_NAVIGATION'
+  if (/(j'hésite|je doute|je ne sais pas quoi faire|décision|choisir)/i.test(message)) return 'DECISION'
+
+  const analysisTriggers = /(pourquoi|comment|que faire|qu'est-ce que|analyse|comprendre|situation|probl[eè]me|conflit|choix|relation|travail)/i
+  if (analysisTriggers.test(message)) {
+    if (/(analyse|multi-angle|syst[eé]mique)/i.test(message)) return 'ANALYSIS_REQUEST'
+    return 'QUESTION'
+  }
+
+  if (/(explorer|exploration|regarder sous un angle|creuser)/i.test(message)) return 'EXPLORATION'
 
   if (text.length < 12) return 'SMALL_TALK'
   return 'RANDOM'
 }
 
 export function isConversationalIntent(intent: ConversationIntent): boolean {
-  return ['GREETING', 'SMALL_TALK', 'EMOTIONAL', 'RANDOM', 'WELLBEING'].includes(intent)
+  return ['GREETING', 'SMALL_TALK', 'EMOTIONAL', 'RANDOM'].includes(intent)
 }
 
 type ShiloOptions = {

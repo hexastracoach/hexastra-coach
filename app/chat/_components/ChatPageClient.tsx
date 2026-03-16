@@ -65,6 +65,18 @@ import {
   type ModerationClass,
 } from '@/lib/chat/conversationLayer'
 import { ensureHexAstraTone } from '@/lib/chat/conversationToneEngine'
+import {
+  detectUserDepthLevel,
+  adjustResponseDepth,
+} from '@/lib/chat/adaptiveDepthEngine'
+import {
+  EMPTY_USER_MEMORY,
+  detectMemorySignals,
+  getUserMemoryContext,
+  updateUserMemory,
+  type UserMemory,
+} from '@/lib/chat/userMemoryEngine'
+import { applyHumanTone } from '@/lib/chat/humanToneEngine'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
 import type {
@@ -248,6 +260,7 @@ export default function ChatPageClient() {
   const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null)
   const [selectedSubmenuKey, setSelectedSubmenuKey] = useState<string | null>(null)
   const [journeyEnabled, setJourneyEnabled] = useState<boolean>(false)
+  const [userMemory, setUserMemory] = useState<UserMemory>(EMPTY_USER_MEMORY)
 
   const [readings, setReadings] = useState<Reading[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -311,6 +324,9 @@ export default function ChatPageClient() {
     () => messages.length === 1 && messages[0]?.id === 'welcome',
     [messages]
   )
+
+  // Memory hint used sparingly
+  const memoryHint = useMemo(() => getUserMemoryContext(userMemory), [userMemory])
 
   const userMessages = useMemo(
     () => messages.filter((message) => message.role === 'user'),
@@ -410,6 +426,17 @@ export default function ChatPageClient() {
     if (data.updatedEvolutionProfile) {
       setEvolutionProfile(data.updatedEvolutionProfile as UserEvolutionProfile)
       saveEvolutionProfile(data.updatedEvolutionProfile as UserEvolutionProfile)
+    }
+
+    if (data.metadata?.userMemoryUpdate && typeof data.metadata.userMemoryUpdate === 'object') {
+      try {
+        const update = data.metadata.userMemoryUpdate as Partial<UserMemory>
+        setUserMemory((prev) => {
+          const merged = { ...prev, ...update }
+          localStorage.setItem('hexastra.userMemory', JSON.stringify(merged))
+          return merged
+        })
+      } catch {}
     }
 
     const quotaMeta = data?.metadata?.quota
@@ -580,11 +607,23 @@ export default function ChatPageClient() {
         const data = await postChatPayload(payload)
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const reply = applyApiResponse(data)
+        const depthLevel = detectUserDepthLevel(message, messages, userPlan)
+        const memoryPreface = memoryHint && !isReading ? `${reply}\n\n${memoryHint}` : reply
+        const depthReply = adjustResponseDepth(memoryPreface, {
+          level: depthLevel,
+          plan: userPlan,
+          isReading,
+        })
         const actionIntent = detectUserIntent(message)
-        const tonedReply = ensureHexAstraTone(reply, {
+        const tonedReply = ensureHexAstraTone(depthReply, {
           intent: actionIntent,
           isReading,
           maxLines: isReading ? undefined : 8,
+        })
+        const humanReply = applyHumanTone(tonedReply, {
+          intent: actionIntent,
+          userMessage: message,
+          isReading,
         })
 
         setMessages([
@@ -592,7 +631,7 @@ export default function ChatPageClient() {
           {
             id: `${Date.now()}-assistant`,
             role: 'assistant',
-            content: tonedReply,
+            content: humanReply,
             created_at: new Date().toISOString(),
             isReading,
           },
@@ -702,6 +741,16 @@ export default function ChatPageClient() {
       if (stored) {
         const parsed = JSON.parse(stored) as BirthData
         if (parsed && typeof parsed === 'object') setBirthData(mergeBirthData(parsed))
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('hexastra.userMemory')
+      if (stored) {
+        const parsed = JSON.parse(stored) as UserMemory
+        if (parsed && typeof parsed === 'object') setUserMemory(parsed)
       }
     } catch {}
   }, [])
@@ -1034,6 +1083,13 @@ export default function ChatPageClient() {
 
       const moderation = moderateMessage(baseContent)
       const convIntent: ConversationIntent = detectUserIntent(baseContent)
+      const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
+      const memorySignals = detectMemorySignals(baseContent)
+      setUserMemory((prev) => {
+        const next = updateUserMemory(prev, memorySignals)
+        try { localStorage.setItem('hexastra.userMemory', JSON.stringify(next)) } catch {}
+        return next
+      })
 
       if (moderation !== 'SAFE') {
         const baseMessages = isWelcome ? [] : messages
@@ -1058,6 +1114,7 @@ export default function ChatPageClient() {
         return
       }
 
+      // Router: only GREETING / SMALL_TALK / EMOTIONAL stay en conversation simple
       if (isConversationalIntent(convIntent)) {
         const userMsg: Msg = {
           id: `${Date.now()}-user`,
@@ -1069,11 +1126,21 @@ export default function ChatPageClient() {
         const assistantMessage: Msg = {
           id: `${Date.now()}-assistant-conv`,
           role: 'assistant',
-          content: ensureHexAstraTone(buildShiloReply({ intent: convIntent, message: baseContent }), {
-            intent: convIntent,
-            isReading: false,
-            maxLines: 8,
-          }),
+          content: applyHumanTone(
+            ensureHexAstraTone(
+              adjustResponseDepth(buildShiloReply({ intent: convIntent, message: baseContent }), {
+                level: depthLevel,
+                plan: userPlan,
+                isReading: false,
+              }),
+              {
+                intent: convIntent,
+                isReading: false,
+                maxLines: 8,
+              }
+            ),
+            { intent: convIntent, userMessage: baseContent, isReading: false }
+          ),
           created_at: new Date().toISOString(),
           isReading: false,
         }
@@ -1184,15 +1251,29 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
         const cachedIsReading =
           cachedReply.includes('────────────────────') ||
           cachedReply.toLowerCase().includes('pour aller plus loin')
-        const tonedCached = ensureHexAstraTone(cachedReply, {
+        const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
+        const depthCached = adjustResponseDepth(
+          memoryHint ? `${cachedReply}\n\n${memoryHint}` : cachedReply,
+          {
+            level: depthLevel,
+            plan: userPlan,
+            isReading: cachedIsReading,
+          }
+        )
+        const tonedCached = ensureHexAstraTone(depthCached, {
           intent: convIntent,
           isReading: cachedIsReading,
           maxLines: cachedIsReading ? undefined : 8,
         })
+        const humanCached = applyHumanTone(tonedCached, {
+          intent: convIntent,
+          userMessage: baseContent,
+          isReading: cachedIsReading,
+        })
         const assistantMessage: Msg = {
           id: `${Date.now()}-cached`,
           role: 'assistant',
-          content: tonedCached,
+          content: humanCached,
           created_at: new Date().toISOString(),
           cached: true,
           isReading: cachedIsReading,
@@ -1238,7 +1319,11 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
         const assistantMessage: Msg = {
           id: `${Date.now()}-assistant`,
           role: 'assistant',
-          content: tonedReply,
+          content: applyHumanTone(tonedReply, {
+            intent: actionIntent,
+            userMessage: content,
+            isReading,
+          }),
           created_at: new Date().toISOString(),
           isReading,
         }
