@@ -5,11 +5,14 @@ import { STRIPE_PRICE_MAP } from '@/lib/billing/stripePlans'
 import { logger } from '@/lib/utils/logger'
 import { validateEnv } from '@/lib/utils/env'
 import { badRequest, internalError, unauthorized, ok } from '@/lib/utils/apiResponse'
+import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
 
 const stripeKey = process.env.STRIPE_SECRET_KEY
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 if (!stripeKey) {
   throw new Error('STRIPE_SECRET_KEY manquante')
@@ -28,6 +31,7 @@ export async function POST(req: NextRequest) {
       NEXT_PUBLIC_APP_URL: {},
       NEXT_PUBLIC_SUPABASE_URL: {},
       NEXT_PUBLIC_SUPABASE_ANON_KEY: {},
+      SUPABASE_SERVICE_ROLE_KEY: {},
     })
 
     const body = await req.json().catch(() => null)
@@ -43,12 +47,25 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = createSupabaseServer()
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
 
-    if (userError || !user) {
+    // Try cookie-based auth first
+    const { data: cookieUser, error: userError } = await supabase.auth.getUser()
+
+    let user = cookieUser
+
+    // Fallback to bearer token (sent from client) when cookies not available
+    if ((!user || userError) && supabaseUrl && supabaseServiceKey) {
+      const token = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+      if (token) {
+        const admin = createSupabaseAdmin(supabaseUrl, supabaseServiceKey)
+        const { data, error } = await admin.auth.getUser(token)
+        if (!error && data?.user) {
+          user = data
+        }
+      }
+    }
+
+    if (!user) {
       return unauthorized()
     }
 

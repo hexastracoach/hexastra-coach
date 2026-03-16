@@ -40,9 +40,14 @@ export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
     }
     setLoading(true)
     try {
+      const { data: session } = await supabase.auth.getSession()
+      const token = session.session?.access_token
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ priceKey }),
       })
       const json = await res.json().catch(() => null)
