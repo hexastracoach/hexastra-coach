@@ -541,12 +541,12 @@ function buildMenuOnlyMessage(
 ): string {
   const items = getMenuForMode(mode)
   const intro = language.startsWith('en')
-    ? 'Choose the angle you want to explore:'
-    : 'Choisis lâ€™angle que tu veux explorer :'
+    ? 'Voici les angles qu’on peut explorer ensemble :'
+    : 'Voici les angles qu’on peut explorer ensemble :'
 
   const lines = items
     .slice(0, 9)
-    .map((item, index) => `${index + 1} â€” ${item.label} : ${item.description}`)
+    .map((item, index) => `${index + 1} — ${item.label} : ${item.description}`)
 
   return [intro, '', ...lines].join('\n')
 }
@@ -663,7 +663,7 @@ export async function runHexastraFlow(input: {
     const route = lightRoute(latestUserMessage)
 
     if (route === 'inappropriate') {
-      const message = 'Je tiens à ce que nos échanges restent utiles et respectueux. Reprenons sur un point qui compte pour toi.'
+      const message = "Je tiens à ce que nos échanges restent utiles et respectueux. Si tu veux, on reprend sur ce qui compte vraiment pour toi."
       return {
         message,
         reply: message,

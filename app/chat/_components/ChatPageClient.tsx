@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -70,7 +70,6 @@ import {
   updateUserMemory,
   type UserMemory,
 } from '@/lib/chat/userMemoryEngine'
-import { detectIntent, type Intent } from '@/lib/hexastra/conversation/intentEngine'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
 import type {
@@ -105,12 +104,12 @@ I'm here to help you clarify a situation, understand your current phase, or expl
       return `Hola.
 
 Soy HexAstra Coach.
-Estoy aquí para ayudarte a aclarar una situación, comprender tu momento actual o explorar el ángulo más útil para ti ahora.`
+Estoy aquÃ­ para ayudarte a aclarar una situaciÃ³n, comprender tu momento actual o explorar el Ã¡ngulo mÃ¡s Ãºtil para ti ahora.`
     default:
       return `Bonjour.
 
 Je suis HexAstra Coach.
-Je suis là pour t’aider à clarifier une situation, comprendre ton moment actuel, ou explorer l’angle le plus utile pour toi maintenant.`
+Je suis lÃ  pour tâ€™aider Ã  clarifier une situation, comprendre ton moment actuel, ou explorer lâ€™angle le plus utile pour toi maintenant.`
   }
 }
 
@@ -386,8 +385,8 @@ export default function ChatPageClient() {
   const pushJourneyMessage = useCallback(
     (enabled: boolean) => {
       const content = enabled
-        ? `Ton parcours HexAstra est activé.\nJe pourrai garder le fil de ton exploration, repérer les étapes déjà traversées et te proposer plus facilement la prochaine étape utile.`
-        : `Le parcours HexAstra est désactivé.\nJe continue à répondre normalement, sans suivre explicitement un chemin étape par étape.`
+        ? `Ton parcours HexAstra est activÃ©.\nJe pourrai garder le fil de ton exploration, repÃ©rer les Ã©tapes dÃ©jÃ  traversÃ©es et te proposer plus facilement la prochaine Ã©tape utile.`
+        : `Le parcours HexAstra est dÃ©sactivÃ©.\nJe continue Ã  rÃ©pondre normalement, sans suivre explicitement un chemin Ã©tape par Ã©tape.`
       setMessages((prev) => [
         ...prev,
         {
@@ -417,7 +416,7 @@ export default function ChatPageClient() {
 
   const applyApiResponse = useCallback((data: HexastraApiResponse | null | undefined) => {
     if (!data) {
-      return "Je n’ai pas pu terminer la lecture pour le moment."
+      return "Je nâ€™ai pas pu terminer la lecture pour le moment."
     }
 
     const reply =
@@ -425,7 +424,7 @@ export default function ChatPageClient() {
         ? data.message
         : typeof data?.reply === 'string'
           ? data.reply
-          : "Je n’ai pas pu terminer la lecture pour le moment."
+          : "Je nâ€™ai pas pu terminer la lecture pour le moment."
 
     if (data.conversationId) setConversationId(data.conversationId)
 
@@ -503,11 +502,11 @@ export default function ChatPageClient() {
 
       setPremiumLock({
         targetPlan: data.metadata.upgradeTargetPlan ?? 'essential',
-        ctaLabel: data.metadata.upgradeCtaLabel ?? 'Passer à Essentiel',
+        ctaLabel: data.metadata.upgradeCtaLabel ?? 'Passer Ã  Essentiel',
         text:
           typeof data?.message === 'string'
             ? data.message
-            : 'Ton accès gratuit a atteint sa limite pour le moment.',
+            : 'Ton accÃ¨s gratuit a atteint sa limite pour le moment.',
       })
 
       return reply
@@ -516,8 +515,8 @@ export default function ChatPageClient() {
     if (data?.metadata?.premiumPreviewLocked) {
       setPremiumLock({
         targetPlan: data.metadata.upgradeTargetPlan ?? 'premium',
-        ctaLabel: data.metadata.upgradeCtaLabel ?? 'Passer à Premium',
-        text: 'La suite de l’analyse complète est disponible dans le plan supérieur.',
+        ctaLabel: data.metadata.upgradeCtaLabel ?? 'Passer Ã  Premium',
+        text: 'La suite de lâ€™analyse complÃ¨te est disponible dans le plan supÃ©rieur.',
       })
     } else {
       setPremiumLock(null)
@@ -630,8 +629,7 @@ export default function ChatPageClient() {
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const reply = applyApiResponse(data)
         const depthLevel = detectUserDepthLevel(message, messages, userPlan)
-        const intentDetected = detectIntent(message).intent
-        conversationStateRef.current = updateConversationState(intentDetected, conversationStateRef.current)
+conversationStateRef.current = updateConversationState(intentDetected, conversationStateRef.current)
         const finalReply = formatAssistantReply(reply, {
           intent: intentDetected,
           userMessage: message,
@@ -658,7 +656,7 @@ export default function ChatPageClient() {
             role: 'assistant',
             content:
               error instanceof Error && error.message === 'Request aborted'
-                ? "La demande précédente a été interrompue au profit de la nouvelle."
+                ? "La demande prÃ©cÃ©dente a Ã©tÃ© interrompue au profit de la nouvelle."
                 : "Je n'ai pas pu ouvrir cet angle pour le moment.",
             created_at: new Date().toISOString(),
           },
@@ -927,38 +925,38 @@ export default function ChatPageClient() {
       }
 
       const parts: string[] = []
-      if (normalized.firstName) parts.push(`prénom ${normalized.firstName}`)
-      if (normalized.birthDate) parts.push(`né(e) le ${normalized.birthDate}`)
+      if (normalized.firstName) parts.push(`prÃ©nom ${normalized.firstName}`)
+      if (normalized.birthDate) parts.push(`nÃ©(e) le ${normalized.birthDate}`)
       if (normalized.birthTimeKnown === false) {
-        parts.push('heure non fournie (12:00 par défaut)')
+        parts.push('heure non fournie (12:00 par dÃ©faut)')
       } else if (normalized.birthTime) {
-        parts.push(`à ${normalized.birthTime}`)
+        parts.push(`Ã  ${normalized.birthTime}`)
       }
-      if (normalized.birthCity) parts.push(`à ${normalized.birthCity}`)
+      if (normalized.birthCity) parts.push(`Ã  ${normalized.birthCity}`)
       if (normalized.birthCountryName) parts.push(normalized.birthCountryName)
 
       if (parts.length) {
         void sendStructuredAction({
-          message: `Données de naissance mises à jour : ${parts.join(', ')}.`,
+          message: `DonnÃ©es de naissance mises Ã  jour : ${parts.join(', ')}.`,
           contextType: activeContextType,
           uiAction: 'restart_flow',
         })
       }
 
       const partnerParts: string[] = []
-      if (normalizedPartner.firstName) partnerParts.push(`prénom ${normalizedPartner.firstName}`)
-      if (normalizedPartner.birthDate) partnerParts.push(`né(e) le ${normalizedPartner.birthDate}`)
+      if (normalizedPartner.firstName) partnerParts.push(`prÃ©nom ${normalizedPartner.firstName}`)
+      if (normalizedPartner.birthDate) partnerParts.push(`nÃ©(e) le ${normalizedPartner.birthDate}`)
       if (normalizedPartner.birthTimeKnown === false) {
-        partnerParts.push('heure non fournie (12:00 par défaut)')
+        partnerParts.push('heure non fournie (12:00 par dÃ©faut)')
       } else if (normalizedPartner.birthTime) {
-        partnerParts.push(`à ${normalizedPartner.birthTime}`)
+        partnerParts.push(`Ã  ${normalizedPartner.birthTime}`)
       }
-      if (normalizedPartner.birthCity) partnerParts.push(`à ${normalizedPartner.birthCity}`)
+      if (normalizedPartner.birthCity) partnerParts.push(`Ã  ${normalizedPartner.birthCity}`)
       if (normalizedPartner.birthCountryName) partnerParts.push(normalizedPartner.birthCountryName)
 
       if (partnerParts.length) {
         void sendStructuredAction({
-          message: `Lecture croisée — données de l'autre personne mises à jour : ${partnerParts.join(', ')}.`,
+          message: `Lecture croisÃ©e â€” donnÃ©es de l'autre personne mises Ã  jour : ${partnerParts.join(', ')}.`,
           contextType: activeContextType,
           uiAction: 'restart_flow',
         })
@@ -1051,8 +1049,7 @@ export default function ChatPageClient() {
       const reply = applyApiResponse(data)
       const isReading = isReadingFlowStep(data?.flowState?.step)
       const depthLevel = detectUserDepthLevel(lastUserMessage || reply, messages, userPlan)
-      const microIntent = detectIntent(lastUserMessage || reply).intent
-      const finalReply = formatAssistantReply(reply, {
+const finalReply = formatAssistantReply(reply, {
         intent: microIntent,
         userMessage: lastUserMessage || reply,
         isReading,
@@ -1096,16 +1093,14 @@ export default function ChatPageClient() {
   const handleSend = useCallback(
     async (provided?: string) => {
       const baseContent = (provided ?? input).trim()
-      const attachNote = attachedFile ? `\n\n[Pièce jointe : ${attachedFile.name}]` : ''
+      const attachNote = attachedFile ? `\n\n[PiÃ¨ce jointe : ${attachedFile.name}]` : ''
       const content = baseContent + attachNote
 
       if (!content.trim() || isTyping) return
       if (isDuplicateMessage(lastMessageRef, content)) return
       if (chatStep !== 'conversation_ready') return
 
-      const moderation = moderateMessage(baseContent)
-      const intentDetected = detectIntent(baseContent).intent
-      const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
+      const moderation = moderateMessage(baseContent)      const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
       const memorySignals = detectMemorySignals(baseContent)
       setUserMemory((prev) => {
         const next = updateUserMemory(prev, memorySignals)
@@ -1144,19 +1139,19 @@ export default function ChatPageClient() {
           {
             id: `${Date.now()}-limit`,
             role: 'assistant',
-            content: `Tu as atteint la limite de ton accès découverte pour le moment.
+            content: `Tu as atteint la limite de ton accÃ¨s dÃ©couverte pour le moment.
 
-Ton espace gratuit se réouvrira automatiquement dans 24h.
-Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
+Ton espace gratuit se rÃ©ouvrira automatiquement dans 24h.
+Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
             created_at: new Date().toISOString(),
           },
         ])
 
         setPremiumLock({
           targetPlan: 'essential',
-          ctaLabel: 'Passer à Essentiel',
+          ctaLabel: 'Passer Ã  Essentiel',
           text:
-            'Ton accès gratuit est temporairement arrivé à sa limite. Reviens dans 24h ou passe à Essentiel pour continuer maintenant.',
+            'Ton accÃ¨s gratuit est temporairement arrivÃ© Ã  sa limite. Reviens dans 24h ou passe Ã  Essentiel pour continuer maintenant.',
         })
 
         return
@@ -1215,7 +1210,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
       const cachedReply = cacheRef.current.get(cacheKey)
       if (cachedReply) {
         const cachedIsReading =
-          cachedReply.includes('────────────────────') ||
+          cachedReply.includes('â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€') ||
           cachedReply.toLowerCase().includes('pour aller plus loin')
         const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
         const composedCached = formatAssistantReply(cachedReply, {
@@ -1270,8 +1265,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
         const reply = applyApiResponse(data)
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
-        const intentDetected = detectIntent(baseContent).intent
-        conversationStateRef.current = updateConversationState(intentDetected, conversationStateRef.current)
+conversationStateRef.current = updateConversationState(intentDetected, conversationStateRef.current)
         const finalReply = formatAssistantReply(reply, {
           intent: intentDetected,
           userMessage: baseContent,
@@ -1305,8 +1299,8 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
             role: 'assistant',
             content:
               error instanceof Error && error.message === 'Request aborted'
-                ? "La demande précédente a été annulée pour laisser passer la nouvelle."
-                : "Je n'ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.",
+                ? "La demande prÃ©cÃ©dente a Ã©tÃ© annulÃ©e pour laisser passer la nouvelle."
+                : "Je n'ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.",
             created_at: new Date().toISOString(),
           },
         ])
@@ -1376,7 +1370,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
       {
         id: `reading-${reading.id}`,
         role: 'assistant',
-        content: `Lecture sauvegardée\n\n${reading.preview}`,
+        content: `Lecture sauvegardÃ©e\n\n${reading.preview}`,
         created_at: reading.date,
       },
     ])
@@ -1445,10 +1439,10 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
 
       {paymentSuccess && (
         <div className="hx-payment-success-banner" role="status">
-          <span>✦</span>
-          <span>Paiement confirmé — votre abonnement est activé.</span>
+          <span>âœ¦</span>
+          <span>Paiement confirmÃ© â€” votre abonnement est activÃ©.</span>
           <button type="button" onClick={() => setPaymentSuccess(false)} aria-label="Fermer">
-            ✕
+            âœ•
           </button>
         </div>
       )}
@@ -1541,7 +1535,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
                     setSelectedSubmenuKey(parent ? item.key : null)
 
                     void sendStructuredAction({
-                      message: parent ? `${parent.label} → ${item.label}` : item.label,
+                      message: parent ? `${parent.label} â†’ ${item.label}` : item.label,
                       contextType: context,
                       menuKey: parent?.key ?? item.key,
                       submenuKey: parent ? item.key : null,
@@ -1585,4 +1579,14 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
 
