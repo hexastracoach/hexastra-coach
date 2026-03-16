@@ -427,8 +427,10 @@ async function runSpecializedModule({
         birth_date: birthData.date,
         birth_time: birthData.time || 'unknown',
         birthDateISO: birthData.birthDateISO,
-        birth_city: birthData.place,
+        birth_city: birthData.place || birthData.city || birthData.firstName, // fallback minime
         birth_country: birthData.country,
+        lat: birthData.lat,
+        lon: birthData.lon,
         question: latestUserMessage,
         practitioner_usage: practitionerUsage,
       })
