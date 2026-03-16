@@ -3,52 +3,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { BirthData } from '../_lib/chat'
 import { EMPTY_BIRTH_DATA } from '../_lib/chat'
-
-type CityResult = {
-  displayName: string
-  city: string
-  country: string
-  countryCode: string
-  lat: string
-  lng: string
-}
+import type { NormalizedPlace } from '@/lib/location/normalizeOpenCageResult'
 
 type Props = {
   data: BirthData
   onSave: (data: BirthData) => void
 }
 
-async function searchCities(query: string): Promise<CityResult[]> {
-  if (query.trim().length < 2) return []
-  const url =
-    `https://nominatim.openstreetmap.org/search` +
-    `?q=${encodeURIComponent(query)}` +
-    `&format=json&limit=8&addressdetails=1` +
-    `&featuretype=city&accept-language=fr`
+async function searchCities(query: string): Promise<NormalizedPlace[]> {
+  if (query.trim().length < 3) return []
   try {
-    const res = await fetch(url, {
-      headers: { 'Accept-Language': 'fr', 'User-Agent': 'HexAstra-Coach/1.0' },
-    })
+    const res = await fetch(`/api/locations/search?q=${encodeURIComponent(query)}`)
     if (!res.ok) return []
-    const data = await res.json()
-    return (data as any[])
-      .filter((r: any) => r.address)
-      .map((r: any): CityResult => {
-        const addr = r.address
-        const city =
-          addr.city || addr.town || addr.village || addr.municipality || addr.county || query
-        return {
-          displayName: r.display_name,
-          city,
-          country: addr.country ?? '',
-          countryCode: (addr.country_code ?? '').toUpperCase(),
-          lat: parseFloat(r.lat).toFixed(4),
-          lng: parseFloat(r.lon).toFixed(4),
-        }
-      })
-      .filter((r, i, arr) =>
-        arr.findIndex((x) => x.city === r.city && x.countryCode === r.countryCode) === i
-      )
+    const data = await res.json() as { results: NormalizedPlace[] }
+    return data.results ?? []
   } catch {
     return []
   }
@@ -66,7 +34,7 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
 
   // City autocomplete state
   const [cityQuery, setCityQuery] = useState(data.birthCity ?? '')
-  const [suggestions, setSuggestions] = useState<CityResult[]>([])
+  const [suggestions, setSuggestions] = useState<NormalizedPlace[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [citySelected, setCitySelected] = useState(!!data.birthCity)
@@ -115,8 +83,9 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
     triggerSearch(q)
   }
 
-  function handleSelectCity(r: CityResult) {
-    setCityQuery(r.city)
+  function handleSelectCity(r: NormalizedPlace) {
+    const cityLabel = r.label || r.city
+    setCityQuery(cityLabel)
     setCitySelected(true)
     setShowDropdown(false)
     setSuggestions([])
@@ -124,9 +93,8 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
       ...prev,
       birthCity: r.city,
       birthCountryName: r.country,
-      birthCountryCode: r.countryCode,
-      birthLat: r.lat,
-      birthLng: r.lng,
+      birthLat: r.lat ? String(r.lat) : '',
+      birthLng: r.lng ? String(r.lng) : '',
     }))
   }
 
@@ -320,7 +288,7 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
                   className="hx-birth-city-option"
                   onMouseDown={(e) => { e.preventDefault(); handleSelectCity(r) }}
                 >
-                  <span className="hx-birth-city-name">{r.city}</span>
+                  <span className="hx-birth-city-name">{r.label || r.city}</span>
                   <span className="hx-birth-city-meta">
                     {r.country}
                   </span>

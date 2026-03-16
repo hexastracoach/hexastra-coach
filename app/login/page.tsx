@@ -30,7 +30,7 @@ export default function LoginPage() {
     } else {
       const { error } = await supabase.auth.signUp({
         email, password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/chat` },
       })
       if (error) setError(error.message)
       else setMessage('Vérifie ta boîte mail pour confirmer ton compte.')

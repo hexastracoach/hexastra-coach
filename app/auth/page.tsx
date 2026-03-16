@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
+import BackButton from '@/components/navigation/BackButton'
 
 type AuthMode = 'login' | 'signup'
 
@@ -66,7 +66,7 @@ export default function AuthPage() {
     setLoading(true)
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${location.origin}/auth/callback` },
+      options: { redirectTo: `${location.origin}/auth/callback?next=/chat` },
     })
     setLoading(false)
   }
@@ -100,7 +100,7 @@ export default function AuthPage() {
       password,
       options: {
         data: { first_name: firstName, last_name: lastName },
-        emailRedirectTo: `${location.origin}/auth/callback`,
+        emailRedirectTo: `${location.origin}/auth/callback?next=/chat`,
       },
     })
     if (error) {
@@ -150,13 +150,13 @@ export default function AuthPage() {
       </video>
       <div className="hx-auth-overlay" aria-hidden="true" />
 
-      {/* ── Back to home + Language switcher ── */}
-      <Link href="/" className="hx-auth-back" aria-label="Retour à l'accueil">
+      {/* ── Back to previous + Language switcher ── */}
+      <BackButton fallbackHref="/" className="hx-auth-back" ariaLabel="Retour à l'accueil">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
           <path d="M11 4L6 9l5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         Retour
-      </Link>
+      </BackButton>
       <div className="hx-auth-lang">
         <LanguageSwitcher />
       </div>

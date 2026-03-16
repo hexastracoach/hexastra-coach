@@ -5,7 +5,6 @@ import type { PlanKey } from '@/types/subscription'
 import { mapDbPlanToPlanKey, downgradeIfInactive } from '@/lib/permissions/plan'
 import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
 import { logger } from '@/lib/utils/logger'
-import { logger } from '@/lib/utils/logger'
 
 const PUBLIC_PATHS = [
   '/',
@@ -135,6 +134,11 @@ export async function middleware(req: NextRequest) {
 
   if (!user) {
     return res
+  }
+
+  // utilisateurs déjà connectés : éviter pages d'auth
+  if (pathname === '/auth' || pathname.startsWith('/auth/')) {
+    return NextResponse.redirect(new URL('/chat', req.url))
   }
 
   /**

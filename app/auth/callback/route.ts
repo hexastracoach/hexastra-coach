@@ -7,12 +7,14 @@ export async function GET(request: NextRequest) {
 
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const next = requestUrl.searchParams.get('next')
+  const safeNext = next && next.startsWith('/') ? next : '/chat'
 
   if (!code) {
     return NextResponse.redirect(new URL('/auth', requestUrl.origin))
   }
 
-  const response = NextResponse.redirect(new URL('/chat', requestUrl.origin))
+  const response = NextResponse.redirect(new URL(safeNext, requestUrl.origin))
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

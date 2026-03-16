@@ -2,22 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
-
-type NominatimResult = {
-  place_id: string
-  display_name: string
-  lat: string
-  lon: string
-  address: {
-    city?: string
-    town?: string
-    village?: string
-    municipality?: string
-    county?: string
-    state?: string
-    country?: string
-  }
-}
+import type { NormalizedPlace } from '@/lib/location/normalizeOpenCageResult'
 
 type Props = {
   value: string
@@ -28,7 +13,7 @@ type Props = {
 export default function CityAutocomplete({ value, countryCode, onSelect }: Props) {
   const { t } = useTranslation()
   const [query, setQuery] = useState(value)
-  const [results, setResults] = useState<NominatimResult[]>([])
+  const [results, setResults] = useState<NormalizedPlace[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -47,19 +32,14 @@ export default function CityAutocomplete({ value, countryCode, onSelect }: Props
   function handleInput(v: string) {
     setQuery(v)
     if (timerRef.current) clearTimeout(timerRef.current)
-    if (v.trim().length < 2) { setResults([]); setOpen(false); return }
+    if (v.trim().length < 3) { setResults([]); setOpen(false); return }
     timerRef.current = setTimeout(async () => {
       setLoading(true)
       try {
-        const cc = countryCode ? `&countrycodes=${countryCode.toLowerCase()}` : ''
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(v)}${cc}&format=json&limit=8&addressdetails=1&featuretype=city`,
-          { headers: { 'Accept-Language': 'fr', 'User-Agent': 'HexAstraCoach/1.0' } }
-        )
-        const json: NominatimResult[] = await res.json()
-        const filtered = json.filter((r) =>
-          r.address.city || r.address.town || r.address.village || r.address.municipality
-        ).slice(0, 7)
+        const cc = countryCode ? `&country=${countryCode}` : ''
+        const res = await fetch(`/api/locations/search?q=${encodeURIComponent(v)}${cc}`)
+        const json = await res.json() as { results: NormalizedPlace[] }
+        const filtered = json.results.slice(0, 8)
         setResults(filtered)
         setOpen(filtered.length > 0)
       } catch {
@@ -67,14 +47,13 @@ export default function CityAutocomplete({ value, countryCode, onSelect }: Props
       } finally {
         setLoading(false)
       }
-    }, 420)
+    }, 320)
   }
 
-  function handleSelect(r: NominatimResult) {
-    const city = r.address.city ?? r.address.town ?? r.address.village ?? r.address.municipality ?? r.address.county ?? r.display_name.split(',')[0]
-    setQuery(city)
+  function handleSelect(r: NormalizedPlace) {
+    setQuery(r.label || r.city)
     setOpen(false)
-    onSelect(city, r.lat, r.lon)
+    onSelect(r.city, String(r.lat ?? ''), String(r.lng ?? ''))
   }
 
   return (
@@ -94,18 +73,14 @@ export default function CityAutocomplete({ value, countryCode, onSelect }: Props
       </div>
       {open && results.length > 0 && (
         <ul className="hx-city-dropdown" role="listbox">
-          {results.map((r) => {
-            const city = r.address.city ?? r.address.town ?? r.address.village ?? r.address.municipality ?? r.display_name.split(',')[0]
-            const region = r.address.state ?? r.address.county ?? ''
-            return (
-              <li key={r.place_id} role="option" aria-selected={false}>
-                <button type="button" className="hx-city-option" onMouseDown={() => handleSelect(r)}>
-                  <span className="hx-city-option-name">{city}</span>
-                  {region && <span className="hx-city-option-region">{region}</span>}
-                </button>
-              </li>
-            )
-          })}
+          {results.map((r) => (
+            <li key={r.label} role="option" aria-selected={false}>
+              <button type="button" className="hx-city-option" onMouseDown={() => handleSelect(r)}>
+                <span className="hx-city-option-name">{r.label || r.city}</span>
+                {r.region && <span className="hx-city-option-region">{r.region}</span>}
+              </button>
+            </li>
+          ))}
         </ul>
       )}
     </div>

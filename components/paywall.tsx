@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import BackButton from './navigation/BackButton'
 
 type Plan = 'free' | 'premium' | 'praticien'
 
@@ -229,7 +230,9 @@ export function PricingPage() {
             Hex<span style={{ color: 'var(--emerald)' }}>Astra</span>
           </span>
         </a>
-        <button onClick={() => router.push('/login')} style={pr.navBack}>Retour</button>
+        <BackButton fallbackHref="/pricing" className="" >
+          <span style={pr.navBack}>Retour</span>
+        </BackButton>
       </nav>
 
       <div style={pr.container}>
