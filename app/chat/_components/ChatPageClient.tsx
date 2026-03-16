@@ -70,7 +70,6 @@ import {
   updateUserMemory,
   type UserMemory,
 } from '@/lib/chat/userMemoryEngine'
-import { updateConversationState, type ConversationState } from '@/lib/hexastra/conversation/stateEngine'
 import { detectIntent, type Intent } from '@/lib/hexastra/conversation/intentEngine'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
@@ -291,7 +290,6 @@ export default function ChatPageClient() {
   const requestAbortRef = useRef<AbortController | null>(null)
   const lastMessageRef = useRef<string | null>(null)
   const journeyHydratedRef = useRef(false)
-  const conversationStateRef = useRef<ConversationState>('start')
   const conversationContextRef = useRef({}) // legacy placeholder, no longer used
 
   const mode = planLoaded ? getEntitlements(userPlan).chatMode : 'essentiel'
@@ -1107,7 +1105,6 @@ export default function ChatPageClient() {
 
       const moderation = moderateMessage(baseContent)
       const intentDetected = detectIntent(baseContent).intent
-      conversationStateRef.current = updateConversationState(intentDetected, conversationStateRef.current)
       const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
       const memorySignals = detectMemorySignals(baseContent)
       setUserMemory((prev) => {
