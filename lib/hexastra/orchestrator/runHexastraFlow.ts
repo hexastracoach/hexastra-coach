@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto'
+﻿import { randomUUID } from 'crypto'
 import { createClient as createSupabaseServer } from '@/lib/supabase/server'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import { buildSystemPrompt } from '@/lib/hexastra/prompts/buildSystemPrompt'
@@ -28,6 +28,7 @@ import type { PlanKey } from '@/lib/plans'
 import type { ChatMessage } from '@/lib/chat/chatPayloadBuilder'
 
 import { classifyQuery } from '@/lib/hexastra/router/classifyQuery'
+import { lightRoute } from '@/lib/hexastra/router/lightRouter'
 import { getModulesForDomain } from '@/lib/hexastra/router/moduleRouter'
 import { buildSignalEnvelope } from '@/lib/hexastra/fusion/signalEnvelope'
 import { fusionEngine } from '@/lib/hexastra/fusion/fusionEngine'
@@ -36,6 +37,7 @@ import { applySentinel } from '@/lib/hexastra/security/sentinel'
 import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
 import { logger } from '@/lib/utils/logger'
+import { buildConversationSystemPrompt } from '@/lib/hexastra/prompts/conversationSystemPrompt'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (
@@ -69,41 +71,41 @@ function tr(language: string, variants: Partial<Record<string, string>>, fallbac
 function buildMissingBirthMessage(language: string): string {
   return tr(language, {
     en: 'To personalize the reading, I need your first name, birth date, birth time (or unknown), and birth city + country.',
-    fr: 'Pour personnaliser la lecture, j’ai besoin de ton prénom, de ta date de naissance, de ton heure de naissance (ou inconnue), et de ta ville + pays de naissance.',
-    es: 'Para personalizar la lectura necesito tu nombre, fecha de nacimiento, hora (o desconocida) y ciudad + país de nacimiento.',
-    pt: 'Para personalizar a leitura, preciso do teu primeiro nome, data de nascimento, hora (ou desconhecida) e cidade + país de nascimento.',
-    de: 'Für eine personalisierte Lesung brauche ich deinen Vornamen, dein Geburtsdatum, Geburtszeit (oder unbekannt) sowie Geburtsort und Land.',
-    it: 'Per personalizzare la lettura ho bisogno del tuo nome, data di nascita, ora (o sconosciuta) e città + paese di nascita.',
+    fr: 'Pour personnaliser la lecture, jâ€™ai besoin de ton prÃ©nom, de ta date de naissance, de ton heure de naissance (ou inconnue), et de ta ville + pays de naissance.',
+    es: 'Para personalizar la lectura necesito tu nombre, fecha de nacimiento, hora (o desconocida) y ciudad + paÃ­s de nacimiento.',
+    pt: 'Para personalizar a leitura, preciso do teu primeiro nome, data de nascimento, hora (ou desconhecida) e cidade + paÃ­s de nascimento.',
+    de: 'FÃ¼r eine personalisierte Lesung brauche ich deinen Vornamen, dein Geburtsdatum, Geburtszeit (oder unbekannt) sowie Geburtsort und Land.',
+    it: 'Per personalizzare la lettura ho bisogno del tuo nome, data di nascita, ora (o sconosciuta) e cittÃ  + paese di nascita.',
   })
 }
 
 function buildPractitionerUsageMessage(language: string): string {
   return tr(language, {
-    en: 'Is this analysis for 1 — yourself or 2 — a client?',
-    fr: 'Cette analyse est-elle pour : 1 — un usage personnel 2 — un(e) client(e) ?',
-    es: '¿Este análisis es para 1 — ti mismo o 2 — un cliente?',
-    pt: 'Esta análise é para 1 — você mesmo ou 2 — um cliente?',
-    de: 'Ist diese Analyse für 1 — dich selbst oder 2 — einen Klienten?',
-    it: 'Questa analisi è per 1 — te stesso oppure 2 — un cliente?',
+    en: 'Is this analysis for 1 â€” yourself or 2 â€” a client?',
+    fr: 'Cette analyse est-elle pour : 1 â€” un usage personnel 2 â€” un(e) client(e) ?',
+    es: 'Â¿Este anÃ¡lisis es para 1 â€” ti mismo o 2 â€” un cliente?',
+    pt: 'Esta anÃ¡lise Ã© para 1 â€” vocÃª mesmo ou 2 â€” um cliente?',
+    de: 'Ist diese Analyse fÃ¼r 1 â€” dich selbst oder 2 â€” einen Klienten?',
+    it: 'Questa analisi Ã¨ per 1 â€” te stesso oppure 2 â€” un cliente?',
   })
 }
 
 function buildGreetingMessage(mode: ReturnType<typeof getModeForPlan>, language: string): string {
   const intro = tr(language, {
-    en: 'Hello, I’m HexAstra. I can help you clarify a situation, explore a life theme, or start a personalized reading.',
-    fr: 'Bonjour, je suis HexAstra. Je peux t’aider à clarifier une situation, explorer un thème de vie, ou lancer une lecture personnalisée.',
-    es: 'Hola, soy HexAstra. Puedo ayudarte a clarificar una situación, explorar un tema de vida o iniciar una lectura personalizada.',
-    pt: 'Olá, sou a HexAstra. Posso ajudar a clarificar uma situação, explorar um tema de vida ou iniciar uma leitura personalizada.',
-    de: 'Hallo, ich bin HexAstra. Ich kann dir helfen, eine Situation zu klären, ein Lebensthema zu erkunden ou eine persönliche Lesung zu starten.',
+    en: 'Hello, Iâ€™m HexAstra. I can help you clarify a situation, explore a life theme, or start a personalized reading.',
+    fr: 'Bonjour, je suis HexAstra. Je peux tâ€™aider Ã  clarifier une situation, explorer un thÃ¨me de vie, ou lancer une lecture personnalisÃ©e.',
+    es: 'Hola, soy HexAstra. Puedo ayudarte a clarificar una situaciÃ³n, explorar un tema de vida o iniciar una lectura personalizada.',
+    pt: 'OlÃ¡, sou a HexAstra. Posso ajudar a clarificar uma situaÃ§Ã£o, explorar um tema de vida ou iniciar uma leitura personalizada.',
+    de: 'Hallo, ich bin HexAstra. Ich kann dir helfen, eine Situation zu klÃ¤ren, ein Lebensthema zu erkunden ou eine persÃ¶nliche Lesung zu starten.',
     it: 'Ciao, sono HexAstra. Posso aiutarti a chiarire una situazione, esplorare un tema di vita o iniziare una lettura personalizzata.',
   })
 
   const invite = tr(language, {
-    en: 'I’m here to help. Ask your question or explore an angle below.',
-    fr: 'Je suis là pour t’accompagner. Pose ta question ou explore un angle ci-dessous.',
-    es: 'Estoy aquí para acompañarte. Haz tu pregunta o explora un ángulo justo debajo.',
-    pt: 'Estou aqui para acompanhar-te. Faz a tua pergunta ou explora um ângulo abaixo.',
-    de: 'Ich begleite dich: Stelle deine Frage oder wähle einen Blickwinkel unten.',
+    en: 'Iâ€™m here to help. Ask your question or explore an angle below.',
+    fr: 'Je suis lÃ  pour tâ€™accompagner. Pose ta question ou explore un angle ci-dessous.',
+    es: 'Estoy aquÃ­ para acompaÃ±arte. Haz tu pregunta o explora un Ã¡ngulo justo debajo.',
+    pt: 'Estou aqui para acompanhar-te. Faz a tua pergunta ou explora um Ã¢ngulo abaixo.',
+    de: 'Ich begleite dich: Stelle deine Frage oder wÃ¤hle einen Blickwinkel unten.',
     it: 'Sono qui per accompagnarti. Fai la tua domanda o esplora un angolo qui sotto.',
   })
 
@@ -151,7 +153,7 @@ async function callOpenAI(payload: unknown): Promise<string> {
   try {
     const openaiKey = process.env.OPENAI_API_KEY
     if (!openaiKey) {
-      return "OPENAI_API_KEY manquante. Configure la variable d’environnement pour activer HexAstra."
+      return "OPENAI_API_KEY manquante. Configure la variable dâ€™environnement pour activer HexAstra."
     }
 
     const res = await fetch('https://api.openai.com/v1/responses', {
@@ -168,7 +170,7 @@ async function callOpenAI(payload: unknown): Promise<string> {
 
     if (!res.ok || !json) {
       logger.error('[callOpenAI] OpenAI error', { status: res.status, json })
-      return 'Je n’ai pas pu terminer la lecture pour le moment.'
+      return 'Je nâ€™ai pas pu terminer la lecture pour le moment.'
     }
 
     const output = Array.isArray((json as any).output) ? (json as any).output : []
@@ -179,22 +181,34 @@ async function callOpenAI(payload: unknown): Promise<string> {
       .join('')
       .trim()
 
-    return text || 'Je n’ai pas pu finaliser la lecture pour le moment.'
+    return text || 'Je nâ€™ai pas pu finaliser la lecture pour le moment.'
   } catch (error) {
     logger.error('[callOpenAI] failed', { error })
     return 'Le moteur HexAstra est temporairement indisponible.'
   }
 }
 
+async function callOpenAIChat(params: { system: string; user: string; model?: string }) {
+  const { system, user, model = 'gpt-4.1-mini' } = params
+  const payload = {
+    model,
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+  }
+  return await callOpenAI(payload)
+}
+
 function buildSpecializedContext(result: SpecializedModuleResult | null): string {
   if (!result) return ''
 
   return [
-    `[RÉSULTAT MÉTIER PRIORITAIRE — À UTILISER COMME SOURCE DE VÉRITÉ]`,
+    `[RÃ‰SULTAT MÃ‰TIER PRIORITAIRE â€” Ã€ UTILISER COMME SOURCE DE VÃ‰RITÃ‰]`,
     `Source: ${result.source}`,
-    `Résumé public attendu: ${result.publicSummary}`,
-    `Données structurées: ${JSON.stringify(result.raw ?? {})}`,
-    `Règle: reformule ce résultat dans le style HexAstra sans dire que tu n'as pas trouvé dans les documents.`,
+    `RÃ©sumÃ© public attendu: ${result.publicSummary}`,
+    `DonnÃ©es structurÃ©es: ${JSON.stringify(result.raw ?? {})}`,
+    `RÃ¨gle: reformule ce rÃ©sultat dans le style HexAstra sans dire que tu n'as pas trouvÃ© dans les documents.`,
   ].join('\n')
 }
 
@@ -222,7 +236,7 @@ function buildKnowledgeQuery({
   if (querySuffix) parts.push(querySuffix)
 
   parts.push(
-    'Appliquer les règles HexAstra, les garde-fous, la mémoire, le timing, le potentiel dominant, et la logique KS.FUSION.V13 si pertinent.'
+    'Appliquer les rÃ¨gles HexAstra, les garde-fous, la mÃ©moire, le timing, le potentiel dominant, et la logique KS.FUSION.V13 si pertinent.'
   )
 
   return parts.filter(Boolean).join('\n')
@@ -320,7 +334,7 @@ async function buildKnowledgeBlock({
     block: [
       compressed.block,
       '',
-      `[MÉTHODE] Les ressources ci-dessus sont déjà filtrées et priorisées selon le step ${flowStep}. Si un résultat métier structuré existe, il prime sur ces ressources.`,
+      `[MÃ‰THODE] Les ressources ci-dessus sont dÃ©jÃ  filtrÃ©es et priorisÃ©es selon le step ${flowStep}. Si un rÃ©sultat mÃ©tier structurÃ© existe, il prime sur ces ressources.`,
     ].join('\n'),
   }
 }
@@ -402,7 +416,7 @@ async function runSpecializedModule({
           ? kua.publicSummary
           : typeof kua?.summary === 'string'
             ? kua.summary
-            : `Utilise le calcul Kua/GPS fourni pour éclairer l'orientation, l'équilibre et la direction prioritaire.`
+            : `Utilise le calcul Kua/GPS fourni pour Ã©clairer l'orientation, l'Ã©quilibre et la direction prioritaire.`
 
       return {
         source: domainRoute === 'gps_kua' ? 'gps_kua' : 'neurokua',
@@ -440,7 +454,7 @@ async function runSpecializedModule({
           ? fusion.publicSummary
           : typeof fusion?.summary === 'string'
             ? fusion.summary
-            : `Utilise la synthèse fusionnée fournie comme signal dominant de la réponse finale.`
+            : `Utilise la synthÃ¨se fusionnÃ©e fournie comme signal dominant de la rÃ©ponse finale.`
 
       return {
         source: 'fusion',
@@ -498,14 +512,14 @@ function buildFusionInstruction(input: {
 }): string {
   const lines = [
     `[ORCHESTRATION KS PRIORITAIRE]`,
-    `Domaine résolu: ${input.resolvedDomainRoute}`,
+    `Domaine rÃ©solu: ${input.resolvedDomainRoute}`,
     `Modules actifs: ${input.activeModules.join(', ') || 'aucun'}`,
   ]
 
   if (input.fusedSignal) {
-    lines.push(`Signal dominant: ${input.fusedSignal.dominantSignal ?? 'non défini'}`)
-    lines.push(`Phase dominante: ${input.fusedSignal.phase ?? 'non définie'}`)
-    lines.push(`Zone dominante: ${input.fusedSignal.zone ?? 'non définie'}`)
+    lines.push(`Signal dominant: ${input.fusedSignal.dominantSignal ?? 'non dÃ©fini'}`)
+    lines.push(`Phase dominante: ${input.fusedSignal.phase ?? 'non dÃ©finie'}`)
+    lines.push(`Zone dominante: ${input.fusedSignal.zone ?? 'non dÃ©finie'}`)
   }
 
   if (input.arbitration) {
@@ -513,9 +527,9 @@ function buildFusionInstruction(input: {
   }
 
   lines.push(
-    `Règle: si un résultat métier structuré existe, il prime sur le retrieval documentaire.`,
-    `Règle: les documents servent à gouverner, enrichir et stabiliser la réponse.`,
-    `Règle: ne jamais dire "je n'ai pas trouvé dans les documents" si une logique métier spécialisée est disponible.`
+    `RÃ¨gle: si un rÃ©sultat mÃ©tier structurÃ© existe, il prime sur le retrieval documentaire.`,
+    `RÃ¨gle: les documents servent Ã  gouverner, enrichir et stabiliser la rÃ©ponse.`,
+    `RÃ¨gle: ne jamais dire "je n'ai pas trouvÃ© dans les documents" si une logique mÃ©tier spÃ©cialisÃ©e est disponible.`
   )
 
   return lines.join('\n')
@@ -528,11 +542,11 @@ function buildMenuOnlyMessage(
   const items = getMenuForMode(mode)
   const intro = language.startsWith('en')
     ? 'Choose the angle you want to explore:'
-    : 'Choisis l’angle que tu veux explorer :'
+    : 'Choisis lâ€™angle que tu veux explorer :'
 
   const lines = items
     .slice(0, 9)
-    .map((item, index) => `${index + 1} — ${item.label} : ${item.description}`)
+    .map((item, index) => `${index + 1} â€” ${item.label} : ${item.description}`)
 
   return [intro, '', ...lines].join('\n')
 }
@@ -557,7 +571,7 @@ function isReadingRequest(args: {
   if (args.contextType === 'hexastraReading') return true
   if (args.selectedMenuKey || args.selectedSubmenuKey) return true
 
-  return /lecture|profil|analyse|scan|cycle|année|mois|portrait|lecture générale|lecture complete|lecture complète/i.test(
+  return /lecture|profil|analyse|scan|cycle|annÃ©e|mois|portrait|lecture gÃ©nÃ©rale|lecture complete|lecture complÃ¨te/i.test(
     msg
   )
 }
@@ -597,7 +611,7 @@ export async function runHexastraFlow(input: {
   const journeyToggle = typeof input.journeyEnabled === 'boolean' ? input.journeyEnabled : undefined
 
   if (!VECTOR_STORE_ID) {
-    logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing — retrieval disabled')
+    logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing â€” retrieval disabled')
   }
 
   const latestUserMessage =
@@ -646,9 +660,26 @@ export async function runHexastraFlow(input: {
     const journeyEnabled = journeyToggle ?? userContext.journeyEnabled ?? false
     userContext = { ...userContext, journeyEnabled }
 
-    if (isGreeting && !input.selectedMenuKey && !input.selectedSubmenuKey) {
-      const message = buildGreetingMessage(mode, userContext.language ?? fallbackLanguage)
+    const route = lightRoute(latestUserMessage)
 
+    if (route === 'inappropriate') {
+      const message = 'Je tiens à ce que nos échanges restent utiles et respectueux. Reprenons sur un point qui compte pour toi.'
+      return {
+        message,
+        reply: message,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: 'conversation', completed: true },
+        menu: { visible: false, items: [] },
+        suggestions: [],
+        metadata: { contextType: input.contextType ?? 'general', shouldPersistMemory: false, journeyEnabled },
+      }
+    }
+
+    if (route === 'navigation') {
+      const items = getMenuForMode(mode)
+      const message = buildMenuOnlyMessage(mode, userContext.language ?? fallbackLanguage)
       return {
         message,
         reply: message,
@@ -656,10 +687,8 @@ export async function runHexastraFlow(input: {
         plan,
         conversationId,
         flowState: { step: 'menu', completed: true },
-        menu: { visible: true, items: getMenuForMode(mode) },
-        suggestions: getMenuForMode(mode)
-          .slice(0, 4)
-          .map((item) => item.label),
+        menu: { visible: true, items },
+        suggestions: items.slice(0, 4).map((item) => item.label),
         metadata: {
           contextType: input.contextType ?? 'general',
           practitionerUsage: userContext.practitionerUsage ?? null,
@@ -667,6 +696,34 @@ export async function runHexastraFlow(input: {
           selectedMenuKey: null,
           selectedSubmenuKey: null,
           sessionStep: 'menu',
+          emotionalState: null,
+          timing: null,
+          journeyEnabled,
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      }
+    }
+
+    if ((route === 'greeting' || route === 'small_talk') && !input.selectedMenuKey && !input.selectedSubmenuKey) {
+      const system = buildConversationSystemPrompt(userContext.language ?? fallbackLanguage)
+      const message = await callOpenAIChat({ system, user: latestUserMessage })
+
+      return {
+        message,
+        reply: message,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: 'conversation', completed: true },
+        menu: { visible: false, items: [] },
+        suggestions: [],
+        metadata: {
+          contextType: input.contextType ?? 'general',
+          practitionerUsage: userContext.practitionerUsage ?? null,
+          shouldPersistMemory: false,
+          selectedMenuKey: null,
+          selectedSubmenuKey: null,
+          sessionStep: 'conversation',
           emotionalState: null,
           timing: null,
           journeyEnabled,
@@ -858,7 +915,7 @@ export async function runHexastraFlow(input: {
     if (readingRequest && !specializedResult) {
       const message = userContext.language?.startsWith('en')
         ? 'The HexAstra calculation service is temporarily unavailable. Please try again in a few moments.'
-        : 'Le service de calcul HexAstra est temporairement indisponible. Réessaie dans quelques instants.'
+        : 'Le service de calcul HexAstra est temporairement indisponible. RÃ©essaie dans quelques instants.'
 
       return {
         message,
@@ -957,7 +1014,7 @@ export async function runHexastraFlow(input: {
 
     const menuInstruction =
       input.uiAction === 'select_menu_item' || input.uiAction === 'select_submenu_item'
-        ? `${selectedMenu ? `L’utilisateur a choisi : ${selectedMenu.label}. ${selectedMenu.description}` : ''} ${selectedMenu?.promptHint ?? ''}`.trim()
+        ? `${selectedMenu ? `Lâ€™utilisateur a choisi : ${selectedMenu.label}. ${selectedMenu.description}` : ''} ${selectedMenu?.promptHint ?? ''}`.trim()
         : ''
 
     const specializedInstruction = buildSpecializedContext(specializedResult)
@@ -1123,8 +1180,8 @@ export async function runHexastraFlow(input: {
     }
 
     return {
-      message: 'Je n’ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.',
-      reply: 'Je n’ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.',
+      message: 'Je nâ€™ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.',
+      reply: 'Je nâ€™ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.',
       mode: 'free',
       plan: 'free' as PlanKey,
       conversationId,
@@ -1139,3 +1196,4 @@ export async function runHexastraFlow(input: {
     clearTimeout(globalTimeout)
   }
 }
+

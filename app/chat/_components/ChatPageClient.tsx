@@ -59,7 +59,6 @@ import {
   buildGuardResponse,
   moderateMessage,
 } from '@/lib/chat/conversationLayer'
-import { ensureHexAstraTone } from '@/lib/chat/conversationToneEngine'
 import {
   detectUserDepthLevel,
   adjustResponseDepth,
@@ -71,13 +70,8 @@ import {
   updateUserMemory,
   type UserMemory,
 } from '@/lib/chat/userMemoryEngine'
-import { applyHumanTone } from '@/lib/chat/humanToneEngine'
-import { composeResponse } from '@/lib/chat/responseComposer'
-import { applyIntelligentSilence } from '@/lib/chat/intelligentSilenceEngine'
 import { updateConversationState, type ConversationState } from '@/lib/hexastra/conversation/stateEngine'
 import { detectIntent, type Intent } from '@/lib/hexastra/conversation/intentEngine'
-import { runConversationController, type ConversationContext } from '@/lib/hexastra/conversation/conversationController'
-import { analyzeAgentState } from '@/lib/hexastra/agent/agentBrain'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
 import type {
@@ -298,11 +292,7 @@ export default function ChatPageClient() {
   const lastMessageRef = useRef<string | null>(null)
   const journeyHydratedRef = useRef(false)
   const conversationStateRef = useRef<ConversationState>('start')
-  const conversationContextRef = useRef<ConversationContext>({
-    shortTerm: { history: [], state: 'start' },
-    longTerm: {},
-    state: 'start',
-  })
+  const conversationContextRef = useRef({}) // legacy placeholder, no longer used
 
   const mode = planLoaded ? getEntitlements(userPlan).chatMode : 'essentiel'
 
@@ -335,7 +325,7 @@ export default function ChatPageClient() {
   // Memory hint used sparingly
   const memoryHint = useMemo(() => getUserMemoryContext(userMemory), [userMemory])
 
-  // Final formatting pipeline: Depth/Tone -> Composer -> HumanTone
+  // Minimal formatting: keep business response as-is, optionally trim via depth
   const formatAssistantReply = useCallback(
     (
       base: string,
@@ -357,15 +347,7 @@ export default function ChatPageClient() {
         plan: userPlan,
         isReading,
       })
-      const toned = ensureHexAstraTone(depthAdjusted, {
-        intent,
-        isReading,
-        maxLines: isReading ? undefined : 8,
-      })
-      const composed = composeResponse(toned, { intent, isReading })
-      const human = applyHumanTone(composed, { intent, userMessage, isReading })
-      const silent = applyIntelligentSilence(human, { intent, userMessage, isReading })
-      return silent
+      return depthAdjusted
     },
     [memoryHint, userPlan]
   )
@@ -1154,79 +1136,6 @@ export default function ChatPageClient() {
         ])
         setInput('')
         setAttachedFile(null)
-        return
-      }
-
-      // Router conversationnel : intents légers / navigation / exploration
-      const isConversational =
-        intentDetected === 'greeting' ||
-        intentDetected === 'small_talk' ||
-        intentDetected === 'gratitude' ||
-        intentDetected === 'navigation' ||
-        intentDetected === 'emotion' ||
-        intentDetected === 'conversation' ||
-        intentDetected === 'project' ||
-        intentDetected === 'relationship' ||
-        intentDetected === 'career' ||
-        intentDetected === 'life' ||
-        intentDetected === 'question'
-
-      if (isConversational) {
-        const userMsg: Msg = {
-          id: `${Date.now()}-user`,
-          role: 'user',
-          content,
-          created_at: new Date().toISOString(),
-        }
-        const brain = analyzeAgentState({
-          message: baseContent,
-          intent: intentDetected,
-          entities: memorySignals as any,
-          memory: conversationContextRef.current,
-        })
-        const convoResult = runConversationController({
-          message: baseContent,
-          history: messages.filter((m) => m.role === 'user').map((m) => m.content),
-          userPlan,
-          ctx: conversationContextRef.current,
-        })
-        conversationContextRef.current = convoResult.ctx
-        const formatted = formatAssistantReply(convoResult.reply, {
-          intent: brain.intent ?? intentDetected,
-          isReading: false,
-          userMessage: baseContent,
-          depthLevel,
-        })
-        const assistantMessage: Msg = {
-          id: `${Date.now()}-assistant-conv`,
-          role: 'assistant',
-          content: formatted,
-          created_at: new Date().toISOString(),
-          isReading: false,
-        }
-
-        const baseMessages = isWelcome ? [] : messages
-        const nextConversation = [...baseMessages, userMsg, assistantMessage]
-        setMessages(nextConversation)
-        setInput('')
-        setAttachedFile(null)
-        setIsTyping(false)
-        return
-      }
-
-      if (!isBirthDataComplete(birthData)) {
-        setShowInlineBirthForm(true)
-        const baseMessages = isWelcome ? [] : messages
-        setMessages([
-          ...baseMessages,
-          {
-            id: `${Date.now()}-birthdata`,
-            role: 'assistant',
-            content:
-              "Pour commencer la lecture, renseigne tes donnÃ©es de naissance dans le formulaire situÃ© juste sous la barre de chat. Tu peux aussi ajouter celles de la seconde personne pour une lecture croisÃ©e.",
-            created_at: new Date().toISOString(),
-          },
-        ])
         return
       }
 
