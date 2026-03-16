@@ -26,6 +26,7 @@ export default function HomePage() {
 
   const [user, setUser] = useState<any>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const chatHref = user ? '/chat' : '/auth'
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -89,7 +90,7 @@ export default function HomePage() {
             <a href="#difference" onClick={closeMobileNav}>{t('nav.whyHexAstra')}</a>
             <a href="#offres" onClick={closeMobileNav}>{t('nav.pricing')}</a>
             {user ? (
-              <Link href="/chat" className="hx-mobile-nav-cta" onClick={closeMobileNav}>
+              <Link href={chatHref} className="hx-mobile-nav-cta" onClick={closeMobileNav}>
                 {t('nav.myAccount')}
               </Link>
             ) : (
@@ -129,7 +130,7 @@ export default function HomePage() {
             <a href="#difference">{t('nav.whyHexAstra')}</a>
             <a href="#offres">{t('nav.pricing')}</a>
             {user ? (
-              <Link href="/chat" className="hx-home-login">{t('nav.myAccount')}</Link>
+              <Link href={chatHref} className="hx-home-login">{t('nav.myAccount')}</Link>
             ) : (
               <Link href="/auth" className="hx-home-login">{t('nav.signIn')}</Link>
             )}
@@ -165,7 +166,7 @@ export default function HomePage() {
               </div>
 
               <div className="hx-home-hero-actions">
-                <Link href={user ? '/chat' : '/auth'} className="hx-home-hero-secondary">{t('home.heroFree')}</Link>
+                <Link href={chatHref} className="hx-home-hero-secondary">{t('home.heroFree')}</Link>
               </div>
             </div>
 
@@ -329,7 +330,7 @@ export default function HomePage() {
             <h2>{t('home.ctaTitle')}</h2>
             <p className="hx-home-copy">{t('home.ctaCopy')}</p>
             <div className="hx-home-hero-actions is-centered">
-              <Link href={user ? '/chat' : '/auth'} className="hx-home-hero-secondary is-prominent">{t('home.ctaAuth')}</Link>
+              <Link href={chatHref} className="hx-home-hero-secondary is-prominent">{t('home.ctaAuth')}</Link>
             </div>
           </div>
         </div>

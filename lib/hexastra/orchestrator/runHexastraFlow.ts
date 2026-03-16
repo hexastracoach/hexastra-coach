@@ -61,28 +61,53 @@ function isBirthComplete(birth: BirthProfile | null): boolean {
   return Boolean(birth?.firstName && birth?.date && birth?.place)
 }
 
+function tr(language: string, variants: Partial<Record<string, string>>, fallback = 'fr'): string {
+  const code = language?.slice(0, 2).toLowerCase() || fallback
+  return variants[code] ?? variants[fallback] ?? ''
+}
+
 function buildMissingBirthMessage(language: string): string {
-  return language.startsWith('en')
-    ? 'To personalize the reading, I need your first name, birth date, birth time (or unknown), and birth city + country.'
-    : 'Pour personnaliser la lecture, j’ai besoin de ton prénom, de ta date de naissance, de ton heure de naissance (ou inconnue), et de ta ville + pays de naissance.'
+  return tr(language, {
+    en: 'To personalize the reading, I need your first name, birth date, birth time (or unknown), and birth city + country.',
+    fr: 'Pour personnaliser la lecture, j’ai besoin de ton prénom, de ta date de naissance, de ton heure de naissance (ou inconnue), et de ta ville + pays de naissance.',
+    es: 'Para personalizar la lectura necesito tu nombre, fecha de nacimiento, hora (o desconocida) y ciudad + país de nacimiento.',
+    pt: 'Para personalizar a leitura, preciso do teu primeiro nome, data de nascimento, hora (ou desconhecida) e cidade + país de nascimento.',
+    de: 'Für eine personalisierte Lesung brauche ich deinen Vornamen, dein Geburtsdatum, Geburtszeit (oder unbekannt) sowie Geburtsort und Land.',
+    it: 'Per personalizzare la lettura ho bisogno del tuo nome, data di nascita, ora (o sconosciuta) e città + paese di nascita.',
+  })
 }
 
 function buildPractitionerUsageMessage(language: string): string {
-  return language.startsWith('en')
-    ? 'Is this analysis for 1 — yourself or 2 — a client?'
-    : 'Cette analyse est-elle pour : 1 — un usage personnel 2 — un client(e) ?'
+  return tr(language, {
+    en: 'Is this analysis for 1 — yourself or 2 — a client?',
+    fr: 'Cette analyse est-elle pour : 1 — un usage personnel 2 — un(e) client(e) ?',
+    es: '¿Este análisis es para 1 — ti mismo o 2 — un cliente?',
+    pt: 'Esta análise é para 1 — você mesmo ou 2 — um cliente?',
+    de: 'Ist diese Analyse für 1 — dich selbst oder 2 — einen Klienten?',
+    it: 'Questa analisi è per 1 — te stesso oppure 2 — un cliente?',
+  })
 }
 
 function buildGreetingMessage(mode: ReturnType<typeof getModeForPlan>, language: string): string {
   const items = getMenuForMode(mode).slice(0, 6)
 
-  const intro = language.startsWith('en')
-    ? 'Hello, I’m HexAstra. I can help you clarify a situation, explore a life theme, or start a personalized reading.'
-    : 'Bonjour, je suis HexAstra. Je peux t’aider à clarifier une situation, explorer un thème de vie, ou lancer une lecture personnalisée.'
+  const intro = tr(language, {
+    en: 'Hello, I’m HexAstra. I can help you clarify a situation, explore a life theme, or start a personalized reading.',
+    fr: 'Bonjour, je suis HexAstra. Je peux t’aider à clarifier une situation, explorer un thème de vie, ou lancer une lecture personnalisée.',
+    es: 'Hola, soy HexAstra. Puedo ayudarte a clarificar una situación, explorar un tema de vida o iniciar una lectura personalizada.',
+    pt: 'Olá, sou a HexAstra. Posso ajudar a clarificar uma situação, explorar um tema de vida ou iniciar uma leitura personalizada.',
+    de: 'Hallo, ich bin HexAstra. Ich kann dir helfen, eine Situation zu klären, ein Lebensthema zu erkunden ou eine persönliche Lesung zu starten.',
+    it: 'Ciao, sono HexAstra. Posso aiutarti a chiarire una situazione, esplorare un tema di vita o iniziare una lettura personalizzata.',
+  })
 
-  const invite = language.startsWith('en')
-    ? 'Choose the angle you want to explore:'
-    : 'Choisis l’angle que tu veux explorer :'
+  const invite = tr(language, {
+    en: 'Choose the angle you want to explore:',
+    fr: 'Choisis l’angle que tu veux explorer :',
+    es: 'Elige el ángulo que quieres explorar:',
+    pt: 'Escolhe o ângulo que queres explorar:',
+    de: 'Wähle den Blickwinkel, den du erkunden möchtest:',
+    it: 'Scegli l’angolo che vuoi esplorare:',
+  })
 
   const lines = items.map((item, index) => `${index + 1} — ${item.label} : ${item.description}`)
 

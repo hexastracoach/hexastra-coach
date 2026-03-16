@@ -237,10 +237,6 @@ export default function Composer({
       </div>
 
       {/* Keyboard hint */}
-      <div className="hx-composer-hint">
-        <span className="hx-composer-hint-enter">⌅</span>
-        Les réponses d’Hexastra Coach sont informatives et ne remplacent pas l’avis d’un professionnel.
-      </div>
     </div>
   )
 }

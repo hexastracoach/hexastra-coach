@@ -40,6 +40,13 @@ export default function AuthPage() {
   const [isError, setIsError] = useState(false)
   const [pwError, setPwError] = useState<string | null>(null)
 
+  // Already logged in? go straight to chat
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) router.replace('/chat')
+    })
+  }, [router, supabase])
+
   /* Sign out on tab/browser close when "rester connecté" is off */
   useEffect(() => {
     const stored = sessionStorage.getItem('hx.noremember')

@@ -6,11 +6,57 @@ import HexastraLogo from '@/app/components/HexastraLogo'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { usePlansUI } from '@/lib/usePlansUI'
 import type { PlanKey } from '@/types/subscription'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { priceKeyFromPlan } from '@/lib/billing/stripePlans'
+import { useRouter } from 'next/navigation'
 
 export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
   const { t } = useTranslation()
   const plans = usePlansUI()
   const plan = plans.find((p) => p.key === planKey)!
+  const supabase = createClient()
+  const [checkoutHref, setCheckoutHref] = useState<string>(`/auth?plan=${planKey}`)
+  const [loading, setLoading] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setCheckoutHref('stripe')
+      } else {
+        setCheckoutHref(`/auth?plan=${planKey}`)
+      }
+    })
+  }, [planKey, supabase])
+
+  async function handleCta(e: React.MouseEvent) {
+    if (checkoutHref !== 'stripe') return
+    e.preventDefault()
+    const priceKey = priceKeyFromPlan(planKey)
+    if (!priceKey) {
+      router.push('/auth')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceKey }),
+      })
+      const json = await res.json().catch(() => null)
+      if (res.ok && json?.url) {
+        window.location.href = json.url
+      } else {
+        router.push(`/auth?plan=${planKey}`)
+      }
+    } catch {
+      router.push(`/auth?plan=${planKey}`)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <main className="hx-pricing-page">
@@ -61,10 +107,11 @@ export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
           </ul>
 
           <Link
-            href={`/auth?plan=${planKey}`}
+            href={checkoutHref === 'stripe' ? '#' : checkoutHref}
+            onClick={handleCta}
             className="hx-pricing-cta-btn"
           >
-            {plan.cta}
+            {loading ? t('pricing.loading') ?? 'Redirection…' : plan.cta}
           </Link>
 
           <p className="hx-pricing-legal">
