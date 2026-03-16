@@ -23,7 +23,21 @@ export function generateContextualSuggestions(input: SuggestionInput): string[] 
     plan: input.plan,
     intent: input.contextType ?? input.domainRoute ?? null,
   })
-  const labels = ranked.map((n) => n.label)
+
+  const humanize = (label: string): string => {
+    const key = label.trim().toLowerCase()
+    if (key.includes('stress')) return 'Explorer ce qui nourrit cette tension en toi aujourd’hui.'
+    if (key.includes('fatigue')) return 'Lire ce que cette fatigue cherche à te faire ralentir ou réajuster.'
+    if (key.includes('recentr')) return 'Approfondir ce qui peut te ramener à un axe plus stable.'
+    if (key.includes('relation')) return 'Approfondir l’axe relationnel qui influence ta décision.'
+    if (key.includes('travail') || key.includes('argent'))
+      return 'Voir ce qui mérite d’être sécurisé avant d’avancer.'
+    if (key.includes('decision') || key.includes('décision'))
+      return 'Comparer ce que chaque option active réellement en toi.'
+    return `Explorer cet angle : ${label}`
+  }
+
+  const labels = ranked.slice(0, 4).map((n) => humanize(n.label))
   if (!labels.includes('Revenir au menu')) labels.push('Revenir au menu')
-  return labels.slice(0, 6)
+  return labels
 }

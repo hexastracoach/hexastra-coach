@@ -149,11 +149,13 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
         <div
           style={{
             display: 'flex',
-            gap: 10,
+            gap: 8,
             alignItems: 'center',
+            justifyContent: 'flex-end',
             marginTop: 4,
             color: 'rgba(255,255,255,0.82)',
             fontSize: 13,
+            width: '100%',
           }}
         >
           <button
@@ -161,30 +163,32 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
             onClick={handleCopy}
             type="button"
             style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.14)',
-              borderRadius: 14,
-              padding: '6px 12px',
+              background: 'transparent',
+              border: 'none',
+              padding: '4px 6px',
               color: '#fefefe',
               cursor: 'pointer',
+              opacity: 0.85,
             }}
+            aria-label="Copier la lecture"
           >
-            {copied ? 'Copié' : 'Copier'}
+            {copied ? '✓' : '📋'}
           </button>
           <button
             className="hx-action-btn"
             onClick={handleShare}
             type="button"
             style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.14)',
-              borderRadius: 14,
-              padding: '6px 12px',
+              background: 'transparent',
+              border: 'none',
+              padding: '4px 6px',
               color: '#fefefe',
               cursor: 'pointer',
+              opacity: 0.85,
             }}
+            aria-label="Partager la lecture"
           >
-            {shared ? 'Partagé' : 'Partager'}
+            {shared ? '✓' : '↗'}
           </button>
           <button
             className="hx-action-btn"
@@ -192,15 +196,16 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
             type="button"
             disabled={!onRetry}
             style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.14)',
-              borderRadius: 14,
-              padding: '6px 12px',
+              background: 'transparent',
+              border: 'none',
+              padding: '4px 6px',
               color: onRetry ? '#fefefe' : 'rgba(255,255,255,0.4)',
               cursor: onRetry ? 'pointer' : 'not-allowed',
+              opacity: 0.85,
             }}
+            aria-label="Relancer la lecture"
           >
-            Réessayer
+            ↻
           </button>
         </div>
       )}
