@@ -26,6 +26,7 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
   const [portalError, setPortalError]     = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -39,6 +40,15 @@ export default function AccountPage() {
   async function handleSignOut() {
     await supabase.auth.signOut()
     router.replace('/')
+  }
+
+  async function handleDeleteReadings() {
+    setDeleting(true)
+    try {
+      await fetch('/api/readings', { method: 'DELETE' }).catch(() => {})
+    } finally {
+      setDeleting(false)
+    }
   }
 
   async function handlePortal() {
@@ -76,7 +86,7 @@ export default function AccountPage() {
       <header className="hx-account-header">
         <Link href="/" className="hx-home-brand" aria-label="HexAstra Coach">
           <div className="hx-home-brand-badge">
-            <HexastraLogo size={20} variant="navbar" priority />
+            <HexastraLogo size={26} variant="navbar" priority />
           </div>
           <div className="hx-home-brand-text">
             <div className="hx-home-brand-title">HexAstra Coach</div>
@@ -137,6 +147,15 @@ export default function AccountPage() {
               onClick={handleSignOut}
             >
               {t('account.signOut')}
+            </button>
+
+            <button
+              type="button"
+              className="hx-account-btn hx-account-btn-ghost"
+              onClick={handleDeleteReadings}
+              disabled={deleting}
+            >
+              {deleting ? t('account.loading') : 'Paramètres · gérer / supprimer mes lectures'}
             </button>
           </div>
 
