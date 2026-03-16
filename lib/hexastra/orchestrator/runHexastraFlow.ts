@@ -426,6 +426,7 @@ async function runSpecializedModule({
         first_name: birthData.firstName,
         birth_date: birthData.date,
         birth_time: birthData.time || 'unknown',
+        birthDateISO: birthData.birthDateISO,
         birth_city: birthData.place,
         birth_country: birthData.country,
         question: latestUserMessage,
