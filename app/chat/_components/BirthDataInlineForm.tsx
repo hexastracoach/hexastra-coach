@@ -175,11 +175,6 @@ export default function BirthDataInlineForm({ data, onSave }: Props) {
       onSubmit={handleSubmit}
       aria-label="Données de naissance"
     >
-      <p className="hx-birth-inline-hint">
-        Pour personnaliser ta lecture, j'ai besoin de quelques informations.
-        Les champs marqués <span aria-hidden="true">*</span> sont obligatoires.
-      </p>
-
       <div className="hx-birth-inline-grid">
 
         {/* Prénom */}
