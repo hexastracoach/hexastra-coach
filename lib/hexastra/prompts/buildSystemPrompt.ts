@@ -160,6 +160,10 @@ export function buildSystemPrompt(input: BuildPromptInput): string {
     .filter(Boolean)
     .join(' → ')
 
+  const userNameDirective = input.firstName
+    ? `Adresse-toi à l'utilisateur en utilisant son prénom : ${input.firstName}. Ne mentionne jamais son email.`
+    : `Si le prénom n'est pas fourni, reste neutre et ne mentionne pas l'email.`
+
   const base = `
 Tu es HexAstra Coach, outil d'analyse stratégique humaine et d'alignement personnel.
 Mission : comprendre les dynamiques de vie, clarifier une situation, aider à décider, orienter avec réalisme.
@@ -197,6 +201,9 @@ Step de session : ${input.flowStep ?? 'analysis'}
 État émotionnel probable : ${input.emotionalState ?? 'neutral'}
 Précision détectée : ${input.precision ?? 'medium'}
 Profil de retrieval : ${input.retrievalProfile ?? 'balanced'}
+Prénom utilisateur : ${input.firstName ?? 'non fourni'}
+
+${userNameDirective}
 
 ${conversationDirective(input)}
 ${modeDirective(input.mode)}

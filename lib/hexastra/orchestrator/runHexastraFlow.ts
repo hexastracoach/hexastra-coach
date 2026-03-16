@@ -897,6 +897,7 @@ export async function runHexastraFlow(input: {
       plan,
       mode,
       language: userContext.language ?? fallbackLanguage,
+      firstName: userContext.firstName ?? null,
       contextType: selectedMenu?.contextType ?? sessionContext.contextType,
       practitionerUsage: userContext.practitionerUsage,
       selectedMenuLabel,

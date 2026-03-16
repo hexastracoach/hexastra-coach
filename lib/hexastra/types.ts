@@ -137,6 +137,7 @@ export type BuildPromptInput = {
   plan: PlanKey
   mode: HexastraMode
   language: string
+  firstName?: string | null
   contextType: ContextType
   practitionerUsage: PractitionerUsageHex
   selectedMenuLabel?: string | null
