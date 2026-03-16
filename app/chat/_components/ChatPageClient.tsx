@@ -54,6 +54,17 @@ import {
 } from '@/lib/stores/userEvolutionStore'
 import type { UserEvolutionProfile } from '@/types/evolution'
 import { useChatLanguage, useTranslation } from '@/lib/i18n/useTranslation'
+import {
+  buildClarificationPrompt,
+  buildGuardResponse,
+  buildShiloReply,
+  detectUserIntent,
+  isConversationalIntent,
+  moderateMessage,
+  type ConversationIntent,
+  type ModerationClass,
+} from '@/lib/chat/conversationLayer'
+import { ensureHexAstraTone } from '@/lib/chat/conversationToneEngine'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
 import type {
@@ -567,15 +578,21 @@ export default function ChatPageClient() {
 
       try {
         const data = await postChatPayload(payload)
-        const reply = applyApiResponse(data)
         const isReading = isReadingFlowStep(data?.flowState?.step)
+        const reply = applyApiResponse(data)
+        const actionIntent = detectUserIntent(message)
+        const tonedReply = ensureHexAstraTone(reply, {
+          intent: actionIntent,
+          isReading,
+          maxLines: isReading ? undefined : 8,
+        })
 
         setMessages([
           ...nextConversation,
           {
             id: `${Date.now()}-assistant`,
             role: 'assistant',
-            content: reply,
+            content: tonedReply,
             created_at: new Date().toISOString(),
             isReading,
           },
@@ -1015,6 +1032,61 @@ export default function ChatPageClient() {
       if (isDuplicateMessage(lastMessageRef, content)) return
       if (chatStep !== 'conversation_ready') return
 
+      const moderation = moderateMessage(baseContent)
+      const convIntent: ConversationIntent = detectUserIntent(baseContent)
+
+      if (moderation !== 'SAFE') {
+        const baseMessages = isWelcome ? [] : messages
+        const userMsg: Msg = {
+          id: `${Date.now()}-user`,
+          role: 'user',
+          content,
+          created_at: new Date().toISOString(),
+        }
+        setMessages([
+          ...baseMessages,
+          userMsg,
+          {
+            id: `${Date.now()}-moderation`,
+            role: 'assistant',
+            content: moderation === 'CONFUSED' ? buildClarificationPrompt() : buildGuardResponse(moderation),
+            created_at: new Date().toISOString(),
+          },
+        ])
+        setInput('')
+        setAttachedFile(null)
+        return
+      }
+
+      if (isConversationalIntent(convIntent)) {
+        const userMsg: Msg = {
+          id: `${Date.now()}-user`,
+          role: 'user',
+          content,
+          created_at: new Date().toISOString(),
+        }
+
+        const assistantMessage: Msg = {
+          id: `${Date.now()}-assistant-conv`,
+          role: 'assistant',
+          content: ensureHexAstraTone(buildShiloReply({ intent: convIntent, message: baseContent }), {
+            intent: convIntent,
+            isReading: false,
+            maxLines: 8,
+          }),
+          created_at: new Date().toISOString(),
+          isReading: false,
+        }
+
+        const baseMessages = isWelcome ? [] : messages
+        const nextConversation = [...baseMessages, userMsg, assistantMessage]
+        setMessages(nextConversation)
+        setInput('')
+        setAttachedFile(null)
+        setIsTyping(false)
+        return
+      }
+
       if (!isBirthDataComplete(birthData)) {
         setShowInlineBirthForm(true)
         const baseMessages = isWelcome ? [] : messages
@@ -1112,10 +1184,15 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
         const cachedIsReading =
           cachedReply.includes('────────────────────') ||
           cachedReply.toLowerCase().includes('pour aller plus loin')
+        const tonedCached = ensureHexAstraTone(cachedReply, {
+          intent: convIntent,
+          isReading: cachedIsReading,
+          maxLines: cachedIsReading ? undefined : 8,
+        })
         const assistantMessage: Msg = {
           id: `${Date.now()}-cached`,
           role: 'assistant',
-          content: cachedReply,
+          content: tonedCached,
           created_at: new Date().toISOString(),
           cached: true,
           isReading: cachedIsReading,
@@ -1161,7 +1238,7 @@ Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
         const assistantMessage: Msg = {
           id: `${Date.now()}-assistant`,
           role: 'assistant',
-          content: reply,
+          content: tonedReply,
           created_at: new Date().toISOString(),
           isReading,
         }
