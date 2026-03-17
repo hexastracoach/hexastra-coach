@@ -537,16 +537,33 @@ export async function runHexastraFlow(input: {
     const activeModules = getModulesForDomain(domainRoute, mode)
 
     const knowledgeBlock = knowledgePayload.block
-    const fusedSignal = await fusionEngine({
-      domainRoute,
-      knowledgeBlock,
-      userContext,
-      sessionContext,
-      menuInstruction,
-      specialized: specializedResult,
-    })
+    let fusedSignal: any = null
+    let arbitration: any = null
+    let messages: any[] = []
 
-    const arbitration = await arbiter({ domainRoute, fusedSignal, userContext, sessionContext })
+    try {
+      fusedSignal = await fusionEngine({
+        domainRoute,
+        knowledgeBlock,
+        userContext,
+        sessionContext,
+        menuInstruction,
+        specialized: specializedResult,
+      })
+      arbitration = await arbiter({ domainRoute, fusedSignal, userContext, sessionContext })
+      messages =
+        buildSignalEnvelope({
+          fusedSignal,
+          arbitration,
+          menuInstruction,
+          specialized: specializedResult,
+        }) ?? []
+    } catch (fusionError) {
+      logger.error('[runHexastraFlow] fusion/buildSignalEnvelope failed', { error: fusionError })
+      fusedSignal = fusedSignal || {}
+      arbitration = arbitration || {}
+      messages = []
+    }
 
     const systemPrompt = buildSystemPrompt({
       mode,
@@ -554,13 +571,6 @@ export async function runHexastraFlow(input: {
       contextType: normalizedContextType,
       menuInstruction,
       journeyEnabled,
-    })
-
-    const messages = buildSignalEnvelope({
-      fusedSignal,
-      arbitration,
-      menuInstruction,
-      specialized: specializedResult,
     })
 
     const payload = buildChatPayload({
