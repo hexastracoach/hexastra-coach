@@ -39,13 +39,13 @@ import { applySentinel } from '@/lib/hexastra/security/sentinel'
 import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
 import { logger } from '@/lib/utils/logger'
-import { openai } from '@/lib/openai/client'
+import { getOpenAIClient } from '@/lib/openai/client'
 
 import { generateConversation } from '@/lib/hexastra/openai/generateConversation'
 import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
-const API_URL = process.env.HEXASTRA_API_URL!.replace(/\/$/, '')
+const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
 const API_KEY = process.env.HEXASTRA_API_KEY || ''
 const GLOBAL_FLOW_TIMEOUT_MS = 18000
 const flowLog = (
@@ -348,6 +348,7 @@ async function callOpenAIResponse(payload: {
   temperature?: number
   max_output_tokens?: number
 }) {
+  const openai = getOpenAIClient()
   const started = Date.now()
   flowLog('info', 'before OpenAI call', { model: payload.model })
   const response = await openai.responses.create({

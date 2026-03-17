@@ -7,6 +7,7 @@ import { validateEnv } from '@/lib/utils/env'
 import { unauthorized, internalError, ok } from '@/lib/utils/apiResponse'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID()

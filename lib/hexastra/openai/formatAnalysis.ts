@@ -1,13 +1,17 @@
-import { openai } from '@/lib/openai/client'
+import { getOpenAIClient } from '@/lib/openai/client'
 import { OPENAI_MODELS } from '@/lib/openai/models'
 import { SHILO_ANALYSIS_PROMPT } from '@/lib/hexastra/prompts/shiloAnalysisPrompt'
 
 export async function formatAnalysis(analysisData: unknown) {
+  const openai = getOpenAIClient()
   const response = await openai.responses.create({
-    model: OPENAI_MODELS.analysis, // gpt-5.4
+    model: OPENAI_MODELS.analysis,
     input: [
       { role: 'system', content: SHILO_ANALYSIS_PROMPT },
-      { role: 'user', content: typeof analysisData === 'string' ? analysisData : JSON.stringify(analysisData) },
+      {
+        role: 'user',
+        content: typeof analysisData === 'string' ? analysisData : JSON.stringify(analysisData),
+      },
     ],
   })
 

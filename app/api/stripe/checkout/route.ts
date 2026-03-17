@@ -9,23 +9,26 @@ import { badRequest, internalError, unauthorized, ok } from '@/lib/utils/apiResp
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
-const stripeKey = process.env.STRIPE_SECRET_KEY
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-if (!stripeKey) {
-  throw new Error('STRIPE_SECRET_KEY manquante')
-}
-
-const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' })
 
 export async function POST(req: NextRequest) {
   try {
     const requestId = randomUUID()
     const log = (level: 'info' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) =>
       logger[level](`[stripe:checkout][${requestId}] ${msg}`, meta)
+
+    const stripeKey = process.env.STRIPE_SECRET_KEY
+
+    if (!stripeKey) {
+      log('error', 'STRIPE_SECRET_KEY missing at runtime')
+      return internalError('Stripe non configure')
+    }
+
+    const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' })
 
     validateEnv({
       STRIPE_SECRET_KEY: {},

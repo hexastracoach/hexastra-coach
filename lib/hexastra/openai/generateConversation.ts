@@ -1,10 +1,11 @@
-﻿import { openai } from '@/lib/openai/client'
+import { getOpenAIClient } from '@/lib/openai/client'
 import { OPENAI_MODELS } from '@/lib/openai/models'
 import { SHILO_CONVERSATION_PROMPT } from '@/lib/hexastra/prompts/shiloConversationPrompt'
 
 export async function generateConversation(userMessage: string) {
+  const openai = getOpenAIClient()
   const response = await openai.responses.create({
-    model: OPENAI_MODELS.conversation, // gpt-5-mini
+    model: OPENAI_MODELS.conversation,
     input: [
       { role: 'system', content: SHILO_CONVERSATION_PROMPT },
       { role: 'user', content: userMessage },
@@ -13,4 +14,3 @@ export async function generateConversation(userMessage: string) {
 
   return response.output_text
 }
-
