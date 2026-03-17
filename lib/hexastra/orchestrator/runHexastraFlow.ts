@@ -444,7 +444,12 @@ export async function runHexastraFlow(input: {
     }
 
     if (!API_KEY || !API_URL) {
-      logger.error('[runHexastraFlow] HEXASTRA_API env missing')
+      logger.error('[runHexastraFlow] HEXASTRA_API env missing', {
+        hasApiUrl: Boolean(API_URL),
+        apiUrlLength: API_URL?.length ?? 0,
+        hasApiKey: Boolean(API_KEY),
+        apiKeyLength: API_KEY?.length ?? 0,
+      })
       throw new Error('HEXASTRA API env missing')
     }
 
