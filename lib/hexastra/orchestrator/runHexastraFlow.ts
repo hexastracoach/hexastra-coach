@@ -154,7 +154,7 @@ async function callRailway(path: string, payload: Record<string, unknown>) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${API_KEY}`,
+      ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
     },
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(9000),
@@ -189,58 +189,41 @@ async function runSpecializedModule({
   const latestUserMessage =
     messages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
 
-  if (
-    (domainRoute === 'gps_kua' || domainRoute === 'neurokua') &&
-    birthData?.date &&
-    birthData?.place
-  ) {
+  // Nouvelle API : tout passe par /chart/fusion (couvre HD, numérologie, kua…)
+  if (birthData?.birthDateISO || birthData?.date) {
     try {
-      const kua = await callRailway('/kua', {
-        birth_date: birthData.date,
-        birth_time: birthData.time || 'unknown',
-        birth_city: birthData.place,
-        birth_country: birthData.country,
-        first_name: birthData.firstName,
+      const lat = typeof birthData.lat === 'number' ? birthData.lat : Number(birthData.lat)
+      const lon = typeof birthData.lon === 'number' ? birthData.lon : Number(birthData.lon)
+
+      const fusionPayload = {
+        birthDateISO:
+          birthData.birthDateISO ||
+          (birthData.date
+            ? `${birthData.date}${birthData.time ? `T${birthData.time}Z` : 'T00:00:00Z'}`
+            : undefined),
+        lat: Number.isFinite(lat) ? lat : undefined,
+        lon: Number.isFinite(lon) ? lon : undefined,
+        city: safeString(birthData.place) || safeString((birthData as any).city),
+        country: safeString(birthData.country),
+        place: safeString(birthData.place),
+        name: safeString(birthData.name) || safeString(birthData.firstName),
+        gender: safeString(birthData.gender) || 'M',
+        tz: 1,
         question: latestUserMessage,
         practitioner_usage: practitionerUsage,
-      })
-
-      const summary =
-        typeof kua?.publicSummary === 'string'
-          ? kua.publicSummary
-          : typeof kua?.summary === 'string'
-            ? kua.summary
-            : `Utilise le calcul Kua/GPS fourni pour éclairer l'orientation, l’équilibre et la direction prioritaire.`
-
-      return {
-        source: domainRoute === 'gps_kua' ? 'gps_kua' : 'neurokua',
-        publicSummary: summary,
-        raw: kua && typeof kua === 'object' ? (kua as Record<string, unknown>) : null,
       }
-    } catch (error) {
-      logger.error('[runSpecializedModule:/kua] failed', {
-        apiUrl: API_URL,
-        hasApiKey: Boolean(API_KEY),
-        error,
-        birthData,
-        latestUserMessage,
-      })
-    }
-  }
 
-  if (domainRoute === 'fusion' && birthData?.date && birthData?.place) {
-    try {
       const fusion = await callRailway('/chart/fusion', {
-        first_name: birthData.firstName,
-        birth_date: birthData.date,
+        first_name: fusionPayload.name,
+        birth_date: fusionPayload.birthDateISO?.slice(0, 10),
         birth_time: birthData.time || 'unknown',
-        birthDateISO: birthData.birthDateISO,
-        birth_city: birthData.place || birthData.city || birthData.firstName, // fallback minime
-        birth_country: birthData.country,
-        lat: birthData.lat,
-        lon: birthData.lon,
-        question: latestUserMessage,
-        practitioner_usage: practitionerUsage,
+        birthDateISO: fusionPayload.birthDateISO,
+        birth_city: fusionPayload.city,
+        birth_country: fusionPayload.country,
+        lat: fusionPayload.lat,
+        lon: fusionPayload.lon,
+        question: fusionPayload.question,
+        practitioner_usage: fusionPayload.practitioner_usage,
       })
 
       const summary =
@@ -251,7 +234,7 @@ async function runSpecializedModule({
             : `Utilise la synthèse fusionnée fournie comme signal dominant de la réponse finale.`
 
       return {
-        source: 'fusion',
+        source: domainRoute === 'neurokua' ? 'neurokua' : domainRoute,
         publicSummary: summary,
         raw:
           fusion && typeof fusion === 'object' ? (fusion as Record<string, unknown>) : null,
