@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'crypto'
+﻿import { createHash, randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { runHexastraFlow } from '@/lib/hexastra/orchestrator/runHexastraFlow'
@@ -18,6 +18,8 @@ import { validateEnv } from '@/lib/utils/env'
 import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
 import { generateConversation } from '@/lib/hexastra/openai/generateConversation'
 import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
+import { classifyIntent } from '@/lib/hexastra/openai/classifyIntent'
+import { generateSuggestions } from '@/lib/hexastra/suggestions/generateSuggestions'
 
 export const runtime = 'nodejs'
 
@@ -28,10 +30,10 @@ const SUPPORTED_LANGUAGES = ['fr', 'en', 'es', 'pt', 'de', 'it'] as const
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 
 const PLAN_LIMITS: Record<PlanKey, number | null> = {
-  free: 10,        // précédemment 3
-  essential: 60,   // précédemment 20
-  premium: null,   // illimité
-  practitioner: null, // illimité
+  free: 10,        // prÃ©cÃ©demment 3
+  essential: 60,   // prÃ©cÃ©demment 20
+  premium: null,   // illimitÃ©
+  practitioner: null, // illimitÃ©
 }
 
 const REQUIRED_ENV = {
@@ -158,8 +160,8 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
 
 function buildSafeErrorResponse() {
   return {
-    message: "Je n'ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.",
-    reply: "Je n'ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.",
+    message: "Je n'ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.",
+    reply: "Je n'ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.",
     mode: 'free',
     plan: 'free',
     flowState: { step: 'error', completed: false },
@@ -182,14 +184,14 @@ function buildQuotaErrorResponse(params: { plan: PlanKey; used: number; limit: n
           ? 'Praticien'
           : 'Gratuit'
 
-  const freeMessage = `Tu as atteint la limite de ton accès découverte pour le moment.
+  const freeMessage = `Tu as atteint la limite de ton accÃ¨s dÃ©couverte pour le moment.
 
-Ton espace gratuit se réouvrira automatiquement dans 24h.
-Si tu veux continuer maintenant, tu peux passer à Essentiel.`
+Ton espace gratuit se rÃ©ouvrira automatiquement dans 24h.
+Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`
 
   const paidMessage = `Tu as atteint la limite de ton plan ${planLabel} pour le moment.
 
-Tu pourras réessayer plus tard, ou passer à l’offre supérieure si tu veux continuer tout de suite.`
+Tu pourras rÃ©essayer plus tard, ou passer Ã  lâ€™offre supÃ©rieure si tu veux continuer tout de suite.`
 
   const finalMessage = plan === 'free' ? freeMessage : paidMessage
 
@@ -204,7 +206,7 @@ Tu pourras réessayer plus tard, ou passer à l’offre supérieure si tu veux c
       shouldPersistMemory: false,
       quotaExceeded: true,
       upgradeTargetPlan: plan === 'free' ? 'essential' : 'premium',
-      upgradeCtaLabel: plan === 'free' ? 'Passer à Essentiel' : 'Passer à Premium',
+      upgradeCtaLabel: plan === 'free' ? 'Passer Ã  Essentiel' : 'Passer Ã  Premium',
       resetAt,
       usage: {
         used,
@@ -243,12 +245,12 @@ function detectLanguageFromText(text: string): SupportedLanguage | null {
   const normalized = text.trim().toLowerCase()
   if (!normalized) return null
 
-  const frenchSignals = ['bonjour', 'salut', 'bonsoir', 'merci', 'je veux', 'j’ai', "j'ai", 'peux-tu', 'peut tu', 'pourquoi', 'comment', 'travail', 'amour', 'santé']
+  const frenchSignals = ['bonjour', 'salut', 'bonsoir', 'merci', 'je veux', 'jâ€™ai', "j'ai", 'peux-tu', 'peut tu', 'pourquoi', 'comment', 'travail', 'amour', 'santÃ©']
   const englishSignals = ['hello', 'hi', 'hey', 'thank you', 'please', 'i want', 'can you', 'how', 'why', 'love', 'work', 'health']
-  const spanishSignals = ['hola', 'buenas', 'gracias', 'por favor', 'ayuda', 'salud', 'trabajo', 'amor', 'como', 'qué', 'porque']
-  const portugueseSignals = ['olá', 'obrigado', 'por favor', 'saúde', 'trabalho', 'amor', 'porquê', 'como', 'podes', 'ajuda']
+  const spanishSignals = ['hola', 'buenas', 'gracias', 'por favor', 'ayuda', 'salud', 'trabajo', 'amor', 'como', 'quÃ©', 'porque']
+  const portugueseSignals = ['olÃ¡', 'obrigado', 'por favor', 'saÃºde', 'trabalho', 'amor', 'porquÃª', 'como', 'podes', 'ajuda']
   const germanSignals = ['hallo', 'danke', 'bitte', 'gesundheit', 'arbeit', 'liebe', 'warum', 'wie', 'kannst', 'hilfe']
-  const italianSignals = ['ciao', 'grazie', 'per favore', 'salute', 'lavoro', 'amore', 'perché', 'come', 'puoi', 'aiuto']
+  const italianSignals = ['ciao', 'grazie', 'per favore', 'salute', 'lavoro', 'amore', 'perchÃ©', 'come', 'puoi', 'aiuto']
 
   const scores = [
     { lang: 'fr' as SupportedLanguage, score: frenchSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
@@ -277,10 +279,6 @@ function resolveRequestedLanguage(body: Record<string, unknown>, messages: ChatM
   const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content
   const detected = lastUserMessage ? detectLanguageFromText(lastUserMessage) : null
   return detected ?? 'fr'
-}
-
-function isGreetingOnlyMessage(text: string): boolean {
-  return /^(bonjour|salut|hello|hey|bonsoir|coucou|yo|hi)$/i.test(text.trim())
 }
 
 async function resolveEffectivePlan(req: NextRequest): Promise<{ plan: PlanKey; userId: string | null }> {
@@ -471,16 +469,16 @@ function buildPremiumLockBlock(plan: PlanKey) {
   if (plan === 'free') {
     return {
       teaser:
-        'Aperçu disponible. La suite de l’analyse complète, les nuances et les leviers prioritaires sont réservés aux plans supérieurs.',
-      ctaLabel: 'Passer à Essentiel',
+        'AperÃ§u disponible. La suite de lâ€™analyse complÃ¨te, les nuances et les leviers prioritaires sont rÃ©servÃ©s aux plans supÃ©rieurs.',
+      ctaLabel: 'Passer Ã  Essentiel',
       targetPlan: 'essential',
     }
   }
 
   return {
     teaser:
-      'La base est visible ici. La lecture complète, plus profonde et plus stratégique, est réservée aux plans Premium et Praticien.',
-    ctaLabel: 'Passer à Premium',
+      'La base est visible ici. La lecture complÃ¨te, plus profonde et plus stratÃ©gique, est rÃ©servÃ©e aux plans Premium et Praticien.',
+    ctaLabel: 'Passer Ã  Premium',
     targetPlan: 'premium',
   }
 }
@@ -545,14 +543,12 @@ export async function POST(req: NextRequest) {
 
     const sanitizedMessages = sanitizeMessages((body as Record<string, unknown>).messages)
     const lastUserMessage = [...sanitizedMessages].reverse().find((m) => m.role === 'user')?.content?.trim() ?? ''
-    const isGreetingOnly = isGreetingOnlyMessage(lastUserMessage)
-
+    
     log('info', 'request summary', {
       requestType,
       messagesCount: sanitizedMessages.length,
       lastUserMessage,
-      isGreetingOnly,
-    })
+          })
 
     const { plan: effectivePlan, userId } = await resolveEffectivePlan(req)
     log('info', 'effective plan resolved', { effectivePlan, userId })
@@ -563,25 +559,7 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).journeyEnabled as boolean)
         : false
 
-    // Si greeting simple, répondre via OpenAI direct et sortir
-    if (isGreetingOnly) {
-      const content = await generateConversation(lastUserMessage || 'Bonjour.')
-      return NextResponse.json(
-        {
-          content,
-          type: 'conversation',
-          plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
-        },
-        { status: 200 }
-      )
-    }
+    const intent = await classifyIntent(lastUserMessage)
 
     const quota = await enforceDailyQuota({
       req,
@@ -605,13 +583,8 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Routage léger
-    const normalized = lastUserMessage.toLowerCase()
-    const isMenu =
-      /(menu|explorer les angles|voir les angles|revenir au menu|angles)/i.test(normalized) ||
-      normalizeUiAction((body as Record<string, unknown>).uiAction) === 'open_menu'
-
-    if (isGreetingOnly) {
+    // Routage lÃ©ger par intention
+    if (intent === 'conversation') {
       const content = await generateConversation(lastUserMessage || 'Bonjour.')
       return NextResponse.json(
         {
@@ -630,7 +603,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (isMenu) {
+    if (intent === 'menu') {
       log('info', 'routing to navigation/menu')
       const menuResponse = await runHexastraFlow({
         plan: effectivePlan,
@@ -656,6 +629,25 @@ export async function POST(req: NextRequest) {
         journeyEnabled,
       })
       return NextResponse.json(menuResponse, { status: 200 })
+    }
+
+    if (intent === 'irrelevant') {
+      const polite = "Je prÃ©fÃ¨re rester concentrÃ© sur ce qui peut vraiment tâ€™aider."
+      return NextResponse.json(
+        {
+          content: polite,
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        },
+        { status: 200 }
+      )
     }
 
     log('info', 'calling runHexastraFlow (business)')
@@ -704,9 +696,14 @@ export async function POST(req: NextRequest) {
         ? await formatAnalysis(response.message)
         : response.message
 
+    const withSuggestions =
+      reformatted && shouldRephrase
+        ? `${reformatted}\n\n---\n${generateSuggestions(response.message).join('\n')}`
+        : reformatted
+
     const finalResponse = applyPremiumInsightLock({
       plan: effectivePlan,
-      response: reformatted ? { ...response, message: reformatted, reply: reformatted } : response,
+      response: withSuggestions ? { ...response, message: withSuggestions, reply: withSuggestions } : response,
     })
 
     const enriched = enrichReadingResponse({
@@ -742,8 +739,7 @@ export async function POST(req: NextRequest) {
             windowStartedAt: quota.windowStartedAt,
           },
           responseDepth,
-          isGreetingOnly,
-          journeyEnabled,
+                    journeyEnabled,
         },
       },
       { status: 200 }
@@ -753,3 +749,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(buildSafeErrorResponse(), { status: 500 })
   }
 }
+
