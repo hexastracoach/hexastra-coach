@@ -408,13 +408,6 @@ export async function POST(req: NextRequest) {
 
     const intentLocal = detectIntentLocal(lastUserMessage)
 
-    const cacheKey = buildCacheKey(userId, lastUserMessage, normalizeBirthData((body as Record<string, unknown>).birthData))
-    const cached = getCache(cacheKey)
-    if (cached) {
-      log('info', 'cacheHit', { cacheKey })
-      return NextResponse.json(cached, { status: 200 })
-    }
-
     if (intentLocal === 'greeting') {
       const content = await generateConversation(lastUserMessage || 'Bonjour.')
       const resp = {
@@ -429,8 +422,14 @@ export async function POST(req: NextRequest) {
         flowState: { step: 'conversation', completed: true },
         menu: { visible: false, items: [] },
       }
-      setCache(cacheKey, resp)
       return NextResponse.json(resp, { status: 200 })
+    }
+
+    const cacheKey = buildCacheKey(userId, lastUserMessage, normalizeBirthData((body as Record<string, unknown>).birthData))
+    const cached = getCache(cacheKey)
+    if (cached) {
+      log('info', 'cacheHit', { cacheKey })
+      return NextResponse.json(cached, { status: 200 })
     }
 
     if (intentLocal === 'menu') {
