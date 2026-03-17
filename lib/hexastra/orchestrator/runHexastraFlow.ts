@@ -70,6 +70,15 @@ type SpecializedModuleResult = {
 
 const safeString = (value: unknown): string => (typeof value === 'string' ? value : '')
 const safeArray = <T>(value: unknown): T[] => (Array.isArray(value) ? value.filter(Boolean) as T[] : [])
+const safeBuildSignalEnvelope = (params: Parameters<typeof buildSignalEnvelope>[0]): KSSignal | null => {
+  try {
+    const signal = buildSignalEnvelope(params)
+    return signal && typeof signal === 'object' ? (signal as KSSignal) : null
+  } catch (error) {
+    logger.error('[runHexastraFlow] buildSignalEnvelope failed', { error, module: params.module })
+    return null
+  }
+}
 
 function normalizeMenuItem(item: Partial<HexastraMenuItem>): HexastraMenuItem {
   return {
@@ -229,7 +238,26 @@ async function runSpecializedModule({
   messages: ChatMessage[]
 }): Promise<SpecializedModuleResult | null> {
   const latestUserMessage =
-    messages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
+    messages.filter((m) => m.role === 'user').at(-1)?.content?.trim() ?? ''
+
+  if (!latestUserMessage || latestUserMessage.length < 3) {
+    flowLog('info', 'skip specialized module: empty latestUserMessage', { domainRoute })
+    return null
+  }
+
+  const allowedDomain = domainRoute === 'neurokua' || domainRoute === 'gps_kua' || domainRoute === 'fusion'
+  if (!allowedDomain) {
+    flowLog('info', 'skip specialized module: domainRoute not specialized', { domainRoute })
+    return null
+  }
+
+  if (!birthData || !isBirthComplete(birthData)) {
+    flowLog('info', 'skip specialized module: birth data incomplete', {
+      hasBirth: Boolean(birthData),
+      birthKeys: birthData ? Object.keys(birthData) : [],
+    })
+    return null
+  }
 
   // Nouvelle API : tout passe par /chart/fusion (couvre HD, numérologie, kua…)
   if (birthData?.birthDateISO || birthData?.date) {
@@ -592,7 +620,7 @@ export async function runHexastraFlow(input: {
     // Construire des signaux KS robustes
     const signals: KSSignal[] = []
     const specializedSignal = specializedResult
-      ? buildSignalEnvelope({
+      ? safeBuildSignalEnvelope({
           module: specializedResult.source ?? 'specialized',
           result: specializedResult.raw ?? { publicSummary: specializedResult.publicSummary },
           domainRoute,
@@ -601,20 +629,25 @@ export async function runHexastraFlow(input: {
     if (specializedSignal) signals.push(specializedSignal)
 
     const knowledgeSignal = knowledgeBlock
-      ? buildSignalEnvelope({ module: 'retrieval', result: { signals: [knowledgeBlock] }, domainRoute })
+      ? safeBuildSignalEnvelope({ module: 'retrieval', result: { signals: [knowledgeBlock] }, domainRoute })
       : null
     if (knowledgeSignal) signals.push(knowledgeSignal)
+
+    const safeSignals = Array.isArray(signals) ? signals.filter(Boolean) : []
+    const fallbackSignal =
+      safeBuildSignalEnvelope({ module: 'fallback', result: {}, domainRoute }) ??
+      ({ module: 'fallback', signals: ['signal_general'], intensity: 0.5, confidence: 0.5 } as KSSignal)
 
     let fusedSignal: any = null
     let arbitration: any = null
     try {
-      fusedSignal = fusionEngine(signals.length ? signals : [buildSignalEnvelope({ module: 'fallback', result: {}, domainRoute })])
+      fusedSignal = fusionEngine(safeSignals.length ? safeSignals : [fallbackSignal])
       arbitration = await arbiter({ domainRoute, fusedSignal, userContext, sessionContext })
     } catch (fusionError) {
       logger.error('[runHexastraFlow] fusion/buildSignalEnvelope failed', {
         error: fusionError,
-        signalsType: typeof signals,
-        signalsLength: signals.length,
+        signalsType: typeof safeSignals,
+        signalsLength: safeSignals.length,
       })
       fusedSignal = fusedSignal || { dominantSignal: 'signal_general' }
       arbitration = arbitration || {}

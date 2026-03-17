@@ -555,10 +555,65 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const intent = await classifyIntent(lastUserMessage)
-    log('info', 'intent classifyIntent', { intent })
+    if (intentLocal === 'conversation') {
+      log('info', 'enter simple conversation branch')
+      try {
+        const content = await generateConversation(lastUserMessage || 'Bonjour.')
+        const message = typeof content === 'string' && content.trim().length > 0
+          ? content.trim()
+          : 'Je suis là. Dis-moi ce dont tu as besoin.'
+        const convResponse = {
+          message,
+          reply: message,
+          content: message,
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        }
+        setCache(cacheKey, convResponse)
+        log('info', 'return simple conversation payload')
+        return NextResponse.json(convResponse, { status: 200 })
+      } catch (error) {
+        log('warn', 'simple conversation failed, fallback local', { error: (error as Error)?.message })
+        const fallbackMessage = 'Je suis là. Dis-moi ce dont tu as besoin.'
+        const convResponse = {
+          message: fallbackMessage,
+          reply: fallbackMessage,
+          content: fallbackMessage,
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        }
+        log('info', 'return simple conversation fallback payload')
+        return NextResponse.json(convResponse, { status: 200 })
+      }
+    }
 
-    log('info', 'enter analysis/conversation branch')
+    const intent =
+      intentLocal === 'analysis'
+        ? await classifyIntent(lastUserMessage).catch((error) => {
+            log('warn', 'classifyIntent failed; keep intentLocal', { error })
+            return intentLocal
+          })
+        : intentLocal
+
+    if (intentLocal === 'analysis' && intent && intent !== intentLocal) {
+      log('info', 'intent classifyIntent', { intent })
+    }
+
+    log('info', 'enter analysis branch')
     const response = await runHexastraFlow({
       plan: effectivePlan,
       responseDepth,
