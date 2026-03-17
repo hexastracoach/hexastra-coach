@@ -62,8 +62,10 @@ function normalizeText(value: string): string {
   return (value || '')
     .trim()
     .toLowerCase()
+    .replace(/[^a-z0-9\s]/gi, ' ')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
 }
 
 function isGreeting(normalized: string): boolean {
