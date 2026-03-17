@@ -42,6 +42,20 @@ const REQUIRED_ENV = {
   SUPABASE_SERVICE_ROLE_KEY: {},
 }
 
+function normalizeText(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function isGreetingOrSmallTalk(normalized: string): boolean {
+  return /^(salut|bonjour|hello|hey|coucou|yo|bonsoir|hi|merci|ok|daccord|dac|ca va|ça va|\?ca va|\?ça va|oui|non)$/.test(
+    normalized.replace(/\s+\?/g, '?').replace(/\s+/g, ' ')
+  )
+}
+
 function getResponseDepth(plan: PlanKey): ResponseDepth {
   switch (plan) {
     case 'essential':
@@ -543,12 +557,14 @@ export async function POST(req: NextRequest) {
 
     const sanitizedMessages = sanitizeMessages((body as Record<string, unknown>).messages)
     const lastUserMessage = [...sanitizedMessages].reverse().find((m) => m.role === 'user')?.content?.trim() ?? ''
-    
+    const normalizedLast = normalizeText(lastUserMessage)
+
     log('info', 'request summary', {
       requestType,
       messagesCount: sanitizedMessages.length,
       lastUserMessage,
-          })
+      normalizedLast,
+    })
 
     const { plan: effectivePlan, userId } = await resolveEffectivePlan(req)
     log('info', 'effective plan resolved', { effectivePlan, userId })
@@ -559,8 +575,30 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).journeyEnabled as boolean)
         : false
 
+    // 1) Greeting / small talk : OpenAI direct, pas de quota
+    if (isGreetingOrSmallTalk(normalizedLast)) {
+      const content = await generateConversation(lastUserMessage || 'Bonjour.')
+      return NextResponse.json(
+        {
+          content,
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        },
+        { status: 200 }
+      )
+    }
+
+    // 2) Intention via OpenAI classifier
     const intent = await classifyIntent(lastUserMessage)
 
+    // 3) Quota pour les flux métier
     const quota = await enforceDailyQuota({
       req,
       userId,
