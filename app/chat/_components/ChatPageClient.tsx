@@ -300,7 +300,10 @@ export default function ChatPageClient() {
     birthData,
     microReadings,
   })
-  const chatStep = step === 'birthdata_missing' ? 'conversation_ready' : step
+
+  // The composer should stay usable as soon as we're past the initial loading,
+  // even if micro-readings or practitioner usage steps are pending.
+  const chatStep = step === 'loading' ? 'loading' : 'conversation_ready'
 
   useEffect(() => {
     if (isBirthDataComplete(birthData)) {
