@@ -265,12 +265,14 @@ async function runSpecializedModule({
       const lat = typeof birthData.lat === 'number' ? birthData.lat : Number(birthData.lat)
       const lon = typeof birthData.lon === 'number' ? birthData.lon : Number(birthData.lon)
 
+      const birthDateISO =
+        birthData.birthDateISO ||
+        (birthData.date
+          ? `${birthData.date}${birthData.time ? `T${birthData.time}Z` : 'T00:00:00Z'}`
+          : undefined)
+
       const fusionPayload = {
-        birthDateISO:
-          birthData.birthDateISO ||
-          (birthData.date
-            ? `${birthData.date}${birthData.time ? `T${birthData.time}Z` : 'T00:00:00Z'}`
-            : undefined),
+        birthDateISO,
         lat: Number.isFinite(lat) ? lat : undefined,
         lon: Number.isFinite(lon) ? lon : undefined,
         city: safeString(birthData.place) || safeString((birthData as any).city),
@@ -285,7 +287,7 @@ async function runSpecializedModule({
 
       const fusion = await callRailway('/chart/fusion', {
         first_name: fusionPayload.name,
-        birth_date: fusionPayload.birthDateISO?.slice(0, 10),
+        birth_date: fusionPayload.birthDateISO?.slice(0, 10) ?? birthData.date,
         birth_time: birthData.time || 'unknown',
         birthDateISO: fusionPayload.birthDateISO,
         birth_city: fusionPayload.city,
@@ -317,6 +319,14 @@ async function runSpecializedModule({
         birthData,
         latestUserMessage,
       })
+
+      // Retour de secours pour ne pas casser le flow NeuroKua
+      return {
+        source: domainRoute === 'neurokua' ? 'neurokua' : domainRoute,
+        publicSummary:
+          'Module NeuroKua indisponible pour le moment. Je te partage une lecture générale en attendant.',
+        raw: null,
+      }
     }
   }
 
@@ -602,12 +612,27 @@ export async function runHexastraFlow(input: {
     })
 
     const menuInstruction = retrievalPlan?.menu?.instruction ?? null
-    const specializedResult = await runSpecializedModule({
+    let specializedResult = await runSpecializedModule({
       domainRoute,
       birthData: normalizeBirthData(userContext.birthData),
       practitionerUsage: normalizedPractitionerUsage,
       messages: limitedMessages,
     })
+    if (!specializedResult) {
+      const fallbackPublicSummary =
+        domainRoute === 'neurokua'
+          ? 'Module NeuroKua indisponible pour le moment. Je te partage une lecture générale basée sur tes données enregistrées.'
+          : domainRoute === 'gps_kua'
+            ? 'Module GPS indisponible. Je propose une orientation générale en attendant.'
+            : 'Je poursuis avec une lecture générale.'
+
+      specializedResult = {
+        source: domainRoute,
+        publicSummary: fallbackPublicSummary,
+        raw: null,
+      }
+      flowLog('info', 'specializedResult fallback injected', { domainRoute })
+    }
     flowLog('info', 'specializedResult', {
       hasResult: Boolean(specializedResult),
       source: specializedResult?.source,
@@ -615,7 +640,7 @@ export async function runHexastraFlow(input: {
 
     const activeModules = getModulesForDomain(domainRoute, mode)
 
-    const knowledgeBlock = knowledgePayload.block
+    const knowledgeBlock = knowledgePayload?.block
 
     // Construire des signaux KS robustes
     const signals: KSSignal[] = []
@@ -680,12 +705,19 @@ export async function runHexastraFlow(input: {
       userContext,
       sessionContext,
       messages: messagesForLLM,
-      knowledgeBlock: knowledgePayload.block,
+      knowledgeBlock: knowledgePayload?.block ?? null,
       flowStep,
     })
 
     const rawMessage = await callOpenAIResponse(payload)
     let message = applySentinel(rawMessage)
+    if (!message || !message.trim()) {
+      message =
+        domainRoute === 'neurokua'
+          ? "Je n’ai pas pu ouvrir NeuroKua pour le moment. Voici une lecture générale en attendant : focus sur ton équilibre du jour."
+          : "Je poursuis avec une réponse courte basée sur les informations disponibles."
+      flowLog('warn', 'openai empty response fallback', { domainRoute })
+    }
 
     const menuVisible =
       effectiveRequestType === 'micro_month' ||
