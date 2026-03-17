@@ -874,6 +874,10 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
       return
     }
 
+    // Évite de bloquer l'UI au chargement : on ne déclenche les micro-lectures automatiques
+    // qu'après au moins un message utilisateur.
+    if (isWelcome) return
+
     if (microTriggerRef.current === step) return
     microTriggerRef.current = step
 
@@ -885,7 +889,7 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
           : 'micro_month'
 
     void triggerMicroReading(requestType)
-  }, [step])
+  }, [step, isWelcome])
 
   useEffect(() => {
     return () => {
