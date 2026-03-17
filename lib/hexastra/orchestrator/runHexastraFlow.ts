@@ -31,12 +31,14 @@ import type { ChatMessage } from '@/lib/chat/chatPayloadBuilder'
 import { classifyQuery } from '@/lib/hexastra/router/classifyQuery'
 import { getModulesForDomain } from '@/lib/hexastra/router/moduleRouter'
 import { buildSignalEnvelope } from '@/lib/hexastra/fusion/signalEnvelope'
+import type { KSSignal } from '@/lib/hexastra/fusion/signalEnvelope'
 import { fusionEngine } from '@/lib/hexastra/fusion/fusionEngine'
 import { arbiter } from '@/lib/hexastra/fusion/arbiter'
 import { applySentinel } from '@/lib/hexastra/security/sentinel'
 import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
 import { logger } from '@/lib/utils/logger'
+import { openai } from '@/lib/openai/client'
 
 import { generateConversation } from '@/lib/hexastra/openai/generateConversation'
 import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
@@ -173,6 +175,26 @@ async function callRailway(path: string, payload: Record<string, unknown>) {
     logger.error('[HexAstra][Railway] invalid JSON', { error })
     throw new Error(`Railway ${path} returned invalid JSON`)
   }
+}
+
+async function callOpenAIResponse(payload: {
+  model: string
+  instructions: string
+  input: { role: 'system' | 'user' | 'assistant'; content: string }[]
+  temperature?: number
+  max_output_tokens?: number
+}) {
+  const response = await openai.responses.create({
+    model: payload.model,
+    input: [
+      { role: 'system', content: payload.instructions },
+      ...payload.input,
+    ],
+    temperature: payload.temperature,
+    max_output_tokens: payload.max_output_tokens,
+  })
+
+  return response.output_text ?? ''
 }
 
 async function runSpecializedModule({
@@ -537,32 +559,36 @@ export async function runHexastraFlow(input: {
     const activeModules = getModulesForDomain(domainRoute, mode)
 
     const knowledgeBlock = knowledgePayload.block
+
+    // Construire des signaux KS robustes
+    const signals: KSSignal[] = []
+    const specializedSignal = specializedResult
+      ? buildSignalEnvelope({
+          module: specializedResult.source ?? 'specialized',
+          result: specializedResult.raw ?? { publicSummary: specializedResult.publicSummary },
+          domainRoute,
+        })
+      : null
+    if (specializedSignal) signals.push(specializedSignal)
+
+    const knowledgeSignal = knowledgeBlock
+      ? buildSignalEnvelope({ module: 'retrieval', result: { signals: [knowledgeBlock] }, domainRoute })
+      : null
+    if (knowledgeSignal) signals.push(knowledgeSignal)
+
     let fusedSignal: any = null
     let arbitration: any = null
-    let messages: any[] = []
-
     try {
-      fusedSignal = await fusionEngine({
-        domainRoute,
-        knowledgeBlock,
-        userContext,
-        sessionContext,
-        menuInstruction,
-        specialized: specializedResult,
-      })
+      fusedSignal = fusionEngine(signals.length ? signals : [buildSignalEnvelope({ module: 'fallback', result: {}, domainRoute })])
       arbitration = await arbiter({ domainRoute, fusedSignal, userContext, sessionContext })
-      messages =
-        buildSignalEnvelope({
-          fusedSignal,
-          arbitration,
-          menuInstruction,
-          specialized: specializedResult,
-        }) ?? []
     } catch (fusionError) {
-      logger.error('[runHexastraFlow] fusion/buildSignalEnvelope failed', { error: fusionError })
-      fusedSignal = fusedSignal || {}
+      logger.error('[runHexastraFlow] fusion/buildSignalEnvelope failed', {
+        error: fusionError,
+        signalsType: typeof signals,
+        signalsLength: signals.length,
+      })
+      fusedSignal = fusedSignal || { dominantSignal: 'signal_general' }
       arbitration = arbitration || {}
-      messages = []
     }
 
     const systemPrompt = buildSystemPrompt({
@@ -583,16 +609,20 @@ export async function runHexastraFlow(input: {
       retrievalProfile: sessionContext.retrievalProfile ?? 'balanced',
     })
 
+    const messagesForLLM = limitedMessages.length
+      ? limitedMessages
+      : [{ role: 'user' as const, content: latestUserMessage }]
+
     const payload = buildChatPayload({
       systemPrompt,
       userContext,
       sessionContext,
-      messages,
+      messages: messagesForLLM,
       knowledgeBlock: knowledgePayload.block,
       flowStep,
     })
 
-    const rawMessage = await callOpenAI(payload)
+    const rawMessage = await callOpenAIResponse(payload)
     let message = applySentinel(rawMessage)
 
     const menuVisible =

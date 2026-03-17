@@ -158,7 +158,7 @@ export function buildSystemPrompt(input: BuildPromptInput): string {
   const planConfig = PLAN_MODE_MAP[input.plan] ?? PLAN_MODE_MAP.free
   const labels = [input.selectedMenuLabel, input.selectedSubmenuLabel]
     .filter(Boolean)
-    .join(' → ')
+    .join(' -> ')
 
   const userNameDirective = input.firstName
     ? `Adresse-toi à l'utilisateur en utilisant son prénom : ${input.firstName}. Ne mentionne jamais son email.`
