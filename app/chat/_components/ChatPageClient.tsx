@@ -188,6 +188,57 @@ function isMenuSelectionMessage(value: string) {
   return text.includes('->') || text.includes('→')
 }
 
+function isMenuOpenMessage(value: string) {
+  const text = normalizeText(value)
+  if (!text) return false
+
+  return (
+    text === 'menu' ||
+    text === 'revenir au menu' ||
+    text === 'retour au menu' ||
+    text === 'ouvre le menu' ||
+    text === 'ouvrir le menu' ||
+    text === 'montre le menu' ||
+    text === 'affiche le menu'
+  )
+}
+
+function parseNumericMenuChoice(value: string) {
+  const match = value.trim().match(/^(\d{1,2})$/)
+  if (!match) return null
+
+  const choice = Number(match[1])
+  return Number.isInteger(choice) && choice > 0 ? choice : null
+}
+
+function findMenuItemByKey(items: HexastraMenuItem[], key: string | null) {
+  if (!key) return null
+  return items.find((item) => item.key === key) ?? null
+}
+
+function resolveNumericMenuSelection(
+  items: HexastraMenuItem[],
+  choice: number,
+  selectedMenuKey: string | null
+): { item: HexastraMenuItem; parent?: HexastraMenuItem; openParentOnly?: boolean } | null {
+  const selectedParent = findMenuItemByKey(items, selectedMenuKey)
+
+  if (selectedParent?.submenu?.length) {
+    const submenuItem = selectedParent.submenu[choice - 1]
+    if (!submenuItem) return null
+    return { item: submenuItem, parent: selectedParent }
+  }
+
+  const topLevelItem = items[choice - 1]
+  if (!topLevelItem) return null
+
+  if (topLevelItem.submenu?.length) {
+    return { item: topLevelItem, openParentOnly: true }
+  }
+
+  return { item: topLevelItem }
+}
+
 function assistantAskedForBirthData(value: string) {
   const text = normalizeText(value)
   return (
@@ -339,6 +390,8 @@ export default function ChatPageClient() {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [menuItems, setMenuItems] = useState<HexastraMenuItem[]>([])
+  const [isMenuDockOpen, setIsMenuDockOpen] = useState(false)
+  const [openMenuParentKey, setOpenMenuParentKey] = useState<string | null>(null)
   const [activeContextType, setActiveContextType] = useState<ContextType>('general')
   const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null)
   const [selectedSubmenuKey, setSelectedSubmenuKey] = useState<string | null>(null)
@@ -376,6 +429,7 @@ export default function ChatPageClient() {
   const cacheRef = useRef<Map<string, string>>(new Map())
   const hasPrefilled = useRef(false)
   const microTriggerRef = useRef<string | null>(null)
+  const forceMicroBootstrapRef = useRef(false)
   const requestAbortRef = useRef<AbortController | null>(null)
   const lastMessageRef = useRef<string | null>(null)
   const birthDataRef = useRef<BirthData>(EMPTY_BIRTH_DATA)
@@ -393,8 +447,12 @@ export default function ChatPageClient() {
     microReadings,
   })
 
-  // The composer should stay usable as soon as we're past the initial loading,
-  // even if micro-readings or practitioner usage steps are pending.
+  const isMicroBootstrapPending =
+    step === 'micro_profile_pending' ||
+    step === 'micro_year_pending' ||
+    step === 'micro_month_pending'
+
+  // The composer should stay usable once the blocking bootstrap steps are over.
   const chatStep = step === 'loading' ? 'loading' : 'conversation_ready'
 
   useEffect(() => {
@@ -477,7 +535,8 @@ export default function ChatPageClient() {
     chatStep === 'conversation_ready' &&
     menuItems.length > 0 &&
     !isTyping &&
-    (userMessageCount === 0 || isSimpleGreeting(lastUserMessage))
+    !isMicroBootstrapPending &&
+    isMenuDockOpen
 
   const desktopLeft = viewportWidth >= 1100
   const userInitials = getInitials(userEmail)
@@ -540,14 +599,16 @@ export default function ChatPageClient() {
 
     if (data.menu?.visible && Array.isArray(data.menu.items)) {
       setMenuItems(data.menu.items)
+      setIsMenuDockOpen(true)
     } else if (data.menu?.visible === false) {
-      setMenuItems([])
+      setIsMenuDockOpen(false)
     }
 
     if (metadata.contextType) setActiveContextType(metadata.contextType)
 
     if (metadata.selectedMenuKey !== undefined) {
       setSelectedMenuKey(metadata.selectedMenuKey ?? null)
+      setOpenMenuParentKey(metadata.selectedMenuKey ?? null)
     }
 
     if (metadata.selectedSubmenuKey !== undefined) {
@@ -721,6 +782,13 @@ export default function ChatPageClient() {
       const baseMessages = isWelcome ? [] : messages
       const nextConversation = [...baseMessages, userMessage]
       const requestConversation = [...baseMessages, { ...userMessage, content: requestMessage }]
+
+      setIsMenuDockOpen(uiAction === 'open_menu')
+      if (uiAction === 'open_menu') {
+        setOpenMenuParentKey(null)
+        setSelectedMenuKey(null)
+        setSelectedSubmenuKey(null)
+      }
 
       setMessages(nextConversation)
       setIsTyping(true)
@@ -1001,9 +1069,9 @@ export default function ChatPageClient() {
       return
     }
 
-    // Évite de bloquer l'UI au chargement : on ne déclenche les micro-lectures automatiques
-    // qu'après au moins un message utilisateur.
-    if (isWelcome) return
+    // Évite de bloquer l'UI au chargement. Exception: juste après l'envoi
+    // du formulaire de naissance, on autorise la séquence micro complète.
+    if (isWelcome && !forceMicroBootstrapRef.current) return
 
     if (microTriggerRef.current === step) return
     microTriggerRef.current = step
@@ -1017,6 +1085,12 @@ export default function ChatPageClient() {
 
     void triggerMicroReading(requestType)
   }, [step, isWelcome])
+
+  useEffect(() => {
+    if (step === 'conversation_ready') {
+      forceMicroBootstrapRef.current = false
+    }
+  }, [step])
 
   useEffect(() => {
     return () => {
@@ -1083,16 +1157,7 @@ export default function ChatPageClient() {
             uiAction: 'restart_flow',
           })
         } else {
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `${Date.now()}-birth-saved`,
-              role: 'assistant',
-              content:
-                'Tes données de naissance sont bien enregistrées. Tu peux maintenant lancer une lecture ou choisir un angle du menu.',
-              created_at: new Date().toISOString(),
-            },
-          ])
+          forceMicroBootstrapRef.current = true
         }
       }
 
@@ -1262,6 +1327,74 @@ export default function ChatPageClient() {
       if (!content.trim() || isTyping) return
       if (isDuplicateMessage(lastMessageRef, content)) return
       if (chatStep !== 'conversation_ready') return
+      if (isMicroBootstrapPending) return
+
+      if (isMenuOpenMessage(baseContent)) {
+        const baseMessages = isWelcome ? [] : messages
+        const userMsg: Msg = {
+          id: `${Date.now()}-user`,
+          role: 'user',
+          content,
+          created_at: new Date().toISOString(),
+        }
+
+        setMessages([...baseMessages, userMsg])
+        setInput('')
+        setAttachedFile(null)
+        setMenuItems((prev) => (prev.length ? prev : getMenuForMode(getModeForPlan(userPlan))))
+        setActiveContextType('general')
+        setSelectedMenuKey(null)
+        setSelectedSubmenuKey(null)
+        setOpenMenuParentKey(null)
+        setIsMenuDockOpen(true)
+        return
+      }
+
+      const numericChoice = parseNumericMenuChoice(baseContent)
+      if (numericChoice && menuItems.length > 0) {
+        const selection = resolveNumericMenuSelection(menuItems, numericChoice, selectedMenuKey)
+
+        if (selection?.openParentOnly) {
+          const baseMessages = isWelcome ? [] : messages
+          const userMsg: Msg = {
+            id: `${Date.now()}-user`,
+            role: 'user',
+            content,
+            created_at: new Date().toISOString(),
+          }
+
+          setMessages([...baseMessages, userMsg])
+          setInput('')
+          setAttachedFile(null)
+          setActiveContextType(selection.item.contextType ?? 'general')
+          setSelectedMenuKey(selection.item.key)
+          setSelectedSubmenuKey(null)
+          setOpenMenuParentKey(selection.item.key)
+          setIsMenuDockOpen(true)
+          return
+        }
+
+        if (selection) {
+          const context = selection.item.contextType ?? selection.parent?.contextType ?? 'general'
+          setInput('')
+          setAttachedFile(null)
+          setActiveContextType(context)
+          setSelectedMenuKey(selection.parent?.key ?? selection.item.key)
+          setSelectedSubmenuKey(selection.parent ? selection.item.key : null)
+          setOpenMenuParentKey(selection.parent?.key ?? null)
+          setIsMenuDockOpen(false)
+
+          await sendStructuredAction({
+            message: buildMenuSelectionRequest(selection.item, selection.parent),
+            displayMessage: content,
+            contextType: context,
+            menuKey: selection.parent?.key ?? selection.item.key,
+            submenuKey: selection.parent ? selection.item.key : null,
+            uiAction: selection.parent ? 'select_submenu_item' : 'select_menu_item',
+          })
+          return
+        }
+      }
 
       const moderation = moderateMessage(baseContent)
       const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
@@ -1493,12 +1626,15 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
       saveReading,
       selectedMenuKey,
       selectedSubmenuKey,
+      isMicroBootstrapPending,
       chatStep,
       userPlan,
       postChatPayload,
       journeyEnabled,
       isReadingFlowStep,
       formatAssistantReply,
+      sendStructuredAction,
+      menuItems,
     ]
   )
 
@@ -1507,6 +1643,8 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
     setConversationId(null)
     setInput('')
     setMenuItems([])
+    setIsMenuDockOpen(false)
+    setOpenMenuParentKey(null)
     setActiveContextType('general')
     setSelectedMenuKey(null)
     setSelectedSubmenuKey(null)
@@ -1597,7 +1735,7 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
     onRemoveAttach: () => setAttachedFile(null),
     onBirthFormOpen: () => setShowInlineBirthForm((v) => !v),
     highlightBirth: isWelcome && !isBirthDataComplete(birthData),
-    disabled: chatStep !== 'conversation_ready' || isLimitReached || isTyping,
+    disabled: chatStep !== 'conversation_ready' || isMicroBootstrapPending || isLimitReached || isTyping,
   }
 
   return (
@@ -1697,11 +1835,15 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
                   subtitle="Quel angle souhaites-tu explorer ?"
                   userPlan={userPlan}
                   lastUserMessage={lastUserMessage}
+                  openParentKey={openMenuParentKey}
+                  onOpenParentChange={setOpenMenuParentKey}
                   onSelect={(item, parent) => {
                     const context = item.contextType ?? parent?.contextType ?? 'general'
                     setActiveContextType(context)
                     setSelectedMenuKey(parent?.key ?? item.key)
                     setSelectedSubmenuKey(parent ? item.key : null)
+                    setOpenMenuParentKey(parent?.key ?? null)
+                    setIsMenuDockOpen(false)
 
                     void sendStructuredAction({
                       message: buildMenuSelectionRequest(item, parent),

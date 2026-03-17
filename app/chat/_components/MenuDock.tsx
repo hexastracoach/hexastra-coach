@@ -11,6 +11,8 @@ type Props = {
   onSelect: (item: HexastraMenuItem, parent?: HexastraMenuItem) => void
   userPlan?: string
   lastUserMessage?: string
+  openParentKey?: string | null
+  onOpenParentChange?: (key: string | null) => void
 }
 
 function IconSpark() {
@@ -55,8 +57,19 @@ export default function MenuDock({
   onSelect,
   userPlan,
   lastUserMessage,
+  openParentKey: controlledOpenParentKey,
+  onOpenParentChange,
 }: Props) {
-  const [openParentKey, setOpenParentKey] = useState<string | null>(null)
+  const [uncontrolledOpenParentKey, setUncontrolledOpenParentKey] = useState<string | null>(null)
+  const openParentKey =
+    controlledOpenParentKey !== undefined ? controlledOpenParentKey : uncontrolledOpenParentKey
+
+  const setOpenParentKey = (key: string | null) => {
+    if (controlledOpenParentKey === undefined) {
+      setUncontrolledOpenParentKey(key)
+    }
+    onOpenParentChange?.(key)
+  }
 
   const safeItems = useMemo(() => {
     return Array.isArray(items) ? items.filter(Boolean) : []
