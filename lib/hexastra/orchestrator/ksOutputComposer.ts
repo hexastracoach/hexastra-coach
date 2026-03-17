@@ -16,6 +16,34 @@ function humanizeKsToken(value: string | null | undefined) {
   return value.replace(/_/g, ' ').trim()
 }
 
+function buildInvisibleLead(params: {
+  fusedSignal?: FusedSignalSummary | null
+  executedSubmodules?: ExecutedSubmodule[]
+}) {
+  const dominantSignal = humanizeKsToken(params.fusedSignal?.dominantSignal)
+  const zone = humanizeKsToken(params.fusedSignal?.zone)
+  const phase = humanizeKsToken(params.fusedSignal?.phase)
+  const actionSummary = params.executedSubmodules?.find((entry) => entry.key === 'KS.ActionTranslator')
+
+  const movementText = dominantSignal
+    ? `En ce moment, le mouvement dominant parle surtout de ${dominantSignal}.`
+    : phase
+      ? `En ce moment, on sent surtout une phase de ${phase}.`
+      : null
+
+  const axisText = zone ? `L'axe a renforcer tourne autour de ${zone}.` : null
+  const actionText =
+    actionSummary && typeof actionSummary.result.publicSummary === 'string'
+      ? actionSummary.result.publicSummary
+      : params.fusedSignal?.risk_flag
+        ? 'Le bon geste maintenant est de ralentir, clarifier, puis agir sans surcharge.'
+        : params.fusedSignal?.opportunity_flag
+          ? 'Le bon geste maintenant est d avancer simplement sur ce qui repond le plus clairement.'
+          : null
+
+  return [movementText, axisText, actionText].filter(Boolean).join(' ')
+}
+
 export function buildKsLeadSummary(params: {
   flowStep: string
   selectedOutputStructure?: string | null
@@ -35,52 +63,25 @@ export function buildKsLeadSummary(params: {
     return params.message
   }
 
-  if (/rep[eè]res cl[eé]s/i.test(params.message)) {
-    return params.message
-  }
-
   const trimmedMessage = params.message.trim()
   const lineCount = trimmedMessage.split(/\r?\n/).filter(Boolean).length
   const alreadyStructured =
     /^1[\.\)]\s/m.test(trimmedMessage) ||
     /^[-•]\s/m.test(trimmedMessage) ||
-    /Reconnaissance|Lecture de la dynamique|Mise en perspective|Clé d’action|Cle d action/i.test(trimmedMessage)
+    /Reconnaissance|Lecture de la dynamique|Mise en perspective|Cl[eé] d'action|Ce qui se passe|Ce qui compte/i.test(trimmedMessage)
 
   if (alreadyStructured || lineCount >= 8 || trimmedMessage.length >= 1100) {
     return params.message
   }
 
-  const actionSummary = params.executedSubmodules?.find((entry) => entry.key === 'KS.ActionTranslator')
-  const movementSummary = params.executedSubmodules?.find(
-    (entry) =>
-      entry.key === 'KS.Planetarium' ||
-      entry.key === 'KS.NumCycle' ||
-      entry.key === 'KS.ThemeHexAstra.V1'
-  )
-  const lines = [
-    params.fusedSignal?.dominantSignal
-      ? `- Signal dominant : ${humanizeKsToken(params.fusedSignal.dominantSignal)}`
-      : null,
-    params.fusedSignal?.zone
-      ? `- Axe principal : ${humanizeKsToken(params.fusedSignal.zone)}`
-      : null,
-    movementSummary && typeof movementSummary.result.publicSummary === 'string'
-      ? `- Mouvement du moment : ${movementSummary.result.publicSummary}`
-      : params.fusedSignal?.phase
-        ? `- Mouvement du moment : ${humanizeKsToken(params.fusedSignal.phase)}`
-        : null,
-    actionSummary && typeof actionSummary.result.publicSummary === 'string'
-      ? `- Action utile : ${actionSummary.result.publicSummary}`
-      : params.fusedSignal?.risk_flag
-        ? '- Action utile : ralentir, clarifier, puis agir sans surcharge.'
-        : params.fusedSignal?.opportunity_flag
-          ? '- Action utile : avancer simplement sur le levier le plus vivant.'
-          : null,
-  ].filter(Boolean)
+  const lead = buildInvisibleLead({
+    fusedSignal: params.fusedSignal,
+    executedSubmodules: params.executedSubmodules,
+  })
 
-  if (!lines.length) {
+  if (!lead) {
     return params.message
   }
 
-  return `Repères clés\n${lines.join('\n')}\n\n${params.message}`.trim()
+  return `${lead}\n\n${params.message}`.trim()
 }

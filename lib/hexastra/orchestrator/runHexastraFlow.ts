@@ -249,6 +249,32 @@ function resolveRetrievalProfile(params: {
   return 'balanced'
 }
 
+function chooseResponseStrategy(params: {
+  latestUserMessage: string
+  selectedMenu?: HexastraMenuItem | null
+  selectedSubmenu?: HexastraMenuItem | null
+  flowStep: FlowStep
+  domainRoute: DomainRoute
+  birthDataComplete: boolean
+}) {
+  const text = params.latestUserMessage.trim().toLowerCase()
+  const hasExplicitSelection = Boolean(params.selectedMenu?.key || params.selectedSubmenu?.key)
+  const isShort = text.length < 24
+  const isVeryBroad =
+    /\b(ma vie|mon travail|mes relations|une lecture|analyse moi|j ai besoin d aide)\b/i.test(text)
+  const isDirectRequest =
+    /(theme natal|thème natal|theme astral|thème astral|carte du ciel|neurokua|etat du jour|état du jour|lecture|bilan|analyse|decision|décision)/i.test(text)
+
+  if (params.flowStep === 'clarification') return 'clarify'
+  if (hasExplicitSelection) return 'direct_read'
+  if ((params.domainRoute === 'fusion' || params.domainRoute === 'neurokua') && isDirectRequest && params.birthDataComplete) {
+    return 'direct_read'
+  }
+  if (isVeryBroad) return 'refine'
+  if (isShort && !isDirectRequest) return 'explore'
+  return 'direct_read'
+}
+
 function buildKsNarrativeBrief(params: {
   domainRoute: DomainRoute
   selectedMenu?: HexastraMenuItem | null
@@ -990,6 +1016,14 @@ export async function runHexastraFlow(input: {
       selectedOutputStructure,
       latestUserMessage,
     })
+    const responseStrategy = chooseResponseStrategy({
+      latestUserMessage,
+      selectedMenu,
+      selectedSubmenu,
+      flowStep,
+      domainRoute,
+      birthDataComplete: isBirthComplete(userContext.birthData),
+    })
 
     const systemPrompt = buildSystemPrompt({
       plan,
@@ -1013,6 +1047,7 @@ export async function runHexastraFlow(input: {
       emotionalState: sessionContext.emotionalState,
       precision: sessionContext.precision,
       retrievalProfile,
+      responseStrategy,
     })
 
     const messagesForLLM = limitedMessages.length

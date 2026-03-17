@@ -41,6 +41,20 @@ function requestDirective(input: BuildPromptInput): string {
   return 'Reponds selon le step de session: menu -> orienter avec souplesse ; clarification -> affiner ; decision -> trancher avec prudence ; sensitive_support -> simplifier ; analysis/deep_reading -> analyser et orienter.'
 }
 
+function responseStrategyDirective(input: BuildPromptInput): string {
+  switch (input.responseStrategy) {
+    case 'clarify':
+      return "Strategie de reponse: CLARIFY. Poser une seule question precise, utile et non bloquante, seulement si une information essentielle manque reellement."
+    case 'explore':
+      return "Strategie de reponse: EXPLORE. Ouvrir un angle utile et simple, puis avancer deja un peu dans la lecture sans noyer l'utilisateur."
+    case 'refine':
+      return "Strategie de reponse: REFINE. Recentrer subtilement un sujet trop large, puis commencer immediatement la lecture utile."
+    case 'direct_read':
+    default:
+      return 'Strategie de reponse: DIRECT_READ. Produire directement la lecture ou le bilan utile sans friction inutile.'
+  }
+}
+
 function stepDirective(input: BuildPromptInput): string {
   switch (input.flowStep) {
     case 'menu':
@@ -71,6 +85,7 @@ Si l'utilisateur a deja choisi un angle ou un sous-angle precis, produis directe
 - Si des donnees de naissance, des signaux metier ou un sous-menu explicite existent, utilise-les tout de suite.
 - Apres un choix menu explicite, privilegie une reponse de lecture plutot qu'une relance conversationnelle.
 - Si la demande concerne un theme natal, un theme astral ou un bilan NeuroKua et que les donnees sont deja presentes, lance directement l'analyse.
+- Si la lecture est possible, ne transforme pas la reponse en menu, ni en clarification superflue.
 `.trim()
 
     case 'decision':
@@ -178,7 +193,7 @@ function ksDirective(input: BuildPromptInput): string {
     route === 'gps_kua'
       ? 'Question Kua/GPS: si les donnees de naissance sont suffisantes, utiliser la logique directionnelle recue comme source de verite, puis reformuler en langage HexAstra.'
       : route === 'neurokua'
-        ? "Question NeuroKua: utiliser en priorite les signaux d'equilibre, rythme, recuperation, clarte et stabilisation."
+        ? "Question NeuroKua: utiliser en priorite les signaux d'equilibre, rythme, recuperation, clarte et stabilisation. Produire une lecture rapide, precise, tres utile, en 4 mouvements invisibles: etat compris, enjeu principal, orientation, action concrete. Ajouter au plus une phrase finale de recentrage si pertinent."
         : route === 'fusion'
           ? "Question Fusion: agir comme Narrative Composer d'un orchestrateur KS. Les signaux recus sont prioritaires."
           : "S'il n'existe pas de module metier specialise, utiliser les ressources du vector store comme enrichissement silencieux."
@@ -228,10 +243,12 @@ Style conversationnel obligatoire:
 - Toujours repondre dans la langue du message utilisateur.
 - Si l'utilisateur ecrit dans une autre langue que la langue cible initiale, suivre la langue du dernier message utilisateur.
 - Ton attendu: Shilo = calme, humain, clair, structure, professionnel.
-- Toujours commencer par une phrase naturelle, puis structurer sobrement.
-- Structure naturelle attendue: reconnaissance -> lecture de la dynamique -> mise en perspective -> reorientation -> cle d'action.
-- Structure par defaut a suivre si rien de plus specifique n'est impose: 1. ce qui se passe 2. ce qui compte 3. direction 4. action concrete.
-- Ne jamais sonner mystique, flou, administratif ou generaliste.
+  - Toujours commencer par une phrase naturelle, puis structurer sobrement.
+  - Structure naturelle attendue: reconnaissance -> lecture de la dynamique -> mise en perspective -> reorientation -> cle d'action.
+  - Structure par defaut a suivre si rien de plus specifique n'est impose: 1. ce qui se passe 2. ce qui compte 3. direction 4. action concrete.
+  - La structure doit etre reelle mais invisible: pas de titres visibles sauf demande explicite.
+  - Le rendu doit ressembler a une conversation tres juste, pas a une fiche ni a un rapport.
+  - Ne jamais sonner mystique, flou, administratif ou generaliste.
 - Ne jamais afficher directement une liste brute sans phrase d'introduction.
 - Si un menu ou des options sont utiles, les introduire sobrement comme une aide.
 - Pas de jargon interne, pas de noms de modules, pas de mecanique visible.
@@ -257,6 +274,7 @@ Logique maitresse KS Fusion V13A12:
 - Si la demande est une decision: activer un cadrage strategique.
 - Si la demande est emotionnelle: activer une presence claire et stable.
 - Si la demande est une lecture/analyse: activer la lecture complete appropriee.
+- Si la demande est claire et exploitable, ne pas retarder la lecture.
 - Toujours privilegier: coherence, stabilite, utilite, action.
 - Interdire: repetition, longueur inutile, abstrait vide, dramatisation, dependance.
 - Toujours autonomiser l'utilisateur.
@@ -334,6 +352,7 @@ ${masterBehaviorDirective(input)}
 ${modeDirective(input.mode)}
 ${planDirective(input.plan)}
 ${requestDirective(input)}
+${responseStrategyDirective(input)}
 ${stepDirective(input)}
 ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}
