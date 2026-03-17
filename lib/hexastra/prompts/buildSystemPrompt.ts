@@ -44,7 +44,7 @@ function requestDirective(input: BuildPromptInput): string {
 function responseStrategyDirective(input: BuildPromptInput): string {
   switch (input.responseStrategy) {
     case 'clarify':
-      return "Strategie de reponse: CLARIFY. Poser une seule question precise, utile et non bloquante, seulement si une information essentielle manque reellement."
+      return `Strategie de reponse: CLARIFY. Poser une seule question precise, utile et non bloquante, seulement si une information essentielle manque reellement.${input.selectedClarificationQuestion ? ` Question de cadrage prioritaire: ${input.selectedClarificationQuestion}` : ''}`
     case 'explore':
       return "Strategie de reponse: EXPLORE. Ouvrir un angle utile et simple, puis avancer deja un peu dans la lecture sans noyer l'utilisateur."
     case 'refine':
@@ -136,6 +136,12 @@ function ksDirective(input: BuildPromptInput): string {
   const outputStructure = input.selectedOutputStructure
     ? `Structure de sortie attendue: ${input.selectedOutputStructure}`
     : 'Aucune structure de sortie forcee.'
+  const contextFrame = input.selectedContextFrame
+    ? `Contexte metier du sous-angle: ${input.selectedContextFrame}`
+    : 'Aucun contexte de sous-angle explicite.'
+  const clarificationQuestion = input.selectedClarificationQuestion
+    ? `Question de cadrage utile si une precision manque: ${input.selectedClarificationQuestion}`
+    : 'Aucune question de cadrage specialisee definie.'
   const ksNarrativeBrief = input.ksNarrativeBrief
     ? `Synthese KS deja arbitree: ${input.ksNarrativeBrief}`
     : 'Aucune synthese KS arbitree disponible.'
@@ -212,6 +218,8 @@ Architecture KS active:
 ${source}
 ${promptHint}
 ${outputStructure}
+${contextFrame}
+${clarificationQuestion}
 ${ksNarrativeBrief}
 ${ksSummary}
 ${submoduleSummaries}

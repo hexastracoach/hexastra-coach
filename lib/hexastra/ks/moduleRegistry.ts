@@ -14,6 +14,7 @@ export type KsSubmoduleContract = {
   outputType: string
   dependencies: string[]
   priority: 'high' | 'medium' | 'low'
+  executionStrategy?: 'api_first' | 'module_first' | 'support'
 }
 
 export const KS_SUBMODULE_REGISTRY: Record<string, KsSubmoduleContract> = {

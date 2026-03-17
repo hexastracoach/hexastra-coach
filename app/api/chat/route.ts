@@ -179,6 +179,25 @@ function detectIntentLocal(message: string): 'greeting' | 'menu' | 'birth_update
   return 'conversation'
 }
 
+function hasExplicitGuidance(body: Record<string, unknown>) {
+  return Boolean(
+    (typeof body.selectedMenuKey === 'string' && body.selectedMenuKey.trim()) ||
+      (typeof body.selectedSubmenuKey === 'string' && body.selectedSubmenuKey.trim()) ||
+      body.uiAction === 'select_menu_item' ||
+      body.uiAction === 'select_submenu_item' ||
+      body.uiAction === 'restart_flow'
+  )
+}
+
+function looksAlreadyStructured(text: string) {
+  const trimmed = (text || '').trim()
+  return (
+    /^1[\.\)]\s/m.test(trimmed) ||
+    /^[-•]\s/m.test(trimmed) ||
+    trimmed.split(/\r?\n/).filter(Boolean).length >= 6
+  )
+}
+
 function buildCacheKey(userId: string | null, message: string, birthData?: unknown) {
   const bd = birthData ? JSON.stringify(birthData) : ''
   return `${userId ?? 'guest'}::${message}::${bd}`
@@ -803,12 +822,15 @@ export async function POST(req: NextRequest) {
       journeyEnabled,
     })
 
+    const explicitGuidance = hasExplicitGuidance(body as Record<string, unknown>)
     const shouldRephrase =
       intentLocal === 'analysis' &&
+      !explicitGuidance &&
       response?.flowState?.step !== 'menu' &&
       !(response?.menu?.visible) &&
       typeof response?.message === 'string' &&
-      response?.message.trim().length > 0
+      response?.message.trim().length > 0 &&
+      !looksAlreadyStructured(response.message)
 
     const reformatted =
       shouldRephrase && response.message
@@ -850,6 +872,7 @@ export async function POST(req: NextRequest) {
         (finalResponse?.metadata as any)?.selectedSubmenuKey ??
         (body as any)?.selectedSubmenuKey ??
         null,
+      explicitGuidance,
     })
 
     const normalizedEnriched = buildConsistentResponse(enriched as ChatResponsePayload, {

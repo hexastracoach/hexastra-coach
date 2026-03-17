@@ -190,6 +190,8 @@ export type BuildPromptInput = {
   selectedSubmenuLabel?: string | null
   selectedPromptHint?: string | null
   selectedOutputStructure?: string | null
+  selectedContextFrame?: string | null
+  selectedClarificationQuestion?: string | null
   ksSummary?: {
     dominantSignal?: string | null
     primaryModule?: string | null

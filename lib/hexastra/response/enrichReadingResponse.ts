@@ -11,6 +11,7 @@ type EnrichInput = {
   domainRoute?: string | null
   selectedMenuKey?: string | null
   selectedSubmenuKey?: string | null
+  explicitGuidance?: boolean
 }
 
 const TECH_STEPS = ['quota_limit', 'error', 'birthdata', 'practitioner_usage', 'loading', 'menu', 'clarification']
@@ -35,8 +36,9 @@ function pickSign(birthDate?: string | null, solar?: string | null): SolarSign |
 }
 
 export function enrichReadingResponse(input: EnrichInput): HexastraApiResponse {
-  const { response, plan, birthDate, solarSign, contextType, domainRoute, selectedMenuKey, selectedSubmenuKey } = input
+  const { response, plan, birthDate, solarSign, contextType, domainRoute, selectedMenuKey, selectedSubmenuKey, explicitGuidance } = input
   if (!shouldEnrich(response)) return response
+  if (explicitGuidance || selectedMenuKey || selectedSubmenuKey) return response
 
   const sign = pickSign(birthDate, solarSign)
   const closure = SOLAR_SIGN_CLOSURES[sign]

@@ -70,7 +70,7 @@ const flowLog = (
 type ResponseDepth = 'short' | 'medium' | 'long' | 'expert'
 
 type SpecializedModuleResult = {
-  source: 'gps_kua' | 'neurokua' | 'fusion'
+  source: 'gps_kua' | 'neurokua' | 'fusion' | 'timing' | 'science'
   publicSummary: string
   raw: Record<string, unknown> | null
 }
@@ -114,7 +114,36 @@ function tr(language: string, variants: Partial<Record<string, string>>, fallbac
   return variants[code] ?? variants[fallback] ?? ''
 }
 
-function buildMissingBirthMessage(language: string): string {
+function requiresPreciseBirthContext(message: string): boolean {
+  const normalized = (message || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  return /(maison|maisons|house|houses|oppose|opposee|opposees|theme natal|theme astral|carte du ciel)/.test(
+    normalized,
+  )
+}
+
+function hasPreciseBirthContext(profile: BirthProfile | null): boolean {
+  if (!profile) return false
+
+  return Boolean(
+    profile.firstName?.trim() &&
+      (profile.birthDateISO?.trim() || profile.date?.trim()) &&
+      profile.place?.trim() &&
+      (profile.time?.trim() || profile.birthTimeKnown === false),
+  )
+}
+
+function buildMissingBirthMessage(language: string, latestUserMessage?: string): string {
+  if (requiresPreciseBirthContext(latestUserMessage ?? '')) {
+    return tr(language, {
+      en: `To give you your houses, their signs, and their opposites, I need your full birth details.\n\nGive me:\n- First name\n- Birth date (DD/MM/YYYY)\n- Birth time (or "unknown")\n- Birth city + country\n\nAs soon as I have that, I’ll give you:\n- the 12 houses\n- the sign in each house\n- their opposites\n- a simple reading of what this means for you`,
+      fr: `Pour te donner tes maisons, leurs signes et leurs opposés, il me manque une base essentielle : tes données de naissance complètes.\n\nDonne-moi :\n- Prénom\n- Date de naissance (JJ/MM/AAAA)\n- Heure de naissance (ou "inconnue")\n- Ville + pays\n\nDès que j’ai ça, je te donne :\n- les 12 maisons\n- le signe dans chaque maison\n- leurs opposés\n- une lecture simple pour comprendre ce que ça veut dire concrètement pour toi`,
+    })
+  }
+
   return tr(language, {
     en: 'To personalize the reading, I need your first name, birth date, birth time (or unknown), and birth city + country.',
     fr: 'Pour personnaliser la lecture, j’ai besoin de ton prénom, de ta date de naissance, de ton heure de naissance (ou inconnue), et de ta ville + pays de naissance.',
@@ -179,7 +208,13 @@ function detectLanguageFromMessages(messages: ChatMessage[], fallback = 'fr'): s
 }
 
 function toSpecializedSource(domainRoute: DomainRoute): SpecializedModuleResult['source'] {
-  if (domainRoute === 'gps_kua' || domainRoute === 'neurokua' || domainRoute === 'fusion') {
+  if (
+    domainRoute === 'gps_kua' ||
+    domainRoute === 'neurokua' ||
+    domainRoute === 'fusion' ||
+    domainRoute === 'timing' ||
+    domainRoute === 'science'
+  ) {
     return domainRoute
   }
   return 'fusion'
@@ -301,6 +336,9 @@ function buildKsNarrativeBrief(params: {
   const parts = [
     `domaine: ${params.domainRoute}`,
     `focus: ${focus}`,
+    effectiveSelectionConfig?.executionStrategy
+      ? `strategie execution: ${effectiveSelectionConfig.executionStrategy}`
+      : null,
     effectiveSelectionConfig?.narrativeContract ? `contrat selection: ${effectiveSelectionConfig.narrativeContract}` : null,
     effectiveSelectionConfig?.outputStructure ? `structure: ${effectiveSelectionConfig.outputStructure}` : null,
     effectiveSelectionConfig?.submodules?.length
@@ -441,7 +479,12 @@ async function runSpecializedModule({
     return null
   }
 
-  const allowedDomain = domainRoute === 'neurokua' || domainRoute === 'gps_kua' || domainRoute === 'fusion'
+  const allowedDomain =
+    domainRoute === 'neurokua' ||
+    domainRoute === 'gps_kua' ||
+    domainRoute === 'fusion' ||
+    domainRoute === 'timing' ||
+    domainRoute === 'science'
   if (!allowedDomain) {
     flowLog('info', 'skip specialized module: domainRoute not specialized', { domainRoute })
     return null
@@ -737,6 +780,9 @@ export async function runHexastraFlow(input: {
         : input.requestType
 
     const isBirthNeeded = !isBirthComplete(userContext.birthData)
+    const needsPreciseBirthContext = requiresPreciseBirthContext(latestUserMessage)
+    const isPreciseBirthContextMissing =
+      needsPreciseBirthContext && !hasPreciseBirthContext(userContext.birthData)
 
     if (plan === 'practitioner' && input.requestType === 'chat' && !normalizedPractitionerUsage) {
       const message = buildPractitionerUsageMessage(userContext.language ?? fallbackLanguage)
@@ -762,8 +808,11 @@ export async function runHexastraFlow(input: {
       }
     }
 
-    if (isBirthNeeded && !isGreeting && input.requestType === 'chat') {
-      const message = buildMissingBirthMessage(userContext.language ?? fallbackLanguage)
+    if ((isBirthNeeded || isPreciseBirthContextMissing) && !isGreeting && input.requestType === 'chat') {
+      const message = buildMissingBirthMessage(
+        userContext.language ?? fallbackLanguage,
+        latestUserMessage,
+      )
       flowLog('info', 'flow step final', {
         step: 'birthdata_missing',
         finalMessageLength: message.length,
@@ -847,13 +896,25 @@ export async function runHexastraFlow(input: {
     })
 
     const menuInstruction = retrievalPlan?.menu?.instruction ?? null
-    let specializedResult = await runSpecializedModule({
-      domainRoute,
-      birthData: normalizeBirthData(userContext.birthData),
-      practitionerUsage: normalizedPractitionerUsage,
-      messages: limitedMessages,
-    })
-    if (!specializedResult) {
+    const selectionExecutionContract =
+      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null) ??
+      getKsSelectionExecutionContract(selectedMenu?.key ?? null)
+    const freeformContract = getKsFreeformExecutionContract(latestUserMessage)
+    const effectiveExecutionContract = selectionExecutionContract ?? freeformContract
+    const domainConfig = getKsDomainConfig(domainRoute)
+    const shouldUseApiBackbone =
+      effectiveExecutionContract?.executionStrategy === 'api_first' ||
+      (!effectiveExecutionContract && domainConfig.executionStrategy === 'api_first')
+
+    let specializedResult = shouldUseApiBackbone
+      ? await runSpecializedModule({
+          domainRoute,
+          birthData: normalizeBirthData(userContext.birthData),
+          practitionerUsage: normalizedPractitionerUsage,
+          messages: limitedMessages,
+        })
+      : null
+    if (shouldUseApiBackbone && !specializedResult) {
       const fallbackPublicSummary =
         domainRoute === 'neurokua'
           ? 'Module NeuroKua indisponible pour le moment. Je te partage une lecture générale basée sur tes données enregistrées.'
@@ -871,17 +932,14 @@ export async function runHexastraFlow(input: {
     flowLog('info', 'specializedResult', {
       hasResult: Boolean(specializedResult),
       source: specializedResult?.source,
+      shouldUseApiBackbone,
     })
-
-    const freeformContract = getKsFreeformExecutionContract(latestUserMessage)
     const selectionModules =
-      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null)?.modules ??
-      getKsSelectionExecutionContract(selectedMenu?.key ?? null)?.modules ??
+      selectionExecutionContract?.modules ??
       freeformContract?.modules ??
       []
     const selectionSubmodules =
-      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null)?.submodules ??
-      getKsSelectionExecutionContract(selectedMenu?.key ?? null)?.submodules ??
+      selectionExecutionContract?.submodules ??
       freeformContract?.submodules ??
       []
     const executedSubmodules = executeKsSubmodules({
@@ -942,17 +1000,23 @@ export async function runHexastraFlow(input: {
     }
 
     const selectedPromptHint =
-      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null)?.promptHint ??
-      getKsSelectionExecutionContract(selectedMenu?.key ?? null)?.promptHint ??
+      selectionExecutionContract?.promptHint ??
       freeformContract?.promptHint ??
       selectedSubmenu?.promptHint ??
       selectedMenu?.promptHint ??
       menuInstruction ??
       null
     const selectedOutputStructure =
-      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null)?.outputStructure ??
-      getKsSelectionExecutionContract(selectedMenu?.key ?? null)?.outputStructure ??
+      selectionExecutionContract?.outputStructure ??
       freeformContract?.outputStructure ??
+      null
+    const selectedContextFrame =
+      selectionExecutionContract?.contextFrame ??
+      freeformContract?.contextFrame ??
+      null
+    const selectedClarificationQuestion =
+      selectionExecutionContract?.clarificationQuestion ??
+      freeformContract?.clarificationQuestion ??
       null
     const retrievalProfile = resolveRetrievalProfile({
       domainRoute,
@@ -1036,6 +1100,8 @@ export async function runHexastraFlow(input: {
       selectedSubmenuLabel: selectedSubmenu?.label ?? null,
       selectedPromptHint,
       selectedOutputStructure,
+      selectedContextFrame,
+      selectedClarificationQuestion,
       ksSummary,
       ksSubmoduleSummaries,
       readingSummary: normalizedReadingSummary,

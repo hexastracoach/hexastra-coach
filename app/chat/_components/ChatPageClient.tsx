@@ -431,6 +431,7 @@ export default function ChatPageClient() {
   const microTriggerRef = useRef<string | null>(null)
   const forceMicroBootstrapRef = useRef(false)
   const requestAbortRef = useRef<AbortController | null>(null)
+  const requestSequenceRef = useRef(0)
   const lastMessageRef = useRef<string | null>(null)
   const birthDataRef = useRef<BirthData>(EMPTY_BIRTH_DATA)
   const partnerBirthDataRef = useRef<BirthData>(EMPTY_BIRTH_DATA)
@@ -496,7 +497,14 @@ export default function ChatPageClient() {
         depthLevel: string
       }
     ) => {
-      const withMemory = !isReading && memoryHint ? `${base}\n\n${memoryHint}` : base
+      const shouldAppendMemory =
+        !isReading &&
+        Boolean(memoryHint) &&
+        intent !== 'greeting' &&
+        intent !== 'menu' &&
+        !isSimpleGreeting(userMessage) &&
+        !/^Bienvenue\./i.test(base.trim())
+      const withMemory = shouldAppendMemory && memoryHint ? `${base}\n\n${memoryHint}` : base
       const depthAdjusted = adjustResponseDepth(withMemory, {
         level: depthLevel as any,
         plan: userPlan,
@@ -705,7 +713,11 @@ export default function ChatPageClient() {
 
       const controller = new AbortController()
       requestAbortRef.current = controller
-      const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+      let timedOut = false
+      const timeout = setTimeout(() => {
+        timedOut = true
+        controller.abort()
+      }, API_TIMEOUT_MS)
 
       try {
         const response = await fetch('/api/chat', {
@@ -738,7 +750,7 @@ export default function ChatPageClient() {
         return data as HexastraApiResponse
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') {
-          throw new Error('Request aborted')
+          throw new Error(timedOut ? 'Request timeout' : 'Request aborted')
         }
         throw error
       } finally {
@@ -769,6 +781,7 @@ export default function ChatPageClient() {
     }) => {
       if (isTyping) return
 
+      const requestSeq = ++requestSequenceRef.current
       const visibleMessage = (displayMessage ?? message).trim()
       const requestMessage = message.trim()
 
@@ -812,6 +825,7 @@ export default function ChatPageClient() {
 
       try {
         const data = await postChatPayload(payload)
+        if (requestSeq !== requestSequenceRef.current) return
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const reply = applyApiResponse(data)
         const depthLevel = detectUserDepthLevel(requestMessage, messages, userPlan)
@@ -833,21 +847,27 @@ export default function ChatPageClient() {
           },
         ])
       } catch (error) {
+        if (requestSeq !== requestSequenceRef.current) return
         console.error('[sendStructuredAction] failed', error)
+        if (error instanceof Error && error.message === 'Request aborted') {
+          return
+        }
         setMessages([
           ...nextConversation,
           {
             id: `${Date.now()}-error`,
             role: 'assistant',
             content:
-              error instanceof Error && error.message === 'Request aborted'
-                ? "La demande précédente a été interrompue au profit de la nouvelle."
+              error instanceof Error && error.message === 'Request timeout'
+                ? "Je n'ai pas pu ouvrir cet angle à temps. On réessaie dans un instant."
                 : "Je n'ai pas pu ouvrir cet angle pour le moment. On réessaie dans un instant.",
             created_at: new Date().toISOString(),
           },
         ])
       } finally {
-        setIsTyping(false)
+        if (requestSeq === requestSequenceRef.current) {
+          setIsTyping(false)
+        }
       }
     },
     [
@@ -1235,6 +1255,7 @@ export default function ChatPageClient() {
   async function triggerMicroReading(requestType: RequestType) {
     if (isTyping) return
     setIsTyping(true)
+    const requestSeq = ++requestSequenceRef.current
 
     const loadingId = `${Date.now()}-micro-loading`
 
@@ -1271,6 +1292,7 @@ export default function ChatPageClient() {
 
     try {
       const data = await postChatPayload(payload)
+      if (requestSeq !== requestSequenceRef.current) return
       const reply = applyApiResponse(data)
       const isReading = isReadingFlowStep(data?.flowState?.step)
       const depthLevel = detectUserDepthLevel(lastUserMessage || reply, messages, userPlan)
@@ -1307,11 +1329,17 @@ export default function ChatPageClient() {
         return next
       })
     } catch (error) {
+      if (requestSeq !== requestSequenceRef.current) return
       console.error('[triggerMicroReading] failed', error)
+      if (error instanceof Error && error.message === 'Request aborted') {
+        return
+      }
       setMessages((prev) => prev.filter((m) => m.id !== loadingId))
       microTriggerRef.current = null
     } finally {
-      setIsTyping(false)
+      if (requestSeq === requestSequenceRef.current) {
+        setIsTyping(false)
+      }
     }
   }
 
@@ -1562,9 +1590,11 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
         uiAction: 'send_message',
         journeyEnabled,
       })
+      const requestSeq = ++requestSequenceRef.current
 
       try {
         const data = await postChatPayload(payload)
+        if (requestSeq !== requestSequenceRef.current) return
         const reply = applyApiResponse(data)
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const depthLevel = detectUserDepthLevel(requestContent, messages, userPlan)
@@ -1592,7 +1622,11 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
 
 
       } catch (error) {
+        if (requestSeq !== requestSequenceRef.current) return
         console.error('[handleSend] failed', error)
+        if (error instanceof Error && error.message === 'Request aborted') {
+          return
+        }
 
         setMessages([
           ...nextConversation,
@@ -1600,14 +1634,18 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
             id: `${Date.now()}-error`,
             role: 'assistant',
             content:
-              error instanceof Error && error.message === 'Request aborted'
-                ? "La demande précédente a été annulée pour laisser passer la nouvelle."
+              error instanceof Error && error.message === 'Request timeout'
+                ? "Je n'ai pas pu terminer la lecture à temps. Réessaie dans quelques instants."
                 : "Je n'ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.",
             created_at: new Date().toISOString(),
           },
         ])
 
         setIsTyping(false)
+      } finally {
+        if (requestSeq === requestSequenceRef.current) {
+          setIsTyping(false)
+        }
       }
     },
     [
