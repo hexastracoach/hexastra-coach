@@ -170,9 +170,12 @@ export type BuildPromptInput = {
   practitionerUsage: PractitionerUsageHex
   selectedMenuLabel?: string | null
   selectedSubmenuLabel?: string | null
+  selectedPromptHint?: string | null
+  selectedOutputStructure?: string | null
   requestType: 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
   domainRoute?: DomainRoute
   specializedSource?: string | null
+  ksNarrativeBrief?: string | null
   flowStep?: FlowStep
   emotionalState?: EmotionalState
   precision?: PrecisionLevel

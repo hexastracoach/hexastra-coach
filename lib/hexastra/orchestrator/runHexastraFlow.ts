@@ -30,6 +30,7 @@ import type { ChatMessage } from '@/lib/chat/chatPayloadBuilder'
 
 import { classifyQuery } from '@/lib/hexastra/router/classifyQuery'
 import { getModulesForDomain } from '@/lib/hexastra/router/moduleRouter'
+import { getKsDomainConfig, getKsFreeformContract, getKsSelectionConfig } from '@/lib/hexastra/ks/ksRegistry'
 import { buildSignalEnvelope } from '@/lib/hexastra/fusion/signalEnvelope'
 import type { KSSignal } from '@/lib/hexastra/fusion/signalEnvelope'
 import { fusionEngine } from '@/lib/hexastra/fusion/fusionEngine'
@@ -203,6 +204,11 @@ function shouldForceDirectReading(params: {
 
   const normalizedMessage = latestUserMessage.toLowerCase()
   if (
+    normalizedMessage.includes('theme natal') ||
+    normalizedMessage.includes('thème natal') ||
+    normalizedMessage.includes('theme astral') ||
+    normalizedMessage.includes('thème astral') ||
+    normalizedMessage.includes('carte du ciel') ||
     normalizedMessage.includes('fais la lecture') ||
     normalizedMessage.includes('donne-moi directement le bilan') ||
     normalizedMessage.includes("donne-moi directement l'analyse")
@@ -211,6 +217,70 @@ function shouldForceDirectReading(params: {
   }
 
   return forcedKeys.has(selectedSubmenuKey ?? '') || forcedKeys.has(selectedMenuKey ?? '')
+}
+
+function resolveRetrievalProfile(params: {
+  domainRoute: DomainRoute
+  specializedSource?: string | null
+  selectedMenu?: HexastraMenuItem | null
+  selectedSubmenu?: HexastraMenuItem | null
+  latestUserMessage?: string | null
+}) {
+  const selectionConfig =
+    getKsSelectionConfig(params.selectedSubmenu?.key ?? null) ??
+    getKsSelectionConfig(params.selectedMenu?.key ?? null)
+  const freeformConfig = getKsFreeformContract(params.latestUserMessage ?? null)
+
+  if (selectionConfig || freeformConfig) return 'selection_specialized'
+  if (params.specializedSource) return 'specialized_first'
+  if (params.selectedSubmenu?.key || params.selectedMenu?.key) return 'menu_guided'
+  if (params.domainRoute === 'neurokua' || params.domainRoute === 'gps_kua') return 'signal_first'
+  return 'balanced'
+}
+
+function buildKsNarrativeBrief(params: {
+  domainRoute: DomainRoute
+  selectedMenu?: HexastraMenuItem | null
+  selectedSubmenu?: HexastraMenuItem | null
+  latestUserMessage?: string | null
+  specializedResult?: SpecializedModuleResult | null
+  fusedSignal?: {
+    primaryModule?: string | null
+    dominantSignal?: string | null
+    phase?: string | null
+    zone?: string | null
+    narrativeBrief?: string | null
+    confidenceScore?: number
+  } | null
+}) {
+  const domainConfig = getKsDomainConfig(params.domainRoute)
+  const selectionConfig =
+    getKsSelectionConfig(params.selectedSubmenu?.key ?? null) ??
+    getKsSelectionConfig(params.selectedMenu?.key ?? null)
+  const freeformConfig = getKsFreeformContract(params.latestUserMessage ?? null)
+  const effectiveSelectionConfig = selectionConfig ?? freeformConfig
+  const focus = params.selectedSubmenu?.label ?? params.selectedMenu?.label ?? 'aucun angle explicite'
+  const parts = [
+    `domaine: ${params.domainRoute}`,
+    `focus: ${focus}`,
+    effectiveSelectionConfig?.narrativeContract ? `contrat selection: ${effectiveSelectionConfig.narrativeContract}` : null,
+    effectiveSelectionConfig?.outputStructure ? `structure: ${effectiveSelectionConfig.outputStructure}` : null,
+    effectiveSelectionConfig?.submodules?.length
+      ? `sous-modules: ${effectiveSelectionConfig.submodules.join(', ')}`
+      : null,
+    `contrat: ${domainConfig.narrativeContract}`,
+    params.specializedResult?.source ? `source prioritaire: ${params.specializedResult.source}` : null,
+    params.fusedSignal?.primaryModule ? `module dominant: ${params.fusedSignal.primaryModule}` : null,
+    params.fusedSignal?.dominantSignal ? `signal dominant: ${params.fusedSignal.dominantSignal}` : null,
+    params.fusedSignal?.phase ? `phase: ${params.fusedSignal.phase}` : null,
+    params.fusedSignal?.zone ? `zone: ${params.fusedSignal.zone}` : null,
+    typeof params.fusedSignal?.confidenceScore === 'number'
+      ? `confiance: ${params.fusedSignal.confidenceScore}`
+      : null,
+    params.fusedSignal?.narrativeBrief ?? null,
+  ].filter(Boolean)
+
+  return parts.join(' | ')
 }
 
 function withGlobalTimeout<T>(promise: Promise<T>, timeoutMs: number, meta?: Record<string, unknown>) {
@@ -750,7 +820,15 @@ export async function runHexastraFlow(input: {
       source: specializedResult?.source,
     })
 
-    const activeModules = getModulesForDomain(domainRoute)
+    const freeformContract = getKsFreeformContract(latestUserMessage)
+    const selectionModules =
+      getKsSelectionConfig(selectedSubmenu?.key ?? null)?.modules ??
+      getKsSelectionConfig(selectedMenu?.key ?? null)?.modules ??
+      freeformContract?.modules ??
+      []
+    const activeModules = Array.from(
+      new Set([...selectionModules, ...getModulesForDomain(domainRoute)])
+    )
 
     const knowledgeBlock = knowledgePayload?.block
 
@@ -790,7 +868,36 @@ export async function runHexastraFlow(input: {
       arbitration = arbitration || {}
     }
 
-      const systemPrompt = buildSystemPrompt({
+    const selectedPromptHint =
+      getKsSelectionConfig(selectedSubmenu?.key ?? null)?.promptHint ??
+      getKsSelectionConfig(selectedMenu?.key ?? null)?.promptHint ??
+      freeformContract?.promptHint ??
+      selectedSubmenu?.promptHint ??
+      selectedMenu?.promptHint ??
+      menuInstruction ??
+      null
+    const selectedOutputStructure =
+      getKsSelectionConfig(selectedSubmenu?.key ?? null)?.outputStructure ??
+      getKsSelectionConfig(selectedMenu?.key ?? null)?.outputStructure ??
+      freeformContract?.outputStructure ??
+      null
+    const retrievalProfile = resolveRetrievalProfile({
+      domainRoute,
+      specializedSource: specializedResult?.source ?? null,
+      selectedMenu,
+      selectedSubmenu,
+      latestUserMessage,
+    })
+    const ksNarrativeBrief = buildKsNarrativeBrief({
+      domainRoute,
+      selectedMenu,
+      selectedSubmenu,
+      latestUserMessage,
+      specializedResult,
+      fusedSignal,
+    })
+
+    const systemPrompt = buildSystemPrompt({
       plan,
       mode,
       language: userContext.language ?? fallbackLanguage,
@@ -799,14 +906,17 @@ export async function runHexastraFlow(input: {
       practitionerUsage: userContext.practitionerUsage ?? null,
       selectedMenuLabel: selectedMenu?.label ?? null,
       selectedSubmenuLabel: selectedSubmenu?.label ?? null,
+      selectedPromptHint,
+      selectedOutputStructure,
       requestType: input.requestType,
       domainRoute,
       specializedSource: specializedResult?.source ?? null,
-        flowStep,
-        emotionalState: sessionContext.emotionalState,
-        precision: sessionContext.precision,
-        retrievalProfile: 'balanced',
-      })
+      ksNarrativeBrief,
+      flowStep,
+      emotionalState: sessionContext.emotionalState,
+      precision: sessionContext.precision,
+      retrievalProfile,
+    })
 
     const messagesForLLM = limitedMessages.length
       ? limitedMessages
