@@ -409,20 +409,37 @@ export async function POST(req: NextRequest) {
     const intentLocal = detectIntentLocal(lastUserMessage)
 
     if (intentLocal === 'greeting') {
-      const content = await generateConversation(lastUserMessage || 'Bonjour.')
-      const resp = {
-        content,
-        type: 'conversation',
-        plan: effectivePlan,
-        mode: effectivePlan,
-        conversationId:
-          typeof (body as Record<string, unknown>).conversationId === 'string'
-            ? ((body as Record<string, unknown>).conversationId as string)
-            : randomUUID(),
-        flowState: { step: 'conversation', completed: true },
-        menu: { visible: false, items: [] },
+      try {
+        const content = await generateConversation(lastUserMessage || 'Bonjour.')
+        const resp = {
+          content,
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        }
+        return NextResponse.json(resp, { status: 200 })
+      } catch (error) {
+        log('warn', 'greeting openai failed, fallback local', { error: (error as Error)?.message })
+        const resp = {
+          content: 'Salut. Comment tu te sens aujourd’hui ?',
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        }
+        return NextResponse.json(resp, { status: 200 })
       }
-      return NextResponse.json(resp, { status: 200 })
     }
 
     const cacheKey = buildCacheKey(userId, lastUserMessage, normalizeBirthData((body as Record<string, unknown>).birthData))
