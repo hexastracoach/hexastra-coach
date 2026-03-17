@@ -325,6 +325,7 @@ export async function runHexastraFlow(input: {
   const fallbackLanguage = input.language ?? detectLanguageFromMessages(input.messages, 'fr')
   const fallbackPlan = normalizePlan(input.plan)
   const journeyToggle = typeof input.journeyEnabled === 'boolean' ? input.journeyEnabled : undefined
+  let journeyEnabled = false
 
   if (!VECTOR_STORE_ID) {
     logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing — retrieval disabled')
@@ -382,7 +383,7 @@ export async function runHexastraFlow(input: {
 
     const plan = normalizePlan(userContext.plan)
     const mode = getModeForPlan(plan)
-    const journeyEnabled = journeyToggle ?? userContext.journeyEnabled ?? false
+    journeyEnabled = journeyToggle ?? userContext.journeyEnabled ?? false
     userContext = { ...userContext, journeyEnabled }
 
     const menuItems = getMenuForMode(mode)
@@ -479,7 +480,7 @@ export async function runHexastraFlow(input: {
     })
 
     const knowledgePayload =
-      retrievalPlan && retrievalPlan.documents.length > 0
+      retrievalPlan?.documents?.length
         ? await compressKnowledgeContext(retrievalPlan.documents, retrievalPlan.slots)
         : { block: null }
 
