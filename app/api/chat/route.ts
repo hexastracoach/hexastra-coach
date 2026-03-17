@@ -167,7 +167,7 @@ function detectIntentLocal(message: string): 'greeting' | 'menu' | 'birth_update
   if (/(naissance|birth|donnees de naissance|donnees naissance|donnees|données|ne\(e\)|nee)/.test(norm)) {
     return 'birth_update'
   }
-  if (/(profil|analyse|lecture|relation|travail|periode|période|decision|décision|blocage|question|hexastra)/.test(norm)) {
+  if (/(profil|analyse|lecture|theme|thème|astral|natal|astro|relation|travail|periode|période|decision|décision|blocage|question|hexastra|neurokua|kua|etat du jour|état du jour)/.test(norm)) {
     return 'analysis'
   }
   return 'conversation'

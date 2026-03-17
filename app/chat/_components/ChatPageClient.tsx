@@ -207,6 +207,30 @@ function buildMenuSelectionRequest(item: HexastraMenuItem, parent?: HexastraMenu
   return `Je veux une lecture ${contextLabel} à partir de mes données enregistrées. Donne-moi directement le bilan ou l'analyse utile, sans me redemander de décrire mon état sauf si c'est indispensable.`
 }
 
+function buildMenuSelectionDisplay(item: HexastraMenuItem, parent?: HexastraMenuItem) {
+  return parent ? `${parent.label} -> ${item.label}` : item.label
+}
+
+function buildStoredBirthDataRequest(value: string, birthData: BirthData) {
+  if (!isBirthDataComplete(birthData)) return value
+
+  const text = normalizeText(value)
+
+  if (
+    /(theme natal|theme astral|carte du ciel|analyse astrale|mon theme|mon theme natal|mon theme astral)/.test(
+      text
+    )
+  ) {
+    return "Je veux mon thème natal à partir de mes données de naissance déjà enregistrées. Lance directement la lecture utile sans me redemander mes données sauf si un champ critique manque réellement."
+  }
+
+  if (/(neurokua|kua)/.test(text) && /(etat du jour|mon etat|bilan du jour|etat interieur)/.test(text)) {
+    return "Je veux une lecture NeuroKua Mon état du jour à partir de mes données enregistrées. Donne-moi directement le bilan ou l'analyse utile, sans me redemander de décrire mon état sauf si c'est indispensable."
+  }
+
+  return value
+}
+
 function getInitials(email: string) {
   if (!email) return 'HX'
   const clean = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ')
@@ -354,6 +378,8 @@ export default function ChatPageClient() {
   const microTriggerRef = useRef<string | null>(null)
   const requestAbortRef = useRef<AbortController | null>(null)
   const lastMessageRef = useRef<string | null>(null)
+  const birthDataRef = useRef<BirthData>(EMPTY_BIRTH_DATA)
+  const partnerBirthDataRef = useRef<BirthData>(EMPTY_BIRTH_DATA)
   const journeyHydratedRef = useRef(false)
   const conversationContextRef = useRef({}) // legacy placeholder, no longer used
 
@@ -376,6 +402,14 @@ export default function ChatPageClient() {
       setShowInlineBirthForm(false)
     }
   }, [birthData])
+
+  useEffect(() => {
+    birthDataRef.current = birthData
+  }, [birthData])
+
+  useEffect(() => {
+    partnerBirthDataRef.current = partnerBirthData
+  }, [partnerBirthData])
 
   useEffect(() => {
     if (!isBirthDataComplete(birthData)) {
@@ -659,12 +693,14 @@ export default function ChatPageClient() {
   const sendStructuredAction = useCallback(
     async ({
       message,
+      displayMessage,
       contextType,
       menuKey,
       submenuKey,
       uiAction,
     }: {
       message: string
+      displayMessage?: string
       contextType: ContextType
       menuKey?: string | null
       submenuKey?: string | null
@@ -672,15 +708,19 @@ export default function ChatPageClient() {
     }) => {
       if (isTyping) return
 
+      const visibleMessage = (displayMessage ?? message).trim()
+      const requestMessage = message.trim()
+
       const userMessage: Msg = {
         id: `${Date.now()}-user`,
         role: 'user',
-        content: message,
+        content: visibleMessage,
         created_at: new Date().toISOString(),
       }
 
       const baseMessages = isWelcome ? [] : messages
       const nextConversation = [...baseMessages, userMessage]
+      const requestConversation = [...baseMessages, { ...userMessage, content: requestMessage }]
 
       setMessages(nextConversation)
       setIsTyping(true)
@@ -688,11 +728,12 @@ export default function ChatPageClient() {
       const payload = buildChatPayload({
         requestType: 'chat',
         plan: userPlan,
-        birthData,
+        birthData: birthDataRef.current,
+        partnerBirthData: partnerBirthDataRef.current,
         practitionerUsage,
         chatLanguage,
         conversationId,
-        messages: nextConversation.map((m) => ({ role: m.role, content: m.content })),
+        messages: requestConversation.map((m) => ({ role: m.role, content: m.content })),
         evolutionProfile,
         contextType,
         selectedMenuKey: menuKey ?? null,
@@ -705,10 +746,10 @@ export default function ChatPageClient() {
         const data = await postChatPayload(payload)
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const reply = applyApiResponse(data)
-        const depthLevel = detectUserDepthLevel(message, messages, userPlan)
+        const depthLevel = detectUserDepthLevel(requestMessage, messages, userPlan)
         const finalReply = formatAssistantReply(reply, {
           intent: ((data?.metadata ?? {}) as ChatApiMetadata).intentDetected,
-          userMessage: message,
+          userMessage: requestMessage,
           isReading,
           depthLevel,
         })
@@ -743,7 +784,6 @@ export default function ChatPageClient() {
     },
     [
       applyApiResponse,
-      birthData,
       chatLanguage,
       conversationId,
       evolutionProfile,
@@ -837,7 +877,11 @@ export default function ChatPageClient() {
       const stored = localStorage.getItem(STORAGE_KEYS.birthData)
       if (stored) {
         const parsed = JSON.parse(stored) as BirthData
-        if (parsed && typeof parsed === 'object') setBirthData(mergeBirthData(parsed))
+        if (parsed && typeof parsed === 'object') {
+          const normalized = mergeBirthData(parsed)
+          birthDataRef.current = normalized
+          setBirthData(normalized)
+        }
       }
     } catch {}
   }, [])
@@ -857,7 +901,11 @@ export default function ChatPageClient() {
       const stored = localStorage.getItem(STORAGE_KEYS.partnerBirthData)
       if (stored) {
         const parsed = JSON.parse(stored) as BirthData
-        if (parsed && typeof parsed === 'object') setPartnerBirthData(mergeBirthData(parsed))
+        if (parsed && typeof parsed === 'object') {
+          const normalized = mergeBirthData(parsed)
+          partnerBirthDataRef.current = normalized
+          setPartnerBirthData(normalized)
+        }
       }
     } catch {}
   }, [])
@@ -980,6 +1028,7 @@ export default function ChatPageClient() {
 
   const handleBirthDataChange = useCallback((next: BirthData) => {
     const normalized = mergeBirthData(next)
+    birthDataRef.current = normalized
     setBirthData(normalized)
     try {
       localStorage.setItem(STORAGE_KEYS.birthData, JSON.stringify(normalized))
@@ -988,6 +1037,7 @@ export default function ChatPageClient() {
 
   const handlePartnerBirthDataChange = useCallback((next: BirthData) => {
     const normalized = mergeBirthData(next)
+    partnerBirthDataRef.current = normalized
     setPartnerBirthData(normalized)
     try {
       localStorage.setItem(STORAGE_KEYS.partnerBirthData, JSON.stringify(normalized))
@@ -1028,6 +1078,7 @@ export default function ChatPageClient() {
         if (shouldResumeAfterBirthSave) {
           void sendStructuredAction({
             message: `Mes données de naissance sont maintenant enregistrées (${parts.join(', ')}). Reprends ma demande précédente et fais la lecture demandée : ${pendingReadingRequest}`,
+            displayMessage: 'Mes données de naissance sont enregistrées. Reprends ma demande précédente.',
             contextType: activeContextType,
             uiAction: 'restart_flow',
           })
@@ -1203,7 +1254,10 @@ export default function ChatPageClient() {
     async (provided?: string) => {
       const baseContent = (provided ?? input).trim()
       const attachNote = attachedFile ? `\n\n[PiÃ¨ce jointe : ${attachedFile.name}]` : ''
+      const currentBirthData = birthDataRef.current
+      const currentPartnerBirthData = partnerBirthDataRef.current
       const content = baseContent + attachNote
+      const requestContent = buildStoredBirthDataRequest(baseContent, currentBirthData) + attachNote
 
       if (!content.trim() || isTyping) return
       if (isDuplicateMessage(lastMessageRef, content)) return
@@ -1314,7 +1368,7 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
         selectedMenuKey ?? '',
         selectedSubmenuKey ?? '',
         conversationId ?? '',
-        content.slice(0, 120),
+        requestContent.slice(0, 120),
       ].join('::')
 
       const cachedReply = cacheRef.current.get(cacheKey)
@@ -1348,16 +1402,22 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
         return
       }
 
-      const historyMsgs: ChatMessage[] = nextConversation.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }))
+      const historyMsgs: ChatMessage[] = [
+        ...baseMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+        {
+          role: 'user',
+          content: requestContent,
+        },
+      ]
 
       const payload = buildChatPayload({
         requestType: 'chat',
         plan: userPlan,
-        birthData,
-        partnerBirthData,
+        birthData: currentBirthData,
+        partnerBirthData: currentPartnerBirthData,
         practitionerUsage,
         chatLanguage,
         conversationId,
@@ -1374,10 +1434,10 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
         const data = await postChatPayload(payload)
         const reply = applyApiResponse(data)
         const isReading = isReadingFlowStep(data?.flowState?.step)
-        const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
+        const depthLevel = detectUserDepthLevel(requestContent, messages, userPlan)
         const finalReply = formatAssistantReply(reply, {
           intent: ((data?.metadata ?? {}) as ChatApiMetadata).intentDetected,
-          userMessage: baseContent,
+          userMessage: requestContent,
           isReading,
           depthLevel,
         })
@@ -1421,8 +1481,6 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
       activeContextType,
       applyApiResponse,
       attachedFile,
-      birthData,
-      partnerBirthData,
       chatLanguage,
       conversationId,
       evolutionProfile,
@@ -1647,6 +1705,7 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
 
                     void sendStructuredAction({
                       message: buildMenuSelectionRequest(item, parent),
+                      displayMessage: buildMenuSelectionDisplay(item, parent),
                       contextType: context,
                       menuKey: parent?.key ?? item.key,
                       submenuKey: parent ? item.key : null,

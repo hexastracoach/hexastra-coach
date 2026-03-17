@@ -13,11 +13,12 @@ type Props = {
 
 export default function MessageList({ messages, isTyping, lastUserMessage, onRetry }: Props) {
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const visibleMessages = messages.filter((message) => message.content !== '__loading_micro__')
 
   useEffect(() => {
     if (!bottomRef.current) return
     bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages, isTyping])
+  }, [visibleMessages, isTyping])
 
   return (
     <div
@@ -31,7 +32,7 @@ export default function MessageList({ messages, isTyping, lastUserMessage, onRet
         width: '100%',
       }}
     >
-      {messages.map((message) => (
+      {visibleMessages.map((message) => (
         <MessageBubble
           key={message.id}
           message={message}
