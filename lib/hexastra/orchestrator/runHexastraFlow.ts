@@ -2,6 +2,8 @@
 import { createClient as createSupabaseServer } from '@/lib/supabase/server'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import { buildSystemPrompt } from '@/lib/hexastra/prompts/buildSystemPrompt'
+import { buildReadingPacket } from '@/lib/hexastra/orchestrator/buildReadingPacket'
+import { buildKnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
 import { buildUserContext } from '@/lib/hexastra/context/buildUserContext'
 import { buildSessionContext } from '@/lib/hexastra/context/buildSessionContext'
 import { buildChatPayload } from '@/lib/hexastra/payload/buildChatPayload'
@@ -950,6 +952,44 @@ export async function runHexastraFlow(input: {
       fusedSignal,
       executedSubmodules,
     })
+    const ksSummary = {
+      dominantSignal: fusedSignal?.dominantSignal ?? null,
+      primaryModule: fusedSignal?.primaryModule ?? null,
+      primaryFamily: fusedSignal?.primaryFamily ?? null,
+      sourceLayers: Array.isArray(fusedSignal?.sourceLayers) ? fusedSignal.sourceLayers : [],
+      submodules: executedSubmodules.map((entry) => entry.key),
+    }
+    const ksSubmoduleSummaries = executedSubmodules
+      .map((entry) => entry.result.publicSummary)
+      .filter((summary): summary is string => typeof summary === 'string' && summary.trim().length > 0)
+    const normalizedReadingSummary = {
+      detectedTheme: readingSummary.detectedTheme,
+      detectedSubtheme: readingSummary.detectedSubtheme,
+      detectedScience: readingSummary.detectedScience,
+      readingLevel: readingSummary.readingLevel,
+      momentType: readingSummary.momentType,
+      phaseType: readingSummary.phaseType,
+      dominantPotential: readingSummary.dominantPotential,
+      mainLever: readingSummary.mainLever,
+      executiveSummary: readingSummary.executiveSummary,
+    }
+    const readingPacket = buildReadingPacket({
+      domainRoute,
+      selectedOutputStructure,
+      ksNarrativeBrief,
+      ksSummary,
+      readingSummary: normalizedReadingSummary,
+      submoduleSummaries: ksSubmoduleSummaries,
+    })
+    const knowledgePacket = buildKnowledgePacket({
+      results: retrievalResults,
+      domainRoute,
+      selectedMenuLabel: selectedMenu?.label ?? null,
+      selectedSubmenuLabel: selectedSubmenu?.label ?? null,
+      selectedPromptHint,
+      selectedOutputStructure,
+      latestUserMessage,
+    })
 
     const systemPrompt = buildSystemPrompt({
       plan,
@@ -962,27 +1002,9 @@ export async function runHexastraFlow(input: {
       selectedSubmenuLabel: selectedSubmenu?.label ?? null,
       selectedPromptHint,
       selectedOutputStructure,
-      ksSummary: {
-        dominantSignal: fusedSignal?.dominantSignal ?? null,
-        primaryModule: fusedSignal?.primaryModule ?? null,
-        primaryFamily: fusedSignal?.primaryFamily ?? null,
-        sourceLayers: Array.isArray(fusedSignal?.sourceLayers) ? fusedSignal.sourceLayers : [],
-        submodules: executedSubmodules.map((entry) => entry.key),
-      },
-      ksSubmoduleSummaries: executedSubmodules
-        .map((entry) => entry.result.publicSummary)
-        .filter((summary): summary is string => typeof summary === 'string' && summary.trim().length > 0),
-      readingSummary: {
-        detectedTheme: readingSummary.detectedTheme,
-        detectedSubtheme: readingSummary.detectedSubtheme,
-        detectedScience: readingSummary.detectedScience,
-        readingLevel: readingSummary.readingLevel,
-        momentType: readingSummary.momentType,
-        phaseType: readingSummary.phaseType,
-        dominantPotential: readingSummary.dominantPotential,
-        mainLever: readingSummary.mainLever,
-        executiveSummary: readingSummary.executiveSummary,
-      },
+      ksSummary,
+      ksSubmoduleSummaries,
+      readingSummary: normalizedReadingSummary,
       requestType: input.requestType,
       domainRoute,
       specializedSource: specializedResult?.source ?? null,
@@ -1004,6 +1026,8 @@ export async function runHexastraFlow(input: {
       messages: messagesForLLM,
       knowledgeBlock: knowledgePayload?.block ?? null,
       flowStep,
+      readingPacket,
+      knowledgePacket,
     })
 
     const rawMessage = await callOpenAIResponse({
@@ -1148,23 +1172,13 @@ export async function runHexastraFlow(input: {
           timing: sessionContext.timing,
           journeyEnabled,
           ksSummary: {
-            dominantSignal: fusedSignal?.dominantSignal ?? null,
-            primaryModule: fusedSignal?.primaryModule ?? null,
-            primaryFamily: fusedSignal?.primaryFamily ?? null,
-            sourceLayers: Array.isArray(fusedSignal?.sourceLayers) ? fusedSignal.sourceLayers : [],
-            submodules: executedSubmodules.map((entry) => entry.key),
+            dominantSignal: ksSummary.dominantSignal,
+            primaryModule: ksSummary.primaryModule,
+            primaryFamily: ksSummary.primaryFamily,
+            sourceLayers: ksSummary.sourceLayers,
+            submodules: ksSummary.submodules,
           },
-          readingSummary: {
-            detectedTheme: readingSummary.detectedTheme,
-            detectedSubtheme: readingSummary.detectedSubtheme,
-            detectedScience: readingSummary.detectedScience,
-            readingLevel: readingSummary.readingLevel,
-            momentType: readingSummary.momentType,
-            phaseType: readingSummary.phaseType,
-            dominantPotential: readingSummary.dominantPotential,
-            mainLever: readingSummary.mainLever,
-            executiveSummary: readingSummary.executiveSummary,
-          },
+          readingSummary: normalizedReadingSummary,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       } as HexastraApiResponse;

@@ -14,6 +14,8 @@ export function buildChatPayload({
   messages,
   knowledgeBlock,
   flowStep,
+  readingPacket,
+  knowledgePacket,
 }: {
   systemPrompt: string
   userContext: HexastraUserContext
@@ -21,6 +23,8 @@ export function buildChatPayload({
   messages: ChatMessage[]
   knowledgeBlock?: string | null
   flowStep?: FlowStep
+  readingPacket?: Record<string, unknown> | null
+  knowledgePacket?: Record<string, unknown> | null
 }) {
   const compactContext = {
     plan: userContext.plan,
@@ -57,6 +61,22 @@ export function buildChatPayload({
         role: 'user',
         content: `Contexte HexAstra interne à intégrer silencieusement : ${JSON.stringify(compactContext)}`,
       },
+      ...(readingPacket
+        ? [
+            {
+              role: 'assistant' as const,
+              content: `Reading packet HexAstra interne à suivre prioritairement pour ordonner la lecture : ${JSON.stringify(readingPacket)}`,
+            },
+          ]
+        : []),
+      ...(knowledgePacket
+        ? [
+            {
+              role: 'assistant' as const,
+              content: `Knowledge packet HexAstra interne. Hiérarchie documentaire à respecter : ${JSON.stringify(knowledgePacket)}`,
+            },
+          ]
+        : []),
       ...(knowledgeBlock ? [{ role: 'assistant' as const, content: knowledgeBlock }] : []),
       ...trimMessages(messages),
     ],

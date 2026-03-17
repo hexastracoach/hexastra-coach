@@ -39,6 +39,17 @@ export function buildKsLeadSummary(params: {
     return params.message
   }
 
+  const trimmedMessage = params.message.trim()
+  const lineCount = trimmedMessage.split(/\r?\n/).filter(Boolean).length
+  const alreadyStructured =
+    /^1[\.\)]\s/m.test(trimmedMessage) ||
+    /^[-•]\s/m.test(trimmedMessage) ||
+    /Reconnaissance|Lecture de la dynamique|Mise en perspective|Clé d’action|Cle d action/i.test(trimmedMessage)
+
+  if (alreadyStructured || lineCount >= 8 || trimmedMessage.length >= 1100) {
+    return params.message
+  }
+
   const actionSummary = params.executedSubmodules?.find((entry) => entry.key === 'KS.ActionTranslator')
   const movementSummary = params.executedSubmodules?.find(
     (entry) =>

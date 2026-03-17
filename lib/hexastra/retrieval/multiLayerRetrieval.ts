@@ -1,8 +1,10 @@
 import { retrieveKnowledge } from "@/lib/vectorSearch"
 import type { DomainRoute } from '@/lib/hexastra/types'
 
-type LayerResult = {
+export type LayerResult = {
   source: string
+  fileId?: string
+  filename?: string
   text: string
   score: number
 }
@@ -38,6 +40,8 @@ export async function multiLayerRetrieval({
   layers.push(
     ...knowledge.map(k => ({
       source: "knowledge",
+      fileId: k.fileId,
+      filename: k.filename,
       text: k.text,
       score: k.score
     }))
@@ -60,6 +64,8 @@ export async function multiLayerRetrieval({
     layers.push(
       ...fusion.map(k => ({
         source: "ks_fusion",
+        fileId: k.fileId,
+        filename: k.filename,
         text: k.text,
         score: k.score + 0.1
       }))
@@ -80,6 +86,8 @@ export async function multiLayerRetrieval({
     layers.push(
       ...domain.map(k => ({
         source: "domain",
+        fileId: k.fileId,
+        filename: k.filename,
         text: k.text,
         score: k.score + 0.05
       }))
