@@ -21,6 +21,9 @@ import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
 import { classifyIntent } from '@/lib/hexastra/openai/classifyIntent'
 import { generateSuggestions } from '@/lib/hexastra/suggestions/generateSuggestions'
 
+const memoryCache = new Map<string, { value: unknown; expires: number }>()
+const CACHE_TTL_MS = 10 * 60 * 1000
+
 export const runtime = 'nodejs'
 
 type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien'
@@ -30,10 +33,10 @@ const SUPPORTED_LANGUAGES = ['fr', 'en', 'es', 'pt', 'de', 'it'] as const
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 
 const PLAN_LIMITS: Record<PlanKey, number | null> = {
-  free: 10,        // prÃ©cÃ©demment 3
-  essential: 60,   // prÃ©cÃ©demment 20
-  premium: null,   // illimitÃ©
-  practitioner: null, // illimitÃ©
+  free: 10,
+  essential: 60,
+  premium: null,
+  practitioner: null,
 }
 
 const REQUIRED_ENV = {
@@ -43,68 +46,54 @@ const REQUIRED_ENV = {
 }
 
 function normalizeText(value: string): string {
-  return value
+  return (value || '')
     .trim()
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
 }
 
-function isGreetingOrSmallTalk(normalized: string): boolean {
-  return /^(salut|bonjour|hello|hey|coucou|yo|bonsoir|hi|merci|ok|daccord|dac|ca va|ça va|\?ca va|\?ça va|oui|non)$/.test(
-    normalized.replace(/\s+\?/g, '?').replace(/\s+/g, ' ')
+function isGreeting(normalized: string): boolean {
+  return /^(salut|bonjour|hello|hey|coucou|yo|bonsoir|hi|cava|ca va|ça va|merci|ok|daccord|dac|oui|non)$/.test(
+    normalized.replace(/\s+/g, '')
   )
 }
 
-function getResponseDepth(plan: PlanKey): ResponseDepth {
-  switch (plan) {
-    case 'essential':
-      return 'medium'
-    case 'premium':
-      return 'long'
-    case 'practitioner':
-      return 'expert'
-    default:
-      return 'short'
+function detectIntentLocal(message: string): 'greeting' | 'menu' | 'birth_update' | 'analysis' | 'conversation' {
+  const norm = normalizeText(message)
+  if (isGreeting(norm)) return 'greeting'
+  if (/(menu|angle|angles|option|choix|navigation)/.test(norm)) return 'menu'
+  if (/(naissance|birth|donnees de naissance|donnees naissance|donnees|données|ne\(e\)|nee)/.test(norm)) {
+    return 'birth_update'
   }
+  if (/(profil|analyse|lecture|relation|travail|periode|période|decision|décision|blocage|question|hexastra)/.test(norm)) {
+    return 'analysis'
+  }
+  return 'conversation'
 }
 
-function sanitizeMessages(messages: unknown): ChatMessage[] {
-  if (!Array.isArray(messages)) return []
-
-  return messages
-    .filter((m): m is { role?: unknown; content?: unknown } => Boolean(m && typeof m === 'object'))
-    .map(
-      (m): ChatMessage => ({
-        role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: typeof m.content === 'string' ? m.content.trim() : '',
-      })
-    )
-    .filter((m) => m.content.length > 0)
-    .slice(-30)
+function buildCacheKey(userId: string | null, message: string, birthData?: unknown) {
+  const bd = birthData ? JSON.stringify(birthData) : ''
+  return `${userId ?? 'guest'}::${message}::${bd}`
 }
 
-function normalizeContextType(value: unknown): ContextType {
-  return typeof value === 'string' ? (value as ContextType) : 'general'
-}
-
-function normalizeUiAction(value: unknown): UiAction {
-  return typeof value === 'string' ? (value as UiAction) : 'send_message'
-}
-
-function normalizePractitionerUsage(value: unknown): PractitionerUsageHex {
-  if (value === 'self' || value === 'client') return value
-  if (value === 'personal') return 'self'
+function getCache(key: string) {
+  const hit = memoryCache.get(key)
+  if (hit && hit.expires > Date.now()) return hit.value
+  memoryCache.delete(key)
   return null
 }
 
-function toOptionalNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return undefined
+function setCache(key: string, value: unknown) {
+  memoryCache.set(key, { value, expires: Date.now() + CACHE_TTL_MS })
+}
+
+function limitHistory(messages: ChatMessage[], max = 6): ChatMessage[] {
+  const recent = messages.slice(-max)
+  const users = recent.filter((m) => m.role === 'user').slice(-3)
+  const assistants = recent.filter((m) => m.role === 'assistant').slice(-2)
+  const allowed = new Set([...users, ...assistants])
+  return recent.filter((m) => allowed.has(m))
 }
 
 function normalizeBirthData(raw: unknown): BirthProfile | null {
@@ -151,8 +140,8 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
         : typeof data.birthCountryName === 'string'
           ? data.birthCountryName.trim()
           : undefined,
-    lat: toOptionalNumber(data.lat ?? data.birthLat),
-    lon: toOptionalNumber(data.lon ?? data.birthLng),
+    lat: typeof data.lat === 'number' ? data.lat : undefined,
+    lon: typeof data.lon === 'number' ? data.lon : undefined,
     gender: typeof data.gender === 'string' ? data.gender.trim() : undefined,
     birthDateISO: isoRaw || undefined,
     birthTimeKnown,
@@ -174,8 +163,8 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
 
 function buildSafeErrorResponse() {
   return {
-    message: "Je n'ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.",
-    reply: "Je n'ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.",
+    message: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
+    reply: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
     mode: 'free',
     plan: 'free',
     flowState: { step: 'error', completed: false },
@@ -198,14 +187,14 @@ function buildQuotaErrorResponse(params: { plan: PlanKey; used: number; limit: n
           ? 'Praticien'
           : 'Gratuit'
 
-  const freeMessage = `Tu as atteint la limite de ton accÃ¨s dÃ©couverte pour le moment.
+  const freeMessage = `Tu as atteint la limite de ton accès découverte pour le moment.
 
-Ton espace gratuit se rÃ©ouvrira automatiquement dans 24h.
-Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`
+Ton espace gratuit se réouvrira automatiquement dans 24h.
+Si tu veux continuer maintenant, tu peux passer à Essentiel.`
 
   const paidMessage = `Tu as atteint la limite de ton plan ${planLabel} pour le moment.
 
-Tu pourras rÃ©essayer plus tard, ou passer Ã  lâ€™offre supÃ©rieure si tu veux continuer tout de suite.`
+Tu pourras réessayer plus tard, ou passer à l’offre supérieure si tu veux continuer tout de suite.`
 
   const finalMessage = plan === 'free' ? freeMessage : paidMessage
 
@@ -219,64 +208,25 @@ Tu pourras rÃ©essayer plus tard, ou passer Ã  lâ€™offre supÃ©rieure s
     metadata: {
       shouldPersistMemory: false,
       quotaExceeded: true,
-      upgradeTargetPlan: plan === 'free' ? 'essential' : 'premium',
-      upgradeCtaLabel: plan === 'free' ? 'Passer Ã  Essentiel' : 'Passer Ã  Premium',
       resetAt,
-      usage: {
-        used,
-        limit,
-        remaining: 0,
-      },
+      used,
+      limit,
     },
   }
 }
 
-function getTodayIsoDate() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function getResetAtIso(windowStartedAt: string | Date) {
-  const startedAt = windowStartedAt instanceof Date ? windowStartedAt : new Date(windowStartedAt)
-  return new Date(startedAt.getTime() + 24 * 60 * 60 * 1000).toISOString()
-}
-
 function getGuestSubjectKey(req: NextRequest) {
-  const forwardedFor = req.headers.get('x-forwarded-for') ?? ''
-  const ip = forwardedFor.split(',')[0]?.trim() || 'unknown-ip'
-  const ua = req.headers.get('user-agent') ?? 'unknown-ua'
-  const raw = `${ip}|${ua}`
-  const hash = createHash('sha256').update(raw).digest('hex').slice(0, 24)
-  return `guest:${hash}`
+  const ua = req.headers.get('user-agent') || ''
+  const ip = req.headers.get('x-forwarded-for') || ''
+  return createHash('sha1')
+    .update(`${ua}::${ip}`)
+    .digest('hex')
 }
 
-function normalizeLanguage(lang: string | null | undefined): SupportedLanguage | null {
-  if (!lang) return null
-  const code = lang.slice(0, 2).toLowerCase()
-  return SUPPORTED_LANGUAGES.includes(code as SupportedLanguage) ? (code as SupportedLanguage) : null
-}
-
-function detectLanguageFromText(text: string): SupportedLanguage | null {
-  const normalized = text.trim().toLowerCase()
-  if (!normalized) return null
-
-  const frenchSignals = ['bonjour', 'salut', 'bonsoir', 'merci', 'je veux', 'jâ€™ai', "j'ai", 'peux-tu', 'peut tu', 'pourquoi', 'comment', 'travail', 'amour', 'santÃ©']
-  const englishSignals = ['hello', 'hi', 'hey', 'thank you', 'please', 'i want', 'can you', 'how', 'why', 'love', 'work', 'health']
-  const spanishSignals = ['hola', 'buenas', 'gracias', 'por favor', 'ayuda', 'salud', 'trabajo', 'amor', 'como', 'quÃ©', 'porque']
-  const portugueseSignals = ['olÃ¡', 'obrigado', 'por favor', 'saÃºde', 'trabalho', 'amor', 'porquÃª', 'como', 'podes', 'ajuda']
-  const germanSignals = ['hallo', 'danke', 'bitte', 'gesundheit', 'arbeit', 'liebe', 'warum', 'wie', 'kannst', 'hilfe']
-  const italianSignals = ['ciao', 'grazie', 'per favore', 'salute', 'lavoro', 'amore', 'perchÃ©', 'come', 'puoi', 'aiuto']
-
-  const scores = [
-    { lang: 'fr' as SupportedLanguage, score: frenchSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
-    { lang: 'en' as SupportedLanguage, score: englishSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
-    { lang: 'es' as SupportedLanguage, score: spanishSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
-    { lang: 'pt' as SupportedLanguage, score: portugueseSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
-    { lang: 'de' as SupportedLanguage, score: germanSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
-    { lang: 'it' as SupportedLanguage, score: italianSignals.reduce((s, w) => s + (normalized.includes(w) ? 1 : 0), 0) },
-  ]
-
-  const best = scores.reduce((max, current) => (current.score > max.score ? current : max), { lang: 'fr' as SupportedLanguage, score: 0 })
-  return best.score === 0 ? null : best.lang
+function normalizeLanguage(language: string | undefined | null): SupportedLanguage | null {
+  if (!language || typeof language !== 'string') return null
+  const value = language.slice(0, 2).toLowerCase()
+  return SUPPORTED_LANGUAGES.includes(value as SupportedLanguage) ? (value as SupportedLanguage) : null
 }
 
 function resolveRequestedLanguage(body: Record<string, unknown>, messages: ChatMessage[]) {
@@ -293,6 +243,26 @@ function resolveRequestedLanguage(body: Record<string, unknown>, messages: ChatM
   const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content
   const detected = lastUserMessage ? detectLanguageFromText(lastUserMessage) : null
   return detected ?? 'fr'
+}
+
+function detectLanguageFromText(text: string): SupportedLanguage | null {
+  const samples: { lang: SupportedLanguage; terms: string[] }[] = [
+    { lang: 'fr', terms: ['bonjour', 'salut'] },
+    { lang: 'en', terms: ['hello', 'hi', 'thanks'] },
+    { lang: 'es', terms: ['hola', 'gracias'] },
+    { lang: 'pt', terms: ['olá', 'obrigado'] },
+    { lang: 'de', terms: ['hallo', 'danke'] },
+    { lang: 'it', terms: ['ciao', 'grazie'] },
+  ]
+
+  const lowered = (text || '').toLowerCase()
+  const scores = samples.map((sample) => ({
+    lang: sample.lang,
+    score: sample.terms.reduce((s, term) => (lowered.includes(term) ? s + 1 : s), 0),
+  }))
+
+  const best = scores.reduce((max, current) => (current.score > max.score ? current : max), { lang: 'fr' as SupportedLanguage, score: 0 })
+  return best.score === 0 ? null : best.lang
 }
 
 async function resolveEffectivePlan(req: NextRequest): Promise<{ plan: PlanKey; userId: string | null }> {
@@ -350,183 +320,31 @@ async function enforceDailyQuota(params: { req: NextRequest; userId: string | nu
   const subjectKey = userId ? `user:${userId}` : getGuestSubjectKey(req)
   const now = new Date()
 
-  const { data: existing, error: selectError } = await admin
-    .from('usage_daily')
-    .select('id, count, window_started_at')
-    .eq('subject_key', subjectKey)
-    .eq('feature', feature)
+  const key = createHash('sha1')
+    .update(`${subjectKey}::${feature}::${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}`)
+    .digest('hex')
+
+  const { data } = await admin
+    .from('daily_usage')
+    .select('*')
+    .eq('usage_key', key)
     .maybeSingle()
 
-  if (selectError) {
-    logger.error('[api/chat] usage select error', { selectError })
-    return {
-      blocked: false as const,
-      used: 0,
-      limit,
-      remaining: limit,
-      resetAt: null,
-      windowStartedAt: null,
-    }
-  }
+  const used = data?.used ?? 0
+  const blocked = used >= limit
 
-  const existingWindowStartedAt =
-    typeof existing?.window_started_at === 'string' && existing.window_started_at
-      ? new Date(existing.window_started_at)
-      : null
-
-  const hasActiveWindow =
-    existingWindowStartedAt !== null &&
-    now.getTime() - existingWindowStartedAt.getTime() < 24 * 60 * 60 * 1000
-
-  if (!existing?.id) {
-    const windowStartedAt = now.toISOString()
-    const { error: insertError } = await admin.from('usage_daily').insert({
-      usage_date: getTodayIsoDate(),
-      subject_key: subjectKey,
-      feature,
-      count: 1,
-      window_started_at: windowStartedAt,
-      updated_at: windowStartedAt,
-    })
-    if (insertError) logger.error('[api/chat] usage insert error', { insertError })
-
-    return {
-      blocked: false as const,
-      used: 1,
-      limit,
-      remaining: Math.max(limit - 1, 0),
-      resetAt: getResetAtIso(windowStartedAt),
-      windowStartedAt,
-    }
-  }
-
-  if (!hasActiveWindow) {
-    const windowStartedAt = now.toISOString()
-    const { error: resetError } = await admin
-      .from('usage_daily')
-      .update({
-        count: 1,
-        usage_date: getTodayIsoDate(),
-        window_started_at: windowStartedAt,
-        updated_at: windowStartedAt,
-      })
-      .eq('id', existing.id)
-
-    if (resetError) logger.error('[api/chat] usage reset error', { resetError })
-
-    return {
-      blocked: false as const,
-      used: 1,
-      limit,
-      remaining: Math.max(limit - 1, 0),
-      resetAt: getResetAtIso(windowStartedAt),
-      windowStartedAt,
-    }
-  }
-
-  const currentCount = existing?.count ?? 0
-  const resetAt = existingWindowStartedAt ? getResetAtIso(existingWindowStartedAt) : null
-
-  if (currentCount >= limit) {
-    return {
-      blocked: true as const,
-      used: currentCount,
-      limit,
-      remaining: 0,
-      resetAt,
-      windowStartedAt: existing?.window_started_at ?? null,
-    }
-  }
-
-  const updatedCount = currentCount + 1
-  const { error: updateError } = await admin
-    .from('usage_daily')
-    .update({
-      count: updatedCount,
-      usage_date: getTodayIsoDate(),
-      updated_at: now.toISOString(),
-    })
-    .eq('id', existing.id)
-
-  if (updateError) logger.error('[api/chat] usage update error', { updateError })
+  const remaining = blocked ? 0 : Math.max(0, limit - used)
+  const resetAt = new Date()
+  resetAt.setUTCDate(resetAt.getUTCDate() + 1)
+  resetAt.setUTCHours(0, 0, 0, 0)
 
   return {
-    blocked: false as const,
-    used: updatedCount,
+    blocked,
+    used,
     limit,
-    remaining: Math.max(limit - updatedCount, 0),
-    resetAt,
-    windowStartedAt: existing?.window_started_at ?? null,
-  }
-}
-
-function shouldApplyPremiumLock(plan: PlanKey) {
-  return plan === 'essential'
-}
-
-function truncateTextForPlan(text: string, plan: PlanKey) {
-  const maxChars = plan === 'free' ? 550 : 1100
-
-  if (!text || text.length <= maxChars) {
-    return { truncated: text, wasTrimmed: false }
-  }
-
-  const sliced = text.slice(0, maxChars)
-  const lastSentence = Math.max(sliced.lastIndexOf('. '), sliced.lastIndexOf('! '), sliced.lastIndexOf('? '))
-
-  const clean = lastSentence > 120 ? sliced.slice(0, lastSentence + 1).trim() : `${sliced.trim()}...`
-
-  return { truncated: clean, wasTrimmed: true }
-}
-
-function buildPremiumLockBlock(plan: PlanKey) {
-  if (plan === 'free') {
-    return {
-      teaser:
-        'AperÃ§u disponible. La suite de lâ€™analyse complÃ¨te, les nuances et les leviers prioritaires sont rÃ©servÃ©s aux plans supÃ©rieurs.',
-      ctaLabel: 'Passer Ã  Essentiel',
-      targetPlan: 'essential',
-    }
-  }
-
-  return {
-    teaser:
-      'La base est visible ici. La lecture complÃ¨te, plus profonde et plus stratÃ©gique, est rÃ©servÃ©e aux plans Premium et Praticien.',
-    ctaLabel: 'Passer Ã  Premium',
-    targetPlan: 'premium',
-  }
-}
-
-function applyPremiumInsightLock(params: { plan: PlanKey; response: any }) {
-  const { plan, response } = params
-
-  if (!shouldApplyPremiumLock(plan)) return response
-
-  const sourceText =
-    typeof response?.reply === 'string'
-      ? response.reply
-      : typeof response?.message === 'string'
-        ? response.message
-        : ''
-
-  if (!sourceText) return response
-
-  const { truncated, wasTrimmed } = truncateTextForPlan(sourceText, plan)
-  if (!wasTrimmed) return response
-
-  const lock = buildPremiumLockBlock(plan)
-  const lockedReply = `${truncated}\n\n${lock.teaser}`
-
-  return {
-    ...response,
-    message: lockedReply,
-    reply: lockedReply,
-    metadata: {
-      ...(response?.metadata ?? {}),
-      premiumPreviewLocked: true,
-      upgradeTargetPlan: lock.targetPlan,
-      upgradeCtaLabel: lock.ctaLabel,
-    },
+    remaining,
+    resetAt: resetAt.toISOString(),
+    windowStartedAt: data?.window_started_at ?? null,
   }
 }
 
@@ -555,7 +373,7 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).requestType as 'micro_profile' | 'micro_year' | 'micro_month')
         : 'chat'
 
-    const sanitizedMessages = sanitizeMessages((body as Record<string, unknown>).messages)
+    const sanitizedMessages = limitHistory(sanitizeMessages((body as Record<string, unknown>).messages))
     const lastUserMessage = [...sanitizedMessages].reverse().find((m) => m.role === 'user')?.content?.trim() ?? ''
     const normalizedLast = normalizeText(lastUserMessage)
 
@@ -575,94 +393,34 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).journeyEnabled as boolean)
         : false
 
-    // 1) Greeting / small talk : OpenAI direct, pas de quota, jamais de flux métier
-    if (isGreetingOrSmallTalk(normalizedLast)) {
+    const intentLocal = detectIntentLocal(lastUserMessage)
+
+    const cacheKey = buildCacheKey(userId, lastUserMessage, normalizeBirthData((body as Record<string, unknown>).birthData))
+    const cached = getCache(cacheKey)
+    if (cached) {
+      log('info', 'cacheHit', { cacheKey })
+      return NextResponse.json(cached, { status: 200 })
+    }
+
+    if (intentLocal === 'greeting') {
       const content = await generateConversation(lastUserMessage || 'Bonjour.')
-      return NextResponse.json(
-        {
-          content,
-          type: 'conversation',
-          plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
-        },
-        { status: 200 }
-      )
+      const resp = {
+        content,
+        type: 'conversation',
+        plan: effectivePlan,
+        mode: effectivePlan,
+        conversationId:
+          typeof (body as Record<string, unknown>).conversationId === 'string'
+            ? ((body as Record<string, unknown>).conversationId as string)
+            : randomUUID(),
+        flowState: { step: 'conversation', completed: true },
+        menu: { visible: false, items: [] },
+      }
+      setCache(cacheKey, resp)
+      return NextResponse.json(resp, { status: 200 })
     }
 
-    // 2) Intention via OpenAI classifier
-    const intent = await classifyIntent(lastUserMessage)
-
-    // 3) Quota pour les flux métier
-    const quota = await enforceDailyQuota({
-      req,
-      userId,
-      plan: effectivePlan,
-      feature: 'chat_api',
-    })
-
-    log('debug', 'quota', quota as any)
-
-    if (quota.blocked && quota.limit !== null) {
-      log('warn', 'quota blocked', { userId, plan: effectivePlan, used: quota.used })
-      return NextResponse.json(
-        buildQuotaErrorResponse({
-          plan: effectivePlan,
-          used: quota.used,
-          limit: quota.limit,
-          resetAt: quota.resetAt,
-        }),
-        { status: 429 }
-      )
-    }
-
-    // Routage lÃ©ger par intention
-    if (intent === 'conversation') {
-      const content = await generateConversation(lastUserMessage || 'Bonjour.')
-      return NextResponse.json(
-        {
-          content,
-          type: 'conversation',
-          plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
-        },
-        { status: 200 }
-      )
-    }
-
-    if (intent === 'conversation') {
-      const content = await generateConversation(lastUserMessage || 'Bonjour.')
-      return NextResponse.json(
-        {
-          content,
-          type: 'conversation',
-          plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
-        },
-        { status: 200 }
-      )
-    }
-
-    const normalizedForMenu = normalizedLast
-    if (intent === 'menu' || /(menu|angle|angles|navigation|explorer les angles|voir les angles)/.test(normalizedForMenu)) {
-      log('info', 'routing to navigation/menu')
+    if (intentLocal === 'menu') {
       const menuResponse = await runHexastraFlow({
         plan: effectivePlan,
         responseDepth,
@@ -686,48 +444,61 @@ export async function POST(req: NextRequest) {
             : null,
         journeyEnabled,
       })
+      setCache(cacheKey, menuResponse)
       return NextResponse.json(menuResponse, { status: 200 })
     }
 
-    if (intent === 'irrelevant') {
-      const polite = "Je prÃ©fÃ¨re rester concentrÃ© sur ce qui peut vraiment tâ€™aider."
+    if (intentLocal === 'birth_update') {
+      const birthResponse = await runHexastraFlow({
+        plan: effectivePlan,
+        responseDepth,
+        language: resolveRequestedLanguage(body as Record<string, unknown>, sanitizedMessages),
+        requestType: 'chat',
+        birthData: normalizeBirthData((body as Record<string, unknown>).birthData),
+        practitionerUsage: normalizePractitionerUsage((body as Record<string, unknown>).practitionerUsage),
+        contextType: 'general',
+        selectedMenuKey: null,
+        selectedSubmenuKey: null,
+        uiAction: 'restart_flow',
+        conversationId:
+          typeof (body as Record<string, unknown>).conversationId === 'string'
+            ? ((body as Record<string, unknown>).conversationId as string)
+            : null,
+        messages: sanitizedMessages,
+        evolutionProfile:
+          (body as Record<string, unknown>).evolutionProfile &&
+          typeof (body as Record<string, unknown>).evolutionProfile === 'object'
+            ? ((body as Record<string, unknown>).evolutionProfile as Record<string, unknown>)
+            : null,
+        journeyEnabled,
+      })
+      setCache(cacheKey, birthResponse)
+      return NextResponse.json(birthResponse, { status: 200 })
+    }
+
+    const quota = await enforceDailyQuota({
+      req,
+      userId,
+      plan: effectivePlan,
+      feature: 'chat_api',
+    })
+
+    log('debug', 'quota', quota as any)
+
+    if (quota.blocked && quota.limit !== null) {
+      log('warn', 'quota blocked', { userId, plan: effectivePlan, used: quota.used })
       return NextResponse.json(
-        {
-          content: polite,
-          type: 'conversation',
+        buildQuotaErrorResponse({
           plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
-        },
-        { status: 200 }
+          used: quota.used,
+          limit: quota.limit,
+          resetAt: quota.resetAt,
+        }),
+        { status: 429 }
       )
     }
 
-    if (intent === 'irrelevant') {
-      const polite = "Je préfère rester concentré sur ce qui peut vraiment t’aider."
-      return NextResponse.json(
-        {
-          content: polite,
-          type: 'conversation',
-          plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
-        },
-        { status: 200 }
-      )
-    }
-
-    log('info', 'calling runHexastraFlow (business)')
+    const intent = await classifyIntent(lastUserMessage)
 
     const response = await runHexastraFlow({
       plan: effectivePlan,
@@ -759,9 +530,6 @@ export async function POST(req: NextRequest) {
       journeyEnabled,
     })
 
-    log('info', 'runHexastraFlow success', { flowState: response?.flowState ?? null })
-
-    // Reformulation Shilo post-analyse (texte uniquement) sauf navigation/menus
     const shouldRephrase =
       response?.flowState?.step !== 'menu' &&
       !(response?.menu?.visible) &&
@@ -775,13 +543,14 @@ export async function POST(req: NextRequest) {
 
     const withSuggestions =
       reformatted && shouldRephrase
-        ? `${reformatted}\n\n---\n${generateSuggestions(response.message).join('\n')}`
+        ? `${reformatted}\n\n${generateSuggestions(response.message).join('\n')}`
         : reformatted
 
-    const finalResponse = applyPremiumInsightLock({
-      plan: effectivePlan,
-      response: withSuggestions ? { ...response, message: withSuggestions, reply: withSuggestions } : response,
-    })
+    const finalResponse = withSuggestions
+      ? { ...response, message: withSuggestions, reply: withSuggestions }
+      : response
+
+    setCache(cacheKey, finalResponse)
 
     const enriched = enrichReadingResponse({
       response: finalResponse,
@@ -816,7 +585,8 @@ export async function POST(req: NextRequest) {
             windowStartedAt: quota.windowStartedAt,
           },
           responseDepth,
-                    journeyEnabled,
+          journeyEnabled,
+          intentDetected: intent,
         },
       },
       { status: 200 }
@@ -827,3 +597,40 @@ export async function POST(req: NextRequest) {
   }
 }
 
+function normalizeContextType(value: unknown): ContextType {
+  return typeof value === 'string' ? (value as ContextType) : 'general'
+}
+
+function normalizeUiAction(value: unknown): UiAction {
+  return typeof value === 'string' ? (value as UiAction) : 'send_message'
+}
+
+function normalizePractitionerUsage(value: unknown): PractitionerUsageHex {
+  if (value === 'self' || value === 'client') return value
+  if (value === 'personal') return 'self'
+  return null
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
+}
+
+function sanitizeMessages(messages: unknown): ChatMessage[] {
+  if (!Array.isArray(messages)) return []
+
+  return messages
+    .filter((m): m is { role?: unknown; content?: unknown } => Boolean(m && typeof m === 'object'))
+    .map(
+      (m): ChatMessage => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: typeof m.content === 'string' ? m.content.trim() : '',
+      })
+    )
+    .filter((m) => m.content.length > 0)
+    .slice(-30)
+}

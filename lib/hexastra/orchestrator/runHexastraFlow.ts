@@ -28,7 +28,6 @@ import type { PlanKey } from '@/lib/plans'
 import type { ChatMessage } from '@/lib/chat/chatPayloadBuilder'
 
 import { classifyQuery } from '@/lib/hexastra/router/classifyQuery'
-import { lightRoute } from '@/lib/hexastra/router/lightRouter'
 import { getModulesForDomain } from '@/lib/hexastra/router/moduleRouter'
 import { buildSignalEnvelope } from '@/lib/hexastra/fusion/signalEnvelope'
 import { fusionEngine } from '@/lib/hexastra/fusion/fusionEngine'
@@ -37,13 +36,12 @@ import { applySentinel } from '@/lib/hexastra/security/sentinel'
 import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
 import { logger } from '@/lib/utils/logger'
+
 import { generateConversation } from '@/lib/hexastra/openai/generateConversation'
 import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
-const API_URL = (
-  process.env.HEXASTRA_API_URL || 'https://hexastra-api-production.up.railway.app'
-).replace(/\/$/, '')
+const API_URL = process.env.HEXASTRA_API_URL!.replace(/\/$/, '')
 const API_KEY = process.env.HEXASTRA_API_KEY || ''
 
 type ResponseDepth = 'short' | 'medium' | 'long' | 'expert'
@@ -72,41 +70,41 @@ function tr(language: string, variants: Partial<Record<string, string>>, fallbac
 function buildMissingBirthMessage(language: string): string {
   return tr(language, {
     en: 'To personalize the reading, I need your first name, birth date, birth time (or unknown), and birth city + country.',
-    fr: 'Pour personnaliser la lecture, jâ€™ai besoin de ton prÃ©nom, de ta date de naissance, de ton heure de naissance (ou inconnue), et de ta ville + pays de naissance.',
-    es: 'Para personalizar la lectura necesito tu nombre, fecha de nacimiento, hora (o desconocida) y ciudad + paÃ­s de nacimiento.',
-    pt: 'Para personalizar a leitura, preciso do teu primeiro nome, data de nascimento, hora (ou desconhecida) e cidade + paÃ­s de nascimento.',
-    de: 'FÃ¼r eine personalisierte Lesung brauche ich deinen Vornamen, dein Geburtsdatum, Geburtszeit (oder unbekannt) sowie Geburtsort und Land.',
-    it: 'Per personalizzare la lettura ho bisogno del tuo nome, data di nascita, ora (o sconosciuta) e cittÃ  + paese di nascita.',
+    fr: 'Pour personnaliser la lecture, j’ai besoin de ton prénom, de ta date de naissance, de ton heure de naissance (ou inconnue), et de ta ville + pays de naissance.',
+    es: 'Para personalizar la lectura necesito tu nombre, fecha de nacimiento, hora (o desconocida) y ciudad + país de nacimiento.',
+    pt: 'Para personalizar a leitura, preciso do teu primeiro nome, data de nascimento, hora (ou desconhecida) e cidade + país de nascimento.',
+    de: 'Für eine personalisierte Lesung brauche ich deinen Vornamen, dein Geburtsdatum, Geburtszeit (oder unbekannt) sowie Geburtsort und Land.',
+    it: 'Per personalizzare la lettura ho bisogno del tuo nome, data di nascita, ora (o sconosciuta) e città + paese di nascita.',
   })
 }
 
 function buildPractitionerUsageMessage(language: string): string {
   return tr(language, {
-    en: 'Is this analysis for 1 â€” yourself or 2 â€” a client?',
-    fr: 'Cette analyse est-elle pour : 1 â€” un usage personnel 2 â€” un(e) client(e) ?',
-    es: 'Â¿Este anÃ¡lisis es para 1 â€” ti mismo o 2 â€” un cliente?',
-    pt: 'Esta anÃ¡lise Ã© para 1 â€” vocÃª mesmo ou 2 â€” um cliente?',
-    de: 'Ist diese Analyse fÃ¼r 1 â€” dich selbst oder 2 â€” einen Klienten?',
-    it: 'Questa analisi Ã¨ per 1 â€” te stesso oppure 2 â€” un cliente?',
+    en: 'Is this analysis for 1 — yourself or 2 — a client?',
+    fr: 'Cette analyse est-elle pour : 1 — un usage personnel 2 — un(e) client(e) ?',
+    es: '¿Este análisis es para 1 — ti mismo o 2 — un cliente?',
+    pt: 'Esta análise é para 1 — você mesmo ou 2 — um cliente?',
+    de: 'Ist diese Analyse für 1 — dich selbst oder 2 — einen Klienten?',
+    it: 'Questa analisi è per 1 — te stesso oppure 2 — un cliente?',
   })
 }
 
 function buildGreetingMessage(mode: ReturnType<typeof getModeForPlan>, language: string): string {
   const intro = tr(language, {
-    en: 'Hello, Iâ€™m HexAstra. I can help you clarify a situation, explore a life theme, or start a personalized reading.',
-    fr: 'Bonjour, je suis HexAstra. Je peux tâ€™aider Ã  clarifier une situation, explorer un thÃ¨me de vie, ou lancer une lecture personnalisÃ©e.',
-    es: 'Hola, soy HexAstra. Puedo ayudarte a clarificar una situaciÃ³n, explorar un tema de vida o iniciar una lectura personalizada.',
-    pt: 'OlÃ¡, sou a HexAstra. Posso ajudar a clarificar uma situaÃ§Ã£o, explorar um tema de vida ou iniciar uma leitura personalizada.',
-    de: 'Hallo, ich bin HexAstra. Ich kann dir helfen, eine Situation zu klÃ¤ren, ein Lebensthema zu erkunden ou eine persÃ¶nliche Lesung zu starten.',
+    en: 'Hello, I’m HexAstra. I can help you clarify a situation, explore a life theme, or start a personalized reading.',
+    fr: 'Bonjour, je suis HexAstra. Je peux t’aider à clarifier une situation, explorer un thème de vie, ou lancer une lecture personnalisée.',
+    es: 'Hola, soy HexAstra. Puedo ayudarte a clarificar una situación, explorar un tema de vida o iniciar una lectura personalizada.',
+    pt: 'Olá, sou a HexAstra. Posso ajudar a clarificar uma situação, explorar um tema de vida ou iniciar uma leitura personalizada.',
+    de: 'Hallo, ich bin HexAstra. Ich kann dir helfen, eine Situation zu klären, ein Lebensthema zu erkunden oder eine persönliche Lesung zu starten.',
     it: 'Ciao, sono HexAstra. Posso aiutarti a chiarire una situazione, esplorare un tema di vita o iniziare una lettura personalizzata.',
   })
 
   const invite = tr(language, {
-    en: 'Iâ€™m here to help. Ask your question or explore an angle below.',
-    fr: 'Je suis lÃ  pour tâ€™accompagner. Pose ta question ou explore un angle ci-dessous.',
-    es: 'Estoy aquÃ­ para acompaÃ±arte. Haz tu pregunta o explora un Ã¡ngulo justo debajo.',
-    pt: 'Estou aqui para acompanhar-te. Faz a tua pergunta ou explora um Ã¢ngulo abaixo.',
-    de: 'Ich begleite dich: Stelle deine Frage oder wÃ¤hle einen Blickwinkel unten.',
+    en: 'I’m here to help. Ask your question or explore an angle below.',
+    fr: 'Je suis là pour t’accompagner. Pose ta question ou explore un angle ci-dessous.',
+    es: 'Estoy aquí para acompañarte. Haz tu pregunta o explora un ángulo justo debajo.',
+    pt: 'Estou aqui para acompanhar-te. Faz a tua pergunta ou explora um ângulo abaixo.',
+    de: 'Ich begleite dich: Stelle deine Frage oder wähle einen Blickwinkel unten.',
     it: 'Sono qui per accompagnarti. Fai la tua domanda o esplora un angolo qui sotto.',
   })
 
@@ -121,23 +119,6 @@ function monthKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
-function shouldGenerateMicroProfile(
-  lastAt?: string | null,
-  birthData?: BirthProfile | null
-): boolean {
-  return Boolean(birthData?.date) && !lastAt
-}
-
-function shouldGenerateYearReading(lastAt?: string | null): boolean {
-  if (!lastAt) return true
-  return !lastAt.startsWith(yearKey())
-}
-
-function shouldGenerateMonthReading(lastAt?: string | null): boolean {
-  if (!lastAt) return true
-  return !lastAt.startsWith(monthKey())
-}
-
 function detectLanguageFromMessages(messages: ChatMessage[], fallback = 'fr'): string {
   const text = messages
     .filter((m) => m.role === 'user')
@@ -150,220 +131,28 @@ function detectLanguageFromMessages(messages: ChatMessage[], fallback = 'fr'): s
   return 'fr'
 }
 
-async function callOpenAI(payload: unknown): Promise<string> {
-  try {
-    const openaiKey = process.env.OPENAI_API_KEY
-    if (!openaiKey) {
-      return "OPENAI_API_KEY manquante. Configure la variable dâ€™environnement pour activer HexAstra."
-    }
-
-    const res = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(30000),
-    })
-
-    const json = await res.json().catch(() => null)
-
-    if (!res.ok || !json) {
-      logger.error('[callOpenAI] OpenAI error', { status: res.status, json })
-      return 'Je nâ€™ai pas pu terminer la lecture pour le moment.'
-    }
-
-    const output = Array.isArray((json as any).output) ? (json as any).output : []
-    const text = output
-      .flatMap((block: any) => (Array.isArray(block?.content) ? block.content : []))
-      .filter((item: any) => item?.type === 'output_text' && typeof item.text === 'string')
-      .map((item: any) => item.text)
-      .join('')
-      .trim()
-
-    return text || 'Je nâ€™ai pas pu finaliser la lecture pour le moment.'
-  } catch (error) {
-    logger.error('[callOpenAI] failed', { error })
-    return 'Le moteur HexAstra est temporairement indisponible.'
-  }
-}
-
-function buildSpecializedContext(result: SpecializedModuleResult | null): string {
-  if (!result) return ''
-
-  return [
-    `[RÃ‰SULTAT MÃ‰TIER PRIORITAIRE â€” Ã€ UTILISER COMME SOURCE DE VÃ‰RITÃ‰]`,
-    `Source: ${result.source}`,
-    `RÃ©sumÃ© public attendu: ${result.publicSummary}`,
-    `DonnÃ©es structurÃ©es: ${JSON.stringify(result.raw ?? {})}`,
-    `RÃ¨gle: reformule ce rÃ©sultat dans le style HexAstra sans dire que tu n'as pas trouvÃ© dans les documents.`,
-  ].join('\n')
-}
-
-function buildKnowledgeQuery({
-  latestUserMessage,
-  selectedMenuLabel,
-  selectedSubmenuLabel,
-  contextType,
-  domainRoute,
-  querySuffix,
-}: {
-  latestUserMessage: string
-  selectedMenuLabel?: string | null
-  selectedSubmenuLabel?: string | null
-  contextType?: ContextType
-  domainRoute?: DomainRoute
-  querySuffix?: string
-}): string {
-  const parts = [latestUserMessage.trim()]
-
-  if (selectedMenuLabel) parts.push(`menu principal: ${selectedMenuLabel}`)
-  if (selectedSubmenuLabel) parts.push(`sous-menu: ${selectedSubmenuLabel}`)
-  if (contextType) parts.push(`contexte: ${contextType}`)
-  if (domainRoute) parts.push(`domaine KS prioritaire: ${domainRoute}`)
-  if (querySuffix) parts.push(querySuffix)
-
-  parts.push(
-    'Appliquer les rÃ¨gles HexAstra, les garde-fous, la mÃ©moire, le timing, le potentiel dominant, et la logique KS.FUSION.V13 si pertinent.'
-  )
-
-  return parts.filter(Boolean).join('\n')
-}
-
-async function buildKnowledgeBlock({
-  latestUserMessage,
-  plan,
-  selectedMenuLabel,
-  selectedSubmenuLabel,
-  contextType,
-  domainRoute,
-  flowStep,
-  specializedSource,
-}: {
-  latestUserMessage: string
-  plan: PlanKey
-  selectedMenuLabel?: string | null
-  selectedSubmenuLabel?: string | null
-  contextType?: ContextType
-  domainRoute?: DomainRoute
-  flowStep: FlowStep
-  specializedSource?: string | null
-}): Promise<{ block: string | null; profile: string }> {
-  const openaiKey = process.env.OPENAI_API_KEY
-
-  if (!VECTOR_STORE_ID || !openaiKey || !latestUserMessage.trim()) {
-    logger.warn('[runHexastraFlow] retrieval disabled', {
-      hasVectorStoreId: Boolean(VECTOR_STORE_ID),
-      hasOpenAIKey: Boolean(openaiKey),
-      hasQuery: Boolean(latestUserMessage.trim()),
-    })
-    return { block: null, profile: 'disabled' }
-  }
-
-  const retrievalPlan = buildRetrievalPlan({
-    plan,
-    flowStep,
-    domainRoute: domainRoute ?? 'general',
-    specializedSource,
-  })
-
-  if (!retrievalPlan.includeKnowledge) {
-    return { block: null, profile: retrievalPlan.profile }
-  }
-
-  const query = buildKnowledgeQuery({
-    latestUserMessage,
-    selectedMenuLabel,
-    selectedSubmenuLabel,
-    contextType,
-    domainRoute,
-    querySuffix: retrievalPlan.querySuffix,
-  })
-
-  const knowledgeResults = await multiLayerRetrieval({
-    query,
-    plan,
-    vectorStoreId: VECTOR_STORE_ID,
-    apiKey: openaiKey,
-    domainRoute,
-  })
-
-  if (!knowledgeResults.length) {
-    logger.info('[runHexastraFlow] retrieval returned 0 docs', {
-      query,
-      plan,
-      domainRoute,
-    })
-    return { block: null, profile: retrievalPlan.profile }
-  }
-
-  const config = getAdaptiveRetrievalConfig({ plan, domainRoute, query })
-
-  const compressed = compressKnowledgeContext(
-    knowledgeResults.slice(0, retrievalPlan.topK),
-    {
-      ...config,
-      maxDocsAfterDedup: Math.min(config.maxDocsAfterDedup, retrievalPlan.topK),
-      maxContextChars:
-        retrievalPlan.profile === 'minimal'
-          ? Math.min(config.maxContextChars, 4500)
-          : retrievalPlan.profile === 'balanced'
-            ? Math.min(config.maxContextChars, 9000)
-            : Math.min(config.maxContextChars, 15000),
-    }
-  )
-
-  if (!compressed.block) {
-    return { block: null, profile: retrievalPlan.profile }
-  }
-
-  return {
-    profile: retrievalPlan.profile,
-    block: [
-      compressed.block,
-      '',
-      `[MÃ‰THODE] Les ressources ci-dessus sont dÃ©jÃ  filtrÃ©es et priorisÃ©es selon le step ${flowStep}. Si un rÃ©sultat mÃ©tier structurÃ© existe, il prime sur ces ressources.`,
-    ].join('\n'),
-  }
-}
-
 async function callRailway(path: string, payload: Record<string, unknown>) {
   const url = `${API_URL}${path}`
 
-  console.log('[HexAstra][Railway] URL =', url)
-  console.log('[HexAstra][Railway] API key present =', Boolean(API_KEY))
-  console.log('[HexAstra][Railway] Payload keys =', Object.keys(payload))
-
-  let res: Response
-
-  try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(20000),
-      cache: 'no-store',
-    })
-  } catch (error) {
-    logger.error('[HexAstra][Railway] network/fetch error', { error })
-    throw new Error(`Railway fetch failed for ${path}`)
-  }
-
-  const text = await res.text().catch(() => '')
-
-  console.log('[HexAstra][Railway] status =', res.status)
-  console.log('[HexAstra][Railway] body =', text)
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${API_KEY}`,
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(9000),
+  })
 
   if (!res.ok) {
-    throw new Error(`Railway ${path} failed: ${res.status} ${text}`)
+    throw new Error(`Railway ${path} failed with status ${res.status}`)
   }
 
+  const text = await res.text()
+  if (!text) return null
+
   try {
-    return text ? JSON.parse(text) : {}
+    return JSON.parse(text)
   } catch (error) {
     logger.error('[HexAstra][Railway] invalid JSON', { error })
     throw new Error(`Railway ${path} returned invalid JSON`)
@@ -405,7 +194,7 @@ async function runSpecializedModule({
           ? kua.publicSummary
           : typeof kua?.summary === 'string'
             ? kua.summary
-            : `Utilise le calcul Kua/GPS fourni pour Ã©clairer l'orientation, l'Ã©quilibre et la direction prioritaire.`
+            : `Utilise le calcul Kua/GPS fourni pour éclairer l'orientation, l’équilibre et la direction prioritaire.`
 
       return {
         source: domainRoute === 'gps_kua' ? 'gps_kua' : 'neurokua',
@@ -443,7 +232,7 @@ async function runSpecializedModule({
           ? fusion.publicSummary
           : typeof fusion?.summary === 'string'
             ? fusion.summary
-            : `Utilise la synthÃ¨se fusionnÃ©e fournie comme signal dominant de la rÃ©ponse finale.`
+            : `Utilise la synthèse fusionnée fournie comme signal dominant de la réponse finale.`
 
       return {
         source: 'fusion',
@@ -481,88 +270,26 @@ function resolveDomainRoute(input: {
     case 'energy':
       return 'neurokua'
     case 'decision':
-      return 'decision'
-    case 'relationship':
-      return 'relationship'
-    case 'career':
-      return 'career'
-    case 'hexastraReading':
+      return 'gps_kua'
+    case 'practitioner':
       return 'fusion'
     default:
-      return 'general'
+      return 'fusion'
   }
 }
 
-function buildFusionInstruction(input: {
-  resolvedDomainRoute: DomainRoute
-  activeModules: string[]
-  fusedSignal: any
-  arbitration: string | null
-}): string {
-  const lines = [
-    `[ORCHESTRATION KS PRIORITAIRE]`,
-    `Domaine rÃ©solu: ${input.resolvedDomainRoute}`,
-    `Modules actifs: ${input.activeModules.join(', ') || 'aucun'}`,
-  ]
+function normalizeBirthData(birth: BirthProfile | null): BirthProfile | null {
+  if (!birth) return null
 
-  if (input.fusedSignal) {
-    lines.push(`Signal dominant: ${input.fusedSignal.dominantSignal ?? 'non dÃ©fini'}`)
-    lines.push(`Phase dominante: ${input.fusedSignal.phase ?? 'non dÃ©finie'}`)
-    lines.push(`Zone dominante: ${input.fusedSignal.zone ?? 'non dÃ©finie'}`)
-  }
-
-  if (input.arbitration) {
-    lines.push(`Arbitrage: ${input.arbitration}`)
-  }
-
-  lines.push(
-    `RÃ¨gle: si un rÃ©sultat mÃ©tier structurÃ© existe, il prime sur le retrieval documentaire.`,
-    `RÃ¨gle: les documents servent Ã  gouverner, enrichir et stabiliser la rÃ©ponse.`,
-    `RÃ¨gle: ne jamais dire "je n'ai pas trouvÃ© dans les documents" si une logique mÃ©tier spÃ©cialisÃ©e est disponible.`
-  )
-
-  return lines.join('\n')
-}
-
-function buildMenuOnlyMessage(
-  mode: ReturnType<typeof getModeForPlan>,
-  language: string
-): string {
-  const items = getMenuForMode(mode)
-  const intro = language.startsWith('en')
-    ? 'Voici les angles qu’on peut explorer ensemble :'
-    : 'Voici les angles qu’on peut explorer ensemble :'
-
-  const lines = items
-    .slice(0, 9)
-    .map((item, index) => `${index + 1} — ${item.label} : ${item.description}`)
-
-  return [intro, '', ...lines].join('\n')
-}
-
-function isReadingRequest(args: {
-  requestType: 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
-  selectedMenuKey?: string | null
-  selectedSubmenuKey?: string | null
-  contextType?: ContextType
-  latestUserMessage: string
-}): boolean {
-  const msg = args.latestUserMessage.toLowerCase()
-
-  if (
-    args.requestType === 'micro_profile' ||
-    args.requestType === 'micro_year' ||
-    args.requestType === 'micro_month'
-  ) {
-    return true
-  }
-
-  if (args.contextType === 'hexastraReading') return true
-  if (args.selectedMenuKey || args.selectedSubmenuKey) return true
-
-  return /lecture|profil|analyse|scan|cycle|annÃ©e|mois|portrait|lecture gÃ©nÃ©rale|lecture complete|lecture complÃ¨te/i.test(
-    msg
-  )
+  const norm = { ...birth }
+  norm.firstName = norm.firstName?.trim()
+  norm.lastName = norm.lastName?.trim()
+  norm.place = norm.place?.trim()
+  norm.country = norm.country?.trim()
+  norm.birthDateISO = norm.birthDateISO?.trim()
+  norm.date = norm.date?.trim()
+  norm.time = norm.time?.trim()
+  return norm
 }
 
 export async function runHexastraFlow(input: {
@@ -600,11 +327,20 @@ export async function runHexastraFlow(input: {
   const journeyToggle = typeof input.journeyEnabled === 'boolean' ? input.journeyEnabled : undefined
 
   if (!VECTOR_STORE_ID) {
-    logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing â€” retrieval disabled')
+    logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing — retrieval disabled')
   }
 
+  // limiter le contexte à 6 messages (3 user + 2 assistant + dernier user)
+  const limitedMessages = (() => {
+    const recent = input.messages.slice(-6)
+    const users = recent.filter((m) => m.role === 'user').slice(-3)
+    const assistants = recent.filter((m) => m.role === 'assistant').slice(-2)
+    const allowed = new Set([...users, ...assistants])
+    return recent.filter((m) => allowed.has(m))
+  })()
+
   const latestUserMessage =
-    input.messages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
+    limitedMessages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
   const isGreeting = /^(bonjour|salut|hello|hey|bonsoir|coucou|yo)\s*$/i.test(
     latestUserMessage.trim()
   )
@@ -649,116 +385,39 @@ export async function runHexastraFlow(input: {
     const journeyEnabled = journeyToggle ?? userContext.journeyEnabled ?? false
     userContext = { ...userContext, journeyEnabled }
 
-    const route = lightRoute(latestUserMessage)
+    const menuItems = getMenuForMode(mode)
 
-    if (route === 'inappropriate') {
-      const message = "Je tiens à ce que nos échanges restent utiles et respectueux. Si tu veux, on reprend sur ce qui compte vraiment pour toi."
-      return {
-        message,
-        reply: message,
-        mode,
-        plan,
-        conversationId,
-        flowState: { step: 'conversation', completed: true },
-        menu: { visible: false, items: [] },
-        suggestions: [],
-        metadata: { contextType: input.contextType ?? 'general', shouldPersistMemory: false, journeyEnabled },
-      }
-    }
+    const flowStep = computeFlowStep({
+      requestType: input.requestType,
+      uiAction: input.uiAction,
+      contextType: input.contextType,
+      birthData: userContext.birthData,
+      selectedMenuKey: input.selectedMenuKey,
+      selectedSubmenuKey: input.selectedSubmenuKey,
+    })
 
-    if (route === 'navigation') {
-      const items = getMenuForMode(mode)
-      const message = buildMenuOnlyMessage(mode, userContext.language ?? fallbackLanguage)
-      return {
-        message,
-        reply: message,
-        mode,
-        plan,
-        conversationId,
-        flowState: { step: 'menu', completed: true },
-        menu: { visible: true, items },
-        suggestions: items.slice(0, 4).map((item) => item.label),
-        metadata: {
-          contextType: input.contextType ?? 'general',
-          practitionerUsage: userContext.practitionerUsage ?? null,
-          shouldPersistMemory: false,
-          selectedMenuKey: null,
-          selectedSubmenuKey: null,
-          sessionStep: 'menu',
-          emotionalState: null,
-          timing: null,
-          journeyEnabled,
-        },
-        updatedEvolutionProfile: input.evolutionProfile ?? null,
-      }
-    }
+    const selectedMenu =
+      input.selectedMenuKey && menuItems
+        ? findMenuItem(menuItems, input.selectedMenuKey)
+        : null
 
-    if ((route === 'greeting' || route === 'small_talk') && !input.selectedMenuKey && !input.selectedSubmenuKey) {
-      const message = await generateConversation(latestUserMessage || buildGreetingMessage(mode, userContext.language ?? fallbackLanguage))
+    const selectedSubmenu =
+      selectedMenu && input.selectedSubmenuKey
+        ? findMenuItem(selectedMenu.submenu ?? [], input.selectedSubmenuKey)
+        : null
 
-      return {
-        message,
-        reply: message,
-        mode,
-        plan,
-        conversationId,
-        flowState: { step: 'conversation', completed: true },
-        menu: { visible: false, items: [] },
-        suggestions: [],
-        metadata: {
-          contextType: input.contextType ?? 'general',
-          practitionerUsage: userContext.practitionerUsage ?? null,
-          shouldPersistMemory: false,
-          selectedMenuKey: null,
-          selectedSubmenuKey: null,
-          sessionStep: 'conversation',
-          emotionalState: null,
-          timing: null,
-          journeyEnabled,
-        },
-        updatedEvolutionProfile: input.evolutionProfile ?? null,
-      }
-    }
+    const latestMenuKey = selectedSubmenu?.key ?? selectedMenu?.key ?? null
+    const latestDomainRoute = selectedSubmenu?.domainRoute ?? selectedMenu?.domainRoute ?? null
 
-    let sessionContext: any = null
-    try {
-      sessionContext = await buildSessionContext({
-        supabase,
-        conversationId,
-        message: latestUserMessage,
-        contextType: input.contextType,
-        selectedMenuKey: input.selectedMenuKey,
-        selectedSubmenuKey: input.selectedSubmenuKey,
-        practitioner: mode === 'praticien',
-      })
-    } catch (sessionError) {
-      logger.error('[runHexastraFlow] buildSessionContext failed', { error: sessionError })
+    const effectiveRequestType =
+      input.uiAction === 'open_menu' || input.uiAction === 'restart_flow'
+        ? 'chat'
+        : input.requestType
 
-      sessionContext = {
-        contextType: input.contextType ?? 'general',
-        domainRoute: null,
-        selectedMenuKey: input.selectedMenuKey ?? null,
-        selectedSubmenuKey: input.selectedSubmenuKey ?? null,
-        emotionalState: null,
-        timing: null,
-        precision: null,
-        readingLevel: null,
-        lifePhase: null,
-        dominantPotential: null,
-        activeModule: null,
-        currentTheme: null,
-        state: null,
-      }
-    }
+    const isBirthNeeded = !isBirthComplete(userContext.birthData)
 
-    const practitionerNeedsUsage =
-      plan === 'practitioner' &&
-      !userContext.practitionerUsage &&
-      input.requestType === 'chat'
-
-    if (practitionerNeedsUsage) {
+    if (plan === 'practitioner' && input.requestType === 'chat' && !input.practitionerUsage) {
       const message = buildPractitionerUsageMessage(userContext.language ?? fallbackLanguage)
-
       return {
         message,
         reply: message,
@@ -766,263 +425,122 @@ export async function runHexastraFlow(input: {
         plan,
         conversationId,
         flowState: { step: 'practitioner_usage', completed: false },
+        menu: { visible: false, items: [] },
         metadata: {
-          practitionerUsage: null,
-          contextType: sessionContext.contextType,
+          contextType: input.contextType ?? 'general',
+          practitionerUsage: userContext.practitionerUsage ?? null,
           shouldPersistMemory: false,
           journeyEnabled,
         },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
     }
 
-    if (!isBirthComplete(userContext.birthData) && input.requestType === 'chat') {
+    if (isBirthNeeded && !isGreeting && input.requestType === 'chat') {
       const message = buildMissingBirthMessage(userContext.language ?? fallbackLanguage)
-
       return {
         message,
         reply: message,
         mode,
         plan,
         conversationId,
-        flowState: { step: 'birthdata', completed: false },
+        flowState: { step: 'birthdata_missing', completed: false },
+        menu: { visible: false, items: [] },
         metadata: {
-          practitionerUsage: userContext.practitionerUsage,
-          contextType: sessionContext.contextType,
-          shouldPersistMemory: false,
-          journeyEnabled,
-        },
-      }
-    }
-
-    const userMemory = userContext.memory
-    const profileDue = shouldGenerateMicroProfile(
-      userMemory?.last_profile_reading_at,
-      userContext.birthData
-    )
-    const yearDue = shouldGenerateYearReading(userMemory?.last_year_reading_at)
-    const monthDue = shouldGenerateMonthReading(userMemory?.last_month_reading_at)
-
-    let effectiveRequestType = input.requestType
-
-    if (input.requestType === 'chat') {
-      if (profileDue) effectiveRequestType = 'micro_profile'
-      else if (yearDue) effectiveRequestType = 'micro_year'
-      else if (monthDue) effectiveRequestType = 'micro_month'
-    }
-
-    const selectedMenu = findMenuItem(
-      mode,
-      input.selectedSubmenuKey ?? input.selectedMenuKey ?? null
-    )
-
-    const initialResolvedDomainRoute = resolveDomainRoute({
-      latestUserMessage,
-      selectedMenuDomainRoute: selectedMenu?.domainRoute ?? null,
-      sessionDomainRoute: sessionContext.domainRoute,
-      contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-    })
-
-    const readingRequest = isReadingRequest({
-      requestType: effectiveRequestType,
-      selectedMenuKey: input.selectedMenuKey,
-      selectedSubmenuKey: input.selectedSubmenuKey,
-      contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-      latestUserMessage,
-    })
-
-    const isPractitionerMode = mode === 'praticien'
-
-    const resolvedDomainRoute: DomainRoute = readingRequest
-      ? (isPractitionerMode ? initialResolvedDomainRoute : 'fusion')
-      : initialResolvedDomainRoute
-
-    const activeModules = getModulesForDomain(resolvedDomainRoute)
-    const hasBirthData = isBirthComplete(userContext.birthData)
-    const hasShownMicroReadings = Boolean(sessionContext.state?.has_shown_micro_readings)
-
-    const flowStep = computeFlowStep({
-      requestType: effectiveRequestType,
-      uiAction: input.uiAction,
-      latestUserMessage,
-      hasBirthData,
-      hasShownMicroReadings,
-      practitionerNeedsUsage,
-      selectedMenuKey: input.selectedMenuKey ?? sessionContext.selectedMenuKey,
-      selectedSubmenuKey: input.selectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
-      emotionalState: sessionContext.emotionalState,
-      timing: sessionContext.timing,
-      precision: sessionContext.precision,
-    })
-
-    if (
-      (flowStep === 'menu' &&
-        !latestUserMessage.trim() &&
-        !input.selectedMenuKey &&
-        !input.selectedSubmenuKey)
-    ) {
-      const message = buildMenuOnlyMessage(mode, userContext.language ?? fallbackLanguage)
-
-      return {
-        message,
-        reply: message,
-        mode,
-        plan,
-        conversationId,
-        flowState: { step: 'menu', completed: true },
-        menu: { visible: true, items: getMenuForMode(mode) },
-        suggestions: getMenuForMode(mode)
-          .slice(0, 4)
-          .map((item) => item.label),
-        metadata: {
-          contextType: sessionContext.contextType,
-          practitionerUsage: userContext.practitionerUsage,
+          contextType: input.contextType ?? 'general',
+          practitionerUsage: userContext.practitionerUsage ?? null,
           shouldPersistMemory: false,
           selectedMenuKey: null,
           selectedSubmenuKey: null,
-          sessionStep: 'menu',
-          emotionalState: sessionContext.emotionalState,
-          timing: sessionContext.timing,
+          sessionStep: 'birthdata_missing',
+          emotionalState: null,
+          timing: null,
           journeyEnabled,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
     }
 
-    const shouldRunSpecialized =
-      readingRequest && Boolean(userContext.birthData?.date && userContext.birthData?.place)
-
-    const specializedResult = shouldRunSpecialized
-      ? await runSpecializedModule({
-          domainRoute: resolvedDomainRoute,
-          birthData: userContext.birthData,
-          practitionerUsage: userContext.practitionerUsage,
-          messages: input.messages,
-        })
-      : null
-
-    if (readingRequest && !specializedResult) {
-      const message = userContext.language?.startsWith('en')
-        ? 'The HexAstra calculation service is temporarily unavailable. Please try again in a few moments.'
-        : 'Le service de calcul HexAstra est temporairement indisponible. RÃ©essaie dans quelques instants.'
-
-      return {
-        message,
-        reply: message,
-        mode,
-        plan,
-        conversationId,
-        flowState: { step: flowStep, completed: false },
-        metadata: {
-          contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-          practitionerUsage: userContext.practitionerUsage,
-          shouldPersistMemory: false,
-          selectedMenuKey: input.selectedMenuKey ?? sessionContext.selectedMenuKey,
-          selectedSubmenuKey: input.selectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
-          sessionStep: flowStep,
-          emotionalState: sessionContext.emotionalState,
-          timing: sessionContext.timing,
-          journeyEnabled,
-        },
-        updatedEvolutionProfile: input.evolutionProfile ?? null,
-      }
-    }
-
-    const selectedMenuLabel = input.selectedMenuKey
-      ? findMenuItem(mode, input.selectedMenuKey)?.label ?? null
-      : null
-
-    const selectedSubmenuLabel = input.selectedSubmenuKey
-      ? findMenuItem(mode, input.selectedSubmenuKey)?.label ?? null
-      : null
-
-    const knowledgePayload =
-      effectiveRequestType === 'chat'
-        ? await buildKnowledgeBlock({
-            latestUserMessage,
-            plan,
-            selectedMenuLabel,
-            selectedSubmenuLabel,
-            contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-            domainRoute: resolvedDomainRoute,
-            flowStep,
-            specializedSource: specializedResult?.source ?? null,
-          })
-        : { block: null, profile: 'minimal' }
-
-    const systemPrompt = buildSystemPrompt({
-      plan,
-      mode,
-      language: userContext.language ?? fallbackLanguage,
-      firstName: userContext.firstName ?? null,
-      contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-      practitionerUsage: userContext.practitionerUsage,
-      selectedMenuLabel,
-      selectedSubmenuLabel,
-      requestType: effectiveRequestType,
-      domainRoute: resolvedDomainRoute,
-      specializedSource: specializedResult?.source ?? null,
-      flowStep,
-      emotionalState: sessionContext.emotionalState,
-      precision: sessionContext.precision,
-      retrievalProfile: knowledgePayload.profile,
-      responseDepth: input.responseDepth,
-    } as any)
-
-    const signalInputs = []
-
-    if (specializedResult) {
-      signalInputs.push(
-        buildSignalEnvelope({
-          module: specializedResult.source,
-          result: specializedResult.raw,
-          domainRoute: resolvedDomainRoute,
-        })
-      )
-    }
-
-    signalInputs.push(
-      buildSignalEnvelope({
-        module: 'context_engine',
-        result: {
-          readingLevel: sessionContext.readingLevel,
-          lifePhase: sessionContext.lifePhase,
-          dominantPotential: sessionContext.dominantPotential,
-          contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-          emotionalState: sessionContext.emotionalState,
-          precision: sessionContext.precision,
-          timing: sessionContext.timing,
-          flowStep,
-        },
-        domainRoute: resolvedDomainRoute,
-      })
-    )
-
-    const fusedSignal = signalInputs.length ? fusionEngine(signalInputs) : null
-    const arbitration = fusedSignal ? arbiter(fusedSignal) : null
-
-    const menuInstruction =
-      input.uiAction === 'select_menu_item' || input.uiAction === 'select_submenu_item'
-        ? `${selectedMenu ? `Lâ€™utilisateur a choisi : ${selectedMenu.label}. ${selectedMenu.description}` : ''} ${selectedMenu?.promptHint ?? ''}`.trim()
-        : ''
-
-    const specializedInstruction = buildSpecializedContext(specializedResult)
-    const fusionInstruction = buildFusionInstruction({
-      resolvedDomainRoute,
-      activeModules,
-      fusedSignal,
-      arbitration,
+    const domainRoute = resolveDomainRoute({
+      latestUserMessage,
+      selectedMenuDomainRoute: latestDomainRoute,
+      sessionDomainRoute: userContext.session?.domainRoute ?? null,
+      contextType: input.contextType,
     })
 
-    const messages = [
-      ...input.messages,
-      ...(menuInstruction ? [{ role: 'user' as const, content: menuInstruction }] : []),
-      ...(specializedInstruction
-        ? [{ role: 'assistant' as const, content: specializedInstruction }]
-        : []),
-      ...(fusionInstruction
-        ? [{ role: 'assistant' as const, content: fusionInstruction }]
-        : []),
-    ]
+    const retrievalPlan = await buildRetrievalPlan({
+      messages: limitedMessages,
+      userContext,
+      sessionContext: null,
+      mode,
+      domainRoute,
+      vectorStoreId: VECTOR_STORE_ID,
+      adaptiveConfig: getAdaptiveRetrievalConfig(plan),
+    })
+
+    const knowledgePayload =
+      retrievalPlan && retrievalPlan.documents.length > 0
+        ? await compressKnowledgeContext(retrievalPlan.documents, retrievalPlan.slots)
+        : { block: null }
+
+    const selectedMenuKey =
+      latestMenuKey ??
+      userContext.session?.selectedMenuKey ??
+      retrievalPlan?.menu?.selectedMenuKey ??
+      null
+    const selectedSubmenuKey =
+      selectedSubmenu?.key ??
+      userContext.session?.selectedSubmenuKey ??
+      retrievalPlan?.menu?.selectedSubmenuKey ??
+      null
+
+    const sessionContext = await buildSessionContext({
+      supabase,
+      conversationId,
+      message: latestUserMessage,
+      contextType: input.contextType,
+      selectedMenuKey,
+      selectedSubmenuKey,
+      mode,
+      domainRoute,
+    })
+
+    const menuInstruction = retrievalPlan?.menu?.instruction ?? null
+    const specializedResult = await runSpecializedModule({
+      domainRoute,
+      birthData: normalizeBirthData(userContext.birthData),
+      practitionerUsage: input.practitionerUsage,
+      messages: limitedMessages,
+    })
+
+    const activeModules = getModulesForDomain(domainRoute, mode)
+
+    const knowledgeBlock = knowledgePayload.block
+    const fusedSignal = await fusionEngine({
+      domainRoute,
+      knowledgeBlock,
+      userContext,
+      sessionContext,
+      menuInstruction,
+      specialized: specializedResult,
+    })
+
+    const arbitration = await arbiter({ domainRoute, fusedSignal, userContext, sessionContext })
+
+    const systemPrompt = buildSystemPrompt({
+      mode,
+      language: userContext.language ?? fallbackLanguage,
+      contextType: input.contextType ?? 'general',
+      menuInstruction,
+      journeyEnabled,
+    })
+
+    const messages = buildSignalEnvelope({
+      fusedSignal,
+      arbitration,
+      menuInstruction,
+      specialized: specializedResult,
+    })
 
     const payload = buildChatPayload({
       systemPrompt,
@@ -1042,7 +560,12 @@ export async function runHexastraFlow(input: {
       input.uiAction === 'restart_flow' ||
       flowStep === 'menu'
 
-    const menuItems = getMenuForMode(mode)
+    const menuItemsReturned = menuItems
+
+    if (menuVisible && (!message || !message.trim())) {
+      message =
+        "Tes données sont bien enregistrées. Je peux maintenant ouvrir ton profil ou explorer une question."
+    }
 
     try {
       await persistConversationMessage(
@@ -1056,7 +579,7 @@ export async function runHexastraFlow(input: {
         flowStep,
         mode,
         contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-        domainRoute: resolvedDomainRoute,
+        domainRoute: domainRoute,
         activeModule:
           specializedResult?.source ?? activeModules[0] ?? sessionContext.activeModule,
         emotionalState: sessionContext.emotionalState,
@@ -1072,7 +595,7 @@ export async function runHexastraFlow(input: {
         last_selected_submenu_key:
           input.selectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
         active_flow: flowStep,
-        current_domain_route: resolvedDomainRoute,
+        current_domain_route: domainRoute,
         active_module: specializedResult?.source ?? activeModules[0] ?? null,
         has_shown_micro_readings:
           effectiveRequestType === 'micro_month'
@@ -1115,75 +638,45 @@ export async function runHexastraFlow(input: {
       }
     }
 
-    // Reformulation Shilo post-analyse si on n'est pas en navigation
-    const shouldRephrase =
-      input.requestType === 'chat' &&
-      !menuVisible &&
-      !isGreeting &&
-      route !== 'navigation'
+    const menuVisibleReturn =
+      effectiveRequestType === 'micro_month' ||
+      input.uiAction === 'open_menu' ||
+      input.uiAction === 'restart_flow' ||
+      flowStep === 'menu'
 
-    if (shouldRephrase) {
-      const rephrased = await formatAnalysis(message)
-      if (rephrased) {
-        message = rephrased
-      }
-    }
+    const finalMessage = menuVisibleReturn
+      ? message
+      : message
 
     return {
-      message,
-      reply: message,
+      message: finalMessage,
+      reply: finalMessage,
       mode,
       plan,
       conversationId,
-      flowState: { step: menuVisible ? 'menu' : flowStep, completed: true },
-      menu: { visible: menuVisible, items: menuItems },
-      suggestions: menuVisible
-        ? menuItems.slice(0, 4).map((item) => item.label)
-        : undefined,
+      flowState: { step: menuVisibleReturn ? 'menu' : flowStep, completed: true },
+      menu: { visible: menuVisibleReturn, items: menuItemsReturned },
+      suggestions: menuVisibleReturn
+        ? []
+        : [],
       metadata: {
         contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-        practitionerUsage: userContext.practitionerUsage,
-        shouldPersistMemory: true,
-        selectedMenuKey: input.selectedMenuKey ?? sessionContext.selectedMenuKey,
-        selectedSubmenuKey: input.selectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
-        sessionStep: flowStep,
+        practitionerUsage: userContext.practitionerUsage ?? null,
+        shouldPersistMemory: !menuVisibleReturn,
+        selectedMenuKey,
+        selectedSubmenuKey,
+        sessionStep: menuVisibleReturn ? 'menu' : flowStep,
         emotionalState: sessionContext.emotionalState,
         timing: sessionContext.timing,
         journeyEnabled,
       },
       updatedEvolutionProfile: input.evolutionProfile ?? null,
-    }
+    } as HexastraApiResponse
   } catch (error) {
     logger.error('[runHexastraFlow] fatal error', { error })
-
-    const mode = getModeForPlan(fallbackPlan)
-
-    if (isGreeting) {
-      const message = buildGreetingMessage(mode, fallbackLanguage)
-
-      return {
-        message,
-        reply: message,
-        mode,
-        plan: fallbackPlan,
-        conversationId,
-        flowState: { step: 'menu', completed: true },
-        menu: { visible: true, items: getMenuForMode(mode) },
-        suggestions: getMenuForMode(mode)
-          .slice(0, 4)
-          .map((item) => item.label),
-      metadata: {
-        shouldPersistMemory: false,
-        contextType: input.contextType ?? 'general',
-        journeyEnabled,
-      },
-      updatedEvolutionProfile: input.evolutionProfile ?? null,
-    } as HexastraApiResponse
-    }
-
     return {
-      message: 'Je nâ€™ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.',
-      reply: 'Je nâ€™ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.',
+      message: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
+      reply: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
       mode: 'free',
       plan: 'free' as PlanKey,
       conversationId,
@@ -1198,5 +691,3 @@ export async function runHexastraFlow(input: {
     clearTimeout(globalTimeout)
   }
 }
-
-
