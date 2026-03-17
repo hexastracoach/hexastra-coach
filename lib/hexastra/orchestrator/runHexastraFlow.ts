@@ -21,6 +21,7 @@ import type {
   DomainRoute,
   FlowStep,
   HexastraApiResponse,
+  HexastraMenuItem,
   PractitionerUsageHex,
   UiAction,
 } from '@/lib/hexastra/types'
@@ -50,6 +51,21 @@ type SpecializedModuleResult = {
   source: 'gps_kua' | 'neurokua' | 'fusion'
   publicSummary: string
   raw: Record<string, unknown> | null
+}
+
+const safeString = (value: unknown): string => (typeof value === 'string' ? value : '')
+const safeArray = <T>(value: unknown): T[] => (Array.isArray(value) ? value.filter(Boolean) as T[] : [])
+
+function normalizeMenuItem(item: Partial<HexastraMenuItem>): HexastraMenuItem {
+  return {
+    key: safeString(item.key) || 'unknown',
+    label: safeString(item.label),
+    description: safeString(item.description) || undefined,
+    contextType: (item.contextType as ContextType) ?? 'general',
+    domainRoute: (item.domainRoute as DomainRoute) ?? 'fusion',
+    promptHint: safeString(item.promptHint) || undefined,
+    submenu: safeArray<HexastraMenuItem>(item.submenu).map((sub) => normalizeMenuItem(sub)),
+  }
 }
 
 function normalizePlan(plan: unknown): PlanKey {
@@ -311,6 +327,16 @@ export async function runHexastraFlow(input: {
   const controller = new AbortController()
   const globalTimeout = setTimeout(() => controller.abort(), 18000) // 18s fail-fast for Vercel
 
+  // Central input normalization to keep the flow crash-proof
+  const normalizedMessages = safeArray<ChatMessage>(input.messages)
+  const normalizedContextType: ContextType = input.contextType ?? 'general'
+  const normalizedBirthData = normalizeBirthData(input.birthData)
+  const normalizedPractitionerUsage = input.practitionerUsage ?? null
+  const normalizedSelectedMenuKey = input.selectedMenuKey ?? null
+  const normalizedSelectedSubmenuKey = input.selectedSubmenuKey ?? null
+  const normalizedUiAction = input.uiAction ?? 'send_message'
+  const normalizedJourneyToggle = Boolean(input?.journeyEnabled)
+
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     logger.error('[runHexastraFlow] Supabase public env missing')
     throw new Error('Supabase env missing')
@@ -322,10 +348,21 @@ export async function runHexastraFlow(input: {
   }
 
   const conversationId = input.conversationId ?? randomUUID()
-  const fallbackLanguage = input.language ?? detectLanguageFromMessages(input.messages, 'fr')
+  const fallbackLanguage = input.language ?? detectLanguageFromMessages(normalizedMessages, 'fr')
   const fallbackPlan = normalizePlan(input.plan)
-  const journeyToggle = typeof input.journeyEnabled === 'boolean' ? input.journeyEnabled : undefined
-  let journeyEnabled = false
+  let journeyEnabled = normalizedJourneyToggle
+
+  logger.debug('[runHexastraFlow] normalized input', {
+    plan: input.plan,
+    normalizedPlan: fallbackPlan,
+    language: fallbackLanguage,
+    contextType: normalizedContextType,
+    uiAction: normalizedUiAction,
+    messagesCount: normalizedMessages.length,
+    selectedMenuKey: normalizedSelectedMenuKey,
+    selectedSubmenuKey: normalizedSelectedSubmenuKey,
+    journeyEnabled: normalizedJourneyToggle,
+  })
 
   if (!VECTOR_STORE_ID) {
     logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing — retrieval disabled')
@@ -333,7 +370,7 @@ export async function runHexastraFlow(input: {
 
   // limiter le contexte à 6 messages (3 user + 2 assistant + dernier user)
   const limitedMessages = (() => {
-    const recent = input.messages.slice(-6)
+    const recent = normalizedMessages.slice(-6)
     const users = recent.filter((m) => m.role === 'user').slice(-3)
     const assistants = recent.filter((m) => m.role === 'assistant').slice(-2)
     const allowed = new Set([...users, ...assistants])
@@ -365,8 +402,8 @@ export async function runHexastraFlow(input: {
         user,
         fallbackPlan,
         fallbackLanguage,
-        birthData: input.birthData,
-        practitionerUsage: input.practitionerUsage,
+        birthData: normalizedBirthData,
+        practitionerUsage: normalizedPractitionerUsage,
       })
     } catch (userContextError) {
       logger.error('[runHexastraFlow] buildUserContext failed', { error: userContextError })
@@ -374,50 +411,50 @@ export async function runHexastraFlow(input: {
       userContext = {
         plan: fallbackPlan,
         language: fallbackLanguage,
-        birthData: input.birthData,
-        practitionerUsage: input.practitionerUsage,
+        birthData: normalizedBirthData,
+        practitionerUsage: normalizedPractitionerUsage,
         memory: null,
-        journeyEnabled: journeyToggle ?? false,
+        journeyEnabled: normalizedJourneyToggle,
       }
     }
 
     const plan = normalizePlan(userContext.plan)
     const mode = getModeForPlan(plan)
-    journeyEnabled = journeyToggle ?? userContext.journeyEnabled ?? false
+    journeyEnabled = normalizedJourneyToggle ?? userContext.journeyEnabled ?? false
     userContext = { ...userContext, journeyEnabled }
 
-    const menuItems = getMenuForMode(mode)
+    const menuItems = safeArray(getMenuForMode(mode)).map((item) => normalizeMenuItem(item))
 
     const flowStep = computeFlowStep({
       requestType: input.requestType,
-      uiAction: input.uiAction,
-      contextType: input.contextType,
+      uiAction: normalizedUiAction,
+      contextType: normalizedContextType,
       birthData: userContext.birthData,
-      selectedMenuKey: input.selectedMenuKey,
-      selectedSubmenuKey: input.selectedSubmenuKey,
+      selectedMenuKey: normalizedSelectedMenuKey,
+      selectedSubmenuKey: normalizedSelectedSubmenuKey,
     })
 
     const selectedMenu =
-      input.selectedMenuKey && menuItems
-        ? findMenuItem(menuItems, input.selectedMenuKey)
+      normalizedSelectedMenuKey && menuItems
+        ? findMenuItem(menuItems, normalizedSelectedMenuKey)
         : null
 
     const selectedSubmenu =
-      selectedMenu && input.selectedSubmenuKey
-        ? findMenuItem(selectedMenu.submenu ?? [], input.selectedSubmenuKey)
+      selectedMenu && normalizedSelectedSubmenuKey
+        ? findMenuItem(selectedMenu.submenu ?? [], normalizedSelectedSubmenuKey)
         : null
 
     const latestMenuKey = selectedSubmenu?.key ?? selectedMenu?.key ?? null
     const latestDomainRoute = selectedSubmenu?.domainRoute ?? selectedMenu?.domainRoute ?? null
 
     const effectiveRequestType =
-      input.uiAction === 'open_menu' || input.uiAction === 'restart_flow'
+      normalizedUiAction === 'open_menu' || normalizedUiAction === 'restart_flow'
         ? 'chat'
         : input.requestType
 
     const isBirthNeeded = !isBirthComplete(userContext.birthData)
 
-    if (plan === 'practitioner' && input.requestType === 'chat' && !input.practitionerUsage) {
+    if (plan === 'practitioner' && input.requestType === 'chat' && !normalizedPractitionerUsage) {
       const message = buildPractitionerUsageMessage(userContext.language ?? fallbackLanguage)
       return {
         message,
@@ -428,7 +465,7 @@ export async function runHexastraFlow(input: {
         flowState: { step: 'practitioner_usage', completed: false },
         menu: { visible: false, items: [] },
         metadata: {
-          contextType: input.contextType ?? 'general',
+          contextType: normalizedContextType,
           practitionerUsage: userContext.practitionerUsage ?? null,
           shouldPersistMemory: false,
           journeyEnabled,
@@ -448,7 +485,7 @@ export async function runHexastraFlow(input: {
         flowState: { step: 'birthdata_missing', completed: false },
         menu: { visible: false, items: [] },
         metadata: {
-          contextType: input.contextType ?? 'general',
+          contextType: normalizedContextType,
           practitionerUsage: userContext.practitionerUsage ?? null,
           shouldPersistMemory: false,
           selectedMenuKey: null,
@@ -466,7 +503,7 @@ export async function runHexastraFlow(input: {
       latestUserMessage,
       selectedMenuDomainRoute: latestDomainRoute,
       sessionDomainRoute: userContext.session?.domainRoute ?? null,
-      contextType: input.contextType,
+      contextType: normalizedContextType,
     })
 
     const retrievalPlan = await buildRetrievalPlan({
@@ -481,7 +518,7 @@ export async function runHexastraFlow(input: {
 
     const knowledgePayload =
       retrievalPlan?.documents?.length
-        ? await compressKnowledgeContext(retrievalPlan.documents, retrievalPlan.slots)
+        ? await compressKnowledgeContext(retrievalPlan.documents, retrievalPlan.slots ?? [])
         : { block: null }
 
     const selectedMenuKey =
@@ -499,7 +536,7 @@ export async function runHexastraFlow(input: {
       supabase,
       conversationId,
       message: latestUserMessage,
-      contextType: input.contextType,
+      contextType: normalizedContextType,
       selectedMenuKey,
       selectedSubmenuKey,
       mode,
@@ -510,7 +547,7 @@ export async function runHexastraFlow(input: {
     const specializedResult = await runSpecializedModule({
       domainRoute,
       birthData: normalizeBirthData(userContext.birthData),
-      practitionerUsage: input.practitionerUsage,
+      practitionerUsage: normalizedPractitionerUsage,
       messages: limitedMessages,
     })
 
@@ -531,7 +568,7 @@ export async function runHexastraFlow(input: {
     const systemPrompt = buildSystemPrompt({
       mode,
       language: userContext.language ?? fallbackLanguage,
-      contextType: input.contextType ?? 'general',
+      contextType: normalizedContextType,
       menuInstruction,
       journeyEnabled,
     })
@@ -557,8 +594,8 @@ export async function runHexastraFlow(input: {
 
     const menuVisible =
       effectiveRequestType === 'micro_month' ||
-      input.uiAction === 'open_menu' ||
-      input.uiAction === 'restart_flow' ||
+      normalizedUiAction === 'open_menu' ||
+      normalizedUiAction === 'restart_flow' ||
       flowStep === 'menu'
 
     const menuItemsReturned = menuItems
@@ -591,10 +628,10 @@ export async function runHexastraFlow(input: {
       await writeSessionState(supabase, conversationId, {
         current_theme: selectedMenu?.label ?? sessionContext.currentTheme ?? null,
         current_context_type: selectedMenu?.contextType ?? sessionContext.contextType,
-        menu_level: input.selectedSubmenuKey ? 'submenu' : 'main',
-        last_selected_menu_key: input.selectedMenuKey ?? sessionContext.selectedMenuKey,
+        menu_level: normalizedSelectedSubmenuKey ? 'submenu' : 'main',
+        last_selected_menu_key: normalizedSelectedMenuKey ?? sessionContext.selectedMenuKey,
         last_selected_submenu_key:
-          input.selectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
+          normalizedSelectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
         active_flow: flowStep,
         current_domain_route: domainRoute,
         active_module: specializedResult?.source ?? activeModules[0] ?? null,
@@ -641,8 +678,8 @@ export async function runHexastraFlow(input: {
 
     const menuVisibleReturn =
       effectiveRequestType === 'micro_month' ||
-      input.uiAction === 'open_menu' ||
-      input.uiAction === 'restart_flow' ||
+      normalizedUiAction === 'open_menu' ||
+      normalizedUiAction === 'restart_flow' ||
       flowStep === 'menu'
 
     const finalMessage = menuVisibleReturn

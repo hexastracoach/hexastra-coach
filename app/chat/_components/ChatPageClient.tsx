@@ -1548,7 +1548,7 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
                     setSelectedSubmenuKey(parent ? item.key : null)
 
                     void sendStructuredAction({
-                      message: parent ? `${parent.label} â†’ ${item.label}` : item.label,
+                      message: parent ? `${parent.label} -> ${item.label}` : item.label,
                       contextType: context,
                       menuKey: parent?.key ?? item.key,
                       submenuKey: parent ? item.key : null,

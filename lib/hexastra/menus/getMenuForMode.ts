@@ -3,8 +3,8 @@ import type { HexastraMenuItem, HexastraMode } from '@/lib/hexastra/types'
 const libreMenu: HexastraMenuItem[] = [
   {
     key: 'neurokua',
-    label: 'NeuroKua™',
-    description: 'Régule ton état intérieur et ton énergie du moment.',
+    label: 'NeuroKua\u2122',
+    description: 'Règle ton état intérieur et ton énergie du moment.',
     contextType: 'energy',
     domainRoute: 'neurokua',
     promptHint: 'Active le module NeuroKua et la logique GPS/Kua si utile.',
@@ -117,18 +117,24 @@ const libreMenu: HexastraMenuItem[] = [
 
 const practitionerMenu: HexastraMenuItem[] = [
   {
-    key: 'pract_neurokua', label: 'NeuroKua™', description: 'Diagnostic de l’état interne et réglages d’équilibre.', contextType: 'energy', domainRoute: 'neurokua', submenu: [
+    key: 'pract_neurokua',
+    label: 'NeuroKua\u2122',
+    description: 'Diagnostic de l’état interne et réglages d’équilibre.',
+    contextType: 'energy',
+    domainRoute: 'neurokua',
+    submenu: [
       { key: 'balance', label: 'Équilibre global', description: 'Mesure de cohérence et stabilité interne.', contextType: 'energy', domainRoute: 'neurokua' },
       { key: 'dominant_imbalance', label: 'Déséquilibre dominant', description: 'Identifier l’axe principal de correction.', contextType: 'energy', domainRoute: 'neurokua' },
       { key: 'recovery', label: 'Surcharge / récupération', description: 'Évaluer le risque d’épuisement.', contextType: 'wellbeing', domainRoute: 'neurokua' },
       { key: 'prioritized_adjustments', label: 'Ajustements prioritaires', description: 'Actions à fort effet immédiat.', contextType: 'decision', domainRoute: 'neurokua' },
       { key: 'protocol', label: 'Protocole court', description: 'Routine simple de stabilisation.', contextType: 'energy', domainRoute: 'neurokua' },
-    ] },
-  { key: 'pract_relation', label: 'Relationnel™', description: 'Lecture des dynamiques, tensions et leviers relationnels.', contextType: 'relationship', domainRoute: 'relationship' },
-  { key: 'pract_professional', label: 'Professionnel™', description: 'Analyse de positionnement, risques et stratégie d’évolution.', contextType: 'career', domainRoute: 'career' },
-  { key: 'pract_cycle', label: 'Cycle à venir™', description: 'Projection de phase et timing d’action à moyen terme.', contextType: 'timing', domainRoute: 'timing' },
-  { key: 'pract_decision', label: 'Décision précise™', description: 'Comparatif structuré A/B avec risques et plan.', contextType: 'decision', domainRoute: 'decision' },
-  { key: 'pract_general', label: 'Lecture générale actuelle™', description: 'Synthèse multidimensionnelle exploitable.', contextType: 'hexastraReading', domainRoute: 'fusion' },
+    ],
+  },
+  { key: 'pract_relation', label: 'Relationnel\u2122', description: 'Lecture des dynamiques, tensions et leviers relationnels.', contextType: 'relationship', domainRoute: 'relationship' },
+  { key: 'pract_professional', label: 'Professionnel\u2122', description: 'Analyse de positionnement, risques et stratégie d’évolution.', contextType: 'career', domainRoute: 'career' },
+  { key: 'pract_cycle', label: 'Cycle à venir\u2122', description: 'Projection de phase et timing d’action à moyen terme.', contextType: 'timing', domainRoute: 'timing' },
+  { key: 'pract_decision', label: 'Décision précise\u2122', description: 'Comparatif structuré A/B avec risques et plan.', contextType: 'decision', domainRoute: 'decision' },
+  { key: 'pract_general', label: 'Lecture générale actuelle\u2122', description: 'Synthèse multidimensionnelle exploitable.', contextType: 'hexastraReading', domainRoute: 'fusion' },
   { key: 'science', label: 'Analyses par science', description: 'Choisis une science pour éclairer la situation.', contextType: 'science', domainRoute: 'science' },
 ]
 
@@ -136,10 +142,9 @@ export function getMenuForMode(mode: HexastraMode): HexastraMenuItem[] {
   return mode === 'praticien' ? practitionerMenu : libreMenu
 }
 
-export function findMenuItem(mode: HexastraMode, key?: string | null): HexastraMenuItem | null {
-  if (!key) return null
-  const menu = getMenuForMode(mode)
-  for (const item of menu) {
+export function findMenuItem(items: HexastraMenuItem[], key?: string | null): HexastraMenuItem | null {
+  if (!key || !Array.isArray(items)) return null
+  for (const item of items) {
     if (item.key === key) return item
     const sub = item.submenu?.find((child) => child.key === key)
     if (sub) return sub
