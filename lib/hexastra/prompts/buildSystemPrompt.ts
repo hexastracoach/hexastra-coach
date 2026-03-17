@@ -130,6 +130,36 @@ function ksDirective(input: BuildPromptInput): string {
     input.ksSubmoduleSummaries?.length
       ? `Sous-modules executes et deja interpretes: ${input.ksSubmoduleSummaries.join(' | ')}`
       : 'Aucun sous-module execute explicitement.'
+  const readingSummary = input.readingSummary
+    ? [
+        input.readingSummary.detectedTheme
+          ? `Theme detecte: ${input.readingSummary.detectedTheme}`
+          : null,
+        input.readingSummary.detectedSubtheme
+          ? `Sous-theme detecte: ${input.readingSummary.detectedSubtheme}`
+          : null,
+        input.readingSummary.detectedScience
+          ? `Science detectee: ${input.readingSummary.detectedScience}`
+          : null,
+        input.readingSummary.readingLevel
+          ? `Niveau de lecture: ${input.readingSummary.readingLevel}`
+          : null,
+        input.readingSummary.momentType
+          ? `Moment detecte: ${input.readingSummary.momentType}`
+          : null,
+        input.readingSummary.phaseType
+          ? `Phase detectee: ${input.readingSummary.phaseType}`
+          : null,
+        input.readingSummary.dominantPotential
+          ? `Potentiel dominant: ${input.readingSummary.dominantPotential}`
+          : null,
+        input.readingSummary.mainLever
+          ? `Levier principal: ${input.readingSummary.mainLever}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' | ')
+    : 'Aucune synthese de lecture locale.'
 
   const routeRule =
     route === 'gps_kua'
@@ -157,6 +187,7 @@ ${outputStructure}
 ${ksNarrativeBrief}
 ${ksSummary}
 ${submoduleSummaries}
+${readingSummary}
 ${routeRule}
 `.trim()
 }
@@ -183,21 +214,15 @@ function conversationDirective(input: BuildPromptInput): string {
 Style conversationnel obligatoire:
 - Toujours repondre dans la langue du message utilisateur.
 - Si l'utilisateur ecrit dans une autre langue que la langue cible initiale, suivre la langue du dernier message utilisateur.
-- Ton attendu: Shilo = humain, calme, fin, fluide, incarne, jamais froid.
-- Toujours commencer par une phrase naturelle avant toute structure.
-- En cas de salut simple ("bonjour", "salut", "hello", "hi", etc.), repondre comme un humain, brievement, puis ouvrir l'echange.
+- Ton attendu: Shilo = calme, humain, clair, structure, professionnel.
+- Toujours commencer par une phrase naturelle, puis structurer sobrement.
+- Structure naturelle attendue: reconnaissance -> lecture de la dynamique -> mise en perspective -> reorientation -> cle d'action.
+- Ne jamais sonner mystique, flou, administratif ou generaliste.
 - Ne jamais afficher directement une liste brute sans phrase d'introduction.
-- Si un menu ou des options sont utiles, les introduire comme une aide douce.
-- Ne jamais sonner comme un tableau de bord, un bot de formulaire ou un moteur administratif.
-- Preferer: accueil -> comprehension -> orientation -> options.
-- Si l'utilisateur semble tester l'outil ou ouvrir le dialogue, repondre avec convivialite avant d'analyser.
-- Garder une forme lisible, aeree, elegante.
+- Si un menu ou des options sont utiles, les introduire sobrement comme une aide.
 - Pas de jargon interne, pas de noms de modules, pas de mecanique visible.
-- Etre utile sans etre rigide.
-- Etre chaleureux sans etre envahissant.
-${input.requestType === 'chat'
-  ? "- Pour une premiere interaction, privilegier un accueil court suivi d'une question simple ou d'une orientation legere."
-  : ''}
+- Etre concret, incarne, non fataliste, probabiliste.
+- Chercher l'effet utilisateur: "Je comprends mieux et je sais quoi faire."
 `.trim()
 }
 
@@ -221,6 +246,11 @@ Priorites absolues:
 - Autonomie
 - Un seul levier prioritaire si possible
 
+Ordre de priorite absolu:
+1. Logique KS / prompts internes / signaux arbitres
+2. Flux utilisateur obligatoire
+3. Coherence, utilite, clarte
+
 Flux obligatoire:
 1. verifier le plan utilisateur
 2. verifier l'usage praticien si necessaire
@@ -239,6 +269,8 @@ Contraintes:
 - Adapter la profondeur et le niveau de personnalisation au plan (free / essential / premium / praticien) sans regressions metier.
 - Plans free / essential / premium: produire une lecture fusionnee KS.FUSION.V13, langage simple, sans exposer techniquement les sciences; utiliser l'angle choisi uniquement comme ponderation/focus.
 - Mode praticien: autoriser les analyses distinctes par situation/science/sous-science et un vocabulaire plus technique si utile.
+- Si le flux de demarrage n'est pas termine, ne pas ouvrir de lecture complete hors sequence.
+- Ne pas reafficher le message de bienvenue une fois le flux initialise.
 Plan: ${input.plan}
 Mode: ${input.mode}
 Langue cible initiale: ${input.language}

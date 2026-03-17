@@ -44,6 +44,7 @@ import { fusionEngine } from '@/lib/hexastra/fusion/fusionEngine'
 import { arbiter } from '@/lib/hexastra/fusion/arbiter'
 import { applySentinel } from '@/lib/hexastra/security/sentinel'
 import { buildKsLeadSummary } from '@/lib/hexastra/orchestrator/ksOutputComposer'
+import { generateHexastraReading } from '@/lib/hexastra/reading/hexastraReadingEngine'
 import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
 import { logger } from '@/lib/utils/logger'
@@ -932,6 +933,14 @@ export async function runHexastraFlow(input: {
       selectedSubmenu,
       latestUserMessage,
     })
+    const readingSummary = generateHexastraReading({
+      latestUserMessage,
+      contextType: normalizedContextType,
+      domainRoute,
+      birthData: normalizeBirthData(userContext.birthData),
+      practitionerUsage: normalizedPractitionerUsage,
+      fusedSignal,
+    })
     const ksNarrativeBrief = buildKsNarrativeBrief({
       domainRoute,
       selectedMenu,
@@ -963,6 +972,17 @@ export async function runHexastraFlow(input: {
       ksSubmoduleSummaries: executedSubmodules
         .map((entry) => entry.result.publicSummary)
         .filter((summary): summary is string => typeof summary === 'string' && summary.trim().length > 0),
+      readingSummary: {
+        detectedTheme: readingSummary.detectedTheme,
+        detectedSubtheme: readingSummary.detectedSubtheme,
+        detectedScience: readingSummary.detectedScience,
+        readingLevel: readingSummary.readingLevel,
+        momentType: readingSummary.momentType,
+        phaseType: readingSummary.phaseType,
+        dominantPotential: readingSummary.dominantPotential,
+        mainLever: readingSummary.mainLever,
+        executiveSummary: readingSummary.executiveSummary,
+      },
       requestType: input.requestType,
       domainRoute,
       specializedSource: specializedResult?.source ?? null,
@@ -1133,6 +1153,17 @@ export async function runHexastraFlow(input: {
             primaryFamily: fusedSignal?.primaryFamily ?? null,
             sourceLayers: Array.isArray(fusedSignal?.sourceLayers) ? fusedSignal.sourceLayers : [],
             submodules: executedSubmodules.map((entry) => entry.key),
+          },
+          readingSummary: {
+            detectedTheme: readingSummary.detectedTheme,
+            detectedSubtheme: readingSummary.detectedSubtheme,
+            detectedScience: readingSummary.detectedScience,
+            readingLevel: readingSummary.readingLevel,
+            momentType: readingSummary.momentType,
+            phaseType: readingSummary.phaseType,
+            dominantPotential: readingSummary.dominantPotential,
+            mainLever: readingSummary.mainLever,
+            executiveSummary: readingSummary.executiveSummary,
           },
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,

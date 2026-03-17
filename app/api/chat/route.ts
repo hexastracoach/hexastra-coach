@@ -268,6 +268,11 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
   return hasUsefulData ? birth : null
 }
 
+function isBirthProfileComplete(profile: BirthProfile | null) {
+  if (!profile) return false
+  return Boolean(profile.firstName?.trim() && (profile.birthDateISO?.trim() || profile.date?.trim()) && profile.place?.trim())
+}
+
 function buildSafeErrorResponse() {
   return buildConsistentResponse(
     {
@@ -531,17 +536,20 @@ export async function POST(req: NextRequest) {
 
     if (intentLocal === 'greeting') {
       log('info', 'branch chosen', { branch: 'greeting' })
-      const greetingMenu = getMenuForMode(getModeForPlan(effectivePlan))
+      const normalizedBirthData = normalizeBirthData((body as Record<string, unknown>).birthData)
+      const canOpenMenu = isBirthProfileComplete(normalizedBirthData)
+      const greetingMenu = canOpenMenu ? getMenuForMode(getModeForPlan(effectivePlan)) : []
       const payload = {
-        content:
-          'Bonjour. Choisis simplement un angle du menu et je t’accompagne directement sur la bonne lecture.',
+        content: canOpenMenu
+          ? 'Bienvenue.\n\nJe suis HexAstra Coach.\nChaque réponse te donne une lecture claire, une mise en perspective et une action concrète.\n\nQue souhaites-tu explorer ?'
+          : 'Bienvenue.\n\nJe suis HexAstra Coach.\nUn outil de lecture stratégique pour t’aider à comprendre ta situation, ton timing et la meilleure direction à prendre.',
         type: 'greeting',
         plan: effectivePlan,
         mode: effectivePlan,
         conversationId: requestedConversationId ?? randomUUID(),
-        flowState: { step: 'menu', completed: true },
+        flowState: { step: canOpenMenu ? 'menu' : 'conversation', completed: true },
         menu: {
-          visible: true,
+          visible: canOpenMenu,
           items: greetingMenu,
         },
         metadata: {
@@ -556,9 +564,9 @@ export async function POST(req: NextRequest) {
         plan: effectivePlan,
         mode: effectivePlan,
         conversationId: requestedConversationId ?? undefined,
-        flowState: { step: 'menu', completed: true },
+        flowState: { step: canOpenMenu ? 'menu' : 'conversation', completed: true },
         menu: {
-          visible: true,
+          visible: canOpenMenu,
           items: greetingMenu,
         },
       })

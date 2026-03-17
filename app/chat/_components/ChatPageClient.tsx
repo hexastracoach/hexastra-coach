@@ -123,17 +123,17 @@ function getWelcomeContent(language: string) {
       return `Hello.
 
 I'm HexAstra Coach.
-I'm here to help you clarify a situation, understand your current phase, or explore the angle that matters most right now.`
+I'm here to help you understand your situation, your timing, and the most useful direction to take.`
     case 'es':
       return `Hola.
 
 Soy HexAstra Coach.
-Estoy aquÃ­ para ayudarte a aclarar una situaciÃ³n, comprender tu momento actual o explorar el Ã¡ngulo mÃ¡s Ãºtil para ti ahora.`
+Estoy aqui para ayudarte a comprender tu situacion, tu timing y la direccion mas util a seguir.`
     default:
       return `Bonjour.
 
 Je suis HexAstra Coach.
-Je suis lÃ  pour tâ€™aider Ã  clarifier une situation, comprendre ton moment actuel, ou explorer lâ€™angle le plus utile pour toi maintenant.`
+Un outil de lecture strategique pour t'aider a comprendre ta situation, ton timing et la meilleure direction a prendre.`
   }
 }
 

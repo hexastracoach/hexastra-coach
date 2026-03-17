@@ -132,6 +132,17 @@ export type HexastraApiResponse = {
       sourceLayers?: string[]
       submodules?: string[]
     }
+    readingSummary?: {
+      detectedTheme?: string | null
+      detectedSubtheme?: string | null
+      detectedScience?: string | null
+      readingLevel?: string | null
+      momentType?: string | null
+      phaseType?: string | null
+      dominantPotential?: string | null
+      mainLever?: string | null
+      executiveSummary?: string[]
+    }
   }
   updatedEvolutionProfile?: Record<string, unknown> | null
 }
@@ -187,6 +198,17 @@ export type BuildPromptInput = {
     submodules?: string[]
   } | null
   ksSubmoduleSummaries?: string[] | null
+  readingSummary?: {
+    detectedTheme?: string | null
+    detectedSubtheme?: string | null
+    detectedScience?: string | null
+    readingLevel?: string | null
+    momentType?: string | null
+    phaseType?: string | null
+    dominantPotential?: string | null
+    mainLever?: string | null
+    executiveSummary?: string[]
+  } | null
   requestType: 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
   domainRoute?: DomainRoute
   specializedSource?: string | null
