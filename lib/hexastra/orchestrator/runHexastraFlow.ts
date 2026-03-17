@@ -53,12 +53,6 @@ const flowLog = (
   meta?: Record<string, unknown>
 ) => {
   logger[level](`[runHexastraFlow] ${msg}`, meta)
-  const printer = level === 'error' ? console.error : level === 'warn' ? console.warn : console.info
-  try {
-    printer(`[runHexastraFlow] ${msg}`, meta ?? '')
-  } catch {
-    printer(`[runHexastraFlow] ${msg}`)
-  }
 }
 
 type ResponseDepth = 'short' | 'medium' | 'long' | 'expert'

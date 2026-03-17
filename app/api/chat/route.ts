@@ -469,13 +469,6 @@ export async function POST(req: NextRequest) {
   const requestId = randomUUID()
   const log = (level: 'info' | 'debug' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) => {
     logger[level](`[api/chat][${requestId}] ${msg}`, meta)
-    const printer =
-      level === 'error' ? console.error : level === 'warn' ? console.warn : console.info
-    try {
-      printer(`[api/chat][${requestId}] ${msg}`, meta ?? '')
-    } catch {
-      printer(`[api/chat][${requestId}] ${msg}`)
-    }
   }
 
   log('info', 'POST hit')
@@ -640,7 +633,8 @@ export async function POST(req: NextRequest) {
         branch: 'menu',
         ...getNormalizationDiagnostics(menuResponse as ChatResponsePayload),
       })
-      return NextResponse.json(normalizedMenuResponse, { status: 200 })
+      const status = normalizedMenuResponse.flowState?.step === 'error' ? 500 : 200
+      return NextResponse.json(normalizedMenuResponse, { status })
     }
 
     if (intentLocal === 'birth_update') {
@@ -681,7 +675,8 @@ export async function POST(req: NextRequest) {
         branch: 'birth_update',
         ...getNormalizationDiagnostics(birthResponse as ChatResponsePayload),
       })
-      return NextResponse.json(normalizedBirthResponse, { status: 200 })
+      const status = normalizedBirthResponse.flowState?.step === 'error' ? 500 : 200
+      return NextResponse.json(normalizedBirthResponse, { status })
     }
 
     const quota = await enforceDailyQuota({
@@ -878,6 +873,7 @@ export async function POST(req: NextRequest) {
       menuVisible: enriched?.menu?.visible ?? finalResponse?.menu?.visible,
       intentDetected: intent,
     })
+    const finalStatus = normalizedEnriched.flowState?.step === 'error' ? 500 : 200
     return NextResponse.json(
       {
         ...normalizedEnriched,
@@ -899,7 +895,7 @@ export async function POST(req: NextRequest) {
           intentDetected: intent,
         },
       },
-      { status: 200 }
+      { status: finalStatus }
     )
   } catch (error) {
     log('error', 'fatal error', { error })
