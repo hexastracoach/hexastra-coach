@@ -164,11 +164,15 @@ function detectIntentLocal(message: string): 'greeting' | 'menu' | 'birth_update
   const norm = normalizeText(message)
   if (isGreeting(norm)) return 'greeting'
   if (/(menu|angle|angles|option|choix|navigation)/.test(norm)) return 'menu'
-  if (/(naissance|birth|donnees de naissance|donnees naissance|donnees|données|ne\(e\)|nee)/.test(norm)) {
-    return 'birth_update'
-  }
   if (/(profil|analyse|lecture|theme|thème|astral|natal|astro|relation|travail|periode|période|decision|décision|blocage|question|hexastra|neurokua|kua|etat du jour|état du jour)/.test(norm)) {
     return 'analysis'
+  }
+  if (
+    /(donnees de naissance mises a jour|donnees naissance mises a jour|birth data updated|ne e le|nee le|ne le|prenom|date de naissance|heure de naissance|ville de naissance|pays de naissance)/.test(
+      norm
+    )
+  ) {
+    return 'birth_update'
   }
   return 'conversation'
 }
