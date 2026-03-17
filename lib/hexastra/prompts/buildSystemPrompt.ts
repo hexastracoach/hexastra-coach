@@ -155,7 +155,7 @@ ${input.requestType === 'chat'
 }
 
 export function buildSystemPrompt(input: BuildPromptInput): string {
-  const planConfig = PLAN_MODE_MAP[input.plan]
+  const planConfig = PLAN_MODE_MAP[input.plan] ?? PLAN_MODE_MAP.free
   const labels = [input.selectedMenuLabel, input.selectedSubmenuLabel]
     .filter(Boolean)
     .join(' → ')

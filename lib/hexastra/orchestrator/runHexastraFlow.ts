@@ -566,11 +566,21 @@ export async function runHexastraFlow(input: {
     }
 
     const systemPrompt = buildSystemPrompt({
+      plan,
       mode,
       language: userContext.language ?? fallbackLanguage,
+      firstName: userContext.firstName ?? userContext.name ?? null,
       contextType: normalizedContextType,
-      menuInstruction,
-      journeyEnabled,
+      practitionerUsage: userContext.practitionerUsage ?? null,
+      selectedMenuLabel: selectedMenu?.label ?? null,
+      selectedSubmenuLabel: selectedSubmenu?.label ?? null,
+      requestType: input.requestType,
+      domainRoute,
+      specializedSource: specializedResult?.source ?? null,
+      flowStep,
+      emotionalState: sessionContext.emotionalState,
+      precision: sessionContext.precision,
+      retrievalProfile: sessionContext.retrievalProfile ?? 'balanced',
     })
 
     const payload = buildChatPayload({
