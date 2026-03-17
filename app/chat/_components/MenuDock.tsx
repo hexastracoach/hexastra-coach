@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 type Props = {
   items: HexastraMenuItem[]
   title?: string
+  subtitle?: string
   onSelect: (item: HexastraMenuItem, parent?: HexastraMenuItem) => void
   userPlan?: string
   lastUserMessage?: string
@@ -50,6 +51,7 @@ function IconChevron({ open }: { open: boolean }) {
 export default function MenuDock({
   items,
   title = 'Explorer un angle',
+  subtitle = 'Choisis simplement la direction que tu veux approfondir.',
   onSelect,
   userPlan,
   lastUserMessage,
@@ -88,9 +90,7 @@ export default function MenuDock({
           </span>
           <div className="hx-menu-dock-inline-copy">
             <div className="hx-menu-dock-inline-title">{title}</div>
-            <p className="hx-menu-dock-inline-subtitle">
-              Choisis simplement la direction que tu veux approfondir.
-            </p>
+            <p className="hx-menu-dock-inline-subtitle">{subtitle}</p>
           </div>
         </div>
       </div>

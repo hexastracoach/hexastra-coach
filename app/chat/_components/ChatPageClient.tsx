@@ -31,6 +31,8 @@ import {
   isBirthDataComplete,
 } from '@/lib/chat/bootstrapMachine'
 import { getEntitlements } from '@/lib/chat/entitlements'
+import { getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
+import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import {
   loadMicroReadings,
   markProfileDone,
@@ -236,9 +238,7 @@ export default function ChatPageClient() {
   const chatLanguage = useChatLanguage()
   const { t } = useTranslation()
 
-  const welcomeMessage = useMemo(() => createWelcomeMessage(chatLanguage), [chatLanguage])
-
-  const [messages, setMessages] = useState<Msg[]>([welcomeMessage])
+  const [messages, setMessages] = useState<Msg[]>([])
   const [premiumLock, setPremiumLock] = useState<{
     targetPlan: string
     ctaLabel: string
@@ -314,10 +314,7 @@ export default function ChatPageClient() {
     }
   }, [birthData])
 
-  const isWelcome = useMemo(
-    () => messages.length === 1 && messages[0]?.id === 'welcome',
-    [messages]
-  )
+  const isWelcome = useMemo(() => messages.length === 0, [messages])
 
   // Memory hint used sparingly
   const memoryHint = useMemo(() => getUserMemoryContext(userMemory), [userMemory])
@@ -360,10 +357,7 @@ export default function ChatPageClient() {
     chatStep === 'conversation_ready' &&
     menuItems.length > 0 &&
     !isTyping &&
-    (
-      isSimpleGreeting(lastUserMessage) ||
-      userMessageCount <= 1
-    )
+    (userMessageCount === 0 || isSimpleGreeting(lastUserMessage))
 
   const desktopLeft = viewportWidth >= 1100
   const userInitials = getInitials(userEmail)
@@ -416,7 +410,7 @@ export default function ChatPageClient() {
 
   const applyApiResponse = useCallback((data: HexastraApiResponse | null | undefined) => {
     if (!data) {
-      return "Je nâ€™ai pas pu terminer la lecture pour le moment."
+      return "Je n'ai pas pu terminer la lecture pour le moment."
     }
 
     const reply =
@@ -424,7 +418,7 @@ export default function ChatPageClient() {
         ? data.message
         : typeof data?.reply === 'string'
           ? data.reply
-          : "Je nâ€™ai pas pu terminer la lecture pour le moment."
+          : "Je n'ai pas pu terminer la lecture pour le moment."
 
     if (data.conversationId) setConversationId(data.conversationId)
 
@@ -656,7 +650,7 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
             role: 'assistant',
             content:
               error instanceof Error && error.message === 'Request aborted'
-                ? "La demande prÃ©cÃ©dente a Ã©tÃ© interrompue au profit de la nouvelle."
+                ? "La demande précédente a été interrompue au profit de la nouvelle."
                 : "Je n'ai pas pu ouvrir cet angle pour le moment.",
             created_at: new Date().toISOString(),
           },
@@ -707,14 +701,12 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
     }
   }, [supabase])
 
+  // Pré-charger le menu initial dès que le plan est connu
   useEffect(() => {
-    setMessages((prev) => {
-      if (prev.length === 1 && prev[0]?.id === 'welcome') {
-        return [createWelcomeMessage(chatLanguage)]
-      }
-      return prev
-    })
-  }, [chatLanguage])
+    if (!planLoaded || menuItems.length) return
+    const mode = getModeForPlan(userPlan)
+    setMenuItems(getMenuForMode(mode))
+  }, [planLoaded, menuItems.length, userPlan])
 
   useEffect(() => {
     const handleResize = () => setViewportWidth(window.innerWidth)
@@ -1300,8 +1292,8 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
             role: 'assistant',
             content:
               error instanceof Error && error.message === 'Request aborted'
-                ? "La demande prÃ©cÃ©dente a Ã©tÃ© annulÃ©e pour laisser passer la nouvelle."
-                : "Je n'ai pas pu terminer la lecture pour le moment. RÃ©essaie dans quelques instants.",
+                ? "La demande précédente a été annulée pour laisser passer la nouvelle."
+                : "Je n'ai pas pu terminer la lecture pour le moment. Réessaie dans quelques instants.",
             created_at: new Date().toISOString(),
           },
         ])
@@ -1527,6 +1519,8 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
               {shouldShowMenuDock && (
                 <MenuDock
                   items={menuItems}
+                  title="HexAstra Coach"
+                  subtitle="Quel angle souhaites-tu explorer ?"
                   userPlan={userPlan}
                   lastUserMessage={lastUserMessage}
                   onSelect={(item, parent) => {
