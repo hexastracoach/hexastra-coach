@@ -175,6 +175,38 @@ function isSimpleGreeting(value: string) {
   return greetings.has(text)
 }
 
+function isBirthDataUpdateMessage(value: string) {
+  const text = normalizeText(value)
+  return (
+    text.includes('donnees de naissance mises a jour') ||
+    text.includes("lecture croisee donnees de l autre personne mises a jour")
+  )
+}
+
+function isMenuSelectionMessage(value: string) {
+  const text = (value || '').trim()
+  return text.includes('->') || text.includes('→')
+}
+
+function assistantAskedForBirthData(value: string) {
+  const text = normalizeText(value)
+  return (
+    text.includes('date de naissance') ||
+    text.includes('heure exacte') ||
+    text.includes('ville') ||
+    text.includes('pays') ||
+    text.includes('pour dresser ton theme astral')
+  )
+}
+
+function buildMenuSelectionRequest(item: HexastraMenuItem, parent?: HexastraMenuItem) {
+  const parentLabel = parent?.label ?? item.label
+  const targetLabel = parent ? item.label : null
+  const contextLabel = targetLabel ? `${parentLabel} -> ${targetLabel}` : parentLabel
+
+  return `Je veux une lecture ${contextLabel} à partir de mes données enregistrées. Donne-moi directement le bilan ou l'analyse utile, sans me redemander de décrire mon état sauf si c'est indispensable.`
+}
+
 function getInitials(email: string) {
   if (!email) return 'HX'
   const clean = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, ' ')
@@ -390,6 +422,23 @@ export default function ChatPageClient() {
 
   const userMessageCount = userMessages.length
   const lastUserMessage = userMessages[userMessages.length - 1]?.content ?? ''
+  const lastAssistantMessage =
+    [...messages].reverse().find((message) => message.role === 'assistant')?.content ?? ''
+  const pendingReadingRequest = [...userMessages]
+    .reverse()
+    .find((message) => {
+      const content = message.content ?? ''
+      return (
+        content.trim().length > 0 &&
+        !isBirthDataUpdateMessage(content) &&
+        !isMenuSelectionMessage(content)
+      )
+    })?.content ?? ''
+  const shouldResumeAfterBirthSave =
+    assistantAskedForBirthData(lastAssistantMessage) && pendingReadingRequest.trim().length > 0
+  const birthSubmitLabel = shouldResumeAfterBirthSave
+    ? 'Envoyer mes données et reprendre ma demande ->'
+    : 'Enregistrer mes données ->'
   const shouldShowMenuDock =
     chatStep === 'conversation_ready' &&
     menuItems.length > 0 &&
@@ -976,11 +1025,24 @@ export default function ChatPageClient() {
       if (normalized.birthCountryName) parts.push(normalized.birthCountryName)
 
       if (parts.length) {
-        void sendStructuredAction({
-          message: `Données de naissance mises à jour : ${parts.join(', ')}.`,
-          contextType: activeContextType,
-          uiAction: 'restart_flow',
-        })
+        if (shouldResumeAfterBirthSave) {
+          void sendStructuredAction({
+            message: `Mes données de naissance sont maintenant enregistrées (${parts.join(', ')}). Reprends ma demande précédente et fais la lecture demandée : ${pendingReadingRequest}`,
+            contextType: activeContextType,
+            uiAction: 'restart_flow',
+          })
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `${Date.now()}-birth-saved`,
+              role: 'assistant',
+              content:
+                'Tes données de naissance sont bien enregistrées. Tu peux maintenant lancer une lecture ou choisir un angle du menu.',
+              created_at: new Date().toISOString(),
+            },
+          ])
+        }
       }
 
       const partnerParts: string[] = []
@@ -1002,7 +1064,14 @@ export default function ChatPageClient() {
         })
       }
     },
-    [activeContextType, handleBirthDataChange, handlePartnerBirthDataChange, sendStructuredAction]
+    [
+      activeContextType,
+      handleBirthDataChange,
+      handlePartnerBirthDataChange,
+      pendingReadingRequest,
+      sendStructuredAction,
+      shouldResumeAfterBirthSave,
+    ]
   )
 
   const handlePractitionerUsageSelect = useCallback((usage: PractitionerUsage) => {
@@ -1577,7 +1646,7 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
                     setSelectedSubmenuKey(parent ? item.key : null)
 
                     void sendStructuredAction({
-                      message: parent ? `${parent.label} -> ${item.label}` : item.label,
+                      message: buildMenuSelectionRequest(item, parent),
                       contextType: context,
                       menuKey: parent?.key ?? item.key,
                       submenuKey: parent ? item.key : null,
@@ -1596,6 +1665,7 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
                   <BirthDataInlineForm
                     data={birthData}
                     partnerData={partnerBirthData}
+                    submitLabel={birthSubmitLabel}
                     onSave={(next, partner) => {
                       handleBirthDataSave(next, partner)
                       setShowInlineBirthForm(false)

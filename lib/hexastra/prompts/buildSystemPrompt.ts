@@ -50,6 +50,15 @@ Réduis l’ambiguïté avant d’aller plus profond.
 - Garde un ton souple, conversationnel et rassurant.
 `.trim()
 
+    case 'analysis':
+      return `
+Step actif: ANALYSIS.
+Si l'utilisateur a déjà choisi un angle ou un sous-angle précis, produis directement la lecture ou le bilan utile.
+- Ne redemande pas de décrire son état sauf si une donnée strictement indispensable manque.
+- Si des données de naissance, des signaux métier ou un sous-menu explicite existent, utilise-les tout de suite.
+- Après un choix menu explicite, privilégie une réponse de lecture plutôt qu'une relance conversationnelle.
+`.trim()
+
     case 'decision':
       return `
 Step actif: DECISION.

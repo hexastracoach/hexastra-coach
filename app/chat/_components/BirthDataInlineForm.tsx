@@ -9,6 +9,7 @@ type Props = {
   data: BirthData
   partnerData: BirthData
   onSave: (data: BirthData, partner: BirthData) => void
+  submitLabel?: string
 }
 
 async function searchCities(query: string): Promise<NormalizedPlace[]> {
@@ -23,7 +24,12 @@ async function searchCities(query: string): Promise<NormalizedPlace[]> {
   }
 }
 
-export default function BirthDataInlineForm({ data, partnerData, onSave }: Props) {
+export default function BirthDataInlineForm({
+  data,
+  partnerData,
+  onSave,
+  submitLabel = 'Enregistrer mes données ->',
+}: Props) {
   const initialTimeKnown = data.birthTimeKnown ?? Boolean(data.birthTime)
   const partnerInitialTimeKnown = partnerData.birthTimeKnown ?? Boolean(partnerData.birthTime)
   const [form, setForm] = useState<BirthData>({
@@ -594,7 +600,7 @@ export default function BirthDataInlineForm({ data, partnerData, onSave }: Props
         className="hx-birth-inline-submit"
         disabled={!isValid || !partnerIsValid}
       >
-        Commencer ma lecture →
+        {submitLabel}
       </button>
 
       <p className="hx-birth-time-unknown-note" style={{ marginTop: 10 }}>

@@ -173,6 +173,46 @@ function toSpecializedSource(domainRoute: DomainRoute): SpecializedModuleResult[
   return 'fusion'
 }
 
+function shouldForceDirectReading(params: {
+  uiAction: UiAction
+  selectedMenuKey: string | null
+  selectedSubmenuKey: string | null
+  latestUserMessage: string
+}) {
+  const { uiAction, selectedMenuKey, selectedSubmenuKey, latestUserMessage } = params
+  if (uiAction !== 'select_menu_item' && uiAction !== 'select_submenu_item' && uiAction !== 'restart_flow') {
+    return false
+  }
+
+  const forcedKeys = new Set([
+    'state_today',
+    'fatigue_recharge',
+    'stress_overload',
+    'quick_adjustment',
+    'detailed_reading',
+    'quick_summary',
+    'general_trends',
+    'current_strengths',
+    'vigilance_points',
+    'orientation',
+    'decision_pro',
+    'decision_relation',
+    'decision_project',
+    'global_decision',
+  ])
+
+  const normalizedMessage = latestUserMessage.toLowerCase()
+  if (
+    normalizedMessage.includes('fais la lecture') ||
+    normalizedMessage.includes('donne-moi directement le bilan') ||
+    normalizedMessage.includes("donne-moi directement l'analyse")
+  ) {
+    return true
+  }
+
+  return forcedKeys.has(selectedSubmenuKey ?? '') || forcedKeys.has(selectedMenuKey ?? '')
+}
+
 function withGlobalTimeout<T>(promise: Promise<T>, timeoutMs: number, meta?: Record<string, unknown>) {
   return Promise.race<T>([
     promise,
@@ -530,8 +570,14 @@ export async function runHexastraFlow(input: {
       userContext = { ...userContext, journeyEnabled }
 
       const menuItems = safeArray(getMenuForMode(mode)).map((item) => normalizeMenuItem(item))
+      const forceDirectReading = shouldForceDirectReading({
+        uiAction: normalizedUiAction,
+        selectedMenuKey: normalizedSelectedMenuKey,
+        selectedSubmenuKey: normalizedSelectedSubmenuKey,
+        latestUserMessage,
+      })
 
-      const flowStep = computeFlowStep({
+      const computedFlowStep = computeFlowStep({
         requestType: input.requestType,
         uiAction: normalizedUiAction,
         latestUserMessage,
@@ -544,6 +590,10 @@ export async function runHexastraFlow(input: {
         timing: 'exploration',
         precision: 'medium',
       } as Parameters<typeof computeFlowStep>[0])
+      const flowStep =
+        forceDirectReading && computedFlowStep !== 'sensitive_support'
+          ? 'analysis'
+          : computedFlowStep
 
     const selectedMenu =
       normalizedSelectedMenuKey && menuItems
@@ -740,7 +790,7 @@ export async function runHexastraFlow(input: {
       arbitration = arbitration || {}
     }
 
-    const systemPrompt = buildSystemPrompt({
+      const systemPrompt = buildSystemPrompt({
       plan,
       mode,
       language: userContext.language ?? fallbackLanguage,
@@ -752,11 +802,11 @@ export async function runHexastraFlow(input: {
       requestType: input.requestType,
       domainRoute,
       specializedSource: specializedResult?.source ?? null,
-      flowStep,
-      emotionalState: sessionContext.emotionalState,
-      precision: sessionContext.precision,
-      retrievalProfile: 'balanced',
-    })
+        flowStep,
+        emotionalState: sessionContext.emotionalState,
+        precision: sessionContext.precision,
+        retrievalProfile: 'balanced',
+      })
 
     const messagesForLLM = limitedMessages.length
       ? limitedMessages
