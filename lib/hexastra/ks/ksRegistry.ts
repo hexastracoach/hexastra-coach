@@ -1,4 +1,5 @@
 import type { DomainRoute } from '@/lib/hexastra/types'
+import { getKsSubmoduleContracts, type KsSubmoduleContract } from './moduleRegistry'
 
 export const KS_EXECUTION_STAGES = [
   'interface_utilisateur',
@@ -19,6 +20,15 @@ type KsSelectionConfig = {
   promptHint?: string
   outputStructure?: string
   submodules?: string[]
+}
+
+export type KsExecutionContract = {
+  modules: string[]
+  narrativeContract: string
+  promptHint?: string
+  outputStructure?: string
+  submodules: string[]
+  submoduleContracts: KsSubmoduleContract[]
 }
 
 export const KS_DOMAIN_REGISTRY: Record<DomainRoute, KsDomainConfig> = {
@@ -157,6 +167,18 @@ export function getKsSelectionConfig(key?: string | null): KsSelectionConfig | n
   return KS_SELECTION_REGISTRY[key] ?? null
 }
 
+export function getKsSelectionExecutionContract(key?: string | null): KsExecutionContract | null {
+  const config = getKsSelectionConfig(key)
+  if (!config) return null
+
+  const submodules = config.submodules ?? []
+  return {
+    ...config,
+    submodules,
+    submoduleContracts: getKsSubmoduleContracts(submodules),
+  }
+}
+
 export function getKsFreeformContract(message?: string | null): KsSelectionConfig | null {
   const text = (message ?? '').toLowerCase()
   if (!text.trim()) return null
@@ -181,4 +203,16 @@ export function getKsFreeformContract(message?: string | null): KsSelectionConfi
   }
 
   return null
+}
+
+export function getKsFreeformExecutionContract(message?: string | null): KsExecutionContract | null {
+  const config = getKsFreeformContract(message)
+  if (!config) return null
+
+  const submodules = config.submodules ?? []
+  return {
+    ...config,
+    submodules,
+    submoduleContracts: getKsSubmoduleContracts(submodules),
+  }
 }

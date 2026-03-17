@@ -125,6 +125,13 @@ export type HexastraApiResponse = {
     premiumPreviewLocked?: boolean
     intentDetected?: string
     responseDepth?: 'short' | 'medium' | 'long' | 'expert'
+    ksSummary?: {
+      dominantSignal?: string | null
+      primaryModule?: string | null
+      primaryFamily?: string | null
+      sourceLayers?: string[]
+      submodules?: string[]
+    }
   }
   updatedEvolutionProfile?: Record<string, unknown> | null
 }
@@ -172,6 +179,14 @@ export type BuildPromptInput = {
   selectedSubmenuLabel?: string | null
   selectedPromptHint?: string | null
   selectedOutputStructure?: string | null
+  ksSummary?: {
+    dominantSignal?: string | null
+    primaryModule?: string | null
+    primaryFamily?: string | null
+    sourceLayers?: string[]
+    submodules?: string[]
+  } | null
+  ksSubmoduleSummaries?: string[] | null
   requestType: 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
   domainRoute?: DomainRoute
   specializedSource?: string | null

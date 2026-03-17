@@ -23,6 +23,10 @@ export function fusionEngine(signals: KSSignal[]) {
   )
 
   const topSignals = ordered.flatMap((signal) => signal.dominantSignals).filter(Boolean).slice(0, 5)
+  const signalEnvelopeIds = ordered.map((signal) => signal.envelope.id)
+  const sourceLayers = Array.from(
+    new Set(ordered.map((signal) => signal.envelope.source_layer).filter(Boolean))
+  )
   const contradictions = Array.from(new Set(ordered.flatMap((signal) => signal.contradictions))).slice(0, 5)
   const validatedSignals = ordered.filter((signal) => signal.sentinel_status !== 'degraded')
   const degradedSignals = ordered.filter((signal) => signal.sentinel_status === 'degraded')
@@ -59,12 +63,15 @@ export function fusionEngine(signals: KSSignal[]) {
     primaryFamily: dominant?.family ?? null,
     dominantFamilies,
     familyScores,
+    signalEnvelopeIds,
+    sourceLayers,
     topSignals,
     contradictions,
     validatedCount: validatedSignals.length,
     degradedCount: degradedSignals.length,
     confidenceScore: averageConfidence,
     intensityScore: averageIntensity,
+    contractVersion: 'ks_signal_envelope_v1',
     sentinelStatus: degradedSignals.length > validatedSignals.length ? 'degraded' : 'validated',
     narrativeBrief: narrativeParts.join(' | ') || 'lecture generale structuree',
   }

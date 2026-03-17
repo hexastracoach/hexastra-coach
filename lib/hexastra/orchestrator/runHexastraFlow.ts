@@ -30,12 +30,20 @@ import type { ChatMessage } from '@/lib/chat/chatPayloadBuilder'
 
 import { classifyQuery } from '@/lib/hexastra/router/classifyQuery'
 import { getModulesForDomain } from '@/lib/hexastra/router/moduleRouter'
-import { getKsDomainConfig, getKsFreeformContract, getKsSelectionConfig } from '@/lib/hexastra/ks/ksRegistry'
+import {
+  getKsDomainConfig,
+  getKsFreeformContract,
+  getKsFreeformExecutionContract,
+  getKsSelectionConfig,
+  getKsSelectionExecutionContract,
+} from '@/lib/hexastra/ks/ksRegistry'
+import { executeKsSubmodules } from '@/lib/hexastra/ks/submoduleExecutor'
 import { buildSignalEnvelope } from '@/lib/hexastra/fusion/signalEnvelope'
 import type { KSSignal } from '@/lib/hexastra/fusion/signalEnvelope'
 import { fusionEngine } from '@/lib/hexastra/fusion/fusionEngine'
 import { arbiter } from '@/lib/hexastra/fusion/arbiter'
 import { applySentinel } from '@/lib/hexastra/security/sentinel'
+import { buildKsLeadSummary } from '@/lib/hexastra/orchestrator/ksOutputComposer'
 import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
 import { logger } from '@/lib/utils/logger'
@@ -227,9 +235,9 @@ function resolveRetrievalProfile(params: {
   latestUserMessage?: string | null
 }) {
   const selectionConfig =
-    getKsSelectionConfig(params.selectedSubmenu?.key ?? null) ??
-    getKsSelectionConfig(params.selectedMenu?.key ?? null)
-  const freeformConfig = getKsFreeformContract(params.latestUserMessage ?? null)
+    getKsSelectionExecutionContract(params.selectedSubmenu?.key ?? null) ??
+    getKsSelectionExecutionContract(params.selectedMenu?.key ?? null)
+  const freeformConfig = getKsFreeformExecutionContract(params.latestUserMessage ?? null)
 
   if (selectionConfig || freeformConfig) return 'selection_specialized'
   if (params.specializedSource) return 'specialized_first'
@@ -252,12 +260,13 @@ function buildKsNarrativeBrief(params: {
     narrativeBrief?: string | null
     confidenceScore?: number
   } | null
+  executedSubmodules?: { key: string; result: Record<string, unknown> }[]
 }) {
   const domainConfig = getKsDomainConfig(params.domainRoute)
   const selectionConfig =
-    getKsSelectionConfig(params.selectedSubmenu?.key ?? null) ??
-    getKsSelectionConfig(params.selectedMenu?.key ?? null)
-  const freeformConfig = getKsFreeformContract(params.latestUserMessage ?? null)
+    getKsSelectionExecutionContract(params.selectedSubmenu?.key ?? null) ??
+    getKsSelectionExecutionContract(params.selectedMenu?.key ?? null)
+  const freeformConfig = getKsFreeformExecutionContract(params.latestUserMessage ?? null)
   const effectiveSelectionConfig = selectionConfig ?? freeformConfig
   const focus = params.selectedSubmenu?.label ?? params.selectedMenu?.label ?? 'aucun angle explicite'
   const parts = [
@@ -267,6 +276,20 @@ function buildKsNarrativeBrief(params: {
     effectiveSelectionConfig?.outputStructure ? `structure: ${effectiveSelectionConfig.outputStructure}` : null,
     effectiveSelectionConfig?.submodules?.length
       ? `sous-modules: ${effectiveSelectionConfig.submodules.join(', ')}`
+      : null,
+    effectiveSelectionConfig?.submoduleContracts?.length
+      ? `contrats sous-modules: ${effectiveSelectionConfig.submoduleContracts
+          .map((contract) => `${contract.key}=${contract.outputType}`)
+          .join(', ')}`
+      : null,
+    params.executedSubmodules?.length
+      ? `sous-modules executes: ${params.executedSubmodules
+          .map((entry) => {
+            const summary =
+              typeof entry.result.publicSummary === 'string' ? entry.result.publicSummary : entry.key
+            return `${entry.key}=${summary}`
+          })
+          .join(' | ')}`
       : null,
     `contrat: ${domainConfig.narrativeContract}`,
     params.specializedResult?.source ? `source prioritaire: ${params.specializedResult.source}` : null,
@@ -821,14 +844,26 @@ export async function runHexastraFlow(input: {
       source: specializedResult?.source,
     })
 
-    const freeformContract = getKsFreeformContract(latestUserMessage)
+    const freeformContract = getKsFreeformExecutionContract(latestUserMessage)
     const selectionModules =
-      getKsSelectionConfig(selectedSubmenu?.key ?? null)?.modules ??
-      getKsSelectionConfig(selectedMenu?.key ?? null)?.modules ??
+      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null)?.modules ??
+      getKsSelectionExecutionContract(selectedMenu?.key ?? null)?.modules ??
       freeformContract?.modules ??
       []
+    const selectionSubmodules =
+      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null)?.submodules ??
+      getKsSelectionExecutionContract(selectedMenu?.key ?? null)?.submodules ??
+      freeformContract?.submodules ??
+      []
+    const executedSubmodules = executeKsSubmodules({
+      submodules: selectionSubmodules,
+      birthData: normalizeBirthData(userContext.birthData),
+      latestUserMessage,
+      domainRoute,
+      practitionerUsage: normalizedPractitionerUsage,
+    })
     const activeModules = Array.from(
-      new Set([...selectionModules, ...getModulesForDomain(domainRoute)])
+      new Set([...selectionModules, ...selectionSubmodules, ...getModulesForDomain(domainRoute)])
     )
 
     const knowledgeBlock = knowledgePayload?.block
@@ -848,11 +883,19 @@ export async function runHexastraFlow(input: {
       ? safeBuildSignalEnvelope({ module: 'retrieval', result: { signals: [knowledgeBlock] }, domainRoute })
       : null
     if (knowledgeSignal) signals.push(knowledgeSignal)
+    for (const executedSubmodule of executedSubmodules) {
+      const submoduleSignal = safeBuildSignalEnvelope({
+        module: executedSubmodule.key,
+        result: executedSubmodule.result,
+        domainRoute,
+      })
+      if (submoduleSignal) signals.push(submoduleSignal)
+    }
 
     const safeSignals = Array.isArray(signals) ? signals.filter(Boolean) : []
     const fallbackSignal =
       safeBuildSignalEnvelope({ module: 'fallback', result: {}, domainRoute }) ??
-      ({ module: 'fallback', signals: ['signal_general'], intensity: 0.5, confidence: 0.5 } as KSSignal)
+      buildSignalEnvelope({ module: 'fallback', result: {}, domainRoute })
 
     let fusedSignal: any = null
     let arbitration: any = null
@@ -870,16 +913,16 @@ export async function runHexastraFlow(input: {
     }
 
     const selectedPromptHint =
-      getKsSelectionConfig(selectedSubmenu?.key ?? null)?.promptHint ??
-      getKsSelectionConfig(selectedMenu?.key ?? null)?.promptHint ??
+      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null)?.promptHint ??
+      getKsSelectionExecutionContract(selectedMenu?.key ?? null)?.promptHint ??
       freeformContract?.promptHint ??
       selectedSubmenu?.promptHint ??
       selectedMenu?.promptHint ??
       menuInstruction ??
       null
     const selectedOutputStructure =
-      getKsSelectionConfig(selectedSubmenu?.key ?? null)?.outputStructure ??
-      getKsSelectionConfig(selectedMenu?.key ?? null)?.outputStructure ??
+      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null)?.outputStructure ??
+      getKsSelectionExecutionContract(selectedMenu?.key ?? null)?.outputStructure ??
       freeformContract?.outputStructure ??
       null
     const retrievalProfile = resolveRetrievalProfile({
@@ -896,6 +939,7 @@ export async function runHexastraFlow(input: {
       latestUserMessage,
       specializedResult,
       fusedSignal,
+      executedSubmodules,
     })
 
     const systemPrompt = buildSystemPrompt({
@@ -909,6 +953,16 @@ export async function runHexastraFlow(input: {
       selectedSubmenuLabel: selectedSubmenu?.label ?? null,
       selectedPromptHint,
       selectedOutputStructure,
+      ksSummary: {
+        dominantSignal: fusedSignal?.dominantSignal ?? null,
+        primaryModule: fusedSignal?.primaryModule ?? null,
+        primaryFamily: fusedSignal?.primaryFamily ?? null,
+        sourceLayers: Array.isArray(fusedSignal?.sourceLayers) ? fusedSignal.sourceLayers : [],
+        submodules: executedSubmodules.map((entry) => entry.key),
+      },
+      ksSubmoduleSummaries: executedSubmodules
+        .map((entry) => entry.result.publicSummary)
+        .filter((summary): summary is string => typeof summary === 'string' && summary.trim().length > 0),
       requestType: input.requestType,
       domainRoute,
       specializedSource: specializedResult?.source ?? null,
@@ -944,6 +998,13 @@ export async function runHexastraFlow(input: {
           : "Je poursuis avec une réponse courte basée sur les informations disponibles."
       flowLog('warn', 'fallback module used', { domainRoute, source: 'openai_empty_response' })
     }
+    message = buildKsLeadSummary({
+      flowStep,
+      selectedOutputStructure,
+      fusedSignal,
+      executedSubmodules,
+      message,
+    })
 
     const menuVisible =
       effectiveRequestType === 'micro_month' ||
@@ -1066,6 +1127,13 @@ export async function runHexastraFlow(input: {
           emotionalState: sessionContext.emotionalState,
           timing: sessionContext.timing,
           journeyEnabled,
+          ksSummary: {
+            dominantSignal: fusedSignal?.dominantSignal ?? null,
+            primaryModule: fusedSignal?.primaryModule ?? null,
+            primaryFamily: fusedSignal?.primaryFamily ?? null,
+            sourceLayers: Array.isArray(fusedSignal?.sourceLayers) ? fusedSignal.sourceLayers : [],
+            submodules: executedSubmodules.map((entry) => entry.key),
+          },
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       } as HexastraApiResponse;

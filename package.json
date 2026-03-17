@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:ks": "vitest run tests/ks"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
@@ -26,6 +27,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "pnpm": "^10.32.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.0"
   }
 }

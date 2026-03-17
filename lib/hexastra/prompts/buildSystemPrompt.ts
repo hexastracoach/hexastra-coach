@@ -111,6 +111,25 @@ function ksDirective(input: BuildPromptInput): string {
   const ksNarrativeBrief = input.ksNarrativeBrief
     ? `Synthese KS deja arbitree: ${input.ksNarrativeBrief}`
     : 'Aucune synthese KS arbitree disponible.'
+  const ksSummary = input.ksSummary
+    ? [
+        input.ksSummary.dominantSignal
+          ? `Signal KS dominant: ${input.ksSummary.dominantSignal}`
+          : null,
+        input.ksSummary.primaryFamily
+          ? `Famille KS dominante: ${input.ksSummary.primaryFamily}`
+          : null,
+        input.ksSummary.sourceLayers?.length
+          ? `Couches sources actives: ${input.ksSummary.sourceLayers.join(', ')}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' | ')
+    : 'Aucun resume KS local disponible.'
+  const submoduleSummaries =
+    input.ksSubmoduleSummaries?.length
+      ? `Sous-modules executes et deja interpretes: ${input.ksSubmoduleSummaries.join(' | ')}`
+      : 'Aucun sous-module execute explicitement.'
 
   const routeRule =
     route === 'gps_kua'
@@ -129,10 +148,15 @@ Architecture KS active:
 - Si un resultat metier structure est fourni, il prime sur le retrieval documentaire.
 - Le vector store sert a enrichir et stabiliser, pas a remplacer un moteur specialise.
 - Ne revele jamais les noms internes KS au grand public.
+- La structure finale doit suivre en priorite la Structure de sortie attendue lorsqu'elle existe.
+- Le signal KS dominant et les sous-modules deja executes servent de squelette de reponse, pas de decor.
+- Ne laisse pas la narration effacer ou contredire les signaux deja arbitres.
 ${source}
 ${promptHint}
 ${outputStructure}
 ${ksNarrativeBrief}
+${ksSummary}
+${submoduleSummaries}
 ${routeRule}
 `.trim()
 }
