@@ -7,7 +7,7 @@ import { detectReadingLevel } from '@/lib/hexastra/detection/detectReadingLevel'
 import { detectTimingIntensity } from '@/lib/hexastra/detection/detectTimingIntensity'
 import { detectEmotionalState } from '@/lib/hexastra/detection/detectEmotionalState'
 import { detectPrecision } from '@/lib/hexastra/session/sessionBrain'
-import { findMenuItem } from '@/lib/hexastra/menus/getMenuForMode'
+import { findMenuItem, getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
 
 export type HexastraSessionContext = {
   state: SessionStateRecord | null
@@ -61,7 +61,7 @@ export async function buildSessionContext({
   const resolvedContext = contextType ?? state?.current_context_type ?? 'general'
   const theme = state?.current_theme ?? (resolvedContext === 'general' ? null : resolvedContext)
   const mode = practitioner ? 'praticien' : 'libre'
-  const selected = findMenuItem(mode, selectedSubmenuKey ?? selectedMenuKey ?? null)
+  const selected = findMenuItem(getMenuForMode(mode), selectedSubmenuKey ?? selectedMenuKey ?? null)
   const domainRoute = selected?.domainRoute ?? state?.current_domain_route ?? inferDomainRoute(message, resolvedContext)
   const activeModule =
     domainRoute === 'gps_kua' ? 'KS.HexAstra.GPS.V1' :

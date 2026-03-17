@@ -1,4 +1,5 @@
 import { retrieveKnowledge } from "@/lib/vectorSearch"
+import type { DomainRoute } from '@/lib/hexastra/types'
 
 type LayerResult = {
   source: string
@@ -17,7 +18,7 @@ export async function multiLayerRetrieval({
   plan: string
   vectorStoreId: string
   apiKey: string
-  domainRoute?: string
+  domainRoute?: DomainRoute
 }) {
 
   const isFree = plan === 'free'

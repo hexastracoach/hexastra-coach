@@ -5,6 +5,7 @@ export type HexastraMode = 'libre' | 'libre_avance' | 'libre_approfondi' | 'prat
 export type FlowStep =
   | 'language'
   | 'birthdata'
+  | 'birthdata_missing'
   | 'practitioner_usage'
   | 'micro_profile'
   | 'micro_year'
@@ -15,6 +16,8 @@ export type FlowStep =
   | 'decision'
   | 'deep_reading'
   | 'sensitive_support'
+  | 'quota_limit'
+  | 'error'
 
 export type ContextType =
   | 'general'
@@ -26,6 +29,7 @@ export type ContextType =
   | 'timing'
   | 'hexastraReading'
   | 'science'
+  | 'practitioner'
 
 export type UiAction =
   | 'new_reading'
@@ -82,10 +86,12 @@ export type HexastraFlowState = {
 export type HexastraApiResponse = {
   message: string
   reply?: string
+  content?: string
   mode: HexastraMode
   plan: PlanKey
   flowState: HexastraFlowState
   conversationId: string
+  type?: string
   menu?: {
     visible: boolean
     items: HexastraMenuItem[]
@@ -101,6 +107,24 @@ export type HexastraApiResponse = {
     emotionalState?: EmotionalState
     timing?: TimingIntensity
     journeyEnabled?: boolean
+    lastUserMessage?: string
+    userMemoryUpdate?: Record<string, unknown>
+    quota?: {
+      used?: number
+      limit?: number | null
+      remaining?: number | null
+      resetAt?: string | null
+      windowStartedAt?: string | null
+    }
+    quotaExceeded?: boolean
+    resetAt?: string | null
+    used?: number
+    limit?: number
+    upgradeTargetPlan?: string
+    upgradeCtaLabel?: string
+    premiumPreviewLocked?: boolean
+    intentDetected?: string
+    responseDepth?: 'short' | 'medium' | 'long' | 'expert'
   }
   updatedEvolutionProfile?: Record<string, unknown> | null
 }

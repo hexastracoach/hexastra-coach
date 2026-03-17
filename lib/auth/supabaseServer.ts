@@ -10,7 +10,10 @@ export function createSupabaseServer() {
 
   // cookies() peut renvoyer un store différent selon le contexte;
   // on défensivise pour éviter les erreurs "get is not a function".
-  const store = cookies()
+  const store = cookies() as unknown as {
+    get?: (name: string) => { value?: string } | undefined
+    set?: (options: { name: string; value: string } & Record<string, unknown>) => void
+  }
   const safeGet = typeof store.get === 'function' ? store.get.bind(store) : () => undefined
   const safeSet = typeof store.set === 'function' ? store.set.bind(store) : () => {}
 

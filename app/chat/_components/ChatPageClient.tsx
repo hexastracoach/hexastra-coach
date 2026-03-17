@@ -80,6 +80,28 @@ import type {
   HexastraMenuItem,
 } from '@/lib/hexastra/types'
 
+type ChatApiMetadata = Record<string, unknown> & {
+  contextType?: ContextType
+  selectedMenuKey?: string | null
+  selectedSubmenuKey?: string | null
+  userMemoryUpdate?: Partial<UserMemory>
+  quota?: {
+    used?: number
+    limit?: number | null
+    remaining?: number | null
+    resetAt?: string | null
+    windowStartedAt?: string | null
+  }
+  quotaExceeded?: boolean
+  resetAt?: string | null
+  used?: number
+  limit?: number
+  upgradeTargetPlan?: string
+  upgradeCtaLabel?: string
+  premiumPreviewLocked?: boolean
+  intentDetected?: string
+}
+
 function IconMenu() {
   return (
     <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
@@ -232,6 +254,18 @@ function mergeBirthData(data: Partial<BirthData>): BirthData {
   }
 }
 
+function getStableApiReply(data: (HexastraApiResponse & { content?: unknown }) | null | undefined) {
+  if (!data) {
+    return "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
+  }
+
+  if (typeof data.message === 'string' && data.message.trim()) return data.message
+  if (typeof data.reply === 'string' && data.reply.trim()) return data.reply
+  if (typeof data.content === 'string' && data.content.trim()) return data.content
+
+  return "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
+}
+
 export default function ChatPageClient() {
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -332,7 +366,7 @@ export default function ChatPageClient() {
         userMessage,
         depthLevel,
       }: {
-        intent: Intent | string | undefined
+        intent: string | undefined
         isReading: boolean
         userMessage: string
         depthLevel: string
@@ -416,12 +450,8 @@ export default function ChatPageClient() {
       return "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
     }
 
-    const reply =
-      typeof data?.message === 'string'
-        ? data.message
-        : typeof data?.reply === 'string'
-          ? data.reply
-          : "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
+    const metadata = (data.metadata ?? {}) as ChatApiMetadata
+    const reply = getStableApiReply(data as HexastraApiResponse & { content?: unknown })
 
     if (data.conversationId) setConversationId(data.conversationId)
 
@@ -431,14 +461,14 @@ export default function ChatPageClient() {
       setMenuItems([])
     }
 
-    if (data.metadata?.contextType) setActiveContextType(data.metadata.contextType)
+    if (metadata.contextType) setActiveContextType(metadata.contextType)
 
-    if (data.metadata?.selectedMenuKey !== undefined) {
-      setSelectedMenuKey(data.metadata.selectedMenuKey ?? null)
+    if (metadata.selectedMenuKey !== undefined) {
+      setSelectedMenuKey(metadata.selectedMenuKey ?? null)
     }
 
-    if (data.metadata?.selectedSubmenuKey !== undefined) {
-      setSelectedSubmenuKey(data.metadata.selectedSubmenuKey ?? null)
+    if (metadata.selectedSubmenuKey !== undefined) {
+      setSelectedSubmenuKey(metadata.selectedSubmenuKey ?? null)
     }
 
     if (data.updatedEvolutionProfile) {
@@ -446,9 +476,9 @@ export default function ChatPageClient() {
       saveEvolutionProfile(data.updatedEvolutionProfile as UserEvolutionProfile)
     }
 
-    if (data.metadata?.userMemoryUpdate && typeof data.metadata.userMemoryUpdate === 'object') {
+    if (metadata.userMemoryUpdate && typeof metadata.userMemoryUpdate === 'object') {
       try {
-        const update = data.metadata.userMemoryUpdate as Partial<UserMemory>
+        const update = metadata.userMemoryUpdate as Partial<UserMemory>
         setUserMemory((prev) => {
           const merged = { ...prev, ...update }
           localStorage.setItem('hexastra.userMemory', JSON.stringify(merged))
@@ -457,7 +487,7 @@ export default function ChatPageClient() {
       } catch {}
     }
 
-    const quotaMeta = data?.metadata?.quota
+    const quotaMeta = metadata.quota
     if (isFreePlan(userPlan) && quotaMeta) {
       const used =
         typeof quotaMeta.used === 'number' && Number.isFinite(quotaMeta.used)
@@ -484,35 +514,36 @@ export default function ChatPageClient() {
       } catch {}
     }
 
-    if (data?.metadata?.quotaExceeded) {
+    if (metadata.quotaExceeded) {
       const resetAtValue =
-        typeof data?.metadata?.resetAt === 'string' && data.metadata.resetAt
-          ? new Date(data.metadata.resetAt)
+        typeof metadata.resetAt === 'string' && metadata.resetAt
+          ? new Date(metadata.resetAt)
           : null
 
       if (isFreePlan(userPlan)) {
         setFreeMessagesUsed(
-          typeof data?.metadata?.usage?.limit === 'number' ? data.metadata.usage.limit : 3
+          typeof metadata.used === 'number'
+            ? metadata.used
+            : typeof metadata.limit === 'number'
+              ? metadata.limit
+              : 3
         )
         setFreeResetAt(resetAtValue)
       }
 
       setPremiumLock({
-        targetPlan: data.metadata.upgradeTargetPlan ?? 'essential',
-        ctaLabel: data.metadata.upgradeCtaLabel ?? 'Passer Ã  Essentiel',
-        text:
-          typeof data?.message === 'string'
-            ? data.message
-            : 'Ton accÃ¨s gratuit a atteint sa limite pour le moment.',
+        targetPlan: metadata.upgradeTargetPlan ?? 'essential',
+        ctaLabel: metadata.upgradeCtaLabel ?? 'Passer Ã  Essentiel',
+        text: reply || 'Ton accÃ¨s gratuit a atteint sa limite pour le moment.',
       })
 
       return reply
     }
 
-    if (data?.metadata?.premiumPreviewLocked) {
+    if (metadata.premiumPreviewLocked) {
       setPremiumLock({
-        targetPlan: data.metadata.upgradeTargetPlan ?? 'premium',
-        ctaLabel: data.metadata.upgradeCtaLabel ?? 'Passer Ã  Premium',
+        targetPlan: metadata.upgradeTargetPlan ?? 'premium',
+        ctaLabel: metadata.upgradeCtaLabel ?? 'Passer Ã  Premium',
         text: 'La suite de lâ€™analyse complÃ¨te est disponible dans le plan supÃ©rieur.',
       })
     } else {
@@ -626,9 +657,8 @@ export default function ChatPageClient() {
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const reply = applyApiResponse(data)
         const depthLevel = detectUserDepthLevel(message, messages, userPlan)
-conversationStateRef.current = updateConversationState(intentDetected, conversationStateRef.current)
         const finalReply = formatAssistantReply(reply, {
-          intent: intentDetected,
+          intent: ((data?.metadata ?? {}) as ChatApiMetadata).intentDetected,
           userMessage: message,
           isReading,
           depthLevel,
@@ -1059,8 +1089,8 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
       const reply = applyApiResponse(data)
       const isReading = isReadingFlowStep(data?.flowState?.step)
       const depthLevel = detectUserDepthLevel(lastUserMessage || reply, messages, userPlan)
-const finalReply = formatAssistantReply(reply, {
-        intent: microIntent,
+      const finalReply = formatAssistantReply(reply, {
+        intent: ((data?.metadata ?? {}) as ChatApiMetadata).intentDetected,
         userMessage: lastUserMessage || reply,
         isReading,
         depthLevel,
@@ -1225,7 +1255,7 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
           cachedReply.toLowerCase().includes('pour aller plus loin')
         const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
         const composedCached = formatAssistantReply(cachedReply, {
-          intent: intentDetected,
+          intent: undefined,
           isReading: cachedIsReading,
           userMessage: baseContent,
           depthLevel,
@@ -1276,9 +1306,8 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
         const reply = applyApiResponse(data)
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
-conversationStateRef.current = updateConversationState(intentDetected, conversationStateRef.current)
         const finalReply = formatAssistantReply(reply, {
-          intent: intentDetected,
+          intent: ((data?.metadata ?? {}) as ChatApiMetadata).intentDetected,
           userMessage: baseContent,
           isReading,
           depthLevel,

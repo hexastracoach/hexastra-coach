@@ -46,6 +46,7 @@ import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = process.env.HEXASTRA_API_URL!.replace(/\/$/, '')
 const API_KEY = process.env.HEXASTRA_API_KEY || ''
+const GLOBAL_FLOW_TIMEOUT_MS = 18000
 const flowLog = (
   level: 'info' | 'debug' | 'warn' | 'error',
   msg: string,
@@ -171,10 +172,34 @@ function detectLanguageFromMessages(messages: ChatMessage[], fallback = 'fr'): s
   return 'fr'
 }
 
+function toSpecializedSource(domainRoute: DomainRoute): SpecializedModuleResult['source'] {
+  if (domainRoute === 'gps_kua' || domainRoute === 'neurokua' || domainRoute === 'fusion') {
+    return domainRoute
+  }
+  return 'fusion'
+}
+
+function withGlobalTimeout<T>(promise: Promise<T>, timeoutMs: number, meta?: Record<string, unknown>) {
+  return Promise.race<T>([
+    promise,
+    new Promise<T>((_, reject) => {
+      const timeoutId = setTimeout(() => {
+        flowLog('error', 'global timeout reached', { timeoutMs, ...(meta ?? {}) })
+        reject(new Error(`runHexastraFlow timed out after ${timeoutMs}ms`))
+      }, timeoutMs)
+
+      promise.finally(() => clearTimeout(timeoutId)).catch(() => {
+        // The caller handles the original rejection; this catch only avoids an unhandled finally chain.
+      })
+    }),
+  ])
+}
+
 async function callRailway(path: string, payload: Record<string, unknown>) {
   const url = `${API_URL}${path}`
 
-  flowLog('info', 'callRailway', { path })
+  const started = Date.now()
+  flowLog('info', 'before Railway call', { path, timeoutMs: 9000 })
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -186,10 +211,20 @@ async function callRailway(path: string, payload: Record<string, unknown>) {
   })
 
   if (!res.ok) {
-    flowLog('warn', 'callRailway non-200', { path, status: res.status })
+    flowLog('warn', 'after Railway call', {
+      path,
+      status: res.status,
+      ok: false,
+      durationMs: Date.now() - started,
+    })
     throw new Error(`Railway ${path} failed with status ${res.status}`)
   }
-  flowLog('info', 'callRailway success', { path, status: res.status })
+  flowLog('info', 'after Railway call', {
+    path,
+    status: res.status,
+    ok: true,
+    durationMs: Date.now() - started,
+  })
 
   const text = await res.text()
   if (!text) return null
@@ -210,7 +245,7 @@ async function callOpenAIResponse(payload: {
   max_output_tokens?: number
 }) {
   const started = Date.now()
-  flowLog('info', 'callOpenAIResponse start', { model: payload.model })
+  flowLog('info', 'before OpenAI call', { model: payload.model })
   const response = await openai.responses.create({
     model: payload.model,
     input: [
@@ -222,7 +257,11 @@ async function callOpenAIResponse(payload: {
   })
 
   const text = response.output_text ?? ''
-  flowLog('info', 'callOpenAIResponse done', { ms: Date.now() - started, length: text.length })
+  flowLog('info', 'after OpenAI call', {
+    model: payload.model,
+    durationMs: Date.now() - started,
+    finalTextLength: text.length,
+  })
   return text
 }
 
@@ -387,120 +426,125 @@ export async function runHexastraFlow(input: {
   evolutionProfile?: Record<string, unknown> | null
   journeyEnabled?: boolean
 }): Promise<HexastraApiResponse> {
-  const controller = new AbortController()
-  const globalTimeout = setTimeout(() => controller.abort(), 18000) // 18s fail-fast for Vercel
   flowLog('info', 'enter runHexastraFlow', {
     plan: input.plan,
     requestType: input.requestType,
     messages: Array.isArray(input.messages) ? input.messages.length : 0,
+    globalTimeoutMs: GLOBAL_FLOW_TIMEOUT_MS,
   })
 
-  // Central input normalization to keep the flow crash-proof
-  const normalizedMessages = safeArray<ChatMessage>(input.messages)
-  const normalizedContextType: ContextType = input.contextType ?? 'general'
-  const normalizedBirthData = normalizeBirthData(input.birthData)
-  const normalizedPractitionerUsage = input.practitionerUsage ?? null
-  const normalizedSelectedMenuKey = input.selectedMenuKey ?? null
-  const normalizedSelectedSubmenuKey = input.selectedSubmenuKey ?? null
-  const normalizedUiAction = input.uiAction ?? 'send_message'
-  const normalizedJourneyToggle = Boolean(input?.journeyEnabled)
+  const executeFlow = async (): Promise<HexastraApiResponse> => {
+    // Central input normalization to keep the flow crash-proof
+    const normalizedMessages = safeArray<ChatMessage>(input.messages)
+    const normalizedContextType: ContextType = input.contextType ?? 'general'
+    const normalizedBirthData = normalizeBirthData(input.birthData)
+    const normalizedPractitionerUsage = input.practitionerUsage ?? null
+    const normalizedSelectedMenuKey = input.selectedMenuKey ?? null
+    const normalizedSelectedSubmenuKey = input.selectedSubmenuKey ?? null
+    const normalizedUiAction = input.uiAction ?? 'send_message'
+    const normalizedJourneyToggle = Boolean(input?.journeyEnabled)
 
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    logger.error('[runHexastraFlow] Supabase public env missing')
-    throw new Error('Supabase env missing')
-  }
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      logger.error('[runHexastraFlow] Supabase public env missing')
+      throw new Error('Supabase env missing')
+    }
 
-  if (!API_KEY || !API_URL) {
-    logger.error('[runHexastraFlow] HEXASTRA_API env missing')
-    throw new Error('HEXASTRA API env missing')
-  }
+    if (!API_KEY || !API_URL) {
+      logger.error('[runHexastraFlow] HEXASTRA_API env missing')
+      throw new Error('HEXASTRA API env missing')
+    }
 
-  const conversationId = input.conversationId ?? randomUUID()
-  const fallbackLanguage = input.language ?? detectLanguageFromMessages(normalizedMessages, 'fr')
-  const fallbackPlan = normalizePlan(input.plan)
-  let journeyEnabled = normalizedJourneyToggle
+    const conversationId = input.conversationId ?? randomUUID()
+    const fallbackLanguage = input.language ?? detectLanguageFromMessages(normalizedMessages, 'fr')
+    const fallbackPlan = normalizePlan(input.plan)
+    let journeyEnabled = normalizedJourneyToggle
 
-  logger.debug('[runHexastraFlow] normalized input', {
-    plan: input.plan,
-    normalizedPlan: fallbackPlan,
-    language: fallbackLanguage,
-    contextType: normalizedContextType,
-    uiAction: normalizedUiAction,
-    messagesCount: normalizedMessages.length,
-    selectedMenuKey: normalizedSelectedMenuKey,
-    selectedSubmenuKey: normalizedSelectedSubmenuKey,
-    journeyEnabled: normalizedJourneyToggle,
-  })
+    logger.debug('[runHexastraFlow] normalized input', {
+      plan: input.plan,
+      normalizedPlan: fallbackPlan,
+      language: fallbackLanguage,
+      contextType: normalizedContextType,
+      uiAction: normalizedUiAction,
+      messagesCount: normalizedMessages.length,
+      selectedMenuKey: normalizedSelectedMenuKey,
+      selectedSubmenuKey: normalizedSelectedSubmenuKey,
+      journeyEnabled: normalizedJourneyToggle,
+    })
 
-  if (!VECTOR_STORE_ID) {
-    logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing — retrieval disabled')
-  }
+    if (!VECTOR_STORE_ID) {
+      logger.warn('[runHexastraFlow] OPENAI_VECTOR_STORE_ID missing — retrieval disabled')
+    }
 
-  // limiter le contexte à 6 messages (3 user + 2 assistant + dernier user)
-  const limitedMessages = (() => {
-    const recent = normalizedMessages.slice(-6)
-    const users = recent.filter((m) => m.role === 'user').slice(-3)
-    const assistants = recent.filter((m) => m.role === 'assistant').slice(-2)
-    const allowed = new Set([...users, ...assistants])
-    return recent.filter((m) => allowed.has(m))
-  })()
+    // limiter le contexte à 6 messages (3 user + 2 assistant + dernier user)
+    const limitedMessages = (() => {
+      const recent = normalizedMessages.slice(-6)
+      const users = recent.filter((m) => m.role === 'user').slice(-3)
+      const assistants = recent.filter((m) => m.role === 'assistant').slice(-2)
+      const allowed = new Set([...users, ...assistants])
+      return recent.filter((m) => allowed.has(m))
+    })()
 
-  const latestUserMessage =
-    limitedMessages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
-  const isGreeting = /^(bonjour|salut|hello|hey|bonsoir|coucou|yo)\s*$/i.test(
-    latestUserMessage.trim()
-  )
+    const latestUserMessage =
+      limitedMessages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
+    const isGreeting = /^(bonjour|salut|hello|hey|bonsoir|coucou|yo)\s*$/i.test(
+      latestUserMessage.trim()
+    )
 
-  try {
     let supabase: any = null
     let user: any = null
 
     try {
-      supabase = await createSupabaseServer()
-      const authResult = supabase?.auth ? await supabase.auth.getUser() : null
-      user = authResult?.data?.user ?? null
-    } catch (authError) {
-      logger.error('[runHexastraFlow] supabase/auth unavailable', { error: authError })
-    }
-
-    let userContext: any = null
-    try {
-      userContext = await buildUserContext({
-        supabase,
-        user,
-        fallbackPlan,
-        fallbackLanguage,
-        birthData: normalizedBirthData,
-        practitionerUsage: normalizedPractitionerUsage,
-      })
-    } catch (userContextError) {
-      logger.error('[runHexastraFlow] buildUserContext failed', { error: userContextError })
-
-      userContext = {
-        plan: fallbackPlan,
-        language: fallbackLanguage,
-        birthData: normalizedBirthData,
-        practitionerUsage: normalizedPractitionerUsage,
-        memory: null,
-        journeyEnabled: normalizedJourneyToggle,
+      try {
+        supabase = await createSupabaseServer()
+        const authResult = supabase?.auth ? await supabase.auth.getUser() : null
+        user = authResult?.data?.user ?? null
+      } catch (authError) {
+        logger.error('[runHexastraFlow] supabase/auth unavailable', { error: authError })
       }
-    }
 
-    const plan = normalizePlan(userContext.plan)
-    const mode = getModeForPlan(plan)
-    journeyEnabled = normalizedJourneyToggle ?? userContext.journeyEnabled ?? false
-    userContext = { ...userContext, journeyEnabled }
+      let userContext: any = null
+      try {
+        userContext = await buildUserContext({
+          supabase,
+          user,
+          fallbackPlan,
+          fallbackLanguage,
+          birthData: normalizedBirthData,
+          practitionerUsage: normalizedPractitionerUsage,
+        })
+      } catch (userContextError) {
+        logger.error('[runHexastraFlow] buildUserContext failed', { error: userContextError })
 
-    const menuItems = safeArray(getMenuForMode(mode)).map((item) => normalizeMenuItem(item))
+        userContext = {
+          plan: fallbackPlan,
+          language: fallbackLanguage,
+          birthData: normalizedBirthData,
+          practitionerUsage: normalizedPractitionerUsage,
+          memory: null,
+          journeyEnabled: normalizedJourneyToggle,
+        }
+      }
 
-    const flowStep = computeFlowStep({
-      requestType: input.requestType,
-      uiAction: normalizedUiAction,
-      contextType: normalizedContextType,
-      birthData: userContext.birthData,
-      selectedMenuKey: normalizedSelectedMenuKey,
-      selectedSubmenuKey: normalizedSelectedSubmenuKey,
-    })
+      const plan = normalizePlan(userContext.plan)
+      const mode = getModeForPlan(plan)
+      journeyEnabled = normalizedJourneyToggle ?? userContext.journeyEnabled ?? false
+      userContext = { ...userContext, journeyEnabled }
+
+      const menuItems = safeArray(getMenuForMode(mode)).map((item) => normalizeMenuItem(item))
+
+      const flowStep = computeFlowStep({
+        requestType: input.requestType,
+        uiAction: normalizedUiAction,
+        latestUserMessage,
+        hasBirthData: isBirthComplete(userContext.birthData),
+        hasShownMicroReadings: Boolean(userContext.session?.hasShownMicroReadings),
+        practitionerNeedsUsage: plan === 'practitioner' && !normalizedPractitionerUsage,
+        selectedMenuKey: normalizedSelectedMenuKey,
+        selectedSubmenuKey: normalizedSelectedSubmenuKey,
+        emotionalState: 'neutral',
+        timing: 'exploration',
+        precision: 'medium',
+      } as Parameters<typeof computeFlowStep>[0])
 
     const selectedMenu =
       normalizedSelectedMenuKey && menuItems
@@ -524,6 +568,10 @@ export async function runHexastraFlow(input: {
 
     if (plan === 'practitioner' && input.requestType === 'chat' && !normalizedPractitionerUsage) {
       const message = buildPractitionerUsageMessage(userContext.language ?? fallbackLanguage)
+      flowLog('info', 'flow step final', {
+        step: 'practitioner_usage',
+        finalMessageLength: message.length,
+      })
       return {
         message,
         reply: message,
@@ -544,6 +592,10 @@ export async function runHexastraFlow(input: {
 
     if (isBirthNeeded && !isGreeting && input.requestType === 'chat') {
       const message = buildMissingBirthMessage(userContext.language ?? fallbackLanguage)
+      flowLog('info', 'flow step final', {
+        step: 'birthdata_missing',
+        finalMessageLength: message.length,
+      })
       return {
         message,
         reply: message,
@@ -574,19 +626,31 @@ export async function runHexastraFlow(input: {
       contextType: normalizedContextType,
     })
 
-    const retrievalPlan = await buildRetrievalPlan({
-      messages: limitedMessages,
-      userContext,
-      sessionContext: null,
-      mode,
+    const retrievalConfig = getAdaptiveRetrievalConfig({
+      plan,
       domainRoute,
-      vectorStoreId: VECTOR_STORE_ID,
-      adaptiveConfig: getAdaptiveRetrievalConfig(plan),
+      query: latestUserMessage,
     })
+    const retrievalPlan = buildRetrievalPlan({
+      plan,
+      flowStep,
+      domainRoute,
+      specializedSource: null,
+    }) as any
+    const retrievalResults =
+      VECTOR_STORE_ID && process.env.OPENAI_API_KEY
+        ? await multiLayerRetrieval({
+            query: latestUserMessage,
+            plan,
+            vectorStoreId: VECTOR_STORE_ID,
+            apiKey: process.env.OPENAI_API_KEY,
+            domainRoute,
+          })
+        : []
 
     const knowledgePayload =
-      retrievalPlan?.documents?.length
-        ? await compressKnowledgeContext(retrievalPlan.documents, retrievalPlan.slots ?? [])
+      retrievalResults.length
+        ? compressKnowledgeContext(retrievalResults as any, retrievalConfig)
         : { block: null }
 
     const selectedMenuKey =
@@ -607,8 +671,7 @@ export async function runHexastraFlow(input: {
       contextType: normalizedContextType,
       selectedMenuKey,
       selectedSubmenuKey,
-      mode,
-      domainRoute,
+      practitioner: plan === 'practitioner',
     })
 
     const menuInstruction = retrievalPlan?.menu?.instruction ?? null
@@ -627,18 +690,18 @@ export async function runHexastraFlow(input: {
             : 'Je poursuis avec une lecture générale.'
 
       specializedResult = {
-        source: domainRoute,
+        source: toSpecializedSource(domainRoute),
         publicSummary: fallbackPublicSummary,
         raw: null,
       }
-      flowLog('info', 'specializedResult fallback injected', { domainRoute })
+      flowLog('warn', 'fallback module used', { domainRoute, source: specializedResult.source })
     }
     flowLog('info', 'specializedResult', {
       hasResult: Boolean(specializedResult),
       source: specializedResult?.source,
     })
 
-    const activeModules = getModulesForDomain(domainRoute, mode)
+    const activeModules = getModulesForDomain(domainRoute)
 
     const knowledgeBlock = knowledgePayload?.block
 
@@ -667,7 +730,7 @@ export async function runHexastraFlow(input: {
     let arbitration: any = null
     try {
       fusedSignal = fusionEngine(safeSignals.length ? safeSignals : [fallbackSignal])
-      arbitration = await arbiter({ domainRoute, fusedSignal, userContext, sessionContext })
+      arbitration = await arbiter(fusedSignal)
     } catch (fusionError) {
       logger.error('[runHexastraFlow] fusion/buildSignalEnvelope failed', {
         error: fusionError,
@@ -693,7 +756,7 @@ export async function runHexastraFlow(input: {
       flowStep,
       emotionalState: sessionContext.emotionalState,
       precision: sessionContext.precision,
-      retrievalProfile: sessionContext.retrievalProfile ?? 'balanced',
+      retrievalProfile: 'balanced',
     })
 
     const messagesForLLM = limitedMessages.length
@@ -709,14 +772,17 @@ export async function runHexastraFlow(input: {
       flowStep,
     })
 
-    const rawMessage = await callOpenAIResponse(payload)
+    const rawMessage = await callOpenAIResponse({
+      ...payload,
+      input: payload.input as { role: 'system' | 'user' | 'assistant'; content: string }[],
+    })
     let message = applySentinel(rawMessage)
     if (!message || !message.trim()) {
       message =
         domainRoute === 'neurokua'
           ? "Je n’ai pas pu ouvrir NeuroKua pour le moment. Voici une lecture générale en attendant : focus sur ton équilibre du jour."
           : "Je poursuis avec une réponse courte basée sur les informations disponibles."
-      flowLog('warn', 'openai empty response fallback', { domainRoute })
+      flowLog('warn', 'fallback module used', { domainRoute, source: 'openai_empty_response' })
     }
 
     const menuVisible =
@@ -813,35 +879,76 @@ export async function runHexastraFlow(input: {
       ? message
       : message
 
-    return {
-      message: finalMessage,
-      reply: finalMessage,
-      mode,
-      plan,
-      conversationId,
-      flowState: { step: menuVisibleReturn ? 'menu' : flowStep, completed: true },
-      menu: { visible: menuVisibleReturn, items: menuItemsReturned },
-      suggestions: menuVisibleReturn
-        ? []
-        : [],
-      metadata: {
-        contextType: selectedMenu?.contextType ?? sessionContext.contextType,
-        practitionerUsage: userContext.practitionerUsage ?? null,
-        shouldPersistMemory: !menuVisibleReturn,
-        selectedMenuKey,
-        selectedSubmenuKey,
-        sessionStep: menuVisibleReturn ? 'menu' : flowStep,
-        emotionalState: sessionContext.emotionalState,
-        timing: sessionContext.timing,
-        journeyEnabled,
-      },
-      updatedEvolutionProfile: input.evolutionProfile ?? null,
-    } as HexastraApiResponse
-  } catch (error) {
+    flowLog('info', 'flow step final', {
+      step: menuVisibleReturn ? 'menu' : flowStep,
+      finalMessageLength: finalMessage.length,
+      menuVisible: menuVisibleReturn,
+    })
+
+      return {
+        message: finalMessage,
+        reply: finalMessage,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: menuVisibleReturn ? 'menu' : flowStep, completed: true },
+        menu: { visible: menuVisibleReturn, items: menuItemsReturned },
+        suggestions: menuVisibleReturn
+          ? []
+          : [],
+        metadata: {
+          contextType: selectedMenu?.contextType ?? sessionContext.contextType,
+          practitionerUsage: userContext.practitionerUsage ?? null,
+          shouldPersistMemory: !menuVisibleReturn,
+          selectedMenuKey,
+          selectedSubmenuKey,
+          sessionStep: menuVisibleReturn ? 'menu' : flowStep,
+          emotionalState: sessionContext.emotionalState,
+          timing: sessionContext.timing,
+          journeyEnabled,
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      } as HexastraApiResponse;
+    } catch (error) {
+      logger.error('[runHexastraFlow] fatal error', { error })
+      flowLog('error', 'flow step final', {
+        step: 'error',
+        finalMessageLength: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.".length,
+      })
+      return {
+        message: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
+        reply: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
+        mode: 'free',
+        plan: 'free' as PlanKey,
+        conversationId,
+        flowState: { step: 'error', completed: false },
+        metadata: {
+          shouldPersistMemory: false,
+          journeyEnabled,
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      } as unknown as HexastraApiResponse;
+    }
+  }
+
+  return withGlobalTimeout(executeFlow(), GLOBAL_FLOW_TIMEOUT_MS, {
+    requestType: input.requestType,
+    conversationId: input.conversationId ?? null,
+  }).catch((error) => {
     logger.error('[runHexastraFlow] fatal error', { error })
+    const conversationId = input.conversationId ?? randomUUID()
+    const journeyEnabled = Boolean(input?.journeyEnabled)
+    const message =
+      "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu."
+
+    flowLog('error', 'flow step final', {
+      step: 'error',
+      finalMessageLength: message.length,
+    })
+
     return {
-      message: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
-      reply: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
+      message,
+      reply: message,
       mode: 'free',
       plan: 'free' as PlanKey,
       conversationId,
@@ -852,7 +959,5 @@ export async function runHexastraFlow(input: {
       },
       updatedEvolutionProfile: input.evolutionProfile ?? null,
     } as unknown as HexastraApiResponse
-  } finally {
-    clearTimeout(globalTimeout)
-  }
+  })
 }

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createSupabaseServer } from '@/lib/auth/supabaseServer'
@@ -49,9 +50,12 @@ export async function POST(req: NextRequest) {
     const supabase = createSupabaseServer()
 
     // Try cookie-based auth first
-    const { data: cookieUser, error: userError } = await supabase.auth.getUser()
+    const {
+      data: { user: cookieUser },
+      error: userError,
+    } = await supabase.auth.getUser()
 
-    let user = cookieUser
+    let user = cookieUser ?? null
 
     // Fallback to bearer token (sent from client) when cookies not available
     if ((!user || userError) && supabaseUrl && supabaseServiceKey) {
@@ -60,7 +64,7 @@ export async function POST(req: NextRequest) {
         const admin = createSupabaseAdmin(supabaseUrl, supabaseServiceKey)
         const { data, error } = await admin.auth.getUser(token)
         if (!error && data?.user) {
-          user = data
+          user = data.user
         }
       }
     }

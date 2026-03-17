@@ -29,6 +29,18 @@ export const runtime = 'nodejs'
 type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien'
 type UsageFeature = 'chat_api'
 type ResponseDepth = 'short' | 'medium' | 'long' | 'expert'
+type ChatResponsePayload = Record<string, unknown> & {
+  message?: string
+  reply?: string
+  content?: string
+  type?: string
+  plan?: PlanKey
+  mode?: PlanKey | string
+  conversationId?: string
+  flowState?: Record<string, unknown>
+  menu?: Record<string, unknown>
+  metadata?: Record<string, unknown>
+}
 const SUPPORTED_LANGUAGES = ['fr', 'en', 'es', 'pt', 'de', 'it'] as const
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 
@@ -66,6 +78,80 @@ function normalizeText(value: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
+}
+
+const DEFAULT_FALLBACK_MESSAGE = 'Je suis là. Dis-moi ce dont tu as besoin.'
+const DEFAULT_EMPTY_MENU = { visible: false, items: [] }
+
+function buildConsistentResponse(
+  payload: ChatResponsePayload,
+  defaults?: {
+    type?: string
+    plan?: PlanKey
+    mode?: PlanKey | string
+    conversationId?: string
+    flowState?: Record<string, unknown>
+    menu?: Record<string, unknown>
+  }
+): ChatResponsePayload {
+  const trimmedMessage =
+    typeof payload.message === 'string' && payload.message.trim().length > 0
+      ? payload.message.trim()
+      : null
+  const trimmedReply =
+    typeof payload.reply === 'string' && payload.reply.trim().length > 0
+      ? payload.reply.trim()
+      : null
+  const trimmedContent =
+    typeof payload.content === 'string' && payload.content.trim().length > 0
+      ? payload.content.trim()
+      : null
+
+  const finalText =
+    trimmedMessage ?? trimmedReply ?? trimmedContent ?? DEFAULT_FALLBACK_MESSAGE
+
+  return {
+    ...payload,
+    message: finalText,
+    reply: finalText,
+    content: finalText,
+    type:
+      typeof payload.type === 'string'
+        ? payload.type
+        : defaults?.type ?? 'conversation',
+    plan:
+      (typeof payload.plan === 'string' ? payload.plan : defaults?.plan) ?? 'free',
+    mode:
+      (typeof payload.mode === 'string' ? payload.mode : defaults?.mode) ??
+      (typeof payload.plan === 'string' ? payload.plan : defaults?.plan) ??
+      'free',
+    conversationId:
+      (typeof payload.conversationId === 'string' && payload.conversationId.trim()) ||
+      defaults?.conversationId ||
+      randomUUID(),
+    flowState:
+      payload.flowState && typeof payload.flowState === 'object'
+        ? payload.flowState
+        : defaults?.flowState ?? { step: 'conversation', completed: true },
+    menu:
+      payload.menu && typeof payload.menu === 'object'
+        ? payload.menu
+        : defaults?.menu ?? DEFAULT_EMPTY_MENU,
+  }
+}
+
+function getNormalizationDiagnostics(payload: ChatResponsePayload) {
+  const message = typeof payload.message === 'string' ? payload.message.trim() : ''
+  const reply = typeof payload.reply === 'string' ? payload.reply.trim() : ''
+  const content = typeof payload.content === 'string' ? payload.content.trim() : ''
+  const from = message ? 'message' : reply ? 'reply' : content ? 'content' : 'fallback'
+  const finalText = message || reply || content || DEFAULT_FALLBACK_MESSAGE
+
+  return {
+    from,
+    usedLocalFallback: from === 'fallback',
+    finalTextLength: finalText.length,
+  }
 }
 
 function isGreeting(normalized: string): boolean {
@@ -177,17 +263,25 @@ function normalizeBirthData(raw: unknown): BirthProfile | null {
 }
 
 function buildSafeErrorResponse() {
-  return {
-    message: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
-    reply: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
-    mode: 'free',
-    plan: 'free',
-    flowState: { step: 'error', completed: false },
-    conversationId: randomUUID(),
-    metadata: {
-      shouldPersistMemory: false,
+  return buildConsistentResponse(
+    {
+      message: "Je n’ai pas pu analyser cette demande pour le moment. Essaie de reformuler ou choisis une option du menu.",
+      mode: 'free',
+      plan: 'free',
+      flowState: { step: 'error', completed: false },
+      conversationId: randomUUID(),
+      metadata: {
+        shouldPersistMemory: false,
+      },
     },
-  }
+    {
+      type: 'error',
+      plan: 'free',
+      mode: 'free',
+      flowState: { step: 'error', completed: false },
+      menu: DEFAULT_EMPTY_MENU,
+    }
+  )
 }
 
 function buildQuotaErrorResponse(params: { plan: PlanKey; used: number; limit: number; resetAt: string | null }) {
@@ -213,21 +307,29 @@ Tu pourras réessayer plus tard, ou passer à l’offre supérieure si tu veux c
 
   const finalMessage = plan === 'free' ? freeMessage : paidMessage
 
-  return {
-    message: finalMessage,
-    reply: finalMessage,
-    mode: plan,
-    plan,
-    flowState: { step: 'quota_limit', completed: false },
-    conversationId: randomUUID(),
-    metadata: {
-      shouldPersistMemory: false,
-      quotaExceeded: true,
-      resetAt,
-      used,
-      limit,
+  return buildConsistentResponse(
+    {
+      message: finalMessage,
+      mode: plan,
+      plan,
+      flowState: { step: 'quota_limit', completed: false },
+      conversationId: randomUUID(),
+      metadata: {
+        shouldPersistMemory: false,
+        quotaExceeded: true,
+        resetAt,
+        used,
+        limit,
+      },
     },
-  }
+    {
+      type: 'quota',
+      plan,
+      mode: plan,
+      flowState: { step: 'quota_limit', completed: false },
+      menu: DEFAULT_EMPTY_MENU,
+    }
+  )
 }
 
 function getGuestSubjectKey(req: NextRequest) {
@@ -386,7 +488,12 @@ export async function POST(req: NextRequest) {
 
     if (!body || typeof body !== 'object') {
       log('warn', 'invalid body')
-      return NextResponse.json(buildSafeErrorResponse(), { status: 400 })
+      const safeErrorResponse = buildSafeErrorResponse()
+      log('info', 'response normalized', {
+        branch: 'safe_error',
+        ...getNormalizationDiagnostics(safeErrorResponse),
+      })
+      return NextResponse.json(safeErrorResponse, { status: 400 })
     }
 
     const requestType =
@@ -399,6 +506,10 @@ export async function POST(req: NextRequest) {
     const sanitizedMessages = limitHistory(sanitizeMessages((body as Record<string, unknown>).messages))
     const lastUserMessage = [...sanitizedMessages].reverse().find((m) => m.role === 'user')?.content?.trim() ?? ''
     const normalizedLast = normalizeText(lastUserMessage)
+    const requestedConversationId =
+      typeof (body as Record<string, unknown>).conversationId === 'string'
+        ? ((body as Record<string, unknown>).conversationId as string)
+        : null
 
     log('info', 'request summary', {
       requestType,
@@ -419,49 +530,57 @@ export async function POST(req: NextRequest) {
     const intentLocal = detectIntentLocal(lastUserMessage)
     log('info', 'intent detected', { intentLocal })
 
-    // test branch to validate greeting route quickly
-    if (lastUserMessage.toLowerCase() === 'salut') {
-      return NextResponse.json({
-        ok: true,
-        type: 'greeting',
-        message: 'Bonjour. Test greeting direct OK.',
-        uiAction: { type: 'open_menu' },
-      })
-    }
-
     if (intentLocal === 'greeting') {
       try {
-        log('info', 'enter greeting branch')
+        log('info', 'branch chosen', { branch: 'greeting' })
         const content = await generateConversation(lastUserMessage || 'Bonjour.')
-        const resp = {
-          content,
-          type: 'conversation',
-          plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
-        }
-        log('info', 'return greeting payload', { type: resp.type })
+        const resp = buildConsistentResponse(
+          {
+            content,
+            type: 'greeting',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? randomUUID(),
+            flowState: { step: 'conversation', completed: true },
+            menu: DEFAULT_EMPTY_MENU,
+          },
+          {
+            type: 'greeting',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? undefined,
+            flowState: { step: 'conversation', completed: true },
+            menu: DEFAULT_EMPTY_MENU,
+          }
+        )
+        log('info', 'response normalized', {
+          branch: 'greeting',
+          ...getNormalizationDiagnostics({ content }),
+        })
         return NextResponse.json(resp, { status: 200 })
       } catch (error) {
         log('warn', 'greeting openai failed, fallback local', { error: (error as Error)?.message })
-        const resp = {
+        const payload = {
           content: 'Salut. Comment tu te sens aujourd’hui ?',
-          type: 'conversation',
+          type: 'greeting',
           plan: effectivePlan,
           mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
+          conversationId: requestedConversationId ?? randomUUID(),
           flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
+          menu: DEFAULT_EMPTY_MENU,
         }
-        log('info', 'return greeting fallback payload', { type: resp.type })
+        const resp = buildConsistentResponse(payload, {
+          type: 'greeting',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId: requestedConversationId ?? undefined,
+          flowState: { step: 'conversation', completed: true },
+          menu: DEFAULT_EMPTY_MENU,
+        })
+        log('info', 'response normalized', {
+          branch: 'greeting_fallback',
+          ...getNormalizationDiagnostics(payload),
+        })
         return NextResponse.json(resp, { status: 200 })
       }
     }
@@ -469,12 +588,22 @@ export async function POST(req: NextRequest) {
     const cacheKey = buildCacheKey(userId, lastUserMessage, normalizeBirthData((body as Record<string, unknown>).birthData))
     const cached = getCache(cacheKey)
     if (cached) {
-      log('info', 'cacheHit', { cacheKey })
-      return NextResponse.json(cached, { status: 200 })
+      const cachedResponse = buildConsistentResponse(cached as ChatResponsePayload, {
+        plan: effectivePlan,
+        mode: effectivePlan,
+        conversationId: requestedConversationId ?? undefined,
+        menu: DEFAULT_EMPTY_MENU,
+      })
+      log('info', 'cacheHit', {
+        cacheKey,
+        branch: 'cache',
+        ...getNormalizationDiagnostics(cached as ChatResponsePayload),
+      })
+      return NextResponse.json(cachedResponse, { status: 200 })
     }
 
     if (intentLocal === 'menu') {
-      log('info', 'enter menu branch')
+      log('info', 'branch chosen', { branch: 'menu' })
       const menuResponse = await runHexastraFlow({
         plan: effectivePlan,
         responseDepth,
@@ -498,13 +627,24 @@ export async function POST(req: NextRequest) {
             : null,
         journeyEnabled,
       })
-      setCache(cacheKey, menuResponse)
-      log('info', 'return menu payload', { type: 'menu' })
-      return NextResponse.json(menuResponse, { status: 200 })
+      const normalizedMenuResponse = buildConsistentResponse(menuResponse as ChatResponsePayload, {
+        type: 'menu',
+        plan: effectivePlan,
+        mode: effectivePlan,
+        conversationId: requestedConversationId ?? undefined,
+        flowState: { step: 'menu', completed: true },
+        menu: DEFAULT_EMPTY_MENU,
+      })
+      setCache(cacheKey, normalizedMenuResponse)
+      log('info', 'response normalized', {
+        branch: 'menu',
+        ...getNormalizationDiagnostics(menuResponse as ChatResponsePayload),
+      })
+      return NextResponse.json(normalizedMenuResponse, { status: 200 })
     }
 
     if (intentLocal === 'birth_update') {
-      log('info', 'enter birth_update branch')
+      log('info', 'branch chosen', { branch: 'birth_update' })
       const birthResponse = await runHexastraFlow({
         plan: effectivePlan,
         responseDepth,
@@ -528,9 +668,20 @@ export async function POST(req: NextRequest) {
             : null,
         journeyEnabled,
       })
-      setCache(cacheKey, birthResponse)
-      log('info', 'return birth_update payload', { type: 'birth_update' })
-      return NextResponse.json(birthResponse, { status: 200 })
+      const normalizedBirthResponse = buildConsistentResponse(birthResponse as ChatResponsePayload, {
+        type: 'birth_update',
+        plan: effectivePlan,
+        mode: effectivePlan,
+        conversationId: requestedConversationId ?? undefined,
+        flowState: { step: 'birthdata', completed: true },
+        menu: DEFAULT_EMPTY_MENU,
+      })
+      setCache(cacheKey, normalizedBirthResponse)
+      log('info', 'response normalized', {
+        branch: 'birth_update',
+        ...getNormalizationDiagnostics(birthResponse as ChatResponsePayload),
+      })
+      return NextResponse.json(normalizedBirthResponse, { status: 200 })
     }
 
     const quota = await enforceDailyQuota({
@@ -544,59 +695,73 @@ export async function POST(req: NextRequest) {
 
     if (quota.blocked && quota.limit !== null) {
       log('warn', 'quota blocked', { userId, plan: effectivePlan, used: quota.used })
+      const quotaResponse = buildQuotaErrorResponse({
+        plan: effectivePlan,
+        used: quota.used,
+        limit: quota.limit,
+        resetAt: quota.resetAt,
+      })
+      log('info', 'response normalized', {
+        branch: 'quota',
+        ...getNormalizationDiagnostics(quotaResponse),
+      })
       return NextResponse.json(
-        buildQuotaErrorResponse({
-          plan: effectivePlan,
-          used: quota.used,
-          limit: quota.limit,
-          resetAt: quota.resetAt,
-        }),
+        quotaResponse,
         { status: 429 }
       )
     }
 
     if (intentLocal === 'conversation') {
-      log('info', 'enter simple conversation branch')
+      log('info', 'branch chosen', { branch: 'conversation' })
       try {
         const content = await generateConversation(lastUserMessage || 'Bonjour.')
-        const message = typeof content === 'string' && content.trim().length > 0
-          ? content.trim()
-          : 'Je suis là. Dis-moi ce dont tu as besoin.'
-        const convResponse = {
-          message,
-          reply: message,
-          content: message,
-          type: 'conversation',
-          plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
-        }
+        const convResponse = buildConsistentResponse(
+          {
+            content,
+            type: 'conversation',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? randomUUID(),
+            flowState: { step: 'conversation', completed: true },
+            menu: DEFAULT_EMPTY_MENU,
+          },
+          {
+            type: 'conversation',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? undefined,
+            flowState: { step: 'conversation', completed: true },
+            menu: DEFAULT_EMPTY_MENU,
+          }
+        )
         setCache(cacheKey, convResponse)
-        log('info', 'return simple conversation payload')
+        log('info', 'response normalized', {
+          branch: 'conversation',
+          ...getNormalizationDiagnostics({ content }),
+        })
         return NextResponse.json(convResponse, { status: 200 })
       } catch (error) {
         log('warn', 'simple conversation failed, fallback local', { error: (error as Error)?.message })
-        const fallbackMessage = 'Je suis là. Dis-moi ce dont tu as besoin.'
-        const convResponse = {
-          message: fallbackMessage,
-          reply: fallbackMessage,
-          content: fallbackMessage,
+        const payload = {
           type: 'conversation',
           plan: effectivePlan,
           mode: effectivePlan,
-          conversationId:
-            typeof (body as Record<string, unknown>).conversationId === 'string'
-              ? ((body as Record<string, unknown>).conversationId as string)
-              : randomUUID(),
+          conversationId: requestedConversationId ?? randomUUID(),
           flowState: { step: 'conversation', completed: true },
-          menu: { visible: false, items: [] },
+          menu: DEFAULT_EMPTY_MENU,
         }
-        log('info', 'return simple conversation fallback payload')
+        const convResponse = buildConsistentResponse(payload, {
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId: requestedConversationId ?? undefined,
+          flowState: { step: 'conversation', completed: true },
+          menu: DEFAULT_EMPTY_MENU,
+        })
+        log('info', 'response normalized', {
+          branch: 'conversation_fallback',
+          ...getNormalizationDiagnostics(payload),
+        })
         return NextResponse.json(convResponse, { status: 200 })
       }
     }
@@ -613,7 +778,7 @@ export async function POST(req: NextRequest) {
       log('info', 'intent classifyIntent', { intent })
     }
 
-    log('info', 'enter analysis branch')
+    log('info', 'branch chosen', { branch: 'analysis' })
     const response = await runHexastraFlow({
       plan: effectivePlan,
       responseDepth,
@@ -661,14 +826,23 @@ export async function POST(req: NextRequest) {
         ? `${reformatted}\n\n${generateSuggestions(response.message).join('\n')}`
         : reformatted
 
-    const finalResponse = withSuggestions
-      ? { ...response, message: withSuggestions, reply: withSuggestions }
-      : response
+    const finalResponse = buildConsistentResponse(
+      withSuggestions
+        ? ({ ...response, message: withSuggestions, reply: withSuggestions, content: withSuggestions } as ChatResponsePayload)
+        : (response as ChatResponsePayload),
+      {
+        type: 'analysis',
+        plan: effectivePlan,
+        mode: effectivePlan,
+        conversationId: requestedConversationId ?? undefined,
+        menu: DEFAULT_EMPTY_MENU,
+      }
+    )
 
     setCache(cacheKey, finalResponse)
 
     const enriched = enrichReadingResponse({
-      response: finalResponse,
+      response: finalResponse as any,
       plan: effectivePlan,
       birthDate: (finalResponse as any)?.birthData?.date ?? (body as any)?.birthData?.date,
       solarSign: (finalResponse as any)?.birthData?.solarSign ?? (body as any)?.birthData?.solarSign,
@@ -682,9 +856,23 @@ export async function POST(req: NextRequest) {
         (finalResponse?.metadata as any)?.selectedSubmenuKey ??
         (body as any)?.selectedSubmenuKey ??
         null,
-      journeyEnabled,
     })
 
+    const normalizedEnriched = buildConsistentResponse(enriched as ChatResponsePayload, {
+      type:
+        typeof finalResponse.type === 'string'
+          ? finalResponse.type
+          : 'analysis',
+      plan: effectivePlan,
+      mode: effectivePlan,
+      conversationId: requestedConversationId ?? undefined,
+      menu: DEFAULT_EMPTY_MENU,
+    })
+
+    log('info', 'response normalized', {
+      branch: 'analysis',
+      ...getNormalizationDiagnostics(enriched as ChatResponsePayload),
+    })
     log('info', 'return final payload', {
       step: enriched?.flowState?.step ?? finalResponse?.flowState?.step,
       menuVisible: enriched?.menu?.visible ?? finalResponse?.menu?.visible,
@@ -692,11 +880,13 @@ export async function POST(req: NextRequest) {
     })
     return NextResponse.json(
       {
-        ...enriched,
+        ...normalizedEnriched,
         plan: effectivePlan,
         mode: effectivePlan,
         metadata: {
-          ...(enriched?.metadata ?? finalResponse?.metadata ?? {}),
+          ...(((normalizedEnriched as ChatResponsePayload)?.metadata as Record<string, unknown> | undefined) ??
+            ((finalResponse as ChatResponsePayload)?.metadata as Record<string, unknown> | undefined) ??
+            {}),
           quota: {
             used: quota.used,
             limit: quota.limit,
@@ -713,7 +903,12 @@ export async function POST(req: NextRequest) {
     )
   } catch (error) {
     log('error', 'fatal error', { error })
-    return NextResponse.json(buildSafeErrorResponse(), { status: 500 })
+    const safeErrorResponse = buildSafeErrorResponse()
+    log('info', 'response normalized', {
+      branch: 'safe_error',
+      ...getNormalizationDiagnostics(safeErrorResponse),
+    })
+    return NextResponse.json(safeErrorResponse, { status: 500 })
   }
 }
 

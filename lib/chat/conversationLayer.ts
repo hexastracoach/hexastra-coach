@@ -18,6 +18,7 @@ export type ConversationIntent =
   | 'GREETING'
   | 'SMALL_TALK'
   | 'EMOTIONAL'
+  | 'WELLBEING'
   | 'QUESTION'
   | 'ANALYSIS_REQUEST'
   | 'DECISION'

@@ -1,6 +1,5 @@
-import type { HexastraApiResponse, HexastraMenuItem, HexastraMode } from '@/lib/hexastra/types'
+import type { HexastraApiResponse } from '@/lib/hexastra/types'
 import { getSolarSignFromDate, SOLAR_SIGN_CLOSURES, type SolarSign } from '@/lib/hexastra/utils/solarSign'
-import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import { generateContextualSuggestions } from '@/lib/hexastra/response/contextualSuggestions'
 
 type EnrichInput = {
@@ -39,7 +38,6 @@ export function enrichReadingResponse(input: EnrichInput): HexastraApiResponse {
   const { response, plan, birthDate, solarSign, contextType, domainRoute, selectedMenuKey, selectedSubmenuKey } = input
   if (!shouldEnrich(response)) return response
 
-  const mode = getModeForPlan(plan as any)
   const sign = pickSign(birthDate, solarSign)
   const closure = SOLAR_SIGN_CLOSURES[sign]
 

@@ -161,4 +161,6 @@ export const PROMPT_MENU: Record<HexastraMode, PromptMenuNode[]> = {
     { key: 'pract_general', label: 'Lecture générale actuelle™', description: 'Synthèse multidimensionnelle.', contextType: 'hexastraReading', domainRoute: 'fusion' },
     { key: 'science', label: 'Analyses par science', description: 'Sciences spécifiques.', contextType: 'science', domainRoute: 'science' },
   ],
+  libre_avance: [],
+  libre_approfondi: [],
 }

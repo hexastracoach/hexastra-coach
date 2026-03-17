@@ -1,6 +1,7 @@
 import { generateContextualExplorationAngles } from '@/lib/hexastra/explorationEngine'
 import { rankExplorationSuggestions } from '@/lib/hexastra/explorationLearningEngine'
 import type { PromptMenuNode } from '@/lib/hexastra/data/promptMenu'
+import type { ExplorationEngineInput } from '@/lib/hexastra/explorationEngine'
 
 type Phase =
   | 'exploration_initiale'
@@ -16,12 +17,7 @@ type NavigatorInput = {
   conversationHistory?: string[]
   birthProfile?: { date?: string | null; solarSign?: string | null }
   plan: string
-  apiCalculations?: {
-    cycle?: 'expansion' | 'stabilisation' | 'transition' | null
-    dominantZone?: string | null
-    depthLevel?: string | null
-    scienceHint?: string | null
-  }
+  apiCalculations?: ExplorationEngineInput['apiCalculations']
   contextType?: string | null
   domainRoute?: string | null
   selectedMenuKey?: string | null
