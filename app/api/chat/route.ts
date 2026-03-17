@@ -20,6 +20,8 @@ import { generateConversation } from '@/lib/hexastra/openai/generateConversation
 import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
 import { classifyIntent } from '@/lib/hexastra/openai/classifyIntent'
 import { generateSuggestions } from '@/lib/hexastra/suggestions/generateSuggestions'
+import { getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
+import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 
 const memoryCache = new Map<string, { value: unknown; expires: number }>()
 const CACHE_TTL_MS = 10 * 60 * 1000
@@ -528,58 +530,43 @@ export async function POST(req: NextRequest) {
     log('info', 'intent detected', { intentLocal })
 
     if (intentLocal === 'greeting') {
-      try {
-        log('info', 'branch chosen', { branch: 'greeting' })
-        const content = await generateConversation(lastUserMessage || 'Bonjour.')
-        const resp = buildConsistentResponse(
-          {
-            content,
-            type: 'greeting',
-            plan: effectivePlan,
-            mode: effectivePlan,
-            conversationId: requestedConversationId ?? randomUUID(),
-            flowState: { step: 'conversation', completed: true },
-            menu: DEFAULT_EMPTY_MENU,
-          },
-          {
-            type: 'greeting',
-            plan: effectivePlan,
-            mode: effectivePlan,
-            conversationId: requestedConversationId ?? undefined,
-            flowState: { step: 'conversation', completed: true },
-            menu: DEFAULT_EMPTY_MENU,
-          }
-        )
-        log('info', 'response normalized', {
-          branch: 'greeting',
-          ...getNormalizationDiagnostics({ content }),
-        })
-        return NextResponse.json(resp, { status: 200 })
-      } catch (error) {
-        log('warn', 'greeting openai failed, fallback local', { error: (error as Error)?.message })
-        const payload = {
-          content: 'Salut. Comment tu te sens aujourd’hui ?',
-          type: 'greeting',
-          plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId: requestedConversationId ?? randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: DEFAULT_EMPTY_MENU,
-        }
-        const resp = buildConsistentResponse(payload, {
-          type: 'greeting',
-          plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId: requestedConversationId ?? undefined,
-          flowState: { step: 'conversation', completed: true },
-          menu: DEFAULT_EMPTY_MENU,
-        })
-        log('info', 'response normalized', {
-          branch: 'greeting_fallback',
-          ...getNormalizationDiagnostics(payload),
-        })
-        return NextResponse.json(resp, { status: 200 })
+      log('info', 'branch chosen', { branch: 'greeting' })
+      const greetingMenu = getMenuForMode(getModeForPlan(effectivePlan))
+      const payload = {
+        content:
+          'Bonjour. Choisis simplement un angle du menu et je t’accompagne directement sur la bonne lecture.',
+        type: 'greeting',
+        plan: effectivePlan,
+        mode: effectivePlan,
+        conversationId: requestedConversationId ?? randomUUID(),
+        flowState: { step: 'menu', completed: true },
+        menu: {
+          visible: true,
+          items: greetingMenu,
+        },
+        metadata: {
+          contextType: 'general',
+          selectedMenuKey: null,
+          selectedSubmenuKey: null,
+          intentDetected: 'greeting',
+        },
       }
+      const resp = buildConsistentResponse(payload, {
+        type: 'greeting',
+        plan: effectivePlan,
+        mode: effectivePlan,
+        conversationId: requestedConversationId ?? undefined,
+        flowState: { step: 'menu', completed: true },
+        menu: {
+          visible: true,
+          items: greetingMenu,
+        },
+      })
+      log('info', 'response normalized', {
+        branch: 'greeting',
+        ...getNormalizationDiagnostics(payload),
+      })
+      return NextResponse.json(resp, { status: 200 })
     }
 
     const cacheKey = buildCacheKey(userId, lastUserMessage, normalizeBirthData((body as Record<string, unknown>).birthData))
