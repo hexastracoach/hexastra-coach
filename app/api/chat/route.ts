@@ -365,8 +365,16 @@ async function enforceDailyQuota(params: { req: NextRequest; userId: string | nu
 
 export async function POST(req: NextRequest) {
   const requestId = randomUUID()
-  const log = (level: 'info' | 'debug' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) =>
+  const log = (level: 'info' | 'debug' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) => {
     logger[level](`[api/chat][${requestId}] ${msg}`, meta)
+    const printer =
+      level === 'error' ? console.error : level === 'warn' ? console.warn : console.info
+    try {
+      printer(`[api/chat][${requestId}] ${msg}`, meta ?? '')
+    } catch {
+      printer(`[api/chat][${requestId}] ${msg}`)
+    }
+  }
 
   log('info', 'POST hit')
 
@@ -622,6 +630,11 @@ export async function POST(req: NextRequest) {
       journeyEnabled,
     })
 
+    log('info', 'return final payload', {
+      step: enriched?.flowState?.step ?? finalResponse?.flowState?.step,
+      menuVisible: enriched?.menu?.visible ?? finalResponse?.menu?.visible,
+      intentDetected: intent,
+    })
     return NextResponse.json(
       {
         ...enriched,

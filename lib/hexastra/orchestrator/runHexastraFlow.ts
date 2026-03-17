@@ -46,6 +46,19 @@ import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = process.env.HEXASTRA_API_URL!.replace(/\/$/, '')
 const API_KEY = process.env.HEXASTRA_API_KEY || ''
+const flowLog = (
+  level: 'info' | 'debug' | 'warn' | 'error',
+  msg: string,
+  meta?: Record<string, unknown>
+) => {
+  logger[level](`[runHexastraFlow] ${msg}`, meta)
+  const printer = level === 'error' ? console.error : level === 'warn' ? console.warn : console.info
+  try {
+    printer(`[runHexastraFlow] ${msg}`, meta ?? '')
+  } catch {
+    printer(`[runHexastraFlow] ${msg}`)
+  }
+}
 
 type ResponseDepth = 'short' | 'medium' | 'long' | 'expert'
 
@@ -152,6 +165,7 @@ function detectLanguageFromMessages(messages: ChatMessage[], fallback = 'fr'): s
 async function callRailway(path: string, payload: Record<string, unknown>) {
   const url = `${API_URL}${path}`
 
+  flowLog('info', 'callRailway', { path })
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -163,8 +177,10 @@ async function callRailway(path: string, payload: Record<string, unknown>) {
   })
 
   if (!res.ok) {
+    flowLog('warn', 'callRailway non-200', { path, status: res.status })
     throw new Error(`Railway ${path} failed with status ${res.status}`)
   }
+  flowLog('info', 'callRailway success', { path, status: res.status })
 
   const text = await res.text()
   if (!text) return null
@@ -184,6 +200,8 @@ async function callOpenAIResponse(payload: {
   temperature?: number
   max_output_tokens?: number
 }) {
+  const started = Date.now()
+  flowLog('info', 'callOpenAIResponse start', { model: payload.model })
   const response = await openai.responses.create({
     model: payload.model,
     input: [
@@ -194,7 +212,9 @@ async function callOpenAIResponse(payload: {
     max_output_tokens: payload.max_output_tokens,
   })
 
-  return response.output_text ?? ''
+  const text = response.output_text ?? ''
+  flowLog('info', 'callOpenAIResponse done', { ms: Date.now() - started, length: text.length })
+  return text
 }
 
 async function runSpecializedModule({
@@ -331,6 +351,11 @@ export async function runHexastraFlow(input: {
 }): Promise<HexastraApiResponse> {
   const controller = new AbortController()
   const globalTimeout = setTimeout(() => controller.abort(), 18000) // 18s fail-fast for Vercel
+  flowLog('info', 'enter runHexastraFlow', {
+    plan: input.plan,
+    requestType: input.requestType,
+    messages: Array.isArray(input.messages) ? input.messages.length : 0,
+  })
 
   // Central input normalization to keep the flow crash-proof
   const normalizedMessages = safeArray<ChatMessage>(input.messages)
@@ -554,6 +579,10 @@ export async function runHexastraFlow(input: {
       birthData: normalizeBirthData(userContext.birthData),
       practitionerUsage: normalizedPractitionerUsage,
       messages: limitedMessages,
+    })
+    flowLog('info', 'specializedResult', {
+      hasResult: Boolean(specializedResult),
+      source: specializedResult?.source,
     })
 
     const activeModules = getModulesForDomain(domainRoute, mode)
