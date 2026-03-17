@@ -91,6 +91,8 @@ function classifyRole(params: {
   const haystack = `${filename} ${text}`
 
   if (
+    haystack.includes('prompt_maitre_ks_fusion_v13') ||
+    haystack.includes('v13a12') ||
     haystack.includes('message_acceuil') ||
     (haystack.includes('prompt') && haystack.includes('instruction')) ||
     haystack.includes('architecture_de_valeur') ||
