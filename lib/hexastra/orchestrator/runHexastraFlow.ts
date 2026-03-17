@@ -37,7 +37,8 @@ import { applySentinel } from '@/lib/hexastra/security/sentinel'
 import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
 import { logger } from '@/lib/utils/logger'
-import { SHILO_CONVERSATION_PROMPT, SHILO_ANALYSIS_PROMPT } from '@/lib/hexastra/prompts'
+import { generateConversation } from '@/lib/hexastra/openai/generateConversation'
+import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (
@@ -186,18 +187,6 @@ async function callOpenAI(payload: unknown): Promise<string> {
     logger.error('[callOpenAI] failed', { error })
     return 'Le moteur HexAstra est temporairement indisponible.'
   }
-}
-
-async function callOpenAIChat(params: { system: string; user: string; model?: string }) {
-  const { system, user, model = 'gpt-4.1-mini' } = params
-  const payload = {
-    model,
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
-  }
-  return await callOpenAI(payload)
 }
 
 function buildSpecializedContext(result: SpecializedModuleResult | null): string {
@@ -705,8 +694,7 @@ export async function runHexastraFlow(input: {
     }
 
     if ((route === 'greeting' || route === 'small_talk') && !input.selectedMenuKey && !input.selectedSubmenuKey) {
-      const system = SHILO_CONVERSATION_PROMPT
-      const message = await callOpenAIChat({ system, user: latestUserMessage })
+      const message = await generateConversation(latestUserMessage || buildGreetingMessage(mode, userContext.language ?? fallbackLanguage))
 
       return {
         message,
@@ -1135,10 +1123,7 @@ export async function runHexastraFlow(input: {
       route !== 'navigation'
 
     if (shouldRephrase) {
-      const rephrased = await callOpenAIChat({
-        system: SHILO_ANALYSIS_PROMPT,
-        user: message,
-      })
+      const rephrased = await formatAnalysis(message)
       if (rephrased) {
         message = rephrased
       }
@@ -1213,4 +1198,5 @@ export async function runHexastraFlow(input: {
     clearTimeout(globalTimeout)
   }
 }
+
 

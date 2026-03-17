@@ -16,6 +16,8 @@ import { logger } from '@/lib/utils/logger'
 import { createSupabaseServer } from '@/lib/auth/supabaseServer'
 import { validateEnv } from '@/lib/utils/env'
 import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
+import { generateConversation } from '@/lib/hexastra/openai/generateConversation'
+import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
 
 export const runtime = 'nodejs'
 
@@ -592,7 +594,60 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    log('info', 'calling runHexastraFlow')
+    // Routage léger
+    const normalized = lastUserMessage.toLowerCase()
+    const isMenu =
+      /(menu|explorer les angles|voir les angles|revenir au menu|angles)/i.test(normalized) ||
+      normalizeUiAction((body as Record<string, unknown>).uiAction) === 'open_menu'
+
+    if (isGreetingOnly) {
+      const content = await generateConversation(lastUserMessage || 'Bonjour.')
+      return NextResponse.json(
+        {
+          content,
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        },
+        { status: 200 }
+      )
+    }
+
+    if (isMenu) {
+      log('info', 'routing to navigation/menu')
+      const menuResponse = await runHexastraFlow({
+        plan: effectivePlan,
+        responseDepth,
+        language: resolveRequestedLanguage(body as Record<string, unknown>, sanitizedMessages),
+        requestType: 'chat',
+        birthData: normalizeBirthData((body as Record<string, unknown>).birthData),
+        practitionerUsage: normalizePractitionerUsage((body as Record<string, unknown>).practitionerUsage),
+        contextType: 'general',
+        selectedMenuKey: null,
+        selectedSubmenuKey: null,
+        uiAction: 'open_menu',
+        conversationId:
+          typeof (body as Record<string, unknown>).conversationId === 'string'
+            ? ((body as Record<string, unknown>).conversationId as string)
+            : null,
+        messages: sanitizedMessages,
+        evolutionProfile:
+          (body as Record<string, unknown>).evolutionProfile &&
+          typeof (body as Record<string, unknown>).evolutionProfile === 'object'
+            ? ((body as Record<string, unknown>).evolutionProfile as Record<string, unknown>)
+            : null,
+        journeyEnabled,
+      })
+      return NextResponse.json(menuResponse, { status: 200 })
+    }
+
+    log('info', 'calling runHexastraFlow (business)')
 
     const response = await runHexastraFlow({
       plan: effectivePlan,
@@ -626,7 +681,23 @@ export async function POST(req: NextRequest) {
 
     log('info', 'runHexastraFlow success', { flowState: response?.flowState ?? null })
 
-    const finalResponse = applyPremiumInsightLock({ plan: effectivePlan, response })
+    // Reformulation Shilo post-analyse (texte uniquement) sauf navigation/menus
+    const shouldRephrase =
+      response?.flowState?.step !== 'menu' &&
+      !(response?.menu?.visible) &&
+      typeof response?.message === 'string' &&
+      response?.message.trim().length > 0
+
+    const reformatted =
+      shouldRephrase && response.message
+        ? await formatAnalysis(response.message)
+        : response.message
+
+    const finalResponse = applyPremiumInsightLock({
+      plan: effectivePlan,
+      response: reformatted ? { ...response, message: reformatted, reply: reformatted } : response,
+    })
+
     const enriched = enrichReadingResponse({
       response: finalResponse,
       plan: effectivePlan,
