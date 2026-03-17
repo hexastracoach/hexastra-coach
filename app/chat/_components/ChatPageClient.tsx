@@ -680,21 +680,32 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
   useEffect(() => {
     let mounted = true
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (!mounted) return
+    supabase.auth
+      .getUser()
+      .then(({ data, error }) => {
+        if (!mounted) return
 
-      if (data.user?.email) setUserEmail(data.user.email)
+        if (data?.user?.email) setUserEmail(data.user.email)
 
-      const plan = (data.user?.user_metadata?.plan as PlanKey) ?? 'free'
-      setUserPlan(plan)
-      setPlanLoaded(true)
+        const plan = (data?.user?.user_metadata?.plan as PlanKey) ?? 'free'
+        setUserPlan(plan)
+        setPlanLoaded(true)
 
-      setEvolutionProfile((prev) => {
-        const updated = { ...(prev ?? {}), plan }
-        saveEvolutionProfile(updated)
-        return updated
+        if (error) {
+          console.warn('[ChatPageClient] getUser error, fallback to free plan', error)
+        }
+
+        setEvolutionProfile((prev) => {
+          const updated = { ...(prev ?? {}), plan }
+          saveEvolutionProfile(updated)
+          return updated
+        })
       })
-    })
+      .catch((err) => {
+        if (!mounted) return
+        console.error('[ChatPageClient] getUser failed', err)
+        setPlanLoaded(true)
+      })
 
     return () => {
       mounted = false
