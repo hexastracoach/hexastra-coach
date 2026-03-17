@@ -575,7 +575,7 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).journeyEnabled as boolean)
         : false
 
-    // 1) Greeting / small talk : OpenAI direct, pas de quota
+    // 1) Greeting / small talk : OpenAI direct, pas de quota, jamais de flux métier
     if (isGreetingOrSmallTalk(normalizedLast)) {
       const content = await generateConversation(lastUserMessage || 'Bonjour.')
       return NextResponse.json(
@@ -641,7 +641,27 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (intent === 'menu') {
+    if (intent === 'conversation') {
+      const content = await generateConversation(lastUserMessage || 'Bonjour.')
+      return NextResponse.json(
+        {
+          content,
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        },
+        { status: 200 }
+      )
+    }
+
+    const normalizedForMenu = normalizedLast
+    if (intent === 'menu' || /(menu|angle|angles|navigation|explorer les angles|voir les angles)/.test(normalizedForMenu)) {
       log('info', 'routing to navigation/menu')
       const menuResponse = await runHexastraFlow({
         plan: effectivePlan,
@@ -671,6 +691,25 @@ export async function POST(req: NextRequest) {
 
     if (intent === 'irrelevant') {
       const polite = "Je prÃ©fÃ¨re rester concentrÃ© sur ce qui peut vraiment tâ€™aider."
+      return NextResponse.json(
+        {
+          content: polite,
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        },
+        { status: 200 }
+      )
+    }
+
+    if (intent === 'irrelevant') {
+      const polite = "Je préfère rester concentré sur ce qui peut vraiment t’aider."
       return NextResponse.json(
         {
           content: polite,
