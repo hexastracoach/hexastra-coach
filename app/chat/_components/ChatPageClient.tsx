@@ -917,38 +917,38 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
       }
 
       const parts: string[] = []
-      if (normalized.firstName) parts.push(`prÃ©nom ${normalized.firstName}`)
-      if (normalized.birthDate) parts.push(`nÃ©(e) le ${normalized.birthDate}`)
+      if (normalized.firstName) parts.push(`prénom ${normalized.firstName}`)
+      if (normalized.birthDate) parts.push(`né(e) le ${normalized.birthDate}`)
       if (normalized.birthTimeKnown === false) {
-        parts.push('heure non fournie (12:00 par dÃ©faut)')
+        parts.push('heure non fournie (12:00 par défaut)')
       } else if (normalized.birthTime) {
-        parts.push(`Ã  ${normalized.birthTime}`)
+        parts.push(`à ${normalized.birthTime}`)
       }
-      if (normalized.birthCity) parts.push(`Ã  ${normalized.birthCity}`)
+      if (normalized.birthCity) parts.push(`à ${normalized.birthCity}`)
       if (normalized.birthCountryName) parts.push(normalized.birthCountryName)
 
       if (parts.length) {
         void sendStructuredAction({
-          message: `DonnÃ©es de naissance mises Ã  jour : ${parts.join(', ')}.`,
+          message: `Données de naissance mises à jour : ${parts.join(', ')}.`,
           contextType: activeContextType,
           uiAction: 'restart_flow',
         })
       }
 
       const partnerParts: string[] = []
-      if (normalizedPartner.firstName) partnerParts.push(`prÃ©nom ${normalizedPartner.firstName}`)
-      if (normalizedPartner.birthDate) partnerParts.push(`nÃ©(e) le ${normalizedPartner.birthDate}`)
+      if (normalizedPartner.firstName) partnerParts.push(`prénom ${normalizedPartner.firstName}`)
+      if (normalizedPartner.birthDate) partnerParts.push(`né(e) le ${normalizedPartner.birthDate}`)
       if (normalizedPartner.birthTimeKnown === false) {
-        partnerParts.push('heure non fournie (12:00 par dÃ©faut)')
+        partnerParts.push('heure non fournie (12:00 par défaut)')
       } else if (normalizedPartner.birthTime) {
-        partnerParts.push(`Ã  ${normalizedPartner.birthTime}`)
+        partnerParts.push(`à ${normalizedPartner.birthTime}`)
       }
-      if (normalizedPartner.birthCity) partnerParts.push(`Ã  ${normalizedPartner.birthCity}`)
+      if (normalizedPartner.birthCity) partnerParts.push(`à ${normalizedPartner.birthCity}`)
       if (normalizedPartner.birthCountryName) partnerParts.push(normalizedPartner.birthCountryName)
 
       if (partnerParts.length) {
         void sendStructuredAction({
-          message: `Lecture croisÃ©e â€” donnÃ©es de l'autre personne mises Ã  jour : ${partnerParts.join(', ')}.`,
+          message: `Lecture croisée — données de l'autre personne mises à jour : ${partnerParts.join(', ')}.`,
           contextType: activeContextType,
           uiAction: 'restart_flow',
         })
