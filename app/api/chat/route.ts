@@ -407,9 +407,21 @@ export async function POST(req: NextRequest) {
         : false
 
     const intentLocal = detectIntentLocal(lastUserMessage)
+    log('info', 'intent detected', { intentLocal })
+
+    // test branch to validate greeting route quickly
+    if (lastUserMessage.toLowerCase() === 'salut') {
+      return NextResponse.json({
+        ok: true,
+        type: 'greeting',
+        message: 'Bonjour. Test greeting direct OK.',
+        uiAction: { type: 'open_menu' },
+      })
+    }
 
     if (intentLocal === 'greeting') {
       try {
+        log('info', 'enter greeting branch')
         const content = await generateConversation(lastUserMessage || 'Bonjour.')
         const resp = {
           content,
@@ -423,6 +435,7 @@ export async function POST(req: NextRequest) {
           flowState: { step: 'conversation', completed: true },
           menu: { visible: false, items: [] },
         }
+        log('info', 'return greeting payload', { type: resp.type })
         return NextResponse.json(resp, { status: 200 })
       } catch (error) {
         log('warn', 'greeting openai failed, fallback local', { error: (error as Error)?.message })
@@ -438,6 +451,7 @@ export async function POST(req: NextRequest) {
           flowState: { step: 'conversation', completed: true },
           menu: { visible: false, items: [] },
         }
+        log('info', 'return greeting fallback payload', { type: resp.type })
         return NextResponse.json(resp, { status: 200 })
       }
     }
@@ -450,6 +464,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (intentLocal === 'menu') {
+      log('info', 'enter menu branch')
       const menuResponse = await runHexastraFlow({
         plan: effectivePlan,
         responseDepth,
@@ -474,10 +489,12 @@ export async function POST(req: NextRequest) {
         journeyEnabled,
       })
       setCache(cacheKey, menuResponse)
+      log('info', 'return menu payload', { type: 'menu' })
       return NextResponse.json(menuResponse, { status: 200 })
     }
 
     if (intentLocal === 'birth_update') {
+      log('info', 'enter birth_update branch')
       const birthResponse = await runHexastraFlow({
         plan: effectivePlan,
         responseDepth,
@@ -502,6 +519,7 @@ export async function POST(req: NextRequest) {
         journeyEnabled,
       })
       setCache(cacheKey, birthResponse)
+      log('info', 'return birth_update payload', { type: 'birth_update' })
       return NextResponse.json(birthResponse, { status: 200 })
     }
 
@@ -528,7 +546,9 @@ export async function POST(req: NextRequest) {
     }
 
     const intent = await classifyIntent(lastUserMessage)
+    log('info', 'intent classifyIntent', { intent })
 
+    log('info', 'enter analysis/conversation branch')
     const response = await runHexastraFlow({
       plan: effectivePlan,
       responseDepth,
@@ -560,6 +580,7 @@ export async function POST(req: NextRequest) {
     })
 
     const shouldRephrase =
+      intentLocal === 'analysis' &&
       response?.flowState?.step !== 'menu' &&
       !(response?.menu?.visible) &&
       typeof response?.message === 'string' &&
