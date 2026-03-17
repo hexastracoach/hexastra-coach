@@ -45,6 +45,19 @@ const REQUIRED_ENV = {
   SUPABASE_SERVICE_ROLE_KEY: {},
 }
 
+function getResponseDepth(plan: PlanKey): ResponseDepth {
+  switch (plan) {
+    case 'essential':
+      return 'medium'
+    case 'premium':
+      return 'long'
+    case 'practitioner':
+      return 'expert'
+    default:
+      return 'short'
+  }
+}
+
 function normalizeText(value: string): string {
   return (value || '')
     .trim()
