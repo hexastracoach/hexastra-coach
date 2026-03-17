@@ -563,21 +563,32 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).journeyEnabled as boolean)
         : false
 
-    const quota = isGreetingOnly
-      ? {
-          blocked: false as const,
-          used: 0,
-          limit: PLAN_LIMITS[effectivePlan],
-          remaining: PLAN_LIMITS[effectivePlan],
-          resetAt: null,
-          windowStartedAt: null,
-        }
-      : await enforceDailyQuota({
-          req,
-          userId,
+    // Si greeting simple, répondre via OpenAI direct et sortir
+    if (isGreetingOnly) {
+      const content = await generateConversation(lastUserMessage || 'Bonjour.')
+      return NextResponse.json(
+        {
+          content,
+          type: 'conversation',
           plan: effectivePlan,
-          feature: 'chat_api',
-        })
+          mode: effectivePlan,
+          conversationId:
+            typeof (body as Record<string, unknown>).conversationId === 'string'
+              ? ((body as Record<string, unknown>).conversationId as string)
+              : randomUUID(),
+          flowState: { step: 'conversation', completed: true },
+          menu: { visible: false, items: [] },
+        },
+        { status: 200 }
+      )
+    }
+
+    const quota = await enforceDailyQuota({
+      req,
+      userId,
+      plan: effectivePlan,
+      feature: 'chat_api',
+    })
 
     log('debug', 'quota', quota as any)
 

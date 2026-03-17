@@ -410,7 +410,7 @@ export default function ChatPageClient() {
 
   const applyApiResponse = useCallback((data: HexastraApiResponse | null | undefined) => {
     if (!data) {
-      return "Je n'ai pas pu terminer la lecture pour le moment."
+      return "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
     }
 
     const reply =
@@ -418,7 +418,7 @@ export default function ChatPageClient() {
         ? data.message
         : typeof data?.reply === 'string'
           ? data.reply
-          : "Je n'ai pas pu terminer la lecture pour le moment."
+          : "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
 
     if (data.conversationId) setConversationId(data.conversationId)
 
@@ -651,7 +651,7 @@ conversationStateRef.current = updateConversationState(intentDetected, conversat
             content:
               error instanceof Error && error.message === 'Request aborted'
                 ? "La demande précédente a été interrompue au profit de la nouvelle."
-                : "Je n'ai pas pu ouvrir cet angle pour le moment.",
+                : "Je n'ai pas pu ouvrir cet angle pour le moment. On réessaie dans un instant.",
             created_at: new Date().toISOString(),
           },
         ])
