@@ -143,6 +143,8 @@ export type HexastraApiResponse = {
       mainLever?: string | null
       executiveSummary?: string[]
     }
+    contextFrame?: string | null
+    clarificationQuestion?: string | null
   }
   updatedEvolutionProfile?: Record<string, unknown> | null
 }

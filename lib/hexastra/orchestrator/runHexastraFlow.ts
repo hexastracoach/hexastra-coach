@@ -1268,6 +1268,8 @@ export async function runHexastraFlow(input: {
           shouldPersistMemory: !menuVisibleReturn,
           selectedMenuKey,
           selectedSubmenuKey,
+          contextFrame: selectedContextFrame,
+          clarificationQuestion: selectedClarificationQuestion,
           sessionStep: menuVisibleReturn ? 'menu' : flowStep,
           emotionalState: sessionContext.emotionalState,
           timing: sessionContext.timing,

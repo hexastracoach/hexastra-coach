@@ -84,6 +84,8 @@ type ChatApiMetadata = Record<string, unknown> & {
   contextType?: ContextType
   selectedMenuKey?: string | null
   selectedSubmenuKey?: string | null
+  contextFrame?: string | null
+  clarificationQuestion?: string | null
   userMemoryUpdate?: Partial<UserMemory>
   quota?: {
     used?: number
@@ -395,6 +397,8 @@ export default function ChatPageClient() {
   const [activeContextType, setActiveContextType] = useState<ContextType>('general')
   const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null)
   const [selectedSubmenuKey, setSelectedSubmenuKey] = useState<string | null>(null)
+  const [activeContextFrame, setActiveContextFrame] = useState<string | null>(null)
+  const [activeClarificationQuestion, setActiveClarificationQuestion] = useState<string | null>(null)
   const [journeyEnabled, setJourneyEnabled] = useState<boolean>(false)
   const [userMemory, setUserMemory] = useState<UserMemory>(EMPTY_USER_MEMORY)
 
@@ -621,6 +625,14 @@ export default function ChatPageClient() {
 
     if (metadata.selectedSubmenuKey !== undefined) {
       setSelectedSubmenuKey(metadata.selectedSubmenuKey ?? null)
+    }
+
+    if (metadata.contextFrame !== undefined) {
+      setActiveContextFrame(metadata.contextFrame ?? null)
+    }
+
+    if (metadata.clarificationQuestion !== undefined) {
+      setActiveClarificationQuestion(metadata.clarificationQuestion ?? null)
     }
 
     if (data.updatedEvolutionProfile) {
@@ -1447,7 +1459,13 @@ export default function ChatPageClient() {
           {
             id: `${Date.now()}-moderation`,
             role: 'assistant',
-            content: moderation === 'CONFUSED' ? buildClarificationPrompt() : buildGuardResponse(moderation),
+            content:
+              moderation === 'CONFUSED'
+                ? activeClarificationQuestion ??
+                  (activeContextFrame
+                    ? `${activeContextFrame}\n\n${buildClarificationPrompt()}`
+                    : buildClarificationPrompt())
+                : buildGuardResponse(moderation),
             created_at: new Date().toISOString(),
           },
         ])
@@ -1681,12 +1699,14 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
     setConversationId(null)
     setInput('')
     setMenuItems([])
-    setIsMenuDockOpen(false)
-    setOpenMenuParentKey(null)
-    setActiveContextType('general')
-    setSelectedMenuKey(null)
-    setSelectedSubmenuKey(null)
-    microTriggerRef.current = null
+      setIsMenuDockOpen(false)
+      setOpenMenuParentKey(null)
+      setActiveContextType('general')
+      setSelectedMenuKey(null)
+      setSelectedSubmenuKey(null)
+      setActiveContextFrame(null)
+      setActiveClarificationQuestion(null)
+      microTriggerRef.current = null
     lastMessageRef.current = null
     try {
       localStorage.removeItem(CONVERSATION_STORAGE_KEY)
