@@ -292,14 +292,13 @@ function buildPractitionerMasterMenuMessage(language: string) {
     '10 — Kua™ : orientation, espace et optimisation',
     '11 — NeuroKua™ : 4 dynamiques, axe correctif et reglage sensoriel',
     '12 — Numerologie™ : cycles annuels, mensuels et transitions',
-    '13 — Pyramide de Maslow™ : besoin dominant, manque et prochain palier',
     '',
     'C — Lectures HexAstra',
     '14 — Lecture HexAstra complete™ : lecture structuree, prete pour consultation',
     '15 — Analyse de phase de vie™ : comprendre la phase et la traverser juste',
     '16 — Analyse multidimensionnelle personnelle™ : leviers, timing et plan',
     '',
-    'Tu peux repondre avec un numero simple, ou avec une combinaison comme 13 et 1.',
+    'Tu peux repondre avec un numero simple, ou avec une combinaison comme 12 et 1.',
   ].join('\n')
 }
 
@@ -316,7 +315,6 @@ function buildScienceOverviewMessage(language: string, practitionerMode: boolean
         '10 — Kua™ : orientation, environnement, optimisation',
         '11 — NeuroKua™ : 4 dynamiques, regulation et ajustement sensoriel',
         '12 — Numerologie™ : cycles annuels et mensuels',
-        '13 — Pyramide de Maslow™ : besoin dominant, manque et palier suivant',
       ]
     : [
         '1 — Astrologie™ : cycles de vie, timing, maisons et aspects',
@@ -325,7 +323,6 @@ function buildScienceOverviewMessage(language: string, practitionerMode: boolean
         '4 — Kua™ : environnement, orientation, equilibre dans l espace',
         '5 — NeuroKua™ : etat interne, axe dominant et reglage utile',
         '6 — Numerologie™ : cycles, annee, mois, dynamique temporelle',
-        '7 — Pyramide de Maslow™ : besoin dominant et prochain palier',
       ]
 
   const outro = practitionerMode
@@ -349,7 +346,6 @@ function resolveScienceChoiceKey(params: {
     '4': 'science_kua',
     '5': 'science_neurokua',
     '6': 'science_triangle',
-    '7': 'science_maslow',
   }
   const practitionerChoices: Record<string, string> = {
     '7': 'science_astrolex',
@@ -358,7 +354,6 @@ function resolveScienceChoiceKey(params: {
     '10': 'science_kua',
     '11': 'science_neurokua',
     '12': 'science_triangle',
-    '13': 'science_maslow',
   }
 
   if (selectedMenuKey === 'science' || looksLikeScienceOverviewMenu(lastAssistantMessage ?? '')) {

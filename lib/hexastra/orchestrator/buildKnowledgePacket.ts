@@ -220,7 +220,18 @@ function inferSubscienceFocus(params: {
   if (haystack.includes('profil')) return 'profil'
   if (haystack.includes('portes')) return 'portes'
   if (haystack.includes('canaux')) return 'canaux'
+  if (haystack.includes('directions favorables')) return 'directions favorables'
+  if (haystack.includes('zones sensibles')) return 'zones sensibles'
+  if (haystack.includes('espace de vie')) return 'espace de vie'
+  if (haystack.includes('equilibre environnemental')) return 'equilibre environnemental'
+  if (haystack.includes('orientation generale')) return 'orientation generale'
+  if (haystack.includes('ajustement espace')) return 'ajustements espace'
+  if (haystack.includes('cycle annuel') || haystack.includes('annee personnelle')) return 'cycle annuel'
+  if (haystack.includes('mois personnel')) return 'mois personnel'
   if (haystack.includes('chemin de vie')) return 'chemin de vie'
+  if (haystack.includes('defi') || haystack.includes('defis')) return 'defis'
+  if (haystack.includes('vibration')) return 'vibration'
+  if (haystack.includes('transition')) return 'transition'
   if (haystack.includes('maslow') || haystack.includes('besoin dominant')) return 'besoin dominant'
   if (haystack.includes('decision')) return 'decision'
   if (haystack.includes('timing')) return 'timing'
@@ -484,7 +495,7 @@ export function buildKnowledgePacket(params: {
     hierarchyGuide:
       'Toujours ordonner la lecture ainsi: prompt maitre -> structure de lecture -> science choisie -> sous-science choisie -> livres de reference relies a la bonne science -> savoir support.',
     fusionGuide:
-      'HexAstra lit par fusion: prioriser la science active, puis croiser avec au moins un appui transverse ou global quand il existe, quel que soit le plan.',
+      'HexAstra lit par fusion: prioriser la science active, puis croiser avec au moins un appui transverse ou global quand il existe, quel que soit le plan. La grille de Maslow peut servir d appui discret pour lire le besoin dominant ou la stabilisation, sans devenir une science affichee par defaut.',
     ignoredSources: ignoredSources.map((entry) => ({
       filename: entry.filename,
       source: entry.source,

@@ -36,13 +36,31 @@ function pickSign(birthDate?: string | null, solar?: string | null): SolarSign |
 }
 
 export function enrichReadingResponse(input: EnrichInput): HexastraApiResponse {
-  const { response, plan, birthDate, solarSign, contextType, domainRoute, selectedMenuKey, selectedSubmenuKey, explicitGuidance } = input
+  const {
+    response,
+    plan,
+    birthDate,
+    solarSign,
+    contextType,
+    domainRoute,
+    selectedMenuKey,
+    selectedSubmenuKey,
+    explicitGuidance,
+  } = input
+
   if (!shouldEnrich(response)) return response
   if (explicitGuidance || selectedMenuKey || selectedSubmenuKey) return response
 
+  const text = response.reply || response.message || ''
+  if (!text.trim()) return response
+
+  // Free stays clean: no decorative closure, no automatic suggestion block.
+  if (plan === 'free') {
+    return response
+  }
+
   const sign = pickSign(birthDate, solarSign)
   const closure = SOLAR_SIGN_CLOSURES[sign]
-
   const suggestions = generateContextualSuggestions({
     plan,
     contextType,
@@ -51,16 +69,13 @@ export function enrichReadingResponse(input: EnrichInput): HexastraApiResponse {
     selectedSubmenuKey,
     lastUserMessage: response?.metadata?.lastUserMessage ?? undefined,
   })
-  const text = response.reply || response.message || ''
 
   const alreadyHasClosure = text.includes(closure.slice(0, 22))
   const suggestionBlock = suggestions.length
-    ? `\n────────────────────\nPour aller plus loin, tu peux :\n- ${suggestions.join('\n- ')}`
+    ? `\n\nPour aller plus loin :\n- ${suggestions.join('\n- ')}`
     : ''
 
-  const enrichedText = alreadyHasClosure
-    ? text
-    : `${text}\n────────────────────\n${closure}${suggestionBlock}`
+  const enrichedText = alreadyHasClosure ? text : `${text}\n\n${closure}${suggestionBlock}`
 
   return {
     ...response,

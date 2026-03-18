@@ -126,7 +126,6 @@ const libreMenu: HexastraMenuItem[] = [
       { key: 'science_kua', label: 'Kua™', description: 'Orientation et environnement personnel.', contextType: 'decision', domainRoute: 'gps_kua', promptHint: 'Lecture Kua de l orientation et du positionnement utile.' },
       { key: 'science_neurokua', label: 'NeuroKua™', description: 'Equilibre interne, axe dominant et reglage sensoriel.', contextType: 'energy', domainRoute: 'neurokua', promptHint: 'Lecture NeuroKua specialisee sur les 4 dynamiques, l axe correctif et les ajustements spatiaux ou sensoriels.' },
       { key: 'science_triangle', label: 'Numerologie™', description: 'Cycle actuel, vibration et periode active.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Lecture de numerologie sur le cycle dominant et la temporalite.' },
-      { key: 'science_maslow', label: 'Pyramide de Maslow™', description: 'Besoin dominant, manque et prochain palier.', contextType: 'wellbeing', domainRoute: 'science', promptHint: 'Lecture Maslow sur le besoin dominant, le manque actif et le palier suivant.' },
     ],
   },
 ]
@@ -164,7 +163,6 @@ const practitionerMenu: HexastraMenuItem[] = [
       { key: 'science_kua', label: 'Kua™', description: 'Orientation et environnement.', contextType: 'decision', domainRoute: 'gps_kua', promptHint: 'Lecture praticienne Kua/GPS du positionnement optimal.' },
       { key: 'science_neurokua', label: 'NeuroKua™', description: '4 dynamiques, axe correctif et reglage sensoriel.', contextType: 'energy', domainRoute: 'neurokua', promptHint: 'Lecture praticienne NeuroKua centree sur les 4 dynamiques, l axe correctif et les ajustements spatiaux ou sensoriels.' },
       { key: 'science_triangle', label: 'Numerologie™', description: 'Cycle, vibration et temporalite.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Lecture praticienne de numerologie sur les cycles et la vibration active.' },
-      { key: 'science_maslow', label: 'Pyramide de Maslow™', description: 'Diagnostic des besoins et du palier actif.', contextType: 'wellbeing', domainRoute: 'science', promptHint: 'Lecture praticienne Maslow sur les besoins dominants et le prochain palier de stabilisation.' },
     ],
   },
 ]

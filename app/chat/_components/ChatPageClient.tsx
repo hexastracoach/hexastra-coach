@@ -68,7 +68,6 @@ import {
 import {
   EMPTY_USER_MEMORY,
   detectMemorySignals,
-  getUserMemoryContext,
   updateUserMemory,
   type UserMemory,
 } from '@/lib/chat/userMemoryEngine'
@@ -482,9 +481,6 @@ export default function ChatPageClient() {
 
   const isWelcome = useMemo(() => messages.length === 0, [messages])
 
-  // Memory hint used sparingly
-  const memoryHint = useMemo(() => getUserMemoryContext(userMemory), [userMemory])
-
   // Minimal formatting: keep business response as-is, optionally trim via depth
   const formatAssistantReply = useCallback(
     (
@@ -501,22 +497,14 @@ export default function ChatPageClient() {
         depthLevel: string
       }
     ) => {
-      const shouldAppendMemory =
-        !isReading &&
-        Boolean(memoryHint) &&
-        intent !== 'greeting' &&
-        intent !== 'menu' &&
-        !isSimpleGreeting(userMessage) &&
-        !/^Bienvenue\./i.test(base.trim())
-      const withMemory = shouldAppendMemory && memoryHint ? `${base}\n\n${memoryHint}` : base
-      const depthAdjusted = adjustResponseDepth(withMemory, {
+      const depthAdjusted = adjustResponseDepth(base, {
         level: depthLevel as any,
         plan: userPlan,
         isReading,
       })
       return depthAdjusted
     },
-    [memoryHint, userPlan]
+    [userPlan]
   )
 
   const userMessages = useMemo(

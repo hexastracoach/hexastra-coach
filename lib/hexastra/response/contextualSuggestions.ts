@@ -11,6 +11,10 @@ type SuggestionInput = {
 }
 
 export function generateContextualSuggestions(input: SuggestionInput): string[] {
+  if (input.plan === 'free') {
+    return []
+  }
+
   const nodes = generateContextualExplorationAngles({
     plan: input.plan,
     contextType: input.contextType,
@@ -19,6 +23,7 @@ export function generateContextualSuggestions(input: SuggestionInput): string[] 
     selectedSubmenuKey: input.selectedSubmenuKey,
     userQuestion: input.lastUserMessage,
   })
+
   const ranked = rankExplorationSuggestions(nodes, {
     plan: input.plan,
     intent: input.contextType ?? input.domainRoute ?? null,
@@ -26,18 +31,17 @@ export function generateContextualSuggestions(input: SuggestionInput): string[] 
 
   const humanize = (label: string): string => {
     const key = label.trim().toLowerCase()
-    if (key.includes('stress')) return 'Explorer ce qui nourrit cette tension en toi aujourd’hui.'
-    if (key.includes('fatigue')) return 'Lire ce que cette fatigue cherche à te faire ralentir ou réajuster.'
-    if (key.includes('recentr')) return 'Approfondir ce qui peut te ramener à un axe plus stable.'
-    if (key.includes('relation')) return 'Approfondir l’axe relationnel qui influence ta décision.'
-    if (key.includes('travail') || key.includes('argent'))
-      return 'Voir ce qui mérite d’être sécurisé avant d’avancer.'
-    if (key.includes('decision') || key.includes('décision'))
-      return 'Comparer ce que chaque option active réellement en toi.'
-    return `Explorer cet angle : ${label}`
+    if (key.includes('stress')) return 'Approfondir la source de cette tension.'
+    if (key.includes('fatigue')) return 'Voir ce que cette fatigue demande de reajuster.'
+    if (key.includes('recentr')) return 'Revenir a ce qui peut te stabiliser maintenant.'
+    if (key.includes('relation')) return 'Regarder l axe relationnel en jeu.'
+    if (key.includes('travail') || key.includes('argent')) return 'Voir ce qui merite d etre securise.'
+    if (key.includes('decision')) return 'Comparer ce que chaque option active reellement.'
+    return label
   }
 
-  const labels = ranked.slice(0, 4).map((n) => humanize(n.label))
-  if (!labels.includes('Revenir au menu')) labels.push('Revenir au menu')
-  return labels
+  return ranked
+    .slice(0, 2)
+    .map((node) => humanize(node.label))
+    .filter(Boolean)
 }
