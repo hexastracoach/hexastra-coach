@@ -64,6 +64,24 @@ describe('HexAstra reading engine', () => {
     ])
   })
 
+  it('does not expose Maslow as a standalone detected science in public reading output', () => {
+    const reading = generateHexastraReading({
+      latestUserMessage: 'Je veux comprendre mon besoin dominant avec Maslow',
+      domainRoute: 'wellbeing',
+      contextType: 'wellbeing',
+      practitionerUsage: 'self',
+      fusedSignal: {
+        dominantSignal: 'besoin_de_securite',
+        zone: 'security',
+      },
+    })
+
+    expect(reading.detectedScience).not.toBe('maslow')
+    expect(reading.structureTemplate).not.toEqual(
+      expect.arrayContaining(['Besoin dominant', 'Prochain palier', 'Action de stabilisation'])
+    )
+  })
+
   it('builds the executive summary in the expected 3-line format', () => {
     const summary = buildExecutiveSummary({
       mainDynamic: 'phase de repositionnement et de clarification',

@@ -212,6 +212,56 @@ describe('buildKnowledgePacket', () => {
     expect(adjustmentsEntry?.subscienceFocus).toBe('ajustements espace')
   })
 
+  it('orders the KS Fusion global block by priority and keeps global doc focuses explicit', () => {
+    const blocks = getDocumentRegistryBlocks()
+    const globalBlock = blocks.ks_fusion_globaux
+
+    expect(globalBlock[0]?.canonicalName).toBe('prompt_maitre_ks_fusion_v13_et_v13a12.txt')
+    expect(
+      globalBlock.find((entry) => entry.canonicalName === 'Structure_de_lecture_HexAstra.docx')
+        ?.subscienceFocus,
+    ).toBe('structure de lecture')
+    expect(
+      globalBlock.find((entry) => entry.canonicalName === 'PROMPT SOUS MODULE KS FUSION V13.pdf')
+        ?.subscienceFocus,
+    ).toBe('sous modules et sous sciences')
+    expect(
+      globalBlock.find((entry) => entry.canonicalName === 'HexAstra_Knowledge_RAG.json')
+        ?.subscienceFocus,
+    ).toBe('rag support')
+    expect(
+      globalBlock.find((entry) => entry.canonicalName === 'KS_CONTEXT_ENGINE_V1.txt')
+        ?.subscienceFocus,
+    ).toBe('moteur de contexte')
+    expect(
+      globalBlock.find((entry) => entry.canonicalName.includes('Memory Core'))?.subscienceFocus,
+    ).toBe('memoire utilisateur')
+    expect(
+      globalBlock.find((entry) => entry.canonicalName.includes('KNOWLEDGE CORE'))?.subscienceFocus,
+    ).toBe('knowledge core')
+    expect(
+      globalBlock.find((entry) => entry.canonicalName.includes('Cartographie'))?.subscienceFocus,
+    ).toBe('cartographie systeme')
+    expect(
+      globalBlock.find((entry) => entry.canonicalName.includes('MODULE DE SECURITE'))?.subscienceFocus,
+    ).toBe('module de securite')
+  })
+
+  it('uses KS Fusion global registry patterns for context engine, signal envelope, cartography, security and instruction blocks', () => {
+    const contextEntry = lookupDocumentRegistry('Guide_Context_Engine_KS.txt')
+    const fusionEngineEntry = lookupDocumentRegistry('KS Signal Envelope et Fusion Engine.pdf')
+    const cartographyEntry = lookupDocumentRegistry('Cartographie_complete_du_systeme_KS_v14.pdf')
+    const securityEntry = lookupDocumentRegistry('Module_de_securite_KS_Fusion.pdf')
+    const instructionBlocksEntry = lookupDocumentRegistry('gpt_instruction_blocks_v2.json')
+
+    expect(contextEntry?.scienceTag).toBe('global')
+    expect(contextEntry?.subscienceFocus).toBe('moteur de contexte')
+    expect(fusionEngineEntry?.subscienceFocus).toBe('contrat de donnees et fusion engine')
+    expect(cartographyEntry?.subscienceFocus).toBe('cartographie systeme')
+    expect(securityEntry?.subscienceFocus).toBe('module de securite')
+    expect(instructionBlocksEntry?.subscienceFocus).toBe('instruction blocks')
+  })
+
   it('prioritizes master prompt and reading structure when present', () => {
     const results: LayerResult[] = [
       {

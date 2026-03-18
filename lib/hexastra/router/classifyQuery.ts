@@ -12,8 +12,9 @@ export function classifyQuery(message: string): DomainRoute {
   if (/(decision|choix|trancher|attendre|agir)/i.test(text)) return 'decision'
   if (/(timing|cycle|phase|periode|mois a venir|prochains mois)/i.test(text)) return 'timing'
   if (/(bien-etre|recentrage|confiance|motivation interieure)/i.test(text)) return 'wellbeing'
+  if (/(maslow|pyramide de maslow)/i.test(text)) return 'wellbeing'
   if (
-    /(science|astrologie|astrolex|human design|porteum|triangle|enneagram|numerologie|neurokua|kua|maslow|spiritlex|mutalex|totemlex)/i.test(
+    /(science|astrologie|astrolex|human design|porteum|triangle|enneagram|numerologie|neurokua|kua|spiritlex|mutalex|totemlex)/i.test(
       text,
     )
   ) {

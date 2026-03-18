@@ -247,9 +247,9 @@ function looksLikeScienceOverviewMenu(message: string) {
   const normalized = normalizeSelectionText(message)
   return (
     normalized.includes('analyse par science') &&
-    /(astrologie|astrolex|human design|enneagramme|kua|neurokua|numerologie|maslow)/.test(
-      normalized,
-    )
+      /(astrologie|astrolex|human design|enneagramme|kua|neurokua|numerologie)/.test(
+        normalized,
+      )
   )
 }
 
@@ -421,13 +421,6 @@ function buildScienceSubanalysisRequest(
       '4': 'Je veux une lecture Kua strategique avec mise en place progressive.',
       '5': 'Je veux une synthese Kua avec plan d orientation simple.',
     },
-    science_maslow: {
-      '1': 'Je veux une lecture Pyramide de Maslow sur mon besoin dominant actuel.',
-      '2': 'Je veux une lecture Pyramide de Maslow sur mon manque ou ma frustration principale.',
-      '3': 'Je veux une lecture Pyramide de Maslow sur le besoin que je compense mal en ce moment.',
-      '4': 'Je veux une lecture Pyramide de Maslow sur le prochain palier a consolider.',
-      '5': 'Je veux une lecture Pyramide de Maslow avec un plan de stabilisation clair.',
-    },
   }
 
   const regularRequests: Record<string, Record<string, string>> = {
@@ -472,13 +465,6 @@ function buildScienceSubanalysisRequest(
       '3': 'Je veux une lecture Kua appliquee a une decision.',
       '4': 'Je veux une lecture Kua sur mon equilibre environnemental.',
       '5': 'Je veux une lecture Kua avec un conseil pratique a appliquer maintenant.',
-    },
-    science_maslow: {
-      '1': 'Je veux une lecture Pyramide de Maslow sur mon besoin dominant du moment.',
-      '2': 'Je veux une lecture Pyramide de Maslow sur mon manque ou ma frustration principale.',
-      '3': 'Je veux une lecture Pyramide de Maslow sur ce que je compense mal en ce moment.',
-      '4': 'Je veux une lecture Pyramide de Maslow sur le prochain palier a consolider.',
-      '5': 'Je veux une lecture Pyramide de Maslow avec une action de stabilisation prioritaire.',
     },
   }
 
@@ -693,23 +679,6 @@ function buildScienceSubanalysisMessage(selectionKey: string, practitionerMode: 
       '3 — Decision : quelle orientation soutient le mieux ton choix',
       '4 — Equilibre environnemental : ce qui apaise ou fatigue ton systeme',
       '5 — Conseil pratique : un ajustement concret a faire maintenant',
-      '',
-      'Reponds avec le numero pour continuer.',
-    ].join('\n')
-  }
-
-  if (selectionKey === 'science_maslow') {
-    return [
-      'Tu as choisi la Pyramide de Maslow™.',
-      '',
-      'Choisis maintenant l angle que tu veux explorer :',
-      '',
-      'Pyramide de Maslow™ — selection',
-      '1 — Besoin dominant : ce qui demande a etre nourrit en premier',
-      '2 — Manque principal : ce qui fragilise ton equilibre actuel',
-      '3 — Compensation : ce que tu essaies de tenir autrement',
-      '4 — Prochain palier : ce qui peut etre consolide ensuite',
-      '5 — Plan de stabilisation : action concrete et prioritaire',
       '',
       'Reponds avec le numero pour continuer.',
     ].join('\n')

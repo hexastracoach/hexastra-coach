@@ -22,6 +22,10 @@ describe('KS routing and contracts', () => {
     expect(classifyQuery('Je veux une lecture Kua pour mon orientation')).toBe('gps_kua')
   })
 
+  it('routes Maslow requests to wellbeing support instead of public science mode', () => {
+    expect(classifyQuery('Je veux une lecture Maslow sur mon besoin dominant')).toBe('wellbeing')
+  })
+
   it('exposes a freeform theme natal execution contract', () => {
     const contract = getKsFreeformExecutionContract('Je veux mon theme astral')
 

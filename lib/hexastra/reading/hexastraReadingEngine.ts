@@ -112,7 +112,6 @@ function inferScience(message: string, domainRoute: DomainRoute) {
   if (text.includes('human design') || text.includes('porteum')) return 'human_design'
   if (text.includes('numerologie') || text.includes('triangle') || text.includes('numeris')) return 'numerologie'
   if (text.includes('ennea')) return 'enneatype'
-  if (text.includes('maslow')) return 'maslow'
   if (text.includes('kua')) return domainRoute === 'gps_kua' ? 'kua' : 'kua'
   if (domainRoute === 'science') return 'science'
   return null
@@ -148,10 +147,6 @@ function pickStructureTemplate(theme: string, science: string | null, practition
   if (science === 'kua') {
     return ['Reconnaissance', 'Orientation utile', 'Zone de tension', 'Positionnement', 'Conseil pratique']
   }
-  if (science === 'maslow') {
-    return ['Reconnaissance', 'Besoin dominant', 'Manque principal', 'Prochain palier', 'Action de stabilisation']
-  }
-
   switch (theme) {
     case 'amour_relations':
       return ['Reconnaissance', 'Dynamique relationnelle', 'Mecanisme invisible', 'Levier relationnel', 'Action concrete']
