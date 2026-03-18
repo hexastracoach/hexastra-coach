@@ -62,14 +62,14 @@ const REQUIRED_ENV = {
 
 function getResponseDepth(plan: PlanKey): ResponseDepth {
   switch (plan) {
+    case 'free':
     case 'essential':
-      return 'medium'
     case 'premium':
       return 'long'
     case 'practitioner':
       return 'expert'
     default:
-      return 'short'
+      return 'long'
   }
 }
 

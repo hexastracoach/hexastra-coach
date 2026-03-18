@@ -25,7 +25,7 @@ export function getEntitlements(plan: PlanKey): Entitlements {
   const maxTokens =
     caps.analysisDepth === 'expert' ? 2000 :
     caps.analysisDepth === 'high'   ? 1600 :
-    caps.analysisDepth === 'medium' ? 1000 : 600
+    caps.analysisDepth === 'medium' ? 1600 : 1600
 
   return {
     canChat: caps.canUseChat,

@@ -20,8 +20,8 @@ export type PlanModeConfig = {
 export const PLAN_MODE_MAP: Record<PlanKey, PlanModeConfig> = {
   free: {
     mode: 'libre',
-    maxDepth: 'short',
-    longResponses: false,
+    maxDepth: 'deep',
+    longResponses: true,
     features: {
       micro_readings: true,
       menu_navigation: true,
@@ -34,8 +34,8 @@ export const PLAN_MODE_MAP: Record<PlanKey, PlanModeConfig> = {
   },
   essential: {
     mode: 'libre_avance',
-    maxDepth: 'medium',
-    longResponses: false,
+    maxDepth: 'deep',
+    longResponses: true,
     features: {
       micro_readings: true,
       menu_navigation: true,
