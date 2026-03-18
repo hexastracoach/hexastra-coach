@@ -7,25 +7,60 @@ function modeDirective(mode: BuildPromptInput['mode']): string {
     return 'Mode Praticien: structure obligatoire = Situation / Phase / Dynamique / Risques / Levier / Recommandation. Vocabulaire technique autorise si utile.'
   }
   if (mode === 'libre_approfondi') {
-    return 'Mode Libre approfondi: plus de profondeur, mais langage simple, humain et stable.'
+    return 'Mode Libre approfondi: plus de profondeur, langage clair et humain, avec jargon technique autorise si la demande ou l angle scientifique le justifie.'
   }
   if (mode === 'libre_avance') {
-    return 'Mode Libre avance: accessible, concret, avec plus de continuite et de precision.'
+    return 'Mode Libre avance: accessible, concret, avec plus de continuite et de precision. Les termes techniques utiles peuvent etre cites et expliques.'
   }
-  return 'Mode Libre: simple, fluide, concret, humain, sans jargon.'
+  return 'Mode Libre: simple, fluide, concret et humain. Si la lecture est scientifique ou demandee comme telle, le jargon technique est autorise a condition d etre bien explique.'
 }
 
 function planDirective(plan: BuildPromptInput['plan']): string {
   switch (plan) {
     case 'essential':
-      return 'Mode ESSENTIAL: guidance structuree avec insights actionnables.'
+      return 'Mode ESSENTIAL: guidance structuree avec insights actionnables. Vocabulaire technique autorise si la demande ou l angle scientifique le justifie.'
     case 'premium':
-      return 'Mode PREMIUM: analyse multi-couche plus profonde, motifs, timing, strategie.'
+      return 'Mode PREMIUM: analyse multi-couche plus profonde, motifs, timing, strategie. Vocabulaire technique pleinement autorise si utile.'
     case 'practitioner':
       return 'Mode PRACTITIONER: systeme complet, adaptatif, predictif, plus technique si vraiment utile.'
     default:
-      return 'Mode FREE: simple, clair, utile, sans surcharge.'
+      return 'Mode FREE: simple, clair, utile, sans surcharge. Si l utilisateur demande une lecture scientifique ou technique, les termes specialises peuvent etre nommes puis expliques.'
   }
+}
+
+function technicalLanguageDirective(input: BuildPromptInput): string {
+  const latestUserMessage = input.messages?.[input.messages.length - 1]?.content ?? ''
+  const labels = `${input.selectedMenuLabel ?? ''} ${input.selectedSubmenuLabel ?? ''}`
+  const combined = `${latestUserMessage} ${labels}`.toLowerCase()
+
+  const explicitTechnicalRequest =
+    /(jargon|technique|scientifique|vocabulaire technique|termes techniques|plus technique|plus precis|plus détaillé|plus detaille|sous-science|sous science|nom des sciences|nom des sous-sciences)/i.test(
+      combined,
+    )
+
+  const scientificAngle =
+    input.contextType === 'science' ||
+    input.domainRoute === 'science' ||
+    /(astrolex|neurokua|porteum|trianglenumeris|enneagramme|k[uú]a|fusion|planetarium|domus|aspectum|transitus|centres|canaux|portes|baseline|balance|overload|recalibration)/i.test(
+      combined,
+    )
+
+  if (explicitTechnicalRequest || scientificAngle) {
+    return `
+Jargon technique des sciences: OUVERT.
+- Tous les plans peuvent recevoir une lecture technique si l'utilisateur le demande ou s'il a choisi une science / sous-science.
+- Il est permis de nommer les sciences et sous-sciences publiques: Astrolex, NeuroKua, Porteum, TriangleNumeris, Enneagramme, Kua, Fusion KS, Planetarium, Domus, Aspectum, Transitus, Centres, Canaux, Portes, Baseline, Balance, Overload, Recalibration.
+- Garder les identifiants internes KS.* invisibles.
+- Si un terme technique apparait, l'ancrer tout de suite dans une phrase concrete pour qu'il reste comprehensible.
+- Ne jamais censurer un angle scientifique sous pretexte du plan utilisateur.
+`.trim()
+  }
+
+  return `
+Jargon technique des sciences: disponible a la demande.
+- Par defaut, rester clair.
+- Si un terme technique eclaire mieux la lecture, il peut etre cite puis explique en langage naturel.
+`.trim()
 }
 
 function requestDirective(input: BuildPromptInput): string {
@@ -233,7 +268,8 @@ Architecture KS active:
 - OpenAI met en ordre, priorise, humanise et retranscrit. Le calcul et la logique KS restent la source de verite des qu'ils existent.
 - Si un resultat metier structure est fourni, il prime sur le retrieval documentaire.
 - Le vector store sert a enrichir et stabiliser, pas a remplacer un moteur specialise.
-- Ne revele jamais les noms internes KS au grand public.
+- Ne revele jamais les identifiants internes KS.* au grand public.
+- Les noms publics des sciences et sous-sciences peuvent etre cites quand l'utilisateur demande une lecture scientifique ou choisit explicitement cet angle.
 - La structure finale doit suivre en priorite la Structure de sortie attendue lorsqu'elle existe.
 - Le signal KS dominant et les sous-modules deja executes servent de squelette de reponse, pas de decor.
 - Ne laisse pas la narration effacer ou contredire les signaux deja arbitres.
@@ -281,10 +317,11 @@ Style conversationnel obligatoire:
   - Ne jamais sonner mystique, flou, administratif ou generaliste.
 - Ne jamais afficher directement une liste brute sans phrase d'introduction.
 - Si un menu ou des options sont utiles, les introduire sobrement comme une aide.
-- Pas de jargon interne, pas de noms de modules, pas de mecanique visible.
+- Pas de jargon interne opaque, pas d'identifiants KS.*, pas de mecanique brute visible.
 - Etre concret, incarne, non fataliste, probabiliste.
 - Si une incertitude existe, utiliser un langage probabiliste plutot que d'affirmer.
-- Ne jamais mentionner l'astrologie, le HD, ni les systemes internes, sauf demande explicite cote praticien.
+- Mentionner les sciences, sous-sciences et termes techniques si l'utilisateur les demande, les choisit via le menu, ou si la lecture est explicitement scientifique.
+- Ne jamais exposer la mecanique systeme interne comme une architecture technique brute.
 - Chercher l'effet utilisateur: "Je comprends mieux et je sais quoi faire."
 `.trim()
 }
@@ -353,8 +390,11 @@ Contraintes:
 - Toujours mobiliser les sciences internes HexAstra (Fusion, NeuroKua, energie du moment, relation, travail/argent, decision, bien-etre) pour structurer chaque reponse, meme pour une question simple.
 - Si les donnees de naissance/profil et le plan le permettent, utiliser les calculs API HexAstra comme source prioritaire; sinon produire un fallback interne structure en conservant le ton HexAstra.
 - Adapter la profondeur et le niveau de personnalisation au plan (free / essential / premium / praticien) sans regressions metier.
-- Plans free / essential / premium: produire une lecture fusionnee KS.FUSION.V13, langage simple, sans exposer techniquement les sciences; utiliser l'angle choisi uniquement comme ponderation/focus.
-- Mode praticien: autoriser les analyses distinctes par situation/science/sous-science et un vocabulaire plus technique si utile.
+- La lecture HexAstra reste une fusion de sciences sur tous les plans, de free a premium puis praticien. Le plan change surtout le quota, le rythme, la densite et la profondeur, pas le principe de croisement des sciences.
+- Meme sur un plan free, ne pas repondre comme si une seule science isolee suffisait a elle seule si la fusion est necessaire pour que la lecture soit juste.
+- Tous les plans: si l'utilisateur demande une science, un sous-angle scientifique, ou un vocabulaire technique, l'ouvrir sans le censurer.
+- Plans free / essential / premium: garder la lecture lisible et pedagogique, mais autoriser les termes techniques et les noms de sciences/sous-sciences si la demande le justifie.
+- Mode praticien: structure plus dense, plus explicite, plus technique par defaut.
 - Si le flux de demarrage n'est pas termine, ne pas ouvrir de lecture complete hors sequence.
 - Ne pas reafficher le message de bienvenue une fois le flux initialise.
 Plan: ${input.plan}
@@ -381,6 +421,7 @@ ${conversationDirective(input)}
 ${masterBehaviorDirective(input)}
 ${modeDirective(input.mode)}
 ${planDirective(input.plan)}
+${technicalLanguageDirective(input)}
 ${requestDirective(input)}
 ${detailedReadingDirective(input)}
 ${responseStrategyDirective(input)}

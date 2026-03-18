@@ -1,4 +1,4 @@
-import { retrieveKnowledge } from "@/lib/vectorSearch"
+import { retrieveKnowledge } from '@/lib/vectorSearch'
 import type { DomainRoute } from '@/lib/hexastra/types'
 
 export type LayerResult = {
@@ -7,6 +7,33 @@ export type LayerResult = {
   filename?: string
   text: string
   score: number
+}
+
+function pushLayer(
+  target: LayerResult[],
+  source: string,
+  items: Awaited<ReturnType<typeof retrieveKnowledge>>,
+  scoreBoost = 0,
+) {
+  target.push(
+    ...items.map((item) => ({
+      source,
+      fileId: item.fileId,
+      filename: item.filename,
+      text: item.text,
+      score: item.score + scoreBoost,
+    })),
+  )
+}
+
+function dedupeResults(results: LayerResult[]) {
+  const seen = new Set<string>()
+  return results.filter((result) => {
+    const key = `${result.fileId ?? ''}::${result.filename ?? ''}::${result.text.slice(0, 120)}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 export async function multiLayerRetrieval({
@@ -22,84 +49,53 @@ export async function multiLayerRetrieval({
   apiKey: string
   domainRoute?: DomainRoute
 }) {
-
-  const isFree = plan === 'free'
-  const isEssential = plan === 'essential'
-
+  const normalizedQuery = query.trim() || 'lecture HexAstra'
   const layers: LayerResult[] = []
 
-  // Layer 1 — Knowledge principal
   const knowledge = await retrieveKnowledge({
-    query,
+    query: normalizedQuery,
     plan,
     vectorStoreId,
     apiKey,
-    domainRoute
+    domainRoute,
   })
+  pushLayer(layers, 'knowledge', knowledge, 0)
 
-  layers.push(
-    ...knowledge.map(k => ({
-      source: "knowledge",
-      fileId: k.fileId,
-      filename: k.filename,
-      text: k.text,
-      score: k.score
-    }))
-  )
-
-  // Layer 2 — KS Fusion (réservé premium/praticien ou requête explicite)
-  if (
-    !isFree &&
-    (plan === 'premium' || plan === 'practitioner' || query.toLowerCase().includes("ks") || query.toLowerCase().includes("fusion"))
-  ) {
-
-    const fusion = await retrieveKnowledge({
-      query: `${query} KS Fusion V13 système`,
-      plan,
-      vectorStoreId,
-      apiKey,
-      domainRoute: "fusion"
-    })
-
-    layers.push(
-      ...fusion.map(k => ({
-        source: "ks_fusion",
-        fileId: k.fileId,
-        filename: k.filename,
-        text: k.text,
-        score: k.score + 0.1
-      }))
-    )
-  }
-
-  // Layer 3 — Domaine spécialisé (pas pour free)
-  if (domainRoute && !isFree) {
-
+  if (domainRoute) {
     const domain = await retrieveKnowledge({
-      query,
+      query: `${normalizedQuery} ${domainRoute}`,
       plan,
       vectorStoreId,
       apiKey,
-      domainRoute
+      domainRoute,
     })
-
-    layers.push(
-      ...domain.map(k => ({
-        source: "domain",
-        fileId: k.fileId,
-        filename: k.filename,
-        text: k.text,
-        score: k.score + 0.05
-      }))
-    )
+    pushLayer(layers, 'domain', domain, 0.06)
   }
 
-  const cap =
-    isFree ? 6 :
-    isEssential ? 8 :
-    plan === 'premium' ? 10 : 12
+  const fusionQuery =
+    domainRoute && domainRoute !== 'general'
+      ? `${normalizedQuery} KS Fusion V13 ${domainRoute}`
+      : `${normalizedQuery} KS Fusion V13`
 
-  return layers
+  const fusion = await retrieveKnowledge({
+    query: fusionQuery,
+    plan,
+    vectorStoreId,
+    apiKey,
+    domainRoute: 'fusion',
+  })
+  pushLayer(layers, 'ks_fusion', fusion, 0.04)
+
+  const capped =
+    plan === 'free'
+      ? 6
+      : plan === 'essential'
+        ? 8
+        : plan === 'premium'
+          ? 10
+          : 12
+
+  return dedupeResults(layers)
     .sort((a, b) => b.score - a.score)
-    .slice(0, cap)
+    .slice(0, capped)
 }

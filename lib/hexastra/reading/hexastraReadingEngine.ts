@@ -108,10 +108,11 @@ function inferScience(message: string, domainRoute: DomainRoute) {
   const text = normalizeText(message)
 
   if (text.includes('neurokua')) return 'neurokua'
-  if (text.includes('astrolex') || text.includes('theme natal') || text.includes('theme astral')) return 'astrolex'
-  if (text.includes('porteum')) return 'porteum'
-  if (text.includes('triangle') || text.includes('numeris')) return 'trianglenumeris'
+  if (text.includes('astrologie') || text.includes('astrolex') || text.includes('theme natal') || text.includes('theme astral')) return 'astrolex'
+  if (text.includes('human design') || text.includes('porteum')) return 'human_design'
+  if (text.includes('numerologie') || text.includes('triangle') || text.includes('numeris')) return 'numerologie'
   if (text.includes('ennea')) return 'enneatype'
+  if (text.includes('maslow')) return 'maslow'
   if (text.includes('kua')) return domainRoute === 'gps_kua' ? 'kua' : 'kua'
   if (domainRoute === 'science') return 'science'
   return null
@@ -135,14 +136,20 @@ function pickStructureTemplate(theme: string, science: string | null, practition
   if (science === 'astrolex') {
     return ['Reconnaissance', 'Energie actuelle', 'Domaine active', 'Timing', 'Conseil du cycle']
   }
+  if (science === 'human_design') {
+    return ['Reconnaissance', 'Fonctionnement naturel', 'Zone sensible', 'Decision juste', 'Ajustement concret']
+  }
   if (science === 'neurokua') {
     return ['Reconnaissance', 'Equilibre des axes', 'Desequilibre principal', 'Ajustement', 'Cle d action']
   }
-  if (science === 'trianglenumeris') {
+  if (science === 'numerologie') {
     return ['Reconnaissance', 'Cycle principal', 'Transition en cours', 'Opportunite', 'Conseil du cycle']
   }
   if (science === 'kua') {
     return ['Reconnaissance', 'Orientation utile', 'Zone de tension', 'Positionnement', 'Conseil pratique']
+  }
+  if (science === 'maslow') {
+    return ['Reconnaissance', 'Besoin dominant', 'Manque principal', 'Prochain palier', 'Action de stabilisation']
   }
 
   switch (theme) {

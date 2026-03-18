@@ -7,6 +7,44 @@ function trimMessages(messages: ChatMessage[]): ChatMessage[] {
   return messages.slice(-12)
 }
 
+function buildKnowledgeHierarchyMessage(knowledgePacket?: Record<string, unknown> | null) {
+  if (!knowledgePacket) return null
+
+  const priorityOrder = Array.isArray(knowledgePacket.priorityOrder)
+    ? knowledgePacket.priorityOrder.join(' -> ')
+    : 'masterPrompt -> readingStructure -> sciencePrompt -> subsciencePrompt -> referenceBook -> supportingKnowledge'
+  const fusionGuide =
+    typeof knowledgePacket.fusionGuide === 'string' ? knowledgePacket.fusionGuide : null
+
+  const orderedSources = Array.isArray((knowledgePacket as { orderedSources?: unknown[] }).orderedSources)
+    ? ((knowledgePacket as { orderedSources?: unknown[] }).orderedSources ?? []).slice(0, 6)
+    : []
+
+  const summarizedSources = orderedSources
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null
+      const source = entry as {
+        role?: string
+        filename?: string | null
+        scienceTag?: string | null
+        excerpt?: string
+      }
+      const role = source.role ?? 'supportingKnowledge'
+      const filename = source.filename ?? 'source inconnue'
+      const scienceTag = source.scienceTag ? ` [${source.scienceTag}]` : ''
+      const excerpt = typeof source.excerpt === 'string' ? source.excerpt : ''
+      return `${role}${scienceTag}: ${filename}${excerpt ? ` -> ${excerpt}` : ''}`
+    })
+    .filter(Boolean)
+    .join('\n')
+
+  return `Hierarchie documentaire HexAstra a respecter strictement: ${priorityOrder}${
+    fusionGuide ? `\nPrincipe de fusion: ${fusionGuide}` : ''
+  }${
+    summarizedSources ? `\nSources ordonnees:\n${summarizedSources}` : ''
+  }`
+}
+
 export function buildChatPayload({
   systemPrompt,
   userContext,
@@ -51,6 +89,8 @@ export function buildChatPayload({
     },
   }
 
+  const knowledgeHierarchyMessage = buildKnowledgeHierarchyMessage(knowledgePacket)
+
   return {
     model: process.env.OPENAI_HEXASTRA_MODEL || 'gpt-4o',
     instructions: systemPrompt,
@@ -59,13 +99,13 @@ export function buildChatPayload({
     input: [
       {
         role: 'user',
-        content: `Contexte HexAstra interne à intégrer silencieusement : ${JSON.stringify(compactContext)}`,
+        content: `Contexte HexAstra interne a integrer silencieusement : ${JSON.stringify(compactContext)}`,
       },
       ...(readingPacket
         ? [
             {
               role: 'assistant' as const,
-              content: `Reading packet HexAstra interne à suivre prioritairement pour ordonner la lecture : ${JSON.stringify(readingPacket)}`,
+              content: `Reading packet HexAstra interne a suivre prioritairement pour ordonner la lecture : ${JSON.stringify(readingPacket)}`,
             },
           ]
         : []),
@@ -73,7 +113,15 @@ export function buildChatPayload({
         ? [
             {
               role: 'assistant' as const,
-              content: `Knowledge packet HexAstra interne. Hiérarchie documentaire à respecter : ${JSON.stringify(knowledgePacket)}`,
+              content: `Knowledge packet HexAstra interne. Hierarchie documentaire a respecter : ${JSON.stringify(knowledgePacket)}`,
+            },
+          ]
+        : []),
+      ...(knowledgeHierarchyMessage
+        ? [
+            {
+              role: 'assistant' as const,
+              content: knowledgeHierarchyMessage,
             },
           ]
         : []),

@@ -247,8 +247,9 @@ function looksLikeScienceOverviewMenu(message: string) {
   const normalized = normalizeSelectionText(message)
   return (
     normalized.includes('analyse par science') &&
-    (normalized.includes('neurokua') || normalized.includes('astrolex')) &&
-    normalized.includes('fusion')
+    /(astrologie|astrolex|human design|enneagramme|kua|neurokua|numerologie|maslow)/.test(
+      normalized,
+    )
   )
 }
 
@@ -285,13 +286,13 @@ function buildPractitionerMasterMenuMessage(language: string) {
     '6 — Lecture generale actuelle™ : synthese multidimensionnelle exploitable',
     '',
     'B — Analyses par science',
-    '7 — NeuroKua™ : lecture neuro-contextuelle de l equilibre interne',
-    '8 — Astrolex™ : cycles, timing, maisons et dynamiques du moment',
-    '9 — Porteum™ : fonctionnement naturel, energie et decision',
-    '10 — TriangleNumeris™ : cycles annuels, mensuels et transitions',
-    '11 — Enneagramme™ : mecanismes, stress et leviers d evolution',
-    '12 — Kua™ : orientation, espace et optimisation',
-    '13 — Fusion KS™ : synthese complete avec hierarchie des leviers',
+    '7 — Astrologie™ : cycles, maisons, aspects et timing',
+    '8 — Human Design™ : centres, canaux, portes et decision',
+    '9 — Enneagramme™ : mecanismes, stress et leviers d evolution',
+    '10 — Kua™ : orientation, espace et optimisation',
+    '11 — NeuroKua™ : 4 dynamiques, axe correctif et reglage sensoriel',
+    '12 — Numerologie™ : cycles annuels, mensuels et transitions',
+    '13 — Pyramide de Maslow™ : besoin dominant, manque et prochain palier',
     '',
     'C — Lectures HexAstra',
     '14 — Lecture HexAstra complete™ : lecture structuree, prete pour consultation',
@@ -309,22 +310,22 @@ function buildScienceOverviewMessage(language: string, practitionerMode: boolean
 
   const scienceList = practitionerMode
     ? [
-        '7 — NeuroKua™ : equilibre interne, charge mentale, regulation',
-        '8 — Astrolex™ : cycles, timing, dynamiques de phase',
-        '9 — Porteum™ : fonctionnement naturel, energie personnelle',
-        '10 — TriangleNumeris™ : cycles annuels et mensuels',
-        '11 — Enneagramme™ : mecanismes comportementaux, stress',
-        '12 — Kua™ : orientation, environnement, optimisation',
-        '13 — Fusion complete™ : synthese multidimensionnelle complete',
+        '7 — Astrologie™ : cycles, maisons, aspects et timing',
+        '8 — Human Design™ : fonctionnement naturel, centres et decision',
+        '9 — Enneagramme™ : mecanismes comportementaux, stress',
+        '10 — Kua™ : orientation, environnement, optimisation',
+        '11 — NeuroKua™ : 4 dynamiques, regulation et ajustement sensoriel',
+        '12 — Numerologie™ : cycles annuels et mensuels',
+        '13 — Pyramide de Maslow™ : besoin dominant, manque et palier suivant',
       ]
     : [
-        '1 — NeuroKua™ : etat mental, energie, fatigue, equilibre interieur',
-        '2 — Astrolex™ : cycles de vie, timing, phases que tu traverses',
-        '3 — Porteum™ : fonctionnement naturel, prise de decision, energie personnelle',
-        '4 — TriangleNumeris™ : cycles, annee, mois, dynamique temporelle',
-        '5 — Enneagramme™ : reactions automatiques, stress, comportement',
-        '6 — Kua™ : environnement, orientation, equilibre dans l espace',
-        '7 — Fusion complete™ : vision globale et strategie',
+        '1 — Astrologie™ : cycles de vie, timing, maisons et aspects',
+        '2 — Human Design™ : fonctionnement naturel, centres et decision',
+        '3 — Enneagramme™ : reactions automatiques, stress, comportement',
+        '4 — Kua™ : environnement, orientation, equilibre dans l espace',
+        '5 — NeuroKua™ : etat interne, axe dominant et reglage utile',
+        '6 — Numerologie™ : cycles, annee, mois, dynamique temporelle',
+        '7 — Pyramide de Maslow™ : besoin dominant et prochain palier',
       ]
 
   const outro = practitionerMode
@@ -342,22 +343,22 @@ function resolveScienceChoiceKey(params: {
 }) {
   const { choice, practitionerMode, selectedMenuKey, lastAssistantMessage } = params
   const regularChoices: Record<string, string> = {
-    '1': 'science_neurokua',
-    '2': 'science_astrolex',
-    '3': 'science_porteum',
-    '4': 'science_triangle',
-    '5': 'science_enneagram',
-    '6': 'science_kua',
-    '7': 'science_fusion',
+    '1': 'science_astrolex',
+    '2': 'science_porteum',
+    '3': 'science_enneagram',
+    '4': 'science_kua',
+    '5': 'science_neurokua',
+    '6': 'science_triangle',
+    '7': 'science_maslow',
   }
   const practitionerChoices: Record<string, string> = {
-    '7': 'science_neurokua',
-    '8': 'science_astrolex',
-    '9': 'science_porteum',
-    '10': 'science_triangle',
-    '11': 'science_enneagram',
-    '12': 'science_kua',
-    '13': 'science_fusion',
+    '7': 'science_astrolex',
+    '8': 'science_porteum',
+    '9': 'science_enneagram',
+    '10': 'science_kua',
+    '11': 'science_neurokua',
+    '12': 'science_triangle',
+    '13': 'science_maslow',
   }
 
   if (selectedMenuKey === 'science' || looksLikeScienceOverviewMenu(lastAssistantMessage ?? '')) {
@@ -385,10 +386,10 @@ function buildScienceSubanalysisRequest(
   const practitionerRequests: Record<string, Record<string, string>> = {
     science_neurokua: {
       '1': 'Je veux une lecture NeuroKua Baseline sur mon etat interne de reference.',
-      '2': 'Je veux une lecture NeuroKua Balance pour identifier mon desequilibre dominant.',
-      '3': 'Je veux une lecture NeuroKua Timing pour savoir s il faut agir ou recuperer.',
-      '4': 'Je veux une lecture NeuroKua Overload sur la surcharge ou le risque d epuisement.',
-      '5': 'Je veux une lecture NeuroKua Recalibration avec un protocole court de realignement.',
+      '2': 'Je veux une lecture NeuroKua Balance pour identifier mon axe dominant et mon axe correctif.',
+      '3': 'Je veux une lecture NeuroKua Timing pour savoir s il faut agir, recuperer ou me recalibrer.',
+      '4': 'Je veux une lecture NeuroKua Overload sur la surcharge, le manque et le risque d epuisement.',
+      '5': 'Je veux une lecture NeuroKua Recalibration avec un reglage spatial, sensoriel ou rythmique concret.',
     },
     science_astrolex: {
       '1': 'Je veux une lecture Astrolex Transitus sur ma situation actuelle.',
@@ -398,18 +399,18 @@ function buildScienceSubanalysisRequest(
       '5': 'Je veux une lecture Astrolex sur le potentiel a activer maintenant.',
     },
     science_porteum: {
-      '1': 'Je veux une lecture Porteum Centres sur mes zones stables et sensibles.',
-      '2': 'Je veux une lecture Porteum Canaux sur mes dynamiques d expression.',
-      '3': 'Je veux une lecture Porteum Portes sur les mecanismes precis actuellement actives.',
-      '4': 'Je veux une lecture Porteum Autorite et Strategie sur ma meilleure maniere de decider.',
-      '5': 'Je veux une synthese praticienne Porteum directement exploitable.',
+      '1': 'Je veux une lecture Human Design sur mes centres definis et sensibles.',
+      '2': 'Je veux une lecture Human Design sur mes canaux et mes dynamiques d expression.',
+      '3': 'Je veux une lecture Human Design sur les portes les plus utiles a regarder.',
+      '4': 'Je veux une lecture Human Design sur mon autorite, ma strategie et ma meilleure maniere de decider.',
+      '5': 'Je veux une synthese praticienne Human Design directement exploitable.',
     },
     science_triangle: {
-      '1': 'Je veux une lecture TriangleNumeris sur mon cycle annuel.',
-      '2': 'Je veux une lecture TriangleNumeris sur mon mois personnel.',
-      '3': 'Je veux une lecture TriangleNumeris sur mes defis actifs.',
-      '4': 'Je veux une lecture TriangleNumeris sur ma transition de periode.',
-      '5': 'Je veux une synthese TriangleNumeris simple et exploitable.',
+      '1': 'Je veux une lecture de numerologie sur mon cycle annuel.',
+      '2': 'Je veux une lecture de numerologie sur mon mois personnel.',
+      '3': 'Je veux une lecture de numerologie sur mon chemin, mes defis ou ma vibration active.',
+      '4': 'Je veux une lecture de numerologie sur ma transition de periode.',
+      '5': 'Je veux une synthese de numerologie simple et exploitable.',
     },
     science_enneagram: {
       '1': 'Je veux une lecture Enneagramme sur mon mecanisme dominant.',
@@ -425,22 +426,22 @@ function buildScienceSubanalysisRequest(
       '4': 'Je veux une lecture Kua strategique avec mise en place progressive.',
       '5': 'Je veux une synthese Kua avec plan d orientation simple.',
     },
-    science_fusion: {
-      '1': 'Je veux une lecture Fusion KS sur ma phase dominante actuelle.',
-      '2': 'Je veux une lecture Fusion KS sur ma zone dominante de vie actuelle.',
-      '3': 'Je veux une lecture Fusion KS sur mes risques et opportunites principales.',
-      '4': 'Je veux une lecture Fusion KS sur mon levier prioritaire.',
-      '5': 'Je veux une lecture Fusion KS avec plan global court et clair.',
+    science_maslow: {
+      '1': 'Je veux une lecture Pyramide de Maslow sur mon besoin dominant actuel.',
+      '2': 'Je veux une lecture Pyramide de Maslow sur mon manque ou ma frustration principale.',
+      '3': 'Je veux une lecture Pyramide de Maslow sur le besoin que je compense mal en ce moment.',
+      '4': 'Je veux une lecture Pyramide de Maslow sur le prochain palier a consolider.',
+      '5': 'Je veux une lecture Pyramide de Maslow avec un plan de stabilisation clair.',
     },
   }
 
   const regularRequests: Record<string, Record<string, string>> = {
     science_neurokua: {
-      '1': 'Je veux une lecture NeuroKua sur mon etat global du moment.',
-      '2': 'Je veux une lecture NeuroKua sur ma fatigue et ma recharge prioritaire.',
-      '3': 'Je veux une lecture NeuroKua sur mon stress ou ma surcharge.',
-      '4': 'Je veux une lecture NeuroKua pour savoir si je dois consolider ou agir.',
-      '5': 'Je veux un ajustement NeuroKua rapide a faire tout de suite.',
+      '1': 'Je veux une lecture NeuroKua sur mon etat global et mon mode dominant du moment.',
+      '2': 'Je veux une lecture NeuroKua sur ma fatigue, ma recharge et ce qui me manque pour retrouver mon equilibre.',
+      '3': 'Je veux une lecture NeuroKua sur mon stress, ma surcharge et mon axe correctif.',
+      '4': 'Je veux une lecture NeuroKua pour savoir si je dois consolider, agir ou me recalibrer.',
+      '5': 'Je veux un ajustement NeuroKua rapide avec un reglage simple de direction, de rythme ou d environnement.',
     },
     science_astrolex: {
       '1': 'Je veux une lecture Astrolex sur mon energie actuelle.',
@@ -450,18 +451,18 @@ function buildScienceSubanalysisRequest(
       '5': 'Je veux une lecture Astrolex avec le conseil du cycle.',
     },
     science_porteum: {
-      '1': 'Je veux une lecture Porteum sur mon fonctionnement global.',
-      '2': 'Je veux une lecture Porteum sur ma prise de decision.',
-      '3': 'Je veux une lecture Porteum sur ma zone sensible.',
-      '4': 'Je veux une lecture Porteum sur mon energie personnelle.',
-      '5': 'Je veux une lecture Porteum avec un ajustement utile concret.',
+      '1': 'Je veux une lecture Human Design sur mon fonctionnement global.',
+      '2': 'Je veux une lecture Human Design sur ma prise de decision.',
+      '3': 'Je veux une lecture Human Design sur ma zone sensible ou mes centres ouverts.',
+      '4': 'Je veux une lecture Human Design sur mon energie personnelle, mes canaux ou mon profil.',
+      '5': 'Je veux une lecture Human Design avec un ajustement utile concret.',
     },
     science_triangle: {
-      '1': 'Je veux une lecture TriangleNumeris sur mon cycle annuel.',
-      '2': 'Je veux une lecture TriangleNumeris sur mon cycle mensuel.',
-      '3': 'Je veux une lecture TriangleNumeris sur ma vibration dominante.',
-      '4': 'Je veux une lecture TriangleNumeris sur mes opportunites et vigilances.',
-      '5': 'Je veux une lecture TriangleNumeris avec le conseil du cycle.',
+      '1': 'Je veux une lecture de numerologie sur mon cycle annuel.',
+      '2': 'Je veux une lecture de numerologie sur mon cycle mensuel.',
+      '3': 'Je veux une lecture de numerologie sur ma vibration dominante ou mon chemin.',
+      '4': 'Je veux une lecture de numerologie sur mes opportunites et vigilances.',
+      '5': 'Je veux une lecture de numerologie avec le conseil du cycle.',
     },
     science_enneagram: {
       '1': 'Je veux une lecture Enneagramme sur ma reaction dominante.',
@@ -477,12 +478,12 @@ function buildScienceSubanalysisRequest(
       '4': 'Je veux une lecture Kua sur mon equilibre environnemental.',
       '5': 'Je veux une lecture Kua avec un conseil pratique a appliquer maintenant.',
     },
-    science_fusion: {
-      '1': 'Je veux une lecture Fusion complete sur la vision globale de mon moment.',
-      '2': 'Je veux une lecture Fusion complete sur mes contradictions principales.',
-      '3': 'Je veux une lecture Fusion complete sur l arbitrage prioritaire a retenir.',
-      '4': 'Je veux une lecture Fusion complete sur la meilleure strategie maintenant.',
-      '5': 'Je veux une lecture Fusion complete pleinement exploitable.',
+    science_maslow: {
+      '1': 'Je veux une lecture Pyramide de Maslow sur mon besoin dominant du moment.',
+      '2': 'Je veux une lecture Pyramide de Maslow sur mon manque ou ma frustration principale.',
+      '3': 'Je veux une lecture Pyramide de Maslow sur ce que je compense mal en ce moment.',
+      '4': 'Je veux une lecture Pyramide de Maslow sur le prochain palier a consolider.',
+      '5': 'Je veux une lecture Pyramide de Maslow avec une action de stabilisation prioritaire.',
     },
   }
 
@@ -584,28 +585,32 @@ function resolveContextualSelection(params: {
 function buildScienceSubanalysisMessage(selectionKey: string, practitionerMode: boolean) {
   if (selectionKey === 'science_astrolex') {
     const intro = practitionerMode
-      ? 'Tu as choisi Astrolex™ en Mode Praticien.'
-      : 'Tu as choisi Astrolex™.'
+      ? 'Tu as choisi Astrologie™ en Mode Praticien.'
+      : 'Tu as choisi Astrologie™.'
     const prompt = practitionerMode
       ? "Pour un diagnostic precis et exploitable, choisis maintenant l'angle d'analyse :"
       : "Pour que l'analyse soit vraiment utile et pas trop vague, choisis l'angle precis que tu veux explorer :"
     const lines = practitionerMode
       ? [
-          '1 — Situation actuelle (Transitus™) : ce qui est en train de se jouer concretement maintenant',
-          '2 — Cycle de vie (phase profonde) : ou tu en es dans ton evolution globale',
-          '3 — Domaine active (Domus™) : le secteur de vie principal impacte',
-          '4 — Tension / defi (Aspectum™) : le blocage ou conflit reel a comprendre',
-          '5 — Potentiel a activer : ce que tu peux utiliser pour avancer efficacement',
+          '1 — Transitus™ : ce qui est en train de se jouer concretement maintenant',
+          '2 — Domus™ : le domaine de vie ou les maisons les plus activees',
+          '3 — Aspectum™ : les tensions, appuis et rapports de force du moment',
+          '4 — Synastrie™ : la dynamique astrologique avec une personne ou une relation',
+          '5 — Geo-Astrologie™ : l impact des lieux, du deplacement ou du cadre geographique',
+          '6 — Planetarium™ : les planetes dominantes et leurs messages',
+          '7 — Synthese astrologique™ : lecture strategique complete',
         ]
       : [
           '1 — Energie actuelle : l ambiance globale du moment',
           '2 — Domaine active : le secteur de ta vie le plus impacte',
           '3 — Tension ou opportunite : ce qui bloque ou ce qui peut avancer',
           '4 — Timing : est-ce le bon moment pour agir ou attendre',
-          '5 — Conseil du cycle : comment t adapter concretement a cette phase',
+          '5 — Synastrie : la dynamique astrologique avec une autre personne',
+          '6 — Lieux / geo-astrologie : l effet des lieux et de ton environnement',
+          '7 — Conseil du cycle : comment t adapter concretement a cette phase',
         ]
 
-    return [intro, '', prompt, '', 'Astrolex™ — selection', ...lines, '', 'Reponds avec le numero pour continuer.'].join(
+    return [intro, '', prompt, '', 'Astrologie™ — selection', ...lines, '', 'Reponds avec le numero pour continuer.'].join(
       '\n',
     )
   }
@@ -617,11 +622,12 @@ function buildScienceSubanalysisMessage(selectionKey: string, practitionerMode: 
       'Choisis maintenant l angle que tu veux explorer :',
       '',
       'NeuroKua™ — selection',
-      '1 — Etat global : ton equilibre et ton etat du moment',
-      '2 — Fatigue / recharge : ce qui te vide et ce qui te recharge',
-      '3 — Stress / surcharge : ce qui comprime ton systeme',
-      '4 — Stabilite ou action : faut-il consolider ou avancer',
-      '5 — Ajustement rapide : le geste utile tout de suite',
+      '1 — Baseline™ : ton niveau de reference et ton mode dominant',
+      '2 — Balance™ : ton axe dominant, ton axe correctif et le desequilibre principal',
+      '3 — Timing™ : agir, recuperer ou temporiser selon la fenetre du moment',
+      '4 — Overload™ : surcharge, manque ou usure par accumulation',
+      '5 — Recalibration™ : reglage rapide de direction, rythme, couleur ou environnement',
+      '6 — Synesthesia™ : orientation, couleur et environnement sensoriel utiles',
       '',
       'Reponds avec le numero pour continuer.',
     ].join('\n')
@@ -629,16 +635,17 @@ function buildScienceSubanalysisMessage(selectionKey: string, practitionerMode: 
 
   if (selectionKey === 'science_porteum') {
     return [
-      'Tu as choisi Porteum™.',
+      'Tu as choisi Human Design™.',
       '',
       'Choisis maintenant l angle que tu veux explorer :',
       '',
-      'Porteum™ — selection',
-      '1 — Fonctionnement global : comment tu operes naturellement',
-      '2 — Prise de decision : comment tu arbitres et avances',
-      '3 — Zone sensible : ce qui se grippe ou se surcharge',
-      '4 — Energie personnelle : ce qui te nourrit vraiment',
-      '5 — Ajustement utile : le meilleur reglage concret pour toi',
+      'Human Design™ — selection',
+      '1 — Centres™ : zones stables et zones sensibles',
+      '2 — Canaux™ : dynamiques d expression et de circulation',
+      '3 — Portes™ : mecanismes precis actuellement actives',
+      '4 — Profil™ : posture naturelle et style d incarnation',
+      '5 — Autorite / Strategie™ : ta meilleure maniere de decider',
+      '6 — Synthese™ : lecture complete et exploitable',
       '',
       'Reponds avec le numero pour continuer.',
     ].join('\n')
@@ -646,16 +653,17 @@ function buildScienceSubanalysisMessage(selectionKey: string, practitionerMode: 
 
   if (selectionKey === 'science_triangle') {
     return [
-      'Tu as choisi TriangleNumeris™.',
+      'Tu as choisi Numerologie™.',
       '',
       'Choisis maintenant l angle que tu veux explorer :',
       '',
-      'TriangleNumeris™ — selection',
+      'Numerologie™ — selection',
       '1 — Cycle annuel : le mouvement de fond de cette annee',
       '2 — Cycle mensuel : ce que le moment active concretement',
-      '3 — Vibration dominante : la frequence qui guide ta phase',
-      '4 — Opportunite / vigilance : ce qui est favorise ou a surveiller',
-      '5 — Conseil du cycle : comment t adapter avec justesse',
+      '3 — Chemin / vibration dominante : la frequence qui guide ta phase',
+      '4 — Defis et transitions : ce qui demande adaptation',
+      '5 — Opportunite / vigilance : ce qui est favorise ou a surveiller',
+      '6 — Conseil du cycle : comment t adapter avec justesse',
       '',
       'Reponds avec le numero pour continuer.',
     ].join('\n')
@@ -695,18 +703,18 @@ function buildScienceSubanalysisMessage(selectionKey: string, practitionerMode: 
     ].join('\n')
   }
 
-  if (selectionKey === 'science_fusion') {
+  if (selectionKey === 'science_maslow') {
     return [
-      'Tu as choisi Fusion complete™.',
+      'Tu as choisi la Pyramide de Maslow™.',
       '',
-      'Choisis maintenant l angle de fusion que tu veux explorer :',
+      'Choisis maintenant l angle que tu veux explorer :',
       '',
-      'Fusion complete™ — selection',
-      '1 — Vision globale : les dominantes de ton moment',
-      '2 — Contradictions : ce qui se tire encore en sens inverse',
-      '3 — Arbitrage : le levier prioritaire a retenir',
-      '4 — Strategie : la direction la plus juste maintenant',
-      '5 — Lecture complete : synthese multidimensionnelle exploitable',
+      'Pyramide de Maslow™ — selection',
+      '1 — Besoin dominant : ce qui demande a etre nourrit en premier',
+      '2 — Manque principal : ce qui fragilise ton equilibre actuel',
+      '3 — Compensation : ce que tu essaies de tenir autrement',
+      '4 — Prochain palier : ce qui peut etre consolide ensuite',
+      '5 — Plan de stabilisation : action concrete et prioritaire',
       '',
       'Reponds avec le numero pour continuer.',
     ].join('\n')
@@ -1588,10 +1596,20 @@ export async function runHexastraFlow(input: {
       contextType: normalizedContextType,
     })
 
+    const retrievalQuery = [
+      latestUserMessage,
+      selectedMenu?.label ?? null,
+      selectedSubmenu?.label ?? null,
+      selectedSubmenu?.promptHint ?? selectedMenu?.promptHint ?? null,
+      selectedSubmenu?.description ?? selectedMenu?.description ?? null,
+    ]
+      .filter((value): value is string => Boolean(value && value.trim()))
+      .join(' | ')
+
     const retrievalConfig = getAdaptiveRetrievalConfig({
       plan,
       domainRoute,
-      query: latestUserMessage,
+      query: retrievalQuery || latestUserMessage,
     })
     const retrievalPlan = buildRetrievalPlan({
       plan,
@@ -1602,7 +1620,7 @@ export async function runHexastraFlow(input: {
     const retrievalResults =
       VECTOR_STORE_ID && process.env.OPENAI_API_KEY
         ? await multiLayerRetrieval({
-            query: latestUserMessage,
+            query: retrievalQuery || latestUserMessage,
             plan,
             vectorStoreId: VECTOR_STORE_ID,
             apiKey: process.env.OPENAI_API_KEY,

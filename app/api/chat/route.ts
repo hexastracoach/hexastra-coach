@@ -215,7 +215,7 @@ function isContextualFlowCommand(
   const lastAssistantMessage = [...history].reverse().find((entry) => entry.role === 'assistant')?.content ?? ''
   const assistantNorm = normalizeText(lastAssistantMessage)
   const assistantShowsGuidedFlow =
-    /analyse par science|selection|astrolex|neurokua|porteum|trianglenumeris|enneagramme|kua|fusion complete|mode praticien|niveau|analyses par situation|analyses par science|menu praticien/.test(
+    /analyse par science|selection|astrologie|astrolex|human design|porteum|neurokua|numerologie|trianglenumeris|enneagramme|kua|maslow|mode praticien|niveau|analyses par situation|analyses par science|menu praticien/.test(
       assistantNorm
     )
 

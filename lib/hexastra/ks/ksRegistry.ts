@@ -96,7 +96,7 @@ export const KS_DOMAIN_REGISTRY: Record<DomainRoute, KsDomainConfig> = {
   science: {
     modules: ['KS.FUSION.V13', 'KS.ASTROLEX.V1', 'KS.PORTEUM.V1', 'KS.TRIANGLENUMERIS.V1', 'KS.SENTINEL'],
     narrativeContract:
-      "Traiter la science choisie comme un angle specialise, puis reintegrer le resultat dans une lecture HexAstra lisible.",
+      'Traiter la science choisie comme un angle specialise, puis reintegrer le resultat dans une lecture HexAstra lisible.',
     executionStrategy: 'api_first',
   },
 }
@@ -107,106 +107,199 @@ const KS_SELECTION_REGISTRY: Record<string, KsSelectionConfig> = {
     narrativeContract: "Produire directement un scan de l'etat du jour, sans re-questionner l'utilisateur.",
     promptHint: "Lecture directe NeuroKua de l'etat du jour a partir des donnees deja enregistrees.",
     outputStructure: 'Etat global -> desequilibre dominant -> levier immediat -> conseil pratique',
-    contextFrame: "Sous-theme NeuroKua centré sur l'état actuel, le niveau d'équilibre, la tension dominante et le bon réglage immédiat.",
-    clarificationQuestion: "Veux-tu surtout comprendre ton état global du jour, ou un point précis comme la fatigue, le stress ou la clarté ?",
-    submodules: ['KS.StateActivation', 'KS.InnerStateReader'],
+    contextFrame:
+      "Sous-theme NeuroKua centre sur l'etat actuel, le niveau d'equilibre, la tension dominante et le bon reglage immediat.",
+    clarificationQuestion:
+      "Veux-tu surtout comprendre ton etat global du jour, ou un point precis comme la fatigue, le stress ou la clarte ?",
+    submodules: ['KS.StateActivation', 'KS.InnerStateReader', 'KS.NeuroTimingMap'],
     executionStrategy: 'api_first',
   },
   fatigue_recharge: {
     modules: ['KS.NeuroKua.System.V1', 'KS.NEUROSOMA', 'KS.Q-INCARNATIO.V1'],
     narrativeContract: 'Diagnostiquer la fatigue dominante et proposer une recharge prioritaire.',
     outputStructure: 'Fatigue dominante -> cause probable -> recharge prioritaire -> geste concret',
-    contextFrame: 'Sous-theme de recharge centré sur la fatigue, la réserve réelle et le meilleur geste de récupération.',
-    clarificationQuestion: "Ta demande porte surtout sur la fatigue physique, mentale ou sur une sensation générale d'épuisement ?",
-    submodules: ['KS.InnerStateReader', 'KS.ActionTranslator'],
+    contextFrame:
+      'Sous-theme de recharge centre sur la fatigue, la reserve reelle et le meilleur geste de recuperation.',
+    clarificationQuestion:
+      "Ta demande porte surtout sur la fatigue physique, mentale ou sur une sensation generale d'epuisement ?",
+    submodules: ['KS.InnerStateReader', 'KS.RecoveryProtocol', 'KS.ActionTranslator'],
     executionStrategy: 'api_first',
   },
   stress_overload: {
     modules: ['KS.NeuroKua.System.V1', 'KS.NEUROSOMA', 'KS.SENTINEL'],
     narrativeContract: 'Identifier la surcharge dominante et donner un levier concret de stabilisation.',
     outputStructure: 'Surcharge dominante -> risque a eviter -> stabilisation -> action simple',
-    contextFrame: 'Sous-theme de surcharge centré sur la tension, la sursollicitation et le levier de stabilisation prioritaire.',
-    clarificationQuestion: "Le stress que tu veux regarder est-il surtout mental, émotionnel ou lié à une situation précise ?",
-    submodules: ['KS.StateActivation', 'KS.VoiceModulation'],
+    contextFrame:
+      'Sous-theme de surcharge centre sur la tension, la sursollicitation et le levier de stabilisation prioritaire.',
+    clarificationQuestion:
+      'Le stress que tu veux regarder est-il surtout mental, emotionnel ou lie a une situation precise ?',
+    submodules: ['KS.StateActivation', 'KS.VoiceModulation', 'KS.NeuroTimingMap'],
     executionStrategy: 'api_first',
   },
   quick_adjustment: {
     modules: ['KS.NeuroKua.System.V1', 'KS.Q-INCARNATIO.V1'],
     narrativeContract: 'Donner un ajustement bref, pratique et immediat.',
     outputStructure: 'Constat -> ajustement rapide -> effet attendu',
-    contextFrame: 'Sous-theme d’ajustement rapide centré sur un micro-réglage concret à effet immédiat.',
-    clarificationQuestion: "Tu veux un ajustement rapide pour retrouver du calme, de l’élan ou de la clarté ?",
-    submodules: ['KS.ActionTranslator'],
+    contextFrame:
+      'Sous-theme d ajustement rapide centre sur un micro-reglage concret a effet immediat.',
+    clarificationQuestion:
+      "Tu veux un ajustement rapide pour retrouver du calme, de l elan ou de la clarte ?",
+    submodules: ['KS.ActionTranslator', 'KS.SynesthesiaMap'],
     executionStrategy: 'api_first',
   },
   detailed_reading: {
     modules: ['KS.FUSION.V13', 'KS.SYNTHEON', 'KS.HEXASTRAL.ENGINE', 'KS.SENTINEL'],
     narrativeContract: 'Produire une lecture fusionnee detaillee, stable et structuree.',
     outputStructure: 'Phase -> dynamique dominante -> risque -> opportunite -> orientation',
-    contextFrame: 'Lecture générale détaillée centrée sur la phase actuelle, les dominantes, les vigilances et la direction utile.',
-    clarificationQuestion: "Veux-tu que la lecture détaillée se concentre surtout sur ta situation globale, une décision, ou un domaine de vie précis ?",
+    contextFrame:
+      'Lecture generale detaillee centree sur la phase actuelle, les dominantes, les vigilances et la direction utile.',
+    clarificationQuestion:
+      'Veux-tu que la lecture detaillee se concentre surtout sur ta situation globale, une decision, ou un domaine de vie precis ?',
     executionStrategy: 'api_first',
   },
   science_neurokua: {
     modules: ['KS.NeuroKua.System.V1', 'KS.NEUROSOMA', 'KS.SENTINEL'],
-    narrativeContract: "Traiter la demande comme une lecture NeuroKua specialisee centree sur l'equilibre et la regulation.",
-    outputStructure: 'Etat global -> axe de regulation -> surcharge ou recharge -> ajustement',
-    contextFrame: "Science NeuroKua centrée sur l'équilibre intérieur, la régulation et le geste juste du moment.",
-    clarificationQuestion: "Souhaites-tu un scan global NeuroKua ou regarder un axe précis comme stress, fatigue ou stabilité ?",
-    submodules: ['KS.StateActivation', 'KS.InnerStateReader', 'KS.ActionTranslator'],
+    narrativeContract:
+      "Traiter la demande comme une lecture NeuroKua specialisee centree sur les 4 dynamiques, l'axe dominant, l'axe correctif et le bon ajustement spatial ou sensoriel.",
+    outputStructure:
+      'Mode dominant -> axe correctif -> surcharge ou manque -> ajustement spatial ou sensoriel -> action concrete',
+    contextFrame:
+      "Science NeuroKua centree sur les 4 dynamiques internes, l'axe correctif, la regulation de l'etat et les ajustements d'environnement utiles.",
+    clarificationQuestion:
+      "Souhaites-tu un scan global NeuroKua, ou regarder un axe precis comme surcharge, clarte, regulation, orientation ou ajustement sensoriel ?",
+    submodules: [
+      'KS.StateActivation',
+      'KS.InnerStateReader',
+      'KS.NeuroTimingMap',
+      'KS.SynesthesiaMap',
+      'KS.RecoveryProtocol',
+      'KS.ActionTranslator',
+    ],
     executionStrategy: 'api_first',
   },
   science_astrolex: {
     modules: ['KS.ASTROLEX.V1', 'KS.Planetarium', 'KS.Transitus', 'KS.SENTINEL'],
-    narrativeContract: 'Lire les influences, la phase traversee et le timing prioritaire.',
-    outputStructure: 'Phase actuelle -> domaine active -> tension ou opportunite -> timing -> conseil',
-    contextFrame: 'Science Astrolex centrée sur le timing, la phase, les maisons, les activations et la bonne fenêtre d’action.',
-    clarificationQuestion: "Sur Astrolex, veux-tu regarder ton timing général, un domaine de vie précis, ou une question astrologique comme les maisons, aspects ou axes ?",
-    submodules: ['KS.Planetarium', 'KS.Domus', 'KS.Aspectum', 'KS.Nodus', 'KS.Transitus', 'KS.AethericMap', 'KS.SyncBridge.Astro'],
+    narrativeContract:
+      'Lire la phase astrologique, les maisons, les aspects, les axes, les relations et le bon timing prioritaire.',
+    outputStructure: 'Planetes dominantes -> maisons ou domaine active -> tension ou appui -> timing -> conseil',
+    contextFrame:
+      'Science Astrologie centree sur le timing, la phase, les maisons, les activations, les axes et la bonne fenetre d action.',
+    clarificationQuestion:
+      'En astrologie, veux-tu regarder le timing general, les maisons, les aspects, la synastrie, la geo-astrologie ou les axes de vie ?',
+    submodules: [
+      'KS.Planetarium',
+      'KS.Domus',
+      'KS.Aspectum',
+      'KS.Nodus',
+      'KS.Transitus',
+      'KS.Synastria',
+      'KS.GeoAstroMap',
+      'KS.HouseOppositionMap',
+      'KS.AethericMap',
+      'KS.SyncBridge.Astro',
+    ],
     executionStrategy: 'api_first',
   },
   science_porteum: {
     modules: ['KS.PORTEUM.V1', 'KS.ChannelMap', 'KS.PolarityMap', 'KS.SENTINEL'],
-    narrativeContract: 'Lire le fonctionnement naturel, les appuis et les frictions d incarnation.',
+    narrativeContract:
+      'Lire le fonctionnement Human Design, les appuis, les centres sensibles, les profils et la logique de decision.',
     outputStructure: 'Fonctionnement naturel -> zone sensible -> bon reflexe -> ajustement',
-    contextFrame: 'Science Porteum centrée sur le fonctionnement réel, les centres d’appui, les canaux et les frictions d’incarnation.',
-    clarificationQuestion: "Avec Porteum, veux-tu surtout comprendre ton fonctionnement global, une zone sensible, ou ton meilleur mode d’action ?",
-    submodules: ['KS.Vocalis', 'KS.DeconditioMap', 'KS.PolarityMap', 'KS.ChannelMap'],
+    contextFrame:
+      "Science Human Design centree sur le fonctionnement reel, les centres d'appui, les canaux, les portes, les profils et la maniere optimale de decider.",
+    clarificationQuestion:
+      "Avec Human Design, veux-tu surtout comprendre ton type, tes centres, tes canaux, tes portes, ton profil ou ta meilleure maniere de decider ?",
+    submodules: [
+      'KS.TypeProfile',
+      'KS.ProfileMap',
+      'KS.ChannelMap',
+      'KS.GateMap',
+      'KS.AuthorityStrategy',
+      'KS.IncarnationCross',
+      'KS.Vocalis',
+      'KS.DeconditioMap',
+      'KS.PolarityMap',
+    ],
     executionStrategy: 'api_first',
   },
   science_triangle: {
     modules: ['KS.TRIANGLENUMERIS.V1', 'KS.NumCore', 'KS.NumCycle', 'KS.SENTINEL'],
-    narrativeContract: 'Lire le cycle dominant, la temporalite utile et la bonne attitude du moment.',
+    narrativeContract:
+      'Lire le cycle numerologique dominant, la vibration active, les transitions et la bonne attitude du moment.',
     outputStructure: 'Cycle dominant -> phase numerique -> opportunite -> vigilance -> attitude',
-    contextFrame: 'Science Triangle Numeris centrée sur les cycles, la vibration active, le rythme et la stabilité du moment.',
-    clarificationQuestion: "Veux-tu une lecture du cycle général, d’une période précise, ou de l’impact actuel sur un domaine de vie ?",
-    submodules: ['KS.NumCore', 'KS.NumCycle', 'KS.HexaNum.LinkBridge'],
+    contextFrame:
+      'Science Numerologie centree sur les cycles, la vibration active, le rythme, le chemin de vie et la stabilite du moment.',
+    clarificationQuestion:
+      "Veux-tu une lecture numerologique du cycle general, du mois personnel, du chemin de vie, des defis, ou de l'impact actuel sur un domaine de vie ?",
+    submodules: [
+      'KS.NumCore',
+      'KS.NumCycle',
+      'KS.LifePathMap',
+      'KS.PersonalMonthMap',
+      'KS.NumericChallengeMap',
+      'KS.HexaNum.LinkBridge',
+    ],
     executionStrategy: 'api_first',
   },
   science_enneagram: {
     modules: ['KS.SPIRITLEX.V1', 'KS.ArchetypeMap', 'KS.EmotionMap', 'KS.SENTINEL'],
-    narrativeContract: 'Lire la reaction dominante, le piege a eviter et le levier evolutif.',
-    outputStructure: 'Reaction dominante -> mode stress -> piege -> levier evolutif',
-    contextFrame: 'Lecture archétypale centrée sur le mécanisme dominant, la défense, le stress et le levier d’évolution.',
-    clarificationQuestion: "Veux-tu comprendre ton mécanisme global, ta réaction sous stress, ou un levier de transformation plus précis ?",
-    submodules: ['KS.SymbolCore', 'KS.ArchetypeMap', 'KS.EmotionMap', 'KS.SpiritLex.LinkBioTotem'],
+    narrativeContract:
+      'Lire le type dominant, les ailes, les instincts, la bascule stress ou securite, puis le levier evolutif prioritaire.',
+    outputStructure: 'Type dominant -> mecanisme de defense -> stress ou securite -> levier evolutif',
+    contextFrame:
+      'Lecture Enneagramme centree sur le type dominant, les ailes, les instincts, la defense et le levier d evolution.',
+    clarificationQuestion:
+      "Avec l Enneagramme, veux-tu comprendre ton type, tes ailes, ton sous-type instinctif, ta bascule stress ou ton levier d evolution ?",
+    submodules: [
+      'KS.SymbolCore',
+      'KS.ArchetypeMap',
+      'KS.EmotionMap',
+      'KS.EnneaTypeMap',
+      'KS.EnneaWingMap',
+      'KS.EnneaInstinctMap',
+      'KS.EnneaStressMap',
+      'KS.SpiritLex.LinkBioTotem',
+    ],
     executionStrategy: 'module_first',
   },
   science_kua: {
     modules: ['KS.HexAstra.GPS.V1', 'KS.KAFA.WAVES', 'KS.SENTINEL'],
-    narrativeContract: "Lire l'orientation, le positionnement et l'ajustement environnemental utile.",
+    narrativeContract:
+      "Lire l'orientation, le positionnement, les directions favorables et l'ajustement environnemental utile.",
     outputStructure: 'Orientation utile -> zone de tension -> ajustement espace -> conseil pratique',
-    contextFrame: 'Science Kua centrée sur l’orientation, le positionnement et l’ajustement de l’environnement.',
-    clarificationQuestion: "Avec Kua, veux-tu une orientation générale, une aide de décision, ou un ajustement concret de ton espace ?",
-    submodules: ['KS.SignalReader', 'KS.PlantInterface'],
+    contextFrame:
+      'Science Kua centree sur les directions favorables, les zones sensibles, le positionnement et l ajustement de l environnement.',
+    clarificationQuestion:
+      "Avec Kua, veux-tu regarder tes directions favorables, une decision, ton espace de vie ou un ajustement concret de ton environnement ?",
+    submodules: ['KS.SignalReader', 'KS.DirectionMap', 'KS.SpaceMap', 'KS.KuaTimingMap', 'KS.PlantInterface'],
     executionStrategy: 'api_first',
+  },
+  science_maslow: {
+    modules: ['KS.FUSION.V13', 'KS.NEUROSOMA', 'KS.Q-INCARNATIO.V1', 'KS.SENTINEL'],
+    narrativeContract:
+      'Lire le besoin dominant selon la pyramide de Maslow, identifier le manque ou la surcharge, puis proposer le prochain palier de stabilisation.',
+    outputStructure: 'Besoin dominant -> manque ou surcharge -> prochain palier -> action de stabilisation',
+    contextFrame:
+      'Science Pyramide de Maslow centree sur le besoin actuellement prioritaire, ce qui manque pour te stabiliser, et le palier suivant a soutenir.',
+    clarificationQuestion:
+      "Avec la Pyramide de Maslow, veux-tu comprendre ton besoin dominant actuel, un manque precis, ou le prochain palier a consolider ?",
+    submodules: [
+      'KS.InnerStateReader',
+      'KS.NeedHierarchyMap',
+      'KS.CompensationMap',
+      'KS.GrowthStepMap',
+      'KS.ActionTranslator',
+    ],
+    executionStrategy: 'module_first',
   },
   science_fusion: {
     modules: ['KS.FUSION.V13', 'KS.SYNTHEON', 'KS.HEXASTRAL.ENGINE', 'KS.SENTINEL'],
     narrativeContract: 'Fusion complete avec arbitrage des dominantes et sortie narrative stabilisee.',
     outputStructure: 'Dominantes -> contradictions -> arbitrage -> orientation -> action',
-    contextFrame: 'Lecture Fusion complète centrée sur les dominantes croisées, les contradictions et l’arbitrage final.',
-    clarificationQuestion: "Veux-tu une fusion complète générale, ou une fusion appliquée à une question ou un domaine précis ?",
+    contextFrame:
+      'Lecture Fusion complete centree sur les dominantes croisees, les contradictions et l arbitrage final.',
+    clarificationQuestion:
+      'Veux-tu une fusion complete generale, ou une fusion appliquee a une question ou un domaine precis ?',
     executionStrategy: 'api_first',
   },
 }
@@ -236,26 +329,32 @@ export function getKsFreeformContract(message?: string | null): KsSelectionConfi
   const text = (message ?? '').toLowerCase()
   if (!text.trim()) return null
 
-  if (
-    text.includes('theme natal') ||
-    text.includes('thème natal') ||
-    text.includes('theme astral') ||
-    text.includes('thème astral') ||
-    text.includes('carte du ciel')
-  ) {
+  if (text.includes('theme natal') || text.includes('theme astral') || text.includes('carte du ciel')) {
     return {
-      modules: ['KS.HEXASTRAL.ENGINE', 'KS.ASTROLEX.V1', 'KS.Planetarium', 'KS.Domus', 'KS.Aspectum', 'KS.SENTINEL'],
+      modules: [
+        'KS.HEXASTRAL.ENGINE',
+        'KS.ASTROLEX.V1',
+        'KS.Planetarium',
+        'KS.Domus',
+        'KS.Aspectum',
+        'KS.SENTINEL',
+      ],
       narrativeContract:
         'Produire une lecture de theme natal directe a partir des donnees de naissance, sans redemander les informations deja presentes.',
-      promptHint:
-        'Lecture directe du theme natal a partir des donnees de naissance deja enregistrees.',
-      outputStructure:
-        'Signature de naissance -> axes dominants -> forces -> vigilances -> orientation actuelle',
+      promptHint: 'Lecture directe du theme natal a partir des donnees de naissance deja enregistrees.',
+      outputStructure: 'Signature de naissance -> axes dominants -> forces -> vigilances -> orientation actuelle',
       contextFrame:
-        'Lecture de thème natal centrée sur la signature de naissance, les maisons, les axes dominants et leur traduction concrète.',
+        'Lecture de theme natal centree sur la signature de naissance, les maisons, les axes dominants et leur traduction concrete.',
       clarificationQuestion:
-        "Veux-tu un thème natal global, ou te concentrer sur un angle précis comme les maisons, les aspects, la mission ou les blocages ?",
-      submodules: ['KS.Planetarium', 'KS.Domus', 'KS.Aspectum', 'KS.ThemeHexAstra.V1'],
+        'Veux-tu un theme natal global, ou te concentrer sur un angle precis comme les maisons, les aspects, les axes ou la vocation ?',
+      submodules: [
+        'KS.Planetarium',
+        'KS.Domus',
+        'KS.Aspectum',
+        'KS.Nodus',
+        'KS.HouseOppositionMap',
+        'KS.ThemeHexAstra.V1',
+      ],
       executionStrategy: 'api_first',
     }
   }
