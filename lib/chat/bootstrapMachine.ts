@@ -52,13 +52,13 @@ export function computeBootstrapStep({
 
   const ents = getEntitlements(plan)
 
-  // 1. Birth data is the prerequisite for everything
-  if (!isBirthDataComplete(birthData)) return 'birthdata_missing'
-
-  // 2. Practitioner plan needs a usage choice before readings
+  // 1. Practitioner plan asks the usage first to mirror the guided GPT flow.
   if (ents.canAskPractitionerUsage && !practitionerUsage) {
     return 'practitioner_usage_needed'
   }
+
+  // 2. Birth data stays mandatory before any real reading.
+  if (!isBirthDataComplete(birthData)) return 'birthdata_missing'
 
   // 3. Micro-readings in strict order
   const profileKey = birthDataProfileKey(birthData)

@@ -195,8 +195,12 @@ function isContextualFlowCommand(
 
   const hasActiveSelection = Boolean(selectedMenuKey || selectedSubmenuKey)
   const isShortChoice = /^\d{1,2}$/.test(norm) || /^niveau\s*\d+$/.test(norm)
+  const isCompositeChoice = /^\d{1,2}\s*(et|&|\+|puis|then)\s*\d{1,2}$/.test(norm)
   const isModeSwitch =
     norm === 'mode praticien' ||
+    norm === 'menu praticien' ||
+    norm === 'passe moi en mode praticien' ||
+    norm === 'repasse moi en mode praticien' ||
     norm === 'en mode praticien' ||
     norm === 'analyse par science' ||
     norm === 'analyse par sciences' ||
@@ -206,13 +210,16 @@ function isContextualFlowCommand(
     norm === 'redonne moi les science'
 
   if (isModeSwitch) return true
-  if (!hasActiveSelection || !isShortChoice) return false
+  if (!isShortChoice && !isCompositeChoice) return false
 
   const lastAssistantMessage = [...history].reverse().find((entry) => entry.role === 'assistant')?.content ?? ''
   const assistantNorm = normalizeText(lastAssistantMessage)
-  return /analyse par science|selection|astrolex|neurokua|porteum|trianglenumeris|enneagramme|kua|fusion complete|mode praticien|niveau/.test(
-    assistantNorm
-  )
+  const assistantShowsGuidedFlow =
+    /analyse par science|selection|astrolex|neurokua|porteum|trianglenumeris|enneagramme|kua|fusion complete|mode praticien|niveau|analyses par situation|analyses par science|menu praticien/.test(
+      assistantNorm
+    )
+
+  return hasActiveSelection || assistantShowsGuidedFlow
 }
 
 function detectIntentLocal(

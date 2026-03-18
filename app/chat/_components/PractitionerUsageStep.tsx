@@ -9,9 +9,13 @@ type Props = {
 export default function PractitionerUsageStep({ onSelect }: Props) {
   return (
     <div className="hx-practitioner-step">
-      <p className="hx-practitioner-step-question">
-        Cette session est-elle pour vous ou pour un(e) client(e) ?
+      <p className="hx-practitioner-step-question">Mode Praticien actif.</p>
+
+      <p className="hx-practitioner-btn-sub" style={{ marginBottom: 12 }}>
+        Ce mode permet une analyse plus precise, plus structuree, et un vocabulaire plus technique si utile.
       </p>
+
+      <p className="hx-practitioner-step-question">Cette analyse est pour :</p>
 
       <div className="hx-practitioner-step-choices">
         <button
@@ -19,10 +23,10 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
           className="hx-practitioner-btn"
           onClick={() => onSelect('personal')}
         >
-          <span className="hx-practitioner-btn-icon" aria-hidden="true">✦</span>
+          <span className="hx-practitioner-btn-icon" aria-hidden="true">*</span>
           <span>
-            <strong>Usage personnel</strong>
-            <span className="hx-practitioner-btn-sub">Lecture pour moi-même</span>
+            <strong>1 - Usage personnel</strong>
+            <span className="hx-practitioner-btn-sub">Lecture pour moi-meme</span>
           </span>
         </button>
 
@@ -31,9 +35,9 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
           className="hx-practitioner-btn"
           onClick={() => onSelect('client')}
         >
-          <span className="hx-practitioner-btn-icon" aria-hidden="true">◈</span>
+          <span className="hx-practitioner-btn-icon" aria-hidden="true">+</span>
           <span>
-            <strong>Usage client</strong>
+            <strong>2 - Usage client</strong>
             <span className="hx-practitioner-btn-sub">Lecture pour un(e) client(e)</span>
           </span>
         </button>

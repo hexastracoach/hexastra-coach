@@ -213,6 +213,95 @@ function asksToReturnToSciences(message: string) {
   )
 }
 
+function normalizeSelectionText(message: string) {
+  return (message || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function asksForPractitionerMasterMenu(message: string) {
+  const normalized = normalizeSelectionText(message)
+  return (
+    normalized === 'mode praticien' ||
+    normalized === 'en mode praticien' ||
+    normalized === 'menu praticien' ||
+    normalized === 'repasse moi en mode praticien' ||
+    normalized === 'passe moi en mode praticien' ||
+    normalized === 'retour au mode praticien'
+  )
+}
+
+function looksLikePractitionerMasterMenu(message: string) {
+  const normalized = normalizeSelectionText(message)
+  return (
+    normalized.includes('menu praticien') &&
+    normalized.includes('analyses par situation') &&
+    normalized.includes('analyses par science')
+  )
+}
+
+function looksLikeScienceOverviewMenu(message: string) {
+  const normalized = normalizeSelectionText(message)
+  return (
+    normalized.includes('analyse par science') &&
+    (normalized.includes('neurokua') || normalized.includes('astrolex')) &&
+    normalized.includes('fusion')
+  )
+}
+
+function parseCompositeChoice(message: string) {
+  const match = normalizeSelectionText(message).match(
+    /^(\d{1,2})\s*(?:et|&|\+|puis|then)\s*(\d{1,2})$/,
+  )
+  if (!match) return null
+  return { first: match[1], second: match[2] }
+}
+
+function buildPractitionerMasterMenuMessage(language: string) {
+  const intro = tr(language, {
+    fr: 'Bienvenue en Mode Praticien.',
+    en: 'Welcome to Practitioner Mode.',
+  })
+
+  return [
+    intro,
+    '',
+    'Ce mode permet :',
+    '- une analyse plus precise et structuree',
+    '- un vocabulaire plus technique',
+    '- des lectures exploitables en consultation ou accompagnement',
+    '',
+    'Mode Praticien — menu',
+    '',
+    'A — Analyses par situation',
+    '1 — NeuroKua™ : diagnostic de l etat interne et reglages d equilibre',
+    '2 — Relationnel™ : dynamiques, tensions et leviers relationnels',
+    '3 — Professionnel™ : positionnement, risques et strategie d evolution',
+    '4 — Cycle a venir™ : projection de phase et timing d action',
+    '5 — Decision precise™ : comparatif A/B avec risques et plan',
+    '6 — Lecture generale actuelle™ : synthese multidimensionnelle exploitable',
+    '',
+    'B — Analyses par science',
+    '7 — NeuroKua™ : lecture neuro-contextuelle de l equilibre interne',
+    '8 — Astrolex™ : cycles, timing, maisons et dynamiques du moment',
+    '9 — Porteum™ : fonctionnement naturel, energie et decision',
+    '10 — TriangleNumeris™ : cycles annuels, mensuels et transitions',
+    '11 — Enneagramme™ : mecanismes, stress et leviers d evolution',
+    '12 — Kua™ : orientation, espace et optimisation',
+    '13 — Fusion KS™ : synthese complete avec hierarchie des leviers',
+    '',
+    'C — Lectures HexAstra',
+    '14 — Lecture HexAstra complete™ : lecture structuree, prete pour consultation',
+    '15 — Analyse de phase de vie™ : comprendre la phase et la traverser juste',
+    '16 — Analyse multidimensionnelle personnelle™ : leviers, timing et plan',
+    '',
+    'Tu peux repondre avec un numero simple, ou avec une combinaison comme 13 et 1.',
+  ].join('\n')
+}
+
 function buildScienceOverviewMessage(language: string, practitionerMode: boolean) {
   const intro = practitionerMode
     ? "Parfait.\nOn passe en Mode Praticien — Analyse par science."
@@ -220,13 +309,13 @@ function buildScienceOverviewMessage(language: string, practitionerMode: boolean
 
   const scienceList = practitionerMode
     ? [
-        '1 — NeuroKua™ : equilibre interne, charge mentale, regulation',
-        '2 — Astrolex™ : cycles, timing, dynamiques de phase',
-        '3 — Porteum™ : fonctionnement naturel, energie personnelle',
-        '4 — TriangleNumeris™ : cycles annuels et mensuels',
-        '5 — Enneagramme™ : mecanismes comportementaux, stress',
-        '6 — Kua™ : orientation, environnement, optimisation',
-        '7 — Fusion complete™ : synthese multidimensionnelle complete',
+        '7 — NeuroKua™ : equilibre interne, charge mentale, regulation',
+        '8 — Astrolex™ : cycles, timing, dynamiques de phase',
+        '9 — Porteum™ : fonctionnement naturel, energie personnelle',
+        '10 — TriangleNumeris™ : cycles annuels et mensuels',
+        '11 — Enneagramme™ : mecanismes comportementaux, stress',
+        '12 — Kua™ : orientation, environnement, optimisation',
+        '13 — Fusion complete™ : synthese multidimensionnelle complete',
       ]
     : [
         '1 — NeuroKua™ : etat mental, energie, fatigue, equilibre interieur',
@@ -243,6 +332,253 @@ function buildScienceOverviewMessage(language: string, practitionerMode: boolean
     : "Tu ne choisis pas une science pour apprendre, tu la choisis pour mieux comprendre ce que tu vis et savoir quoi faire.\n\nDis-moi simplement le numero ou le nom de la science que tu veux explorer."
 
   return [intro, '', 'Analyse par science — selection', ...scienceList, '', outro].join('\n')
+}
+
+function resolveScienceChoiceKey(params: {
+  choice: string
+  practitionerMode: boolean
+  selectedMenuKey?: string | null
+  lastAssistantMessage?: string
+}) {
+  const { choice, practitionerMode, selectedMenuKey, lastAssistantMessage } = params
+  const regularChoices: Record<string, string> = {
+    '1': 'science_neurokua',
+    '2': 'science_astrolex',
+    '3': 'science_porteum',
+    '4': 'science_triangle',
+    '5': 'science_enneagram',
+    '6': 'science_kua',
+    '7': 'science_fusion',
+  }
+  const practitionerChoices: Record<string, string> = {
+    '7': 'science_neurokua',
+    '8': 'science_astrolex',
+    '9': 'science_porteum',
+    '10': 'science_triangle',
+    '11': 'science_enneagram',
+    '12': 'science_kua',
+    '13': 'science_fusion',
+  }
+
+  if (selectedMenuKey === 'science' || looksLikeScienceOverviewMenu(lastAssistantMessage ?? '')) {
+    if (practitionerMode) {
+      return practitionerChoices[choice] ?? regularChoices[choice] ?? null
+    }
+    return regularChoices[choice] ?? null
+  }
+
+  if (
+    practitionerMode &&
+    (selectedMenuKey === 'practitioner_menu' || looksLikePractitionerMasterMenu(lastAssistantMessage ?? ''))
+  ) {
+    return practitionerChoices[choice] ?? null
+  }
+
+  return null
+}
+
+function buildScienceSubanalysisRequest(
+  selectionKey: string,
+  choice: string,
+  practitionerMode: boolean,
+) {
+  const practitionerRequests: Record<string, Record<string, string>> = {
+    science_neurokua: {
+      '1': 'Je veux une lecture NeuroKua Baseline sur mon etat interne de reference.',
+      '2': 'Je veux une lecture NeuroKua Balance pour identifier mon desequilibre dominant.',
+      '3': 'Je veux une lecture NeuroKua Timing pour savoir s il faut agir ou recuperer.',
+      '4': 'Je veux une lecture NeuroKua Overload sur la surcharge ou le risque d epuisement.',
+      '5': 'Je veux une lecture NeuroKua Recalibration avec un protocole court de realignement.',
+    },
+    science_astrolex: {
+      '1': 'Je veux une lecture Astrolex Transitus sur ma situation actuelle.',
+      '2': 'Je veux une lecture Astrolex sur mon cycle de vie et ma phase profonde.',
+      '3': 'Je veux une lecture Astrolex Domus sur le domaine active.',
+      '4': 'Je veux une lecture Astrolex Aspectum sur les tensions, appuis et rapports de force du moment.',
+      '5': 'Je veux une lecture Astrolex sur le potentiel a activer maintenant.',
+    },
+    science_porteum: {
+      '1': 'Je veux une lecture Porteum Centres sur mes zones stables et sensibles.',
+      '2': 'Je veux une lecture Porteum Canaux sur mes dynamiques d expression.',
+      '3': 'Je veux une lecture Porteum Portes sur les mecanismes precis actuellement actives.',
+      '4': 'Je veux une lecture Porteum Autorite et Strategie sur ma meilleure maniere de decider.',
+      '5': 'Je veux une synthese praticienne Porteum directement exploitable.',
+    },
+    science_triangle: {
+      '1': 'Je veux une lecture TriangleNumeris sur mon cycle annuel.',
+      '2': 'Je veux une lecture TriangleNumeris sur mon mois personnel.',
+      '3': 'Je veux une lecture TriangleNumeris sur mes defis actifs.',
+      '4': 'Je veux une lecture TriangleNumeris sur ma transition de periode.',
+      '5': 'Je veux une synthese TriangleNumeris simple et exploitable.',
+    },
+    science_enneagram: {
+      '1': 'Je veux une lecture Enneagramme sur mon mecanisme dominant.',
+      '2': 'Je veux une lecture Enneagramme sur ma bascule stress ou securite.',
+      '3': 'Je veux une lecture Enneagramme sur mes pieges automatiques.',
+      '4': 'Je veux une lecture Enneagramme sur mes ressources et sorties de boucle.',
+      '5': 'Je veux une synthese Enneagramme avec levier d evolution prioritaire.',
+    },
+    science_kua: {
+      '1': 'Je veux une lecture Kua sur mes directions favorables du moment.',
+      '2': 'Je veux une lecture Kua sur mes zones sensibles a corriger.',
+      '3': 'Je veux une lecture Kua sur les ajustements utiles de mon espace.',
+      '4': 'Je veux une lecture Kua strategique avec mise en place progressive.',
+      '5': 'Je veux une synthese Kua avec plan d orientation simple.',
+    },
+    science_fusion: {
+      '1': 'Je veux une lecture Fusion KS sur ma phase dominante actuelle.',
+      '2': 'Je veux une lecture Fusion KS sur ma zone dominante de vie actuelle.',
+      '3': 'Je veux une lecture Fusion KS sur mes risques et opportunites principales.',
+      '4': 'Je veux une lecture Fusion KS sur mon levier prioritaire.',
+      '5': 'Je veux une lecture Fusion KS avec plan global court et clair.',
+    },
+  }
+
+  const regularRequests: Record<string, Record<string, string>> = {
+    science_neurokua: {
+      '1': 'Je veux une lecture NeuroKua sur mon etat global du moment.',
+      '2': 'Je veux une lecture NeuroKua sur ma fatigue et ma recharge prioritaire.',
+      '3': 'Je veux une lecture NeuroKua sur mon stress ou ma surcharge.',
+      '4': 'Je veux une lecture NeuroKua pour savoir si je dois consolider ou agir.',
+      '5': 'Je veux un ajustement NeuroKua rapide a faire tout de suite.',
+    },
+    science_astrolex: {
+      '1': 'Je veux une lecture Astrolex sur mon energie actuelle.',
+      '2': 'Je veux une lecture Astrolex sur le domaine de vie le plus active.',
+      '3': 'Je veux une lecture Astrolex sur la tension ou l opportunite principale du moment.',
+      '4': 'Je veux une lecture Astrolex sur le timing : agir ou attendre.',
+      '5': 'Je veux une lecture Astrolex avec le conseil du cycle.',
+    },
+    science_porteum: {
+      '1': 'Je veux une lecture Porteum sur mon fonctionnement global.',
+      '2': 'Je veux une lecture Porteum sur ma prise de decision.',
+      '3': 'Je veux une lecture Porteum sur ma zone sensible.',
+      '4': 'Je veux une lecture Porteum sur mon energie personnelle.',
+      '5': 'Je veux une lecture Porteum avec un ajustement utile concret.',
+    },
+    science_triangle: {
+      '1': 'Je veux une lecture TriangleNumeris sur mon cycle annuel.',
+      '2': 'Je veux une lecture TriangleNumeris sur mon cycle mensuel.',
+      '3': 'Je veux une lecture TriangleNumeris sur ma vibration dominante.',
+      '4': 'Je veux une lecture TriangleNumeris sur mes opportunites et vigilances.',
+      '5': 'Je veux une lecture TriangleNumeris avec le conseil du cycle.',
+    },
+    science_enneagram: {
+      '1': 'Je veux une lecture Enneagramme sur ma reaction dominante.',
+      '2': 'Je veux une lecture Enneagramme sur mon fonctionnement sous stress.',
+      '3': 'Je veux une lecture Enneagramme sur ma defense automatique.',
+      '4': 'Je veux une lecture Enneagramme sur mon levier d evolution.',
+      '5': 'Je veux une lecture Enneagramme complete et actionnable.',
+    },
+    science_kua: {
+      '1': 'Je veux une lecture Kua sur mon orientation generale.',
+      '2': 'Je veux une lecture Kua sur mon espace de vie.',
+      '3': 'Je veux une lecture Kua appliquee a une decision.',
+      '4': 'Je veux une lecture Kua sur mon equilibre environnemental.',
+      '5': 'Je veux une lecture Kua avec un conseil pratique a appliquer maintenant.',
+    },
+    science_fusion: {
+      '1': 'Je veux une lecture Fusion complete sur la vision globale de mon moment.',
+      '2': 'Je veux une lecture Fusion complete sur mes contradictions principales.',
+      '3': 'Je veux une lecture Fusion complete sur l arbitrage prioritaire a retenir.',
+      '4': 'Je veux une lecture Fusion complete sur la meilleure strategie maintenant.',
+      '5': 'Je veux une lecture Fusion complete pleinement exploitable.',
+    },
+  }
+
+  const requests = practitionerMode ? practitionerRequests : regularRequests
+  return requests[selectionKey]?.[choice] ?? null
+}
+
+function resolveContextualSelection(params: {
+  message: string
+  language: string
+  practitionerMode: boolean
+  selectedMenuKey?: string | null
+  selectedSubmenuKey?: string | null
+  lastAssistantMessage?: string
+}) {
+  const {
+    message,
+    language,
+    practitionerMode,
+    selectedMenuKey,
+    selectedSubmenuKey,
+    lastAssistantMessage,
+  } = params
+  const normalizedMessage = normalizeSelectionText(message)
+  const singleChoice = normalizedMessage.match(/^(\d{1,2})$/)?.[1] ?? null
+  const compositeChoice = parseCompositeChoice(message)
+
+  if (practitionerMode && asksForPractitionerMasterMenu(message)) {
+    return {
+      kind: 'menu' as const,
+      immediateMessage: buildPractitionerMasterMenuMessage(language),
+      selectedMenuKey: 'practitioner_menu',
+      selectedSubmenuKey: null,
+    }
+  }
+
+  if (selectedSubmenuKey?.startsWith('science_') && singleChoice) {
+    const rewrittenMessage = buildScienceSubanalysisRequest(
+      selectedSubmenuKey,
+      singleChoice,
+      practitionerMode,
+    )
+    if (rewrittenMessage) {
+      return {
+        kind: 'reading' as const,
+        rewrittenMessage,
+        selectedMenuKey: 'science',
+        selectedSubmenuKey,
+        uiAction: 'send_message' as UiAction,
+      }
+    }
+  }
+
+  if (compositeChoice) {
+    const scienceKey = resolveScienceChoiceKey({
+      choice: compositeChoice.first,
+      practitionerMode,
+      selectedMenuKey,
+      lastAssistantMessage,
+    })
+    if (scienceKey) {
+      const rewrittenMessage = buildScienceSubanalysisRequest(
+        scienceKey,
+        compositeChoice.second,
+        practitionerMode,
+      )
+      if (rewrittenMessage) {
+        return {
+          kind: 'reading' as const,
+          rewrittenMessage,
+          selectedMenuKey: 'science',
+          selectedSubmenuKey: scienceKey,
+          uiAction: 'send_message' as UiAction,
+        }
+      }
+    }
+  }
+
+  if (singleChoice) {
+    const scienceKey = resolveScienceChoiceKey({
+      choice: singleChoice,
+      practitionerMode,
+      selectedMenuKey,
+      lastAssistantMessage,
+    })
+    if (scienceKey) {
+      return {
+        kind: 'science' as const,
+        selectedMenuKey: 'science',
+        selectedSubmenuKey: scienceKey,
+        uiAction: 'select_submenu_item' as UiAction,
+      }
+    }
+  }
+
+  return null
 }
 
 function buildScienceSubanalysisMessage(selectionKey: string, practitionerMode: boolean) {
@@ -919,7 +1255,7 @@ export async function runHexastraFlow(input: {
       return recent.filter((m) => allowed.has(m))
     })()
 
-    const latestUserMessage =
+    let latestUserMessage =
       limitedMessages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
     const isGreeting = /^(bonjour|salut|hello|hey|bonsoir|coucou|yo)\s*$/i.test(
       latestUserMessage.trim()
@@ -966,22 +1302,52 @@ export async function runHexastraFlow(input: {
       userContext = { ...userContext, journeyEnabled }
 
       const menuItems = safeArray(getMenuForMode(mode)).map((item) => normalizeMenuItem(item))
+      const lastAssistantMessage =
+        [...limitedMessages].reverse().find((message) => message.role === 'assistant')?.content ?? ''
+      let selectedMenuKey = normalizedSelectedMenuKey
+      let selectedSubmenuKey = normalizedSelectedSubmenuKey
+      let uiAction = normalizedUiAction
+      const contextualSelection = resolveContextualSelection({
+        message: latestUserMessage,
+        language: userContext.language ?? fallbackLanguage,
+        practitionerMode: mode === 'praticien',
+        selectedMenuKey,
+        selectedSubmenuKey,
+        lastAssistantMessage,
+      })
+
+      if (contextualSelection?.rewrittenMessage) {
+        latestUserMessage = contextualSelection.rewrittenMessage
+      }
+
+      if (contextualSelection?.selectedMenuKey !== undefined) {
+        selectedMenuKey = contextualSelection.selectedMenuKey
+      }
+
+      if (contextualSelection?.selectedSubmenuKey !== undefined) {
+        selectedSubmenuKey = contextualSelection.selectedSubmenuKey
+      }
+
+      if (contextualSelection?.uiAction) {
+        uiAction = contextualSelection.uiAction
+      }
+
       const forceDirectReading = shouldForceDirectReading({
-        uiAction: normalizedUiAction,
-        selectedMenuKey: normalizedSelectedMenuKey,
-        selectedSubmenuKey: normalizedSelectedSubmenuKey,
+        uiAction,
+        selectedMenuKey,
+        selectedSubmenuKey,
         latestUserMessage,
       })
 
       const computedFlowStep = computeFlowStep({
         requestType: input.requestType,
-        uiAction: normalizedUiAction,
+        uiAction,
         latestUserMessage,
         hasBirthData: isBirthComplete(userContext.birthData),
         hasShownMicroReadings: Boolean(userContext.session?.hasShownMicroReadings),
         practitionerNeedsUsage: plan === 'practitioner' && !normalizedPractitionerUsage,
-        selectedMenuKey: normalizedSelectedMenuKey,
-        selectedSubmenuKey: normalizedSelectedSubmenuKey,
+        selectedMenuKey,
+        selectedSubmenuKey,
         emotionalState: 'neutral',
         timing: 'exploration',
         precision: 'medium',
@@ -992,20 +1358,20 @@ export async function runHexastraFlow(input: {
           : computedFlowStep
 
     const selectedMenu =
-      normalizedSelectedMenuKey && menuItems
-        ? findMenuItem(menuItems, normalizedSelectedMenuKey)
+      selectedMenuKey && menuItems
+        ? findMenuItem(menuItems, selectedMenuKey)
         : null
 
     const selectedSubmenu =
-      selectedMenu && normalizedSelectedSubmenuKey
-        ? findMenuItem(selectedMenu.submenu ?? [], normalizedSelectedSubmenuKey)
+      selectedMenu && selectedSubmenuKey
+        ? findMenuItem(selectedMenu.submenu ?? [], selectedSubmenuKey)
         : null
 
     const latestMenuKey = selectedSubmenu?.key ?? selectedMenu?.key ?? null
     const latestDomainRoute = selectedSubmenu?.domainRoute ?? selectedMenu?.domainRoute ?? null
 
     const effectiveRequestType =
-      normalizedUiAction === 'open_menu' || normalizedUiAction === 'restart_flow'
+      uiAction === 'open_menu' || uiAction === 'restart_flow'
         ? 'chat'
         : input.requestType
 
@@ -1070,6 +1436,38 @@ export async function runHexastraFlow(input: {
       }
     }
 
+    if (contextualSelection?.kind === 'menu' && contextualSelection.immediateMessage) {
+      const message = contextualSelection.immediateMessage
+      flowLog('info', 'flow step final', {
+        step: 'clarification',
+        finalMessageLength: message.length,
+      })
+      return {
+        message,
+        reply: message,
+        content: message,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: 'clarification', completed: false },
+        menu: { visible: false, items: [] },
+        metadata: {
+          contextType: normalizedContextType,
+          practitionerUsage: userContext.practitionerUsage ?? null,
+          shouldPersistMemory: false,
+          selectedMenuKey,
+          selectedSubmenuKey,
+          sessionStep: 'clarification',
+          emotionalState: null,
+          timing: null,
+          journeyEnabled,
+          contextFrame: 'Mode Praticien',
+          clarificationQuestion: 'Choisis le numero de l axe que tu veux explorer.',
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      }
+    }
+
     if (input.requestType === 'chat' && (asksForScienceOverview(latestUserMessage) || asksToReturnToSciences(latestUserMessage))) {
       const message = buildScienceOverviewMessage(userContext.language ?? fallbackLanguage, mode === 'praticien')
       flowLog('info', 'flow step final', {
@@ -1127,8 +1525,8 @@ export async function runHexastraFlow(input: {
           contextType: normalizedContextType,
           practitionerUsage: userContext.practitionerUsage ?? null,
           shouldPersistMemory: false,
-          selectedMenuKey: normalizedSelectedMenuKey,
-          selectedSubmenuKey: normalizedSelectedSubmenuKey,
+          selectedMenuKey,
+          selectedSubmenuKey,
           sessionStep: 'clarification',
           emotionalState: null,
           timing: null,
@@ -1142,12 +1540,12 @@ export async function runHexastraFlow(input: {
 
     if (
       input.requestType === 'chat' &&
-      normalizedUiAction === 'select_submenu_item' &&
-      normalizedSelectedSubmenuKey &&
-      normalizedSelectedSubmenuKey.startsWith('science_')
+      uiAction === 'select_submenu_item' &&
+      selectedSubmenuKey &&
+      selectedSubmenuKey.startsWith('science_')
     ) {
       const sciencePrompt = buildScienceSubanalysisMessage(
-        normalizedSelectedSubmenuKey,
+        selectedSubmenuKey,
         mode === 'praticien',
       )
 
@@ -1169,8 +1567,8 @@ export async function runHexastraFlow(input: {
             contextType: 'science',
             practitionerUsage: userContext.practitionerUsage ?? null,
             shouldPersistMemory: false,
-            selectedMenuKey: normalizedSelectedMenuKey,
-            selectedSubmenuKey: normalizedSelectedSubmenuKey,
+            selectedMenuKey,
+            selectedSubmenuKey,
             sessionStep: 'clarification',
             emotionalState: null,
             timing: null,
@@ -1217,12 +1615,12 @@ export async function runHexastraFlow(input: {
         ? compressKnowledgeContext(retrievalResults as any, retrievalConfig)
         : { block: null }
 
-    const selectedMenuKey =
+    const resolvedSelectedMenuKey =
       latestMenuKey ??
       userContext.session?.selectedMenuKey ??
       retrievalPlan?.menu?.selectedMenuKey ??
       null
-    const selectedSubmenuKey =
+    const resolvedSelectedSubmenuKey =
       selectedSubmenu?.key ??
       userContext.session?.selectedSubmenuKey ??
       retrievalPlan?.menu?.selectedSubmenuKey ??
@@ -1233,8 +1631,8 @@ export async function runHexastraFlow(input: {
       conversationId,
       message: latestUserMessage,
       contextType: normalizedContextType,
-      selectedMenuKey,
-      selectedSubmenuKey,
+      selectedMenuKey: resolvedSelectedMenuKey,
+      selectedSubmenuKey: resolvedSelectedSubmenuKey,
       practitioner: plan === 'practitioner',
     })
 
@@ -1496,8 +1894,8 @@ export async function runHexastraFlow(input: {
 
     const menuVisible =
       effectiveRequestType === 'micro_month' ||
-      normalizedUiAction === 'open_menu' ||
-      normalizedUiAction === 'restart_flow' ||
+      uiAction === 'open_menu' ||
+      uiAction === 'restart_flow' ||
       flowStep === 'menu'
 
     const menuItemsReturned = menuItems
@@ -1530,10 +1928,10 @@ export async function runHexastraFlow(input: {
       await writeSessionState(supabase, conversationId, {
         current_theme: selectedMenu?.label ?? sessionContext.currentTheme ?? null,
         current_context_type: selectedMenu?.contextType ?? sessionContext.contextType,
-        menu_level: normalizedSelectedSubmenuKey ? 'submenu' : 'main',
-        last_selected_menu_key: normalizedSelectedMenuKey ?? sessionContext.selectedMenuKey,
+        menu_level: resolvedSelectedSubmenuKey ? 'submenu' : 'main',
+        last_selected_menu_key: resolvedSelectedMenuKey ?? sessionContext.selectedMenuKey,
         last_selected_submenu_key:
-          normalizedSelectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
+          resolvedSelectedSubmenuKey ?? sessionContext.selectedSubmenuKey,
         active_flow: flowStep,
         current_domain_route: domainRoute,
         active_module: specializedResult?.source ?? activeModules[0] ?? null,
@@ -1580,8 +1978,8 @@ export async function runHexastraFlow(input: {
 
     const menuVisibleReturn =
       effectiveRequestType === 'micro_month' ||
-      normalizedUiAction === 'open_menu' ||
-      normalizedUiAction === 'restart_flow' ||
+      uiAction === 'open_menu' ||
+      uiAction === 'restart_flow' ||
       flowStep === 'menu'
 
     const finalMessage = menuVisibleReturn
@@ -1609,8 +2007,8 @@ export async function runHexastraFlow(input: {
           contextType: selectedMenu?.contextType ?? sessionContext.contextType,
           practitionerUsage: userContext.practitionerUsage ?? null,
           shouldPersistMemory: !menuVisibleReturn,
-          selectedMenuKey,
-          selectedSubmenuKey,
+          selectedMenuKey: resolvedSelectedMenuKey,
+          selectedSubmenuKey: resolvedSelectedSubmenuKey,
           contextFrame: selectedContextFrame,
           clarificationQuestion: selectedClarificationQuestion,
           sessionStep: menuVisibleReturn ? 'menu' : flowStep,

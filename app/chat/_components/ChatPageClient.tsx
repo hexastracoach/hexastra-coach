@@ -1391,7 +1391,10 @@ export default function ChatPageClient() {
       }
 
       const numericChoice = parseNumericMenuChoice(baseContent)
-      if (numericChoice && menuItems.length > 0) {
+      const hasActiveScienceSubanalysis = Boolean(
+        selectedSubmenuKey && selectedSubmenuKey.startsWith('science_')
+      )
+      if (numericChoice && menuItems.length > 0 && !hasActiveScienceSubanalysis) {
         const selection = resolveNumericMenuSelection(menuItems, numericChoice, selectedMenuKey)
 
         if (selection?.openParentOnly) {
