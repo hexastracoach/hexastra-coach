@@ -112,7 +112,7 @@ export function buildGuardResponse(kind: ModerationClass): string {
     return "Je peux t’aider sur ce que tu traverses.\nPeux-tu formuler plus simplement ce qui t’amène ?"
   }
   if (kind === 'OUT_OF_SCOPE') {
-    return "Je suis spécialisé pour t’aider à comprendre une situation, prendre une décision ou explorer un thème de vie.\nSi tu veux, raconte-moi ce que tu traverses en ce moment."
+    return "Je reste dans le cadre d'HexAstra Coach : lectures, sciences KS, timing, dynamiques personnelles, relationnelles, professionnelles et décisions.\nSi tu veux, reformule ta demande dans cet angle ou choisis une lecture du menu."
   }
   return buildClarificationPrompt()
 }

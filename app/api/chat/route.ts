@@ -22,6 +22,7 @@ import { classifyIntent } from '@/lib/hexastra/openai/classifyIntent'
 import { generateSuggestions } from '@/lib/hexastra/suggestions/generateSuggestions'
 import { getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
+import { routeUserQuery } from '@/lib/chat/queryRouter'
 
 const memoryCache = new Map<string, { value: unknown; expires: number }>()
 const CACHE_TTL_MS = 10 * 60 * 1000
@@ -162,10 +163,35 @@ function isGreeting(normalized: string): boolean {
   )
 }
 
-function detectIntentLocal(message: string): 'greeting' | 'menu' | 'birth_update' | 'analysis' | 'conversation' {
+function isReadingFollowUp(message: string, history: ChatMessage[]): boolean {
+  const norm = normalizeText(message)
+  if (!norm) return false
+
+  const followUpMarkers =
+    /(developpe|develope|developper|approfondis|approfondir|continue|vas plus loin|plus en detail|plus en profondeur|detaille|detaille moi|explique mieux|peux tu plus|peux tu développer|peux tu developper|et pour|et concernant|sur ce point|dans ce cas|qu est ce que ca veut dire|que signifie)/i
+
+  if (!followUpMarkers.test(norm) && norm.length > 80) return false
+
+  const lastAssistantMessage = [...history].reverse().find((entry) => entry.role === 'assistant')?.content ?? ''
+  if (!lastAssistantMessage) return false
+
+  const assistantNorm = normalizeText(lastAssistantMessage)
+  return (
+    /(signature de naissance|axes dominants|orientation actuelle|lecture|theme natal|theme astral|maison 1|maison i|oppos[ée]e|astrol|neurokua|forces|vigilances|ce qui se joue|ce qui compte|direction|action concrete)/i.test(
+      assistantNorm
+    ) ||
+    looksAlreadyStructured(lastAssistantMessage)
+  )
+}
+
+function detectIntentLocal(
+  message: string,
+  history: ChatMessage[]
+): 'greeting' | 'menu' | 'birth_update' | 'analysis' | 'conversation' {
   const norm = normalizeText(message)
   if (isGreeting(norm)) return 'greeting'
   if (/(menu|angle|angles|option|choix|navigation)/.test(norm)) return 'menu'
+  if (isReadingFollowUp(message, history)) return 'analysis'
   if (/(profil|analyse|lecture|theme|thème|astral|natal|astro|relation|travail|periode|période|decision|décision|blocage|question|hexastra|neurokua|kua|etat du jour|état du jour)/.test(norm)) {
     return 'analysis'
   }
@@ -177,6 +203,42 @@ function detectIntentLocal(message: string): 'greeting' | 'menu' | 'birth_update
     return 'birth_update'
   }
   return 'conversation'
+}
+
+function isWithinHexastraScope(message: string, history: ChatMessage[]) {
+  if (isReadingFollowUp(message, history)) return true
+
+  const routing = routeUserQuery(message)
+  return routing.decision === 'allowed'
+}
+
+function buildOutOfScopeResponse(plan: PlanKey, mode: string, conversationId?: string | null) {
+  return buildConsistentResponse(
+    {
+      message:
+        "Je reste dans le cadre d'HexAstra Coach : lectures, sciences KS, timing, dynamiques personnelles, relationnelles, professionnelles et decisions.\n\nSi tu veux, reformule ta demande dans cet angle ou choisis une lecture du menu.",
+      type: 'out_of_scope',
+      plan,
+      mode,
+      conversationId: conversationId ?? randomUUID(),
+      flowState: { step: 'conversation', completed: true },
+      menu: DEFAULT_EMPTY_MENU,
+      metadata: {
+        contextType: 'general',
+        selectedMenuKey: null,
+        selectedSubmenuKey: null,
+        intentDetected: 'out_of_scope',
+      },
+    },
+    {
+      type: 'out_of_scope',
+      plan,
+      mode,
+      conversationId: conversationId ?? undefined,
+      flowState: { step: 'conversation', completed: true },
+      menu: DEFAULT_EMPTY_MENU,
+    }
+  )
 }
 
 function hasExplicitGuidance(body: Record<string, unknown>) {
@@ -550,8 +612,27 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).journeyEnabled as boolean)
         : false
 
-    const intentLocal = detectIntentLocal(lastUserMessage)
+    const intentLocal = detectIntentLocal(lastUserMessage, sanitizedMessages)
     log('info', 'intent detected', { intentLocal })
+
+    if (
+      intentLocal !== 'greeting' &&
+      intentLocal !== 'menu' &&
+      intentLocal !== 'birth_update' &&
+      !isWithinHexastraScope(lastUserMessage, sanitizedMessages)
+    ) {
+      log('info', 'branch chosen', { branch: 'out_of_scope' })
+      const outOfScopeResponse = buildOutOfScopeResponse(
+        effectivePlan,
+        effectivePlan,
+        requestedConversationId ?? null
+      )
+      log('info', 'response normalized', {
+        branch: 'out_of_scope',
+        ...getNormalizationDiagnostics(outOfScopeResponse),
+      })
+      return NextResponse.json(outOfScopeResponse, { status: 200 })
+    }
 
     if (intentLocal === 'greeting') {
       log('info', 'branch chosen', { branch: 'greeting' })
