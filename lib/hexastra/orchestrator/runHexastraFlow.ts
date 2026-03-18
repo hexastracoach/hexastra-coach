@@ -187,6 +187,236 @@ function buildGreetingMessage(mode: ReturnType<typeof getModeForPlan>, language:
   return [intro, '', invite].join('\n')
 }
 
+function asksForScienceOverview(message: string) {
+  const normalized = (message || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  return (
+    /a quelle science|a quelles sciences|quelles sciences|quels angles|de quoi es tu capable|de quoi tu es capable|quels modules|que peux tu analyser/.test(
+      normalized,
+    ) ||
+    normalized.trim() === 'analyse par science' ||
+    normalized.trim() === 'analyse par sciences'
+  )
+}
+
+function asksToReturnToSciences(message: string) {
+  const normalized = (message || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  return /retour au sciences|retour aux sciences|redonne moi les science|redonne moi les sciences|les sciences disponibles/.test(
+    normalized,
+  )
+}
+
+function buildScienceOverviewMessage(language: string, practitionerMode: boolean) {
+  const intro = practitionerMode
+    ? "Parfait.\nOn passe en Mode Praticien — Analyse par science."
+    : "Bonne question.\nHexAstra ne fonctionne pas comme un outil \"une science = une reponse\".\nIl croise plusieurs approches pour comprendre ta situation humaine et t'aider a decider."
+
+  const scienceList = practitionerMode
+    ? [
+        '1 — NeuroKua™ : equilibre interne, charge mentale, regulation',
+        '2 — Astrolex™ : cycles, timing, dynamiques de phase',
+        '3 — Porteum™ : fonctionnement naturel, energie personnelle',
+        '4 — TriangleNumeris™ : cycles annuels et mensuels',
+        '5 — Enneagramme™ : mecanismes comportementaux, stress',
+        '6 — Kua™ : orientation, environnement, optimisation',
+        '7 — Fusion complete™ : synthese multidimensionnelle complete',
+      ]
+    : [
+        '1 — NeuroKua™ : etat mental, energie, fatigue, equilibre interieur',
+        '2 — Astrolex™ : cycles de vie, timing, phases que tu traverses',
+        '3 — Porteum™ : fonctionnement naturel, prise de decision, energie personnelle',
+        '4 — TriangleNumeris™ : cycles, annee, mois, dynamique temporelle',
+        '5 — Enneagramme™ : reactions automatiques, stress, comportement',
+        '6 — Kua™ : environnement, orientation, equilibre dans l espace',
+        '7 — Fusion complete™ : vision globale et strategie',
+      ]
+
+  const outro = practitionerMode
+    ? "Choisis maintenant la science a analyser.\nReponds avec le numero ou le nom."
+    : "Tu ne choisis pas une science pour apprendre, tu la choisis pour mieux comprendre ce que tu vis et savoir quoi faire.\n\nDis-moi simplement le numero ou le nom de la science que tu veux explorer."
+
+  return [intro, '', 'Analyse par science — selection', ...scienceList, '', outro].join('\n')
+}
+
+function buildScienceSubanalysisMessage(selectionKey: string, practitionerMode: boolean) {
+  if (selectionKey === 'science_astrolex') {
+    const intro = practitionerMode
+      ? 'Tu as choisi Astrolex™ en Mode Praticien.'
+      : 'Tu as choisi Astrolex™.'
+    const prompt = practitionerMode
+      ? "Pour un diagnostic precis et exploitable, choisis maintenant l'angle d'analyse :"
+      : "Pour que l'analyse soit vraiment utile et pas trop vague, choisis l'angle precis que tu veux explorer :"
+    const lines = practitionerMode
+      ? [
+          '1 — Situation actuelle (Transitus™) : ce qui est en train de se jouer concretement maintenant',
+          '2 — Cycle de vie (phase profonde) : ou tu en es dans ton evolution globale',
+          '3 — Domaine active (Domus™) : le secteur de vie principal impacte',
+          '4 — Tension / defi (Aspectum™) : le blocage ou conflit reel a comprendre',
+          '5 — Potentiel a activer : ce que tu peux utiliser pour avancer efficacement',
+        ]
+      : [
+          '1 — Energie actuelle : l ambiance globale du moment',
+          '2 — Domaine active : le secteur de ta vie le plus impacte',
+          '3 — Tension ou opportunite : ce qui bloque ou ce qui peut avancer',
+          '4 — Timing : est-ce le bon moment pour agir ou attendre',
+          '5 — Conseil du cycle : comment t adapter concretement a cette phase',
+        ]
+
+    return [intro, '', prompt, '', 'Astrolex™ — selection', ...lines, '', 'Reponds avec le numero pour continuer.'].join(
+      '\n',
+    )
+  }
+
+  if (selectionKey === 'science_neurokua') {
+    return [
+      'Tu as choisi NeuroKua™.',
+      '',
+      'Choisis maintenant l angle que tu veux explorer :',
+      '',
+      'NeuroKua™ — selection',
+      '1 — Etat global : ton equilibre et ton etat du moment',
+      '2 — Fatigue / recharge : ce qui te vide et ce qui te recharge',
+      '3 — Stress / surcharge : ce qui comprime ton systeme',
+      '4 — Stabilite ou action : faut-il consolider ou avancer',
+      '5 — Ajustement rapide : le geste utile tout de suite',
+      '',
+      'Reponds avec le numero pour continuer.',
+    ].join('\n')
+  }
+
+  if (selectionKey === 'science_porteum') {
+    return [
+      'Tu as choisi Porteum™.',
+      '',
+      'Choisis maintenant l angle que tu veux explorer :',
+      '',
+      'Porteum™ — selection',
+      '1 — Fonctionnement global : comment tu operes naturellement',
+      '2 — Prise de decision : comment tu arbitres et avances',
+      '3 — Zone sensible : ce qui se grippe ou se surcharge',
+      '4 — Energie personnelle : ce qui te nourrit vraiment',
+      '5 — Ajustement utile : le meilleur reglage concret pour toi',
+      '',
+      'Reponds avec le numero pour continuer.',
+    ].join('\n')
+  }
+
+  if (selectionKey === 'science_triangle') {
+    return [
+      'Tu as choisi TriangleNumeris™.',
+      '',
+      'Choisis maintenant l angle que tu veux explorer :',
+      '',
+      'TriangleNumeris™ — selection',
+      '1 — Cycle annuel : le mouvement de fond de cette annee',
+      '2 — Cycle mensuel : ce que le moment active concretement',
+      '3 — Vibration dominante : la frequence qui guide ta phase',
+      '4 — Opportunite / vigilance : ce qui est favorise ou a surveiller',
+      '5 — Conseil du cycle : comment t adapter avec justesse',
+      '',
+      'Reponds avec le numero pour continuer.',
+    ].join('\n')
+  }
+
+  if (selectionKey === 'science_enneagram') {
+    return [
+      'Tu as choisi Enneagramme™.',
+      '',
+      'Choisis maintenant l angle que tu veux explorer :',
+      '',
+      'Enneagramme™ — selection',
+      '1 — Reaction dominante : ton mecanisme le plus spontané',
+      '2 — Stress : comment tu te deformes sous pression',
+      '3 — Defense automatique : ce que tu mets en place pour tenir',
+      '4 — Levier d evolution : ce qui t aide a t ouvrir',
+      '5 — Lecture complete : une synthese utile et actionnable',
+      '',
+      'Reponds avec le numero pour continuer.',
+    ].join('\n')
+  }
+
+  if (selectionKey === 'science_kua') {
+    return [
+      'Tu as choisi Kua™.',
+      '',
+      'Choisis maintenant l angle que tu veux explorer :',
+      '',
+      'Kua™ — selection',
+      '1 — Orientation generale : la direction la plus favorable',
+      '2 — Espace de vie : comment mieux te positionner',
+      '3 — Decision : quelle orientation soutient le mieux ton choix',
+      '4 — Equilibre environnemental : ce qui apaise ou fatigue ton systeme',
+      '5 — Conseil pratique : un ajustement concret a faire maintenant',
+      '',
+      'Reponds avec le numero pour continuer.',
+    ].join('\n')
+  }
+
+  if (selectionKey === 'science_fusion') {
+    return [
+      'Tu as choisi Fusion complete™.',
+      '',
+      'Choisis maintenant l angle de fusion que tu veux explorer :',
+      '',
+      'Fusion complete™ — selection',
+      '1 — Vision globale : les dominantes de ton moment',
+      '2 — Contradictions : ce qui se tire encore en sens inverse',
+      '3 — Arbitrage : le levier prioritaire a retenir',
+      '4 — Strategie : la direction la plus juste maintenant',
+      '5 — Lecture complete : synthese multidimensionnelle exploitable',
+      '',
+      'Reponds avec le numero pour continuer.',
+    ].join('\n')
+  }
+
+  return null
+}
+
+function buildPractitionerLevelMessage(level: string, currentScienceLabel?: string | null) {
+  const science = currentScienceLabel ?? 'cette lecture'
+
+  if (level === '3') {
+    return [
+      'Parfait, tu montes en niveau d’analyse.',
+      '',
+      `Mode Praticien — Niveau 3 (${science})`,
+      'On passe d une lecture a une logique de diagnostic avance, d optimisation et de precision des leviers.',
+      '',
+      'Ce niveau demande :',
+      '1 — de distinguer la situation reelle du ressenti immediat',
+      '2 — d identifier la contradiction centrale',
+      '3 — de transformer la lecture en test concret dans le reel',
+      '',
+      'Dis-moi maintenant le domaine exact a appliquer : travail, relation, argent, decision, ou situation generale.',
+    ].join('\n')
+  }
+
+  if (level === '2') {
+    return [
+      'Parfait, on ajuste au Mode Praticien — Niveau 2.',
+      '',
+      `Mode Praticien — Niveau 2 (${science})`,
+      'On reste structure, direct et operationnel, avec plus de precision qu en mode libre et moins de profondeur diagnostique qu au niveau 3.',
+      '',
+      'Dis-moi maintenant le domaine exact a appliquer : travail, relation, argent, decision, ou situation generale.',
+    ].join('\n')
+  }
+
+  return [
+    'Mode Praticien active.',
+    '',
+    `On travaille maintenant ${science} avec une lecture plus structuree, plus nette et plus exploitable.`,
+    'Tu peux me donner un domaine precis ou choisir un angle plus fin pour continuer.',
+  ].join('\n')
+}
+
 function yearKey(date = new Date()): string {
   return String(date.getFullYear())
 }
@@ -837,6 +1067,119 @@ export async function runHexastraFlow(input: {
           journeyEnabled,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
+      }
+    }
+
+    if (input.requestType === 'chat' && (asksForScienceOverview(latestUserMessage) || asksToReturnToSciences(latestUserMessage))) {
+      const message = buildScienceOverviewMessage(userContext.language ?? fallbackLanguage, mode === 'praticien')
+      flowLog('info', 'flow step final', {
+        step: 'clarification',
+        finalMessageLength: message.length,
+      })
+      return {
+        message,
+        reply: message,
+        content: message,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: 'clarification', completed: false },
+        menu: { visible: true, items: menuItems },
+        metadata: {
+          contextType: 'science',
+          practitionerUsage: userContext.practitionerUsage ?? null,
+          shouldPersistMemory: false,
+          selectedMenuKey: 'science',
+          selectedSubmenuKey: null,
+          sessionStep: 'clarification',
+          emotionalState: null,
+          timing: null,
+          journeyEnabled,
+          contextFrame: 'Analyse par science',
+          clarificationQuestion: 'Choisis la science que tu veux explorer.',
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      }
+    }
+
+    if (
+      input.requestType === 'chat' &&
+      mode === 'praticien' &&
+      /(^|\s)niveau\s*(2|3)\s*$/i.test(latestUserMessage.trim())
+    ) {
+      const level = latestUserMessage.trim().match(/(2|3)/)?.[1] ?? '2'
+      const activeScienceLabel = selectedSubmenu?.label ?? selectedMenu?.label ?? null
+      const message = buildPractitionerLevelMessage(level, activeScienceLabel)
+      flowLog('info', 'flow step final', {
+        step: 'clarification',
+        finalMessageLength: message.length,
+      })
+      return {
+        message,
+        reply: message,
+        content: message,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: 'clarification', completed: false },
+        menu: { visible: false, items: [] },
+        metadata: {
+          contextType: normalizedContextType,
+          practitionerUsage: userContext.practitionerUsage ?? null,
+          shouldPersistMemory: false,
+          selectedMenuKey: normalizedSelectedMenuKey,
+          selectedSubmenuKey: normalizedSelectedSubmenuKey,
+          sessionStep: 'clarification',
+          emotionalState: null,
+          timing: null,
+          journeyEnabled,
+          contextFrame: activeScienceLabel ?? 'Mode Praticien',
+          clarificationQuestion: 'Donne maintenant le domaine exact a analyser.',
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      }
+    }
+
+    if (
+      input.requestType === 'chat' &&
+      normalizedUiAction === 'select_submenu_item' &&
+      normalizedSelectedSubmenuKey &&
+      normalizedSelectedSubmenuKey.startsWith('science_')
+    ) {
+      const sciencePrompt = buildScienceSubanalysisMessage(
+        normalizedSelectedSubmenuKey,
+        mode === 'praticien',
+      )
+
+      if (sciencePrompt) {
+        flowLog('info', 'flow step final', {
+          step: 'clarification',
+          finalMessageLength: sciencePrompt.length,
+        })
+        return {
+          message: sciencePrompt,
+          reply: sciencePrompt,
+          content: sciencePrompt,
+          mode,
+          plan,
+          conversationId,
+          flowState: { step: 'clarification', completed: false },
+          menu: { visible: false, items: [] },
+          metadata: {
+            contextType: 'science',
+            practitionerUsage: userContext.practitionerUsage ?? null,
+            shouldPersistMemory: false,
+            selectedMenuKey: normalizedSelectedMenuKey,
+            selectedSubmenuKey: normalizedSelectedSubmenuKey,
+            sessionStep: 'clarification',
+            emotionalState: null,
+            timing: null,
+            journeyEnabled,
+            contextFrame: selectedSubmenu?.label ?? 'Analyse par science',
+            clarificationQuestion: 'Choisis maintenant le sous-angle a explorer.',
+          },
+          updatedEvolutionProfile: input.evolutionProfile ?? null,
+        }
       }
     }
 

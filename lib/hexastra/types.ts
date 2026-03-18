@@ -185,6 +185,7 @@ export type BuildPromptInput = {
   plan: PlanKey
   mode: HexastraMode
   language: string
+  messages?: { role: 'user' | 'assistant'; content: string }[]
   firstName?: string | null
   contextType: ContextType
   practitionerUsage: PractitionerUsageHex

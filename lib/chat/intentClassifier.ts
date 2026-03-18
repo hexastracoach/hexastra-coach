@@ -186,6 +186,10 @@ const INTENT_PATTERNS: PatternEntry[] = [
 export function classifyUserIntent(message: string): UserIntent {
   const normalized = message.trim()
 
+  if (/\b(j'ai\s+faim|jai\s+faim|que\s+manger|quoi\s+manger|quoi\s+cuisiner|qu'est-ce\s+que\s+je\s+peux\s+manger)\b/i.test(normalized)) {
+    return 'practical_task'
+  }
+
   // Empty or very short messages fall into life_situation by default
   if (normalized.length < 8) return 'life_situation'
 

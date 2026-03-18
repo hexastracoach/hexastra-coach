@@ -184,13 +184,47 @@ function isReadingFollowUp(message: string, history: ChatMessage[]): boolean {
   )
 }
 
+function isContextualFlowCommand(
+  message: string,
+  history: ChatMessage[],
+  selectedMenuKey?: string | null,
+  selectedSubmenuKey?: string | null
+) {
+  const norm = normalizeText(message)
+  if (!norm) return false
+
+  const hasActiveSelection = Boolean(selectedMenuKey || selectedSubmenuKey)
+  const isShortChoice = /^\d{1,2}$/.test(norm) || /^niveau\s*\d+$/.test(norm)
+  const isModeSwitch =
+    norm === 'mode praticien' ||
+    norm === 'en mode praticien' ||
+    norm === 'analyse par science' ||
+    norm === 'analyse par sciences' ||
+    norm === 'retour aux sciences' ||
+    norm === 'retour au sciences' ||
+    norm === 'redonne moi les sciences' ||
+    norm === 'redonne moi les science'
+
+  if (isModeSwitch) return true
+  if (!hasActiveSelection || !isShortChoice) return false
+
+  const lastAssistantMessage = [...history].reverse().find((entry) => entry.role === 'assistant')?.content ?? ''
+  const assistantNorm = normalizeText(lastAssistantMessage)
+  return /analyse par science|selection|astrolex|neurokua|porteum|trianglenumeris|enneagramme|kua|fusion complete|mode praticien|niveau/.test(
+    assistantNorm
+  )
+}
+
 function detectIntentLocal(
   message: string,
-  history: ChatMessage[]
+  history: ChatMessage[],
+  selectedMenuKey?: string | null,
+  selectedSubmenuKey?: string | null
 ): 'greeting' | 'menu' | 'birth_update' | 'analysis' | 'conversation' {
   const norm = normalizeText(message)
   if (isGreeting(norm)) return 'greeting'
   if (/(menu|angle|angles|option|choix|navigation)/.test(norm)) return 'menu'
+  if (isContextualFlowCommand(message, history, selectedMenuKey, selectedSubmenuKey)) return 'analysis'
   if (isReadingFollowUp(message, history)) return 'analysis'
   if (/(profil|analyse|lecture|theme|thème|astral|natal|astro|relation|travail|periode|période|decision|décision|blocage|question|hexastra|neurokua|kua|etat du jour|état du jour)/.test(norm)) {
     return 'analysis'
@@ -612,7 +646,18 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).journeyEnabled as boolean)
         : false
 
-    const intentLocal = detectIntentLocal(lastUserMessage, sanitizedMessages)
+    const bodyRecord = body as Record<string, unknown>
+    const requestedSelectedMenuKey =
+      typeof bodyRecord.selectedMenuKey === 'string' ? (bodyRecord.selectedMenuKey as string) : null
+    const requestedSelectedSubmenuKey =
+      typeof bodyRecord.selectedSubmenuKey === 'string' ? (bodyRecord.selectedSubmenuKey as string) : null
+
+    const intentLocal = detectIntentLocal(
+      lastUserMessage,
+      sanitizedMessages,
+      requestedSelectedMenuKey,
+      requestedSelectedSubmenuKey
+    )
     log('info', 'intent detected', { intentLocal })
 
     if (

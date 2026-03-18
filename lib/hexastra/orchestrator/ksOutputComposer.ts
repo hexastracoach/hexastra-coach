@@ -13,7 +13,26 @@ type FusedSignalSummary = {
 
 function humanizeKsToken(value: string | null | undefined) {
   if (!value) return null
-  return value.replace(/_/g, ' ').trim()
+  const normalized = value.replace(/_/g, ' ').trim().toLowerCase()
+
+  const tokenMap: Record<string, string> = {
+    security: 'securite et stabilite',
+    stability: 'stabilite',
+    grounding: 'ancrage',
+    clarity: 'clarte',
+    focus: 'focalisation',
+    transition: 'transition',
+    momentum: 'elan juste',
+    'equilibre fragile': 'un equilibre encore fragile',
+    'fragile balance': 'un equilibre encore fragile',
+    'inner pressure': 'une pression interieure a reguler',
+    overload: 'une surcharge a alleger',
+    fatigue: 'une fatigue a respecter',
+    recharge: 'une recharge a prioriser',
+    decision: 'une decision a clarifier',
+  }
+
+  return tokenMap[normalized] ?? normalized
 }
 
 function buildInvisibleLead(params: {

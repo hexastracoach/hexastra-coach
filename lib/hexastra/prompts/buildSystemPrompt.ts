@@ -41,6 +41,28 @@ function requestDirective(input: BuildPromptInput): string {
   return 'Reponds selon le step de session: menu -> orienter avec souplesse ; clarification -> affiner ; decision -> trancher avec prudence ; sensitive_support -> simplifier ; analysis/deep_reading -> analyser et orienter.'
 }
 
+function detailedReadingDirective(input: BuildPromptInput): string {
+  const latestUserMessage = (input.messages?.[input.messages.length - 1]?.content ?? '').toLowerCase()
+  const asksDetailedNatal =
+    /(theme astral|thème astral|theme natal|thème natal|astrologique|astrologique|maisons|maison 1|carte du ciel)/i.test(
+      latestUserMessage
+    ) &&
+    /(detail|detaill|develop|approfond|complet)/i.test(latestUserMessage)
+
+  if (!asksDetailedNatal) {
+    return ''
+  }
+
+  return `
+Lecture demandee: THEME NATAL DETAILLE.
+- Ne pas faire un simple apercu generique.
+- Produire une vraie lecture developpee, fluide et incarnee.
+- Structure invisible attendue: signature de naissance -> axes dominants -> forces -> vigilances -> dynamique relationnelle ou de vocation -> orientation actuelle -> cle d'integration.
+- Si des calculs ou signaux API HexAstra existent, ils priment. Ne jamais improviser des details techniques faux.
+- Si la matiere calculee reste partielle, etre honnete sur ce qui est etabli, mais garder une vraie lecture utile et developpee.
+`.trim()
+}
+
 function responseStrategyDirective(input: BuildPromptInput): string {
   switch (input.responseStrategy) {
     case 'clarify':
@@ -360,6 +382,7 @@ ${masterBehaviorDirective(input)}
 ${modeDirective(input.mode)}
 ${planDirective(input.plan)}
 ${requestDirective(input)}
+${detailedReadingDirective(input)}
 ${responseStrategyDirective(input)}
 ${stepDirective(input)}
 ${ksDirective(input)}
