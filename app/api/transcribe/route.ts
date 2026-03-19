@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger } from '@/lib/utils/logger'
 
 export const runtime = 'nodejs'
 
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!response.ok) {
-      console.error('Transcription API error:', data || text)
+      logger.error('Transcription API error', { status: response.status, data: data || text })
 
       return NextResponse.json(
         {
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
       text: transcript,
     })
   } catch (error: any) {
-    console.error('Transcribe route error:', error)
+    logger.error('Transcribe route error', { err: error })
 
     return NextResponse.json(
       {

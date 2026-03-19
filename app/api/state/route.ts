@@ -1,5 +1,6 @@
 // app/api/state/route.ts
 import { NextResponse } from 'next/server'
+import { logger } from '@/lib/utils/logger'
 
 // Données de démo si n8n non configuré
 const DEMO_STATE = {
@@ -63,7 +64,7 @@ export async function GET() {
     const data = await r.json()
     return NextResponse.json(data)
   } catch (err) {
-    console.error('[/api/state]', err)
+    logger.error('[/api/state] n8n fetch failed — falling back to demo state', { err })
     return NextResponse.json(DEMO_STATE)
   }
 }

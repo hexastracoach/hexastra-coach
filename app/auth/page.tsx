@@ -298,16 +298,21 @@ export default function AuthPage() {
           )}
         </div>
 
-        {/* Rester connecté — login only */}
+        {/* Rester connecté + mot de passe oublié — login only */}
         {mode === 'login' && (
-          <label className="hx-auth-remember">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-            />
-            <span>Rester connecté</span>
-          </label>
+          <div className="hx-auth-login-row">
+            <label className="hx-auth-remember">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <span>Rester connecté</span>
+            </label>
+            <a href="/auth/forgot-password" className="hx-auth-forgot">
+              Mot de passe oublié ?
+            </a>
+          </div>
         )}
 
         <button
