@@ -12,6 +12,16 @@ type Props = {
   submitLabel?: string
 }
 
+type ChoiceCardProps = {
+  kicker: string
+  title: string
+  description: string
+  selected: boolean
+  onClick: () => void
+  badge: string
+  compact?: boolean
+}
+
 async function searchCities(query: string): Promise<NormalizedPlace[]> {
   if (query.trim().length < 2) return []
   try {
@@ -22,6 +32,32 @@ async function searchCities(query: string): Promise<NormalizedPlace[]> {
   } catch {
     return []
   }
+}
+
+function ChoiceCard({
+  kicker,
+  title,
+  description,
+  selected,
+  onClick,
+  badge,
+  compact = false,
+}: ChoiceCardProps) {
+  return (
+    <button
+      type="button"
+      className={`hx-birth-choice-card${selected ? ' is-selected' : ''}${compact ? ' hx-birth-choice-card--compact' : ''}`}
+      onClick={onClick}
+      aria-pressed={selected}
+    >
+      <span className="hx-birth-choice-card-badge" aria-hidden="true">{badge}</span>
+      <span className="hx-birth-choice-card-copy">
+        <span className="hx-birth-choice-card-kicker">{kicker}</span>
+        <strong className="hx-birth-choice-card-title">{title}</strong>
+        <span className="hx-birth-choice-card-sub">{description}</span>
+      </span>
+    </button>
+  )
 }
 
 export default function BirthDataInlineForm({
@@ -344,6 +380,26 @@ export default function BirthDataInlineForm({
           <span className="hx-birth-inline-label">
             Heure de naissance {timeKnown && <span aria-hidden="true">*</span>}
           </span>
+          <div className="hx-birth-inline-choice-grid hx-birth-inline-choice-grid--compact" role="group" aria-label="Choix de l'heure de naissance">
+            <ChoiceCard
+              compact
+              badge="A"
+              kicker="Option"
+              title="Heure connue"
+              description="J'ai une heure de naissance exploitable."
+              selected={timeKnown}
+              onClick={() => handleTimeKnown(true)}
+            />
+            <ChoiceCard
+              compact
+              badge="B"
+              kicker="Option"
+              title="Heure inconnue"
+              description="HexAstra utilisera une heure neutre par defaut."
+              selected={!timeKnown}
+              onClick={() => handleTimeKnown(false)}
+            />
+          </div>
           {timeKnown ? (
             <input
               className="hx-birth-inline-input"
@@ -363,14 +419,6 @@ export default function BirthDataInlineForm({
               tabIndex={-1}
             />
           )}
-          <label className="hx-birth-inline-unknown">
-            <input
-              type="checkbox"
-              checked={timeKnown}
-              onChange={(e) => handleTimeKnown(e.target.checked)}
-            />
-            <span>Je connais mon heure de naissance</span>
-          </label>
           {!timeKnown && (
             <p className="hx-birth-time-unknown-note">
               Une heure exacte améliore la précision du scan.
@@ -430,6 +478,7 @@ export default function BirthDataInlineForm({
                 <li
                   key={i}
                   role="option"
+                  aria-selected="false"
                   className="hx-birth-city-option"
                   onMouseDown={(e) => { e.preventDefault(); handleSelectCity(r) }}
                 >
@@ -451,6 +500,28 @@ export default function BirthDataInlineForm({
       </section>
 
       <div className="hx-birth-inline-toggle-card">
+        <div className="hx-birth-inline-section-head">
+          <span className="hx-birth-inline-section-kicker">Type de lecture</span>
+          <p className="hx-birth-inline-section-title">Choisis la structure du formulaire</p>
+        </div>
+        <div className="hx-birth-inline-choice-grid" role="group" aria-label="Type de lecture">
+          <ChoiceCard
+            badge="1"
+            kicker="Lecture simple"
+            title="Mes donnees uniquement"
+            description="HexAstra enregistre seulement ton profil principal."
+            selected={!dualMode}
+            onClick={() => setDualMode(false)}
+          />
+          <ChoiceCard
+            badge="2"
+            kicker="Lecture croisee"
+            title="Ajouter une autre personne"
+            description="Active une seconde fiche pour une lecture relationnelle ou comparee."
+            selected={dualMode}
+            onClick={() => setDualMode(true)}
+          />
+        </div>
         <label className="hx-birth-inline-unknown" style={{ marginTop: 0 }}>
           <input
             type="checkbox"
@@ -518,6 +589,26 @@ export default function BirthDataInlineForm({
             <span className="hx-birth-inline-label">
               Heure de naissance {partnerTimeKnown && <span aria-hidden="true">*</span>}
             </span>
+            <div className="hx-birth-inline-choice-grid hx-birth-inline-choice-grid--compact" role="group" aria-label="Choix de l'heure de naissance de l'autre personne">
+              <ChoiceCard
+                compact
+                badge="A"
+                kicker="Option"
+                title="Heure connue"
+                description="Une heure precise ameliore la lecture croisee."
+                selected={partnerTimeKnown}
+                onClick={() => handlePartnerTimeKnown(true)}
+              />
+              <ChoiceCard
+                compact
+                badge="B"
+                kicker="Option"
+                title="Heure inconnue"
+                description="HexAstra utilisera une heure neutre par defaut."
+                selected={!partnerTimeKnown}
+                onClick={() => handlePartnerTimeKnown(false)}
+              />
+            </div>
             {partnerTimeKnown ? (
               <input
                 className="hx-birth-inline-input"
@@ -602,6 +693,7 @@ export default function BirthDataInlineForm({
                   <li
                     key={i}
                     role="option"
+                    aria-selected="false"
                     className="hx-birth-city-option"
                     onMouseDown={(e) => { e.preventDefault(); handlePartnerSelectCity(r) }}
                   >

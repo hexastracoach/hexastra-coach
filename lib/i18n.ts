@@ -432,5 +432,4 @@ export const translations: Record<Lang, any> = {
   },
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type T = any

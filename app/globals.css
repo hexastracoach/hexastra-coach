@@ -1549,6 +1549,20 @@ transition: all 0.35s ease;
   backdrop-filter: blur(12px);
 }
 
+.hx-message-bubble.is-assistant.is-status-card,
+.hx-chat-bubble.is-assistant.is-status-card {
+  max-width: min(760px, 92%);
+  padding: 14px 16px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
+    rgba(8, 16, 28, 0.55);
+  border: 1px solid rgba(95, 180, 215, 0.16);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
 .hx-message-content p:first-child,
 .hx-message-content div:first-child {
   margin-top: 0;
@@ -2702,6 +2716,117 @@ transition: all 0.35s ease;
   border: 1px solid rgba(111, 182, 213, 0.14);
 }
 
+.hx-birth-inline-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hx-birth-inline-choice-grid--compact {
+  margin-bottom: 8px;
+}
+
+.hx-birth-choice-card {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px;
+  border-radius: 16px;
+  border: 1px solid rgba(111, 182, 213, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025)),
+    rgba(8, 16, 28, 0.42);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.hx-birth-choice-card:hover {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03)),
+    rgba(8, 16, 28, 0.48);
+  border-color: rgba(115, 201, 234, 0.24);
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.hx-birth-choice-card.is-selected {
+  border-color: rgba(118, 220, 248, 0.3);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.2),
+    inset 0 0 0 1px rgba(111, 206, 234, 0.16);
+}
+
+.hx-birth-choice-card--compact {
+  padding: 11px 12px;
+}
+
+.hx-birth-choice-card-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(102, 196, 226, 0.12);
+  border: 1px solid rgba(111, 206, 234, 0.18);
+  color: rgba(191, 235, 246, 0.92);
+  font-size: 0.82rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.hx-birth-choice-card-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.hx-birth-choice-card-kicker {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(102, 196, 226, 0.1);
+  border: 1px solid rgba(111, 206, 234, 0.14);
+  color: rgba(186, 230, 242, 0.78);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hx-birth-choice-card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: rgba(246, 250, 255, 0.95);
+}
+
+.hx-birth-choice-card-sub {
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: rgba(191, 208, 219, 0.72);
+}
+
+.hx-birth-inline-toggle-card > .hx-birth-inline-unknown,
+.hx-birth-inline-field > .hx-birth-inline-unknown {
+  display: none;
+}
+
 .hx-birth-inline-footer {
   display: flex;
   flex-direction: column;
@@ -2816,6 +2941,20 @@ transition: all 0.35s ease;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.hx-practitioner-step-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hx-practitioner-step-meta-kicker {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(170, 224, 239, 0.72);
 }
 
 .hx-practitioner-step-kicker {
@@ -2936,8 +3075,18 @@ transition: all 0.35s ease;
   display: block;
 }
 
+.hx-practitioner-btn-cta {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(183, 230, 244, 0.86);
+}
+
 @media (max-width: 540px) {
   .hx-birth-inline-grid { grid-template-columns: 1fr; }
+  .hx-birth-inline-choice-grid { grid-template-columns: 1fr; }
   .hx-practitioner-step-choices { flex-direction: column; }
   .hx-birth-inline-submit { align-self: stretch; text-align: center; }
   .hx-birth-inline-form { padding: 22px 18px 18px; }

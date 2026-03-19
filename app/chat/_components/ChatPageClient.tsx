@@ -23,7 +23,8 @@ import {
   FREE_USAGE_STORAGE_KEY,
   FREE_USAGE_FIRST_MSG_KEY,
   canContinueChat,
-  isFreePlan,
+  isQuotaLimitedPlan,
+  shouldPersistQuotaLocally,
   type PlanKey,
 } from '@/lib/plans'
 import {
@@ -56,18 +57,17 @@ import {
   type MicroReadings,
   type PractitionerUsage,
 } from '@/lib/chat/bootstrapTypes'
-import { routeUserQuery } from '@/lib/chat/queryRouter'
+import {
+  resolveClientSendPolicy,
+  resolveSelectionContext,
+} from '@/lib/chat/clientSendPolicy'
+import { resolveClientResponsePolicy } from '@/lib/chat/clientResponsePolicy'
 import {
   loadEvolutionProfile,
   saveEvolutionProfile,
 } from '@/lib/stores/userEvolutionStore'
 import type { UserEvolutionProfile } from '@/types/evolution'
 import { useChatLanguage, useTranslation } from '@/lib/i18n/useTranslation'
-import {
-  buildClarificationPrompt,
-  buildGuardResponse,
-  moderateMessage,
-} from '@/lib/chat/conversationLayer'
 import {
   detectUserDepthLevel,
   adjustResponseDepth,
@@ -168,6 +168,7 @@ function normalizeText(value: string) {
     .trim()
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function isSimpleGreeting(value: string) {
   const text = normalizeText(value)
   if (!text) return false
@@ -200,57 +201,6 @@ function isBirthDataUpdateMessage(value: string) {
 function isMenuSelectionMessage(value: string) {
   const text = (value || '').trim()
   return text.includes('->') || text.includes('→')
-}
-
-function isMenuOpenMessage(value: string) {
-  const text = normalizeText(value)
-  if (!text) return false
-
-  return (
-    text === 'menu' ||
-    text === 'revenir au menu' ||
-    text === 'retour au menu' ||
-    text === 'ouvre le menu' ||
-    text === 'ouvrir le menu' ||
-    text === 'montre le menu' ||
-    text === 'affiche le menu'
-  )
-}
-
-function parseNumericMenuChoice(value: string) {
-  const match = value.trim().match(/^(\d{1,2})$/)
-  if (!match) return null
-
-  const choice = Number(match[1])
-  return Number.isInteger(choice) && choice > 0 ? choice : null
-}
-
-function findMenuItemByKey(items: HexastraMenuItem[], key: string | null) {
-  if (!key) return null
-  return items.find((item) => item.key === key) ?? null
-}
-
-function resolveNumericMenuSelection(
-  items: HexastraMenuItem[],
-  choice: number,
-  selectedMenuKey: string | null
-): { item: HexastraMenuItem; parent?: HexastraMenuItem; openParentOnly?: boolean } | null {
-  const selectedParent = findMenuItemByKey(items, selectedMenuKey)
-
-  if (selectedParent?.submenu?.length) {
-    const submenuItem = selectedParent.submenu[choice - 1]
-    if (!submenuItem) return null
-    return { item: submenuItem, parent: selectedParent }
-  }
-
-  const topLevelItem = items[choice - 1]
-  if (!topLevelItem) return null
-
-  if (topLevelItem.submenu?.length) {
-    return { item: topLevelItem, openParentOnly: true }
-  }
-
-  return { item: topLevelItem }
 }
 
 function assistantAskedForBirthData(value: string) {
@@ -375,18 +325,6 @@ function mergeBirthData(data: Partial<BirthData>): BirthData {
   }
 }
 
-function getStableApiReply(data: (HexastraApiResponse & { content?: unknown }) | null | undefined) {
-  if (!data) {
-    return "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
-  }
-
-  if (typeof data.message === 'string' && data.message.trim()) return data.message
-  if (typeof data.reply === 'string' && data.reply.trim()) return data.reply
-  if (typeof data.content === 'string' && data.content.trim()) return data.content
-
-  return "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
-}
-
 export default function ChatPageClient() {
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -412,7 +350,7 @@ export default function ChatPageClient() {
   const [activeContextFrame, setActiveContextFrame] = useState<string | null>(null)
   const [activeClarificationQuestion, setActiveClarificationQuestion] = useState<string | null>(null)
   const [journeyEnabled, setJourneyEnabled] = useState<boolean>(false)
-  const [userMemory, setUserMemory] = useState<UserMemory>(EMPTY_USER_MEMORY)
+  const [, setUserMemory] = useState<UserMemory>(EMPTY_USER_MEMORY)
 
   const [readings, setReadings] = useState<Reading[]>([])
   const [projects, setProjects] = useState<Project[]>([])
@@ -441,8 +379,8 @@ export default function ChatPageClient() {
 
   const [evolutionProfile, setEvolutionProfile] = useState<UserEvolutionProfile | null>(null)
 
-  const [freeMessagesUsed, setFreeMessagesUsed] = useState(0)
-  const [freeResetAt, setFreeResetAt] = useState<Date | null>(null)
+  const [quotaMessagesUsed, setQuotaMessagesUsed] = useState(0)
+  const [quotaResetAt, setQuotaResetAt] = useState<Date | null>(null)
 
   const cacheRef = useRef<Map<string, string>>(new Map())
   const hasPrefilled = useRef(false)
@@ -454,8 +392,6 @@ export default function ChatPageClient() {
   const birthDataRef = useRef<BirthData>(EMPTY_BIRTH_DATA)
   const partnerBirthDataRef = useRef<BirthData>(EMPTY_BIRTH_DATA)
   const journeyHydratedRef = useRef(false)
-  const conversationContextRef = useRef({}) // legacy placeholder, no longer used
-
   const mode = planLoaded ? getEntitlements(userPlan).chatMode : 'essentiel'
 
   const step = computeBootstrapStep({
@@ -498,9 +434,9 @@ export default function ChatPageClient() {
     (
       base: string,
       {
-        intent,
+        intent: _intent,
         isReading,
-        userMessage,
+        userMessage: _userMessage,
         depthLevel,
       }: {
         intent: string | undefined
@@ -524,7 +460,6 @@ export default function ChatPageClient() {
     [messages]
   )
 
-  const userMessageCount = userMessages.length
   const lastUserMessage = userMessages[userMessages.length - 1]?.content ?? ''
   const lastAssistantMessage =
     [...messages].reverse().find((message) => message.role === 'assistant')?.content ?? ''
@@ -554,7 +489,7 @@ export default function ChatPageClient() {
 
   const desktopLeft = viewportWidth >= 1100
   const userInitials = getInitials(userEmail)
-  const isLimitReached = isFreePlan(userPlan) && !canContinueChat(userPlan, freeMessagesUsed)
+  const isLimitReached = isQuotaLimitedPlan(userPlan) && !canContinueChat(userPlan, quotaMessagesUsed)
 
   const isReadingFlowStep = useCallback((step?: string | null) => {
     if (!step) return false
@@ -602,49 +537,44 @@ export default function ChatPageClient() {
   )
 
   const applyApiResponse = useCallback((data: HexastraApiResponse | null | undefined) => {
-    if (!data) {
-      return "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
-    }
+    const responsePolicy = resolveClientResponsePolicy(data)
 
-    const metadata = (data.metadata ?? {}) as ChatApiMetadata
-    const reply = getStableApiReply(data as HexastraApiResponse & { content?: unknown })
+    if (responsePolicy.conversationId) setConversationId(responsePolicy.conversationId)
 
-    if (data.conversationId) setConversationId(data.conversationId)
-
-    if (data.menu?.visible && Array.isArray(data.menu.items)) {
-      setMenuItems(data.menu.items)
+    if (responsePolicy.menu.action === 'open') {
+      setMenuItems(responsePolicy.menu.items)
       setIsMenuDockOpen(true)
-    } else if (data.menu?.visible === false) {
+    } else if (responsePolicy.menu.action === 'close') {
       setIsMenuDockOpen(false)
     }
 
-    if (metadata.contextType) setActiveContextType(metadata.contextType)
+    if (responsePolicy.context.contextType) setActiveContextType(responsePolicy.context.contextType)
 
-    if (metadata.selectedMenuKey !== undefined) {
-      setSelectedMenuKey(metadata.selectedMenuKey ?? null)
-      setOpenMenuParentKey(metadata.selectedMenuKey ?? null)
+    if (responsePolicy.context.selectedMenuKey !== undefined) {
+      setSelectedMenuKey(responsePolicy.context.selectedMenuKey ?? null)
+      setOpenMenuParentKey(responsePolicy.context.selectedMenuKey ?? null)
     }
 
-    if (metadata.selectedSubmenuKey !== undefined) {
-      setSelectedSubmenuKey(metadata.selectedSubmenuKey ?? null)
+    if (responsePolicy.context.selectedSubmenuKey !== undefined) {
+      setSelectedSubmenuKey(responsePolicy.context.selectedSubmenuKey ?? null)
     }
 
-    if (metadata.contextFrame !== undefined) {
-      setActiveContextFrame(metadata.contextFrame ?? null)
+    if (responsePolicy.context.contextFrame !== undefined) {
+      setActiveContextFrame(responsePolicy.context.contextFrame ?? null)
     }
 
-    if (metadata.clarificationQuestion !== undefined) {
-      setActiveClarificationQuestion(metadata.clarificationQuestion ?? null)
+    if (responsePolicy.context.clarificationQuestion !== undefined) {
+      setActiveClarificationQuestion(responsePolicy.context.clarificationQuestion ?? null)
     }
 
-    if (data.updatedEvolutionProfile) {
-      setEvolutionProfile(data.updatedEvolutionProfile as UserEvolutionProfile)
-      saveEvolutionProfile(data.updatedEvolutionProfile as UserEvolutionProfile)
+    if (responsePolicy.evolutionProfile) {
+      setEvolutionProfile(responsePolicy.evolutionProfile as UserEvolutionProfile)
+      saveEvolutionProfile(responsePolicy.evolutionProfile as UserEvolutionProfile)
     }
 
-    if (metadata.userMemoryUpdate && typeof metadata.userMemoryUpdate === 'object') {
+    if (responsePolicy.userMemoryUpdate) {
       try {
-        const update = metadata.userMemoryUpdate as Partial<UserMemory>
+        const update = responsePolicy.userMemoryUpdate as Partial<UserMemory>
         setUserMemory((prev) => {
           const merged = { ...prev, ...update }
           localStorage.setItem('hexastra.userMemory', JSON.stringify(merged))
@@ -653,70 +583,35 @@ export default function ChatPageClient() {
       } catch {}
     }
 
-    const quotaMeta = metadata.quota
-    if (isFreePlan(userPlan) && quotaMeta) {
-      const used =
-        typeof quotaMeta.used === 'number' && Number.isFinite(quotaMeta.used)
-          ? quotaMeta.used
-          : 0
+    if (isQuotaLimitedPlan(userPlan) && responsePolicy.quotaSync) {
+      setQuotaMessagesUsed(responsePolicy.quotaSync.used)
+      setQuotaResetAt(responsePolicy.quotaSync.resetAt)
 
-      setFreeMessagesUsed(used)
+      if (shouldPersistQuotaLocally(userPlan)) {
+        try {
+          localStorage.setItem(FREE_USAGE_STORAGE_KEY, String(responsePolicy.quotaSync.used))
 
-      const resetAtValue =
-        typeof quotaMeta.resetAt === 'string' && quotaMeta.resetAt
-          ? new Date(quotaMeta.resetAt)
-          : null
-
-      setFreeResetAt(resetAtValue)
-
-      try {
-        localStorage.setItem(FREE_USAGE_STORAGE_KEY, String(used))
-
-        if (typeof quotaMeta.windowStartedAt === 'string' && quotaMeta.windowStartedAt) {
-          localStorage.setItem(FREE_USAGE_FIRST_MSG_KEY, quotaMeta.windowStartedAt)
-        } else if (used <= 0) {
-          localStorage.removeItem(FREE_USAGE_FIRST_MSG_KEY)
-        }
-      } catch {}
-    }
-
-    if (metadata.quotaExceeded) {
-      const resetAtValue =
-        typeof metadata.resetAt === 'string' && metadata.resetAt
-          ? new Date(metadata.resetAt)
-          : null
-
-      if (isFreePlan(userPlan)) {
-        setFreeMessagesUsed(
-          typeof metadata.used === 'number'
-            ? metadata.used
-            : typeof metadata.limit === 'number'
-              ? metadata.limit
-              : 3
-        )
-        setFreeResetAt(resetAtValue)
+          if (responsePolicy.quotaSync.windowStartedAt) {
+            localStorage.setItem(FREE_USAGE_FIRST_MSG_KEY, responsePolicy.quotaSync.windowStartedAt)
+          } else if (responsePolicy.quotaSync.used <= 0) {
+            localStorage.removeItem(FREE_USAGE_FIRST_MSG_KEY)
+          }
+        } catch {}
       }
-
-      setPremiumLock({
-        targetPlan: metadata.upgradeTargetPlan ?? 'essential',
-        ctaLabel: metadata.upgradeCtaLabel ?? 'Passer Ã  Essentiel',
-        text: reply || 'Ton accÃ¨s gratuit a atteint sa limite pour le moment.',
-      })
-
-      return reply
     }
 
-    if (metadata.premiumPreviewLocked) {
-      setPremiumLock({
-        targetPlan: metadata.upgradeTargetPlan ?? 'premium',
-        ctaLabel: metadata.upgradeCtaLabel ?? 'Passer Ã  Premium',
-        text: 'La suite de lâ€™analyse complÃ¨te est disponible dans le plan supÃ©rieur.',
-      })
+    if (responsePolicy.quotaExceeded && isQuotaLimitedPlan(userPlan)) {
+      setQuotaMessagesUsed(responsePolicy.quotaExceeded.used)
+      setQuotaResetAt(responsePolicy.quotaExceeded.resetAt)
+    }
+
+    if (responsePolicy.premiumLock.action === 'set') {
+      setPremiumLock(responsePolicy.premiumLock.value)
     } else {
       setPremiumLock(null)
     }
 
-    return reply
+    return responsePolicy.reply
   }, [userPlan])
 
   const postChatPayload = useCallback(
@@ -1086,7 +981,11 @@ export default function ChatPageClient() {
   }, [searchParams])
 
   useEffect(() => {
-    if (!isFreePlan(userPlan)) return
+    if (!shouldPersistQuotaLocally(userPlan)) {
+      setQuotaMessagesUsed(0)
+      setQuotaResetAt(null)
+      return
+    }
 
     try {
       const firstMsgRaw = localStorage.getItem(FREE_USAGE_FIRST_MSG_KEY)
@@ -1098,19 +997,19 @@ export default function ChatPageClient() {
         if (Date.now() >= resetAt.getTime()) {
           localStorage.removeItem(FREE_USAGE_FIRST_MSG_KEY)
           localStorage.setItem(FREE_USAGE_STORAGE_KEY, '0')
-          setFreeMessagesUsed(0)
-          setFreeResetAt(null)
+          setQuotaMessagesUsed(0)
+          setQuotaResetAt(null)
         } else {
           const n = parseInt(localStorage.getItem(FREE_USAGE_STORAGE_KEY) ?? '0', 10)
-          setFreeMessagesUsed(Number.isFinite(n) ? n : 0)
-          setFreeResetAt(resetAt)
+          setQuotaMessagesUsed(Number.isFinite(n) ? n : 0)
+          setQuotaResetAt(resetAt)
         }
       } else {
-        setFreeMessagesUsed(0)
-        setFreeResetAt(null)
+        setQuotaMessagesUsed(0)
+        setQuotaResetAt(null)
       }
     } catch {
-      setFreeMessagesUsed(0)
+      setQuotaMessagesUsed(0)
     }
   }, [userPlan])
 
@@ -1127,6 +1026,7 @@ export default function ChatPageClient() {
     microTriggerRef.current = step
 
     void triggerMicroReading(pendingMicroRequestType)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWelcome, pendingMicroRequestType])
 
   useEffect(() => {
@@ -1412,7 +1312,26 @@ export default function ChatPageClient() {
       if (chatStep !== 'conversation_ready') return
       if (isMicroBootstrapPending) return
 
-      if (isMenuOpenMessage(baseContent)) {
+      const localDecision = resolveClientSendPolicy({
+        message: baseContent,
+        plan: userPlan,
+        usedMessages: quotaMessagesUsed,
+        menuItems,
+        selectedMenuKey,
+        selectedSubmenuKey,
+        activeClarificationQuestion,
+        activeContextFrame,
+      })
+
+      const _depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
+      const memorySignals = detectMemorySignals(baseContent)
+      setUserMemory((prev) => {
+        const next = updateUserMemory(prev, memorySignals)
+        try { localStorage.setItem('hexastra.userMemory', JSON.stringify(next)) } catch {}
+        return next
+      })
+
+      if (localDecision.kind === 'open_menu') {
         const baseMessages = isWelcome ? [] : messages
         const userMsg: Msg = {
           id: `${Date.now()}-user`,
@@ -1420,7 +1339,6 @@ export default function ChatPageClient() {
           content,
           created_at: new Date().toISOString(),
         }
-
         setMessages([...baseMessages, userMsg])
         setInput('')
         setAttachedFile(null)
@@ -1433,65 +1351,7 @@ export default function ChatPageClient() {
         return
       }
 
-      const numericChoice = parseNumericMenuChoice(baseContent)
-      const hasActiveScienceSubanalysis = Boolean(
-        selectedSubmenuKey && selectedSubmenuKey.startsWith('science_')
-      )
-      if (numericChoice && menuItems.length > 0 && !hasActiveScienceSubanalysis) {
-        const selection = resolveNumericMenuSelection(menuItems, numericChoice, selectedMenuKey)
-
-        if (selection?.openParentOnly) {
-          const baseMessages = isWelcome ? [] : messages
-          const userMsg: Msg = {
-            id: `${Date.now()}-user`,
-            role: 'user',
-            content,
-            created_at: new Date().toISOString(),
-          }
-
-          setMessages([...baseMessages, userMsg])
-          setInput('')
-          setAttachedFile(null)
-          setActiveContextType(selection.item.contextType ?? 'general')
-          setSelectedMenuKey(selection.item.key)
-          setSelectedSubmenuKey(null)
-          setOpenMenuParentKey(selection.item.key)
-          setIsMenuDockOpen(true)
-          return
-        }
-
-        if (selection) {
-          const context = selection.item.contextType ?? selection.parent?.contextType ?? 'general'
-          setInput('')
-          setAttachedFile(null)
-          setActiveContextType(context)
-          setSelectedMenuKey(selection.parent?.key ?? selection.item.key)
-          setSelectedSubmenuKey(selection.parent ? selection.item.key : null)
-          setOpenMenuParentKey(selection.parent?.key ?? null)
-          setIsMenuDockOpen(false)
-
-          await sendStructuredAction({
-            message: buildMenuSelectionRequest(selection.item, selection.parent),
-            displayMessage: content,
-            contextType: context,
-            menuKey: selection.parent?.key ?? selection.item.key,
-            submenuKey: selection.parent ? selection.item.key : null,
-            uiAction: selection.parent ? 'select_submenu_item' : 'select_menu_item',
-          })
-          return
-        }
-      }
-
-      const moderation = moderateMessage(baseContent)
-      const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
-      const memorySignals = detectMemorySignals(baseContent)
-      setUserMemory((prev) => {
-        const next = updateUserMemory(prev, memorySignals)
-        try { localStorage.setItem('hexastra.userMemory', JSON.stringify(next)) } catch {}
-        return next
-      })
-
-      if (moderation !== 'SAFE') {
+      if (localDecision.kind === 'open_parent') {
         const baseMessages = isWelcome ? [] : messages
         const userMsg: Msg = {
           id: `${Date.now()}-user`,
@@ -1499,55 +1359,41 @@ export default function ChatPageClient() {
           content,
           created_at: new Date().toISOString(),
         }
-        setMessages([
-          ...baseMessages,
-          userMsg,
-          {
-            id: `${Date.now()}-moderation`,
-            role: 'assistant',
-            content:
-              moderation === 'CONFUSED'
-                ? activeClarificationQuestion ??
-                  (activeContextFrame
-                    ? `${activeContextFrame}\n\n${buildClarificationPrompt()}`
-                    : buildClarificationPrompt())
-                : buildGuardResponse(moderation),
-            created_at: new Date().toISOString(),
-          },
-        ])
+        const selectionContext = resolveSelectionContext(localDecision.selection)
+
+        setMessages([...baseMessages, userMsg])
         setInput('')
         setAttachedFile(null)
+        setActiveContextType(selectionContext.contextType)
+        setSelectedMenuKey(selectionContext.menuKey)
+        setSelectedSubmenuKey(selectionContext.submenuKey)
+        setOpenMenuParentKey(localDecision.selection.item.key)
+        setIsMenuDockOpen(true)
         return
       }
 
-      if (!canContinueChat(userPlan, freeMessagesUsed)) {
-        const baseMessages = isWelcome ? [] : messages
+      if (localDecision.kind === 'select_context') {
+        const selectionContext = resolveSelectionContext(localDecision.selection)
+        setInput('')
+        setAttachedFile(null)
+        setActiveContextType(selectionContext.contextType)
+        setSelectedMenuKey(selectionContext.menuKey)
+        setSelectedSubmenuKey(selectionContext.submenuKey)
+        setOpenMenuParentKey(selectionContext.openParentKey)
+        setIsMenuDockOpen(false)
 
-        setMessages([
-          ...baseMessages,
-          {
-            id: `${Date.now()}-limit`,
-            role: 'assistant',
-            content: `Tu as atteint la limite de ton accÃ¨s dÃ©couverte pour le moment.
-
-Ton espace gratuit se rÃ©ouvrira automatiquement dans 24h.
-Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
-            created_at: new Date().toISOString(),
-          },
-        ])
-
-        setPremiumLock({
-          targetPlan: 'essential',
-          ctaLabel: 'Passer Ã  Essentiel',
-          text:
-            'Ton accÃ¨s gratuit est temporairement arrivÃ© Ã  sa limite. Reviens dans 24h ou passe Ã  Essentiel pour continuer maintenant.',
+        await sendStructuredAction({
+          message: buildMenuSelectionRequest(localDecision.selection.item, localDecision.selection.parent),
+          displayMessage: content,
+          contextType: selectionContext.contextType,
+          menuKey: selectionContext.menuKey,
+          submenuKey: selectionContext.submenuKey,
+          uiAction: localDecision.selection.parent ? 'select_submenu_item' : 'select_menu_item',
         })
-
         return
       }
 
-      const routeResult = routeUserQuery(baseContent)
-      if (routeResult.decision !== 'allowed') {
+      if (localDecision.kind === 'local_reply') {
         const baseMessages = isWelcome ? [] : messages
         const userMsg: Msg = {
           id: `${Date.now()}-user`,
@@ -1560,12 +1406,16 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
           ...baseMessages,
           userMsg,
           {
-            id: `${Date.now()}-guard`,
+            id: `${Date.now()}-local-guard`,
             role: 'assistant',
-            content: routeResult.message,
+            content: localDecision.reply,
             created_at: new Date().toISOString(),
           },
         ])
+
+        if (localDecision.premiumLock) {
+          setPremiumLock(localDecision.premiumLock)
+        }
 
         setInput('')
         setAttachedFile(null)
@@ -1719,7 +1569,7 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
       chatLanguage,
       conversationId,
       evolutionProfile,
-      freeMessagesUsed,
+      quotaMessagesUsed,
       input,
       isTyping,
       isWelcome,
@@ -1737,6 +1587,8 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
       formatAssistantReply,
       sendStructuredAction,
       menuItems,
+      activeClarificationQuestion,
+      activeContextFrame,
     ]
   )
 
@@ -1745,14 +1597,14 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
     setConversationId(null)
     setInput('')
     setMenuItems([])
-      setIsMenuDockOpen(false)
-      setOpenMenuParentKey(null)
-      setActiveContextType('general')
-      setSelectedMenuKey(null)
-      setSelectedSubmenuKey(null)
-      setActiveContextFrame(null)
-      setActiveClarificationQuestion(null)
-      microTriggerRef.current = null
+    setIsMenuDockOpen(false)
+    setOpenMenuParentKey(null)
+    setActiveContextType('general')
+    setSelectedMenuKey(null)
+    setSelectedSubmenuKey(null)
+    setActiveContextFrame(null)
+    setActiveClarificationQuestion(null)
+    microTriggerRef.current = null
     lastMessageRef.current = null
     try {
       localStorage.removeItem(CONVERSATION_STORAGE_KEY)
@@ -1970,7 +1822,7 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
 
               {bootstrapOverlay ??
                 (isLimitReached ? (
-                  <PaywallBanner plan={userPlan} resetAt={freeResetAt} />
+                  <PaywallBanner plan={userPlan} resetAt={quotaResetAt} />
                 ) : (
                   <Composer {...composerProps} />
                 ))}

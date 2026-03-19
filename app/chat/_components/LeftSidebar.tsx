@@ -454,7 +454,6 @@ export default function LeftSidebar({
       <div className="hx-leftbar-footer">
         <div className="hx-leftbar-progress">
           <div className="hx-leftbar-progress-track">
-            {/* eslint-disable-next-line react/forbid-dom-props */}
             <span
               className="hx-leftbar-progress-fill"
               style={{ '--fill-w': `${Math.min(100, Math.max(6, Math.round((safeReadings.length / 12) * 100)))}%` } as React.CSSProperties}

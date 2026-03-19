@@ -6,55 +6,80 @@ import type {
   PlanUiData,
   PlanApiContext,
 } from '@/types/subscription'
+import { getPlanContract, getPlanQuotaLimit, PLAN_CONTRACTS } from '@/lib/hexastra/orchestration/planContracts'
 
 export type { PlanKey, AnalysisDepth, PlanCapabilities, PlanUiData, PlanApiContext }
 
 // ─── Capabilities par plan ─────────────────────────────────────────────────
 
+function toAnalysisDepth(plan: PlanKey): AnalysisDepth {
+  const contract = getPlanContract(plan)
+  if (contract.responseDepth === 'expert') return 'expert'
+  if (contract.responseDepth === 'medium') return 'medium'
+  if (contract.responseDepth === 'short') return 'low'
+  return 'high'
+}
+
+function getAvailableModesFromContract(plan: PlanKey): Mode[] {
+  const contract = getPlanContract(plan)
+  if (contract.features.practitionerStructure) {
+    return ['essentiel', 'premium', 'praticien']
+  }
+  if (contract.mode === 'libre_approfondi') {
+    return ['essentiel', 'premium']
+  }
+  return ['essentiel']
+}
+
 export const PLAN_CAPABILITIES: Record<PlanKey, PlanCapabilities> = {
   free: {
     canUseChat: true,
-    maxMessagesPerDay: 9999,
-    analysisDepth: 'high',
-    availableModes: ['essentiel'],
-    canUsePractitionerMode: false,
-    canAnalyzeForClients: false,
-    canGetLongResponses: true,
-    canAccessDeepAnalysis: false,
-    canAccessProfessionalFormat: false,
+    maxMessagesPerDay: PLAN_CONTRACTS.free.quotaLimit,
+    analysisDepth: toAnalysisDepth('free'),
+    availableModes: getAvailableModesFromContract('free'),
+    canUsePractitionerMode: PLAN_CONTRACTS.free.features.practitionerStructure,
+    canAnalyzeForClients: PLAN_CONTRACTS.free.features.clientUsage,
+    canGetLongResponses: PLAN_CONTRACTS.free.maxOutputLength !== 'short',
+    canAccessDeepAnalysis: PLAN_CONTRACTS.free.features.deepAnalysis,
+    canAccessProfessionalFormat:
+      PLAN_CONTRACTS.free.features.practitionerStructure && PLAN_CONTRACTS.free.features.clientUsage,
   },
   essential: {
     canUseChat: true,
-    maxMessagesPerDay: null,
-    analysisDepth: 'high',
-    availableModes: ['essentiel'],
-    canUsePractitionerMode: false,
-    canAnalyzeForClients: false,
-    canGetLongResponses: true,
-    canAccessDeepAnalysis: false,
-    canAccessProfessionalFormat: false,
+    maxMessagesPerDay: PLAN_CONTRACTS.essential.quotaLimit,
+    analysisDepth: toAnalysisDepth('essential'),
+    availableModes: getAvailableModesFromContract('essential'),
+    canUsePractitionerMode: PLAN_CONTRACTS.essential.features.practitionerStructure,
+    canAnalyzeForClients: PLAN_CONTRACTS.essential.features.clientUsage,
+    canGetLongResponses: PLAN_CONTRACTS.essential.maxOutputLength !== 'short',
+    canAccessDeepAnalysis: PLAN_CONTRACTS.essential.features.deepAnalysis,
+    canAccessProfessionalFormat:
+      PLAN_CONTRACTS.essential.features.practitionerStructure && PLAN_CONTRACTS.essential.features.clientUsage,
   },
   premium: {
     canUseChat: true,
-    maxMessagesPerDay: null,
-    analysisDepth: 'high',
-    availableModes: ['essentiel', 'premium'],
-    canUsePractitionerMode: false,
-    canAnalyzeForClients: false,
-    canGetLongResponses: true,
-    canAccessDeepAnalysis: true,
-    canAccessProfessionalFormat: false,
+    maxMessagesPerDay: PLAN_CONTRACTS.premium.quotaLimit,
+    analysisDepth: toAnalysisDepth('premium'),
+    availableModes: getAvailableModesFromContract('premium'),
+    canUsePractitionerMode: PLAN_CONTRACTS.premium.features.practitionerStructure,
+    canAnalyzeForClients: PLAN_CONTRACTS.premium.features.clientUsage,
+    canGetLongResponses: PLAN_CONTRACTS.premium.maxOutputLength !== 'short',
+    canAccessDeepAnalysis: PLAN_CONTRACTS.premium.features.deepAnalysis,
+    canAccessProfessionalFormat:
+      PLAN_CONTRACTS.premium.features.practitionerStructure && PLAN_CONTRACTS.premium.features.clientUsage,
   },
   practitioner: {
     canUseChat: true,
-    maxMessagesPerDay: null,
-    analysisDepth: 'expert',
-    availableModes: ['essentiel', 'premium', 'praticien'],
-    canUsePractitionerMode: true,
-    canAnalyzeForClients: true,
-    canGetLongResponses: true,
-    canAccessDeepAnalysis: true,
-    canAccessProfessionalFormat: true,
+    maxMessagesPerDay: PLAN_CONTRACTS.practitioner.quotaLimit,
+    analysisDepth: toAnalysisDepth('practitioner'),
+    availableModes: getAvailableModesFromContract('practitioner'),
+    canUsePractitionerMode: PLAN_CONTRACTS.practitioner.features.practitionerStructure,
+    canAnalyzeForClients: PLAN_CONTRACTS.practitioner.features.clientUsage,
+    canGetLongResponses: PLAN_CONTRACTS.practitioner.maxOutputLength !== 'short',
+    canAccessDeepAnalysis: PLAN_CONTRACTS.practitioner.features.deepAnalysis,
+    canAccessProfessionalFormat:
+      PLAN_CONTRACTS.practitioner.features.practitionerStructure &&
+      PLAN_CONTRACTS.practitioner.features.clientUsage,
   },
 }
 
@@ -136,7 +161,7 @@ export function canUseChatMode(plan: PlanKey, mode: Mode): boolean {
 }
 
 export function canContinueChat(plan: PlanKey, usedMessages: number): boolean {
-  const max = PLAN_CAPABILITIES[plan].maxMessagesPerDay
+  const max = getPlanQuotaLimit(plan)
   if (max === null) return true
   return usedMessages < max
 }
@@ -155,6 +180,14 @@ export function isFreePlan(plan: PlanKey): boolean {
 
 export function isPractitioner(plan: PlanKey): boolean {
   return plan === 'practitioner'
+}
+
+export function isQuotaLimitedPlan(plan: PlanKey): boolean {
+  return getPlanQuotaLimit(plan) !== null
+}
+
+export function shouldPersistQuotaLocally(plan: PlanKey): boolean {
+  return plan === 'free'
 }
 
 /** Retourne le plan immédiatement supérieur pour les CTA d'upgrade */
@@ -178,13 +211,13 @@ export function getModeUnlockLabel(mode: Mode): string {
 
 /** Construit le contexte plan inject\u00e9 dans l'API chat */
 export function buildPlanApiContext(plan: PlanKey): PlanApiContext {
-  const caps = PLAN_CAPABILITIES[plan]
+  const contract = getPlanContract(plan)
   return {
     plan,
-    analysisDepth: caps.analysisDepth,
-    practitionerEnabled: caps.canUsePractitionerMode,
-    longResponseAllowed: caps.canGetLongResponses,
-    professionalUseAllowed: caps.canAnalyzeForClients,
+    analysisDepth: toAnalysisDepth(plan),
+    practitionerEnabled: contract.features.practitionerStructure,
+    longResponseAllowed: contract.maxOutputLength !== 'short',
+    professionalUseAllowed: contract.features.clientUsage,
   }
 }
 

@@ -1,6 +1,5 @@
 // app/analysis/page.tsx
-// @ts-nocheck
-'use client' 
+'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'

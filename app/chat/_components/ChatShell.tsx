@@ -1,7 +1,6 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { DS } from '../_lib/chat'
 
 type Props = {
   left?: ReactNode

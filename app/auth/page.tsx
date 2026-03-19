@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
-import { useTranslation } from '@/lib/i18n/useTranslation'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import BackButton from '@/components/navigation/BackButton'
 
@@ -25,7 +24,6 @@ function validatePassword(pw: string): string | null {
 
 export default function AuthPage() {
   const supabase = createClient()
-  const { t } = useTranslation()
   const router = useRouter()
 
   const [mode, setMode] = useState<AuthMode>('login')
@@ -132,7 +130,9 @@ export default function AuthPage() {
   }
 
   const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') mode === 'login' ? handleLogin() : handleSignup()
+    if (e.key !== 'Enter') return
+    if (mode === 'login') void handleLogin()
+    else void handleSignup()
   }
 
   return (

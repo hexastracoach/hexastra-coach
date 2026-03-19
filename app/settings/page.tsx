@@ -25,6 +25,7 @@ export default function SettingsPage() {
       fetchCount()
       setLoading(false)
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchCount() {

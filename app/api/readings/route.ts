@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/auth/supabaseServer'
 import { logger } from '@/lib/utils/logger'
 import { badRequest, internalError, ok, unauthorized } from '@/lib/utils/apiResponse'

@@ -1,5 +1,3 @@
-import type { Msg } from '@/app/chat/_lib/chat'
-
 export type UserMemory = {
   themes_recurrents: string[]
   etats_dominants: string[]

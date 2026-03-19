@@ -29,6 +29,10 @@ function splitReadingSections(content: string) {
 
 export default function MessageBubble({ message, lastUserMessage, onRetry }: Props) {
   const isUser = message.role === 'user'
+  const isStatusCard =
+    !isUser &&
+    !message.isReading &&
+    (message.id.includes('birth-saved') || message.id.includes('journey'))
   const timeLabel = formatTime(message.created_at)
   const readingSections = useMemo(
     () => (message.isReading ? splitReadingSections(message.content) : null),
@@ -131,7 +135,7 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
       </div>
 
       <div
-        className={`hx-chat-message hx-chat-bubble ${isUser ? 'is-user' : 'is-assistant'}`}
+        className={`hx-chat-message hx-chat-bubble ${isUser ? 'is-user' : 'is-assistant'}${isStatusCard ? ' is-status-card' : ''}`}
         style={{
           fontSize: 15.5,
           lineHeight: 1.72,

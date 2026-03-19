@@ -303,7 +303,7 @@ function depthDirective(depth?: string): string {
   }
 }
 
-function conversationDirective(input: BuildPromptInput): string {
+function conversationDirective(_input: BuildPromptInput): string {
   return `
 Style conversationnel obligatoire:
 - Toujours repondre dans la langue du message utilisateur.

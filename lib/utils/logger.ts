@@ -3,7 +3,6 @@
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 function log(level: LogLevel, message: string, meta?: Record<string, unknown>) {
-  const payload = meta && Object.keys(meta).length > 0 ? { message, ...meta } : { message };
   const line = `[${level.toUpperCase()}] ${message}`;
   switch (level) {
     case 'debug':

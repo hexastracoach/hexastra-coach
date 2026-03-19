@@ -17,7 +17,10 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
         </p>
       </div>
 
-      <p className="hx-practitioner-step-question">Cette analyse est pour :</p>
+      <div className="hx-practitioner-step-meta">
+        <span className="hx-practitioner-step-meta-kicker">Type d'usage</span>
+        <p className="hx-practitioner-step-question">Cette analyse est pour :</p>
+      </div>
 
       <div className="hx-practitioner-step-choices">
         <button
@@ -30,6 +33,7 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
             <span className="hx-practitioner-btn-kicker">Usage personnel</span>
             <strong>1 - Usage personnel</strong>
             <span className="hx-practitioner-btn-sub">Lecture pour moi-meme</span>
+            <span className="hx-practitioner-btn-cta">Ouvrir ce cadre</span>
           </span>
         </button>
 
@@ -43,6 +47,7 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
             <span className="hx-practitioner-btn-kicker">Usage client</span>
             <strong>2 - Usage client</strong>
             <span className="hx-practitioner-btn-sub">Lecture pour un(e) client(e)</span>
+            <span className="hx-practitioner-btn-cta">Ouvrir ce cadre</span>
           </span>
         </button>
       </div>

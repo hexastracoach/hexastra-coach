@@ -1,5 +1,4 @@
 // app/dashboard/page.tsx
-// @ts-nocheck
 'use client'
 
 import { useEffect, useState } from 'react'

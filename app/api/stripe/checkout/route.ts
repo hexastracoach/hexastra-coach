@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import Stripe from 'stripe'
 import { createSupabaseServer } from '@/lib/auth/supabaseServer'
 import { STRIPE_PRICE_MAP } from '@/lib/billing/stripePlans'

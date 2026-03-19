@@ -1,6 +1,5 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import type { PlanKey } from '@/types/subscription';
 import { getUserPlan } from './getUserPlan';
 
 type Requirement = 'essential' | 'premium' | 'practitioner';

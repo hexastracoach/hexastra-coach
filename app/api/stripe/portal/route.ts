@@ -1,15 +1,15 @@
 import { randomUUID } from 'crypto'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createSupabaseServer } from '@/lib/auth/supabaseServer'
 import { logger } from '@/lib/utils/logger'
 import { validateEnv } from '@/lib/utils/env'
-import { unauthorized, internalError, ok } from '@/lib/utils/apiResponse'
+import { unauthorized, ok } from '@/lib/utils/apiResponse'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const requestId = randomUUID()
   const log = (level: 'info' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) =>
     logger[level](`[stripe:portal][${requestId}] ${msg}`, meta)

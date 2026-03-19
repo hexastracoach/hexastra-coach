@@ -2,13 +2,18 @@ import type { Metadata } from 'next'
 import './globals.css'
 import I18nProvider from '@/lib/i18n/I18nProvider'
 
+const metadataBaseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim() || 'https://hexastra.app'
+
 export const metadata: Metadata = {
-  title: 'HexAstra — Comprenez votre moment de vie',
-  description: 'HexAstra analyse votre situation et vous donne des clés concrètes pour vos relations, vos décisions et votre évolution personnelle.',
+  metadataBase: new URL(metadataBaseUrl),
+  title: 'HexAstra - Comprenez votre moment de vie',
+  description:
+    'HexAstra analyse votre situation et vous donne des cles concretes pour vos relations, vos decisions et votre evolution personnelle.',
   keywords: ['astrologie', 'human design', 'analyse personnelle', 'IA', 'lecture natale'],
   authors: [{ name: 'HexAstra' }],
-
-  // ── Favicon & App Icons ──────────────────────────────
+  alternates: {
+    canonical: '/',
+  },
   icons: {
     icon: [
       { url: '/favicon/favicon.svg', type: 'image/svg+xml' },
@@ -19,16 +24,12 @@ export const metadata: Metadata = {
       { url: '/favicon/favicon-192x192.png', sizes: '192x192', type: 'image/png' },
       { url: '/favicon/favicon-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: [
-      { url: '/favicon/favicon-180x180.png', sizes: '180x180', type: 'image/png' },
-    ],
+    apple: [{ url: '/favicon/favicon-180x180.png', sizes: '180x180', type: 'image/png' }],
     shortcut: '/favicon/favicon-32x32.png',
   },
-
-  // ── Open Graph (Facebook, LinkedIn, WhatsApp…) ───────
   openGraph: {
-    title: 'HexAstra — Comprenez votre moment de vie',
-    description: 'Analyse personnalisée par IA · Astrologie · Human Design · PDF + Audio',
+    title: 'HexAstra - Comprenez votre moment de vie',
+    description: 'Analyse personnalisee par IA. Astrologie. Human Design. PDF + Audio.',
     url: 'https://hexastra.app',
     siteName: 'HexAstra',
     images: [
@@ -36,30 +37,24 @@ export const metadata: Metadata = {
         url: '/social/hexastra-og-image.png',
         width: 1200,
         height: 1200,
-        alt: 'HexAstra — Intelligence Personnelle',
+        alt: 'HexAstra - Intelligence Personnelle',
       },
     ],
     locale: 'fr_FR',
     type: 'website',
   },
-
-  // ── Twitter / X Card ────────────────────────────────
   twitter: {
     card: 'summary_large_image',
-    title: 'HexAstra — Comprenez votre moment de vie',
-    description: 'Analyse personnalisée par IA · Astrologie · Human Design · PDF + Audio',
+    title: 'HexAstra - Comprenez votre moment de vie',
+    description: 'Analyse personnalisee par IA. Astrologie. Human Design. PDF + Audio.',
     images: ['/social/hexastra-twitter.png'],
   },
-
-  // ── PWA / Mobile ────────────────────────────────────
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'HexAstra',
   },
-
-  // ── Robots ──────────────────────────────────────────
   robots: {
     index: true,
     follow: true,
@@ -73,16 +68,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* ── Typography: Sora (titres) + Inter (interface) ── */}
         <link
           href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
-        {/* Couleur de la barre du navigateur sur mobile */}
         <meta name="theme-color" content="#2C1F1A" />
         <meta name="msapplication-TileColor" content="#2C1F1A" />
       </head>
-      <body><I18nProvider>{children}</I18nProvider></body>
+      <body>
+        <I18nProvider>{children}</I18nProvider>
+      </body>
     </html>
   )
 }

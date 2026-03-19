@@ -1,5 +1,4 @@
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import type { PromptMenuNode } from '@/lib/hexastra/data/promptMenu'
 
 type TrackEvent = {

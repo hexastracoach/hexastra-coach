@@ -26,6 +26,7 @@ export default function LibraryPage() {
       supabase.from('readings').select('*').order('created_at', { ascending: false })
         .then(({ data: rows }) => { setReadings(rows || []); setLoading(false) })
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const download = async (readingId: string, type: 'pdf' | 'audio') => {

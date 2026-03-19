@@ -13,6 +13,7 @@ import type { PlanKey } from '@/types/subscription'
 import type { ChatMessage } from '@/lib/chat/chatPayloadBuilder'
 import { mapDbPlanToPlanKey, downgradeIfInactive } from '@/lib/permissions/plan'
 import { logger } from '@/lib/utils/logger'
+import { captureError } from '@/lib/utils/errorReporter'
 import { createSupabaseServer } from '@/lib/auth/supabaseServer'
 import { validateEnv } from '@/lib/utils/env'
 import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
@@ -614,7 +615,7 @@ function detectLanguageFromText(text: string): SupportedLanguage | null {
   return best.score === 0 ? null : best.lang
 }
 
-async function resolveEffectivePlan(req: NextRequest): Promise<{ plan: PlanKey; userId: string | null }> {
+async function resolveEffectivePlan(_req: NextRequest): Promise<{ plan: PlanKey; userId: string | null }> {
   try {
     const supabase = createSupabaseServer()
     const {
@@ -815,9 +816,7 @@ export async function POST(req: NextRequest) {
     })
     const {
       menuContract,
-      inference: preQuotaInference,
       policy: preQuotaDecision,
-      execution: preQuotaExecution,
       trace: preQuotaTrace,
     } = preQuotaEvaluation
 
@@ -1186,6 +1185,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (error) {
     log('error', 'fatal error', { error })
+    captureError(error, { path: '/api/chat' })
     const safeErrorResponse = buildSafeErrorResponse()
     log('info', 'response normalized', {
       branch: 'safe_error',
@@ -1209,6 +1209,7 @@ function normalizePractitionerUsage(value: unknown): PractitionerUsageHex {
   return null
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function toOptionalNumber(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value
   if (typeof value === 'string' && value.trim() !== '') {

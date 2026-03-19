@@ -34,9 +34,7 @@ import { classifyQuery } from '@/lib/hexastra/router/classifyQuery'
 import { getModulesForDomain } from '@/lib/hexastra/router/moduleRouter'
 import {
   getKsDomainConfig,
-  getKsFreeformContract,
   getKsFreeformExecutionContract,
-  getKsSelectionConfig,
   getKsSelectionExecutionContract,
 } from '@/lib/hexastra/ks/ksRegistry'
 import { executeKsSubmodules } from '@/lib/hexastra/ks/submoduleExecutor'
@@ -172,6 +170,7 @@ function buildPractitionerUsageMessage(language: string): string {
   })
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildGreetingMessage(mode: ReturnType<typeof getModeForPlan>, language: string): string {
   const intro = tr(language, {
     en: 'Hello, I’m HexAstra. I can help you clarify a situation, explore a life theme, or start a personalized reading.',
@@ -699,10 +698,12 @@ function buildPractitionerLevelMessage(level: string, currentScienceLabel?: stri
   ].join('\n')
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function yearKey(date = new Date()): string {
   return String(date.getFullYear())
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function monthKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
@@ -1213,7 +1214,7 @@ export async function runHexastraFlow(input: {
       return recent.filter((m) => allowed.has(m))
     })()
 
-    let latestUserMessage =
+    const latestUserMessage =
       limitedMessages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
     const isGreeting = /^(bonjour|salut|hello|hey|bonsoir|coucou|yo)\s*$/i.test(
       latestUserMessage.trim()
@@ -1399,7 +1400,6 @@ export async function runHexastraFlow(input: {
     })
     const {
       menuContract,
-      inference: orchestrationInference,
       policy: orchestrationDecision,
       execution: orchestrationExecution,
       trace,
@@ -1886,6 +1886,7 @@ export async function runHexastraFlow(input: {
         signalsLength: safeSignals.length,
       })
       fusedSignal = fusedSignal || { dominantSignal: 'signal_general' }
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       arbitration = arbitration || {}
     }
 

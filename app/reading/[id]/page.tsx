@@ -21,6 +21,7 @@ export default function ReadingPage() {
     if (!params.id) return
     supabase.from('readings').select('*').eq('id', params.id).single()
       .then(({ data }) => { setReading(data); setLoading(false) })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id])
 
   const download = async (type: 'pdf' | 'audio') => {

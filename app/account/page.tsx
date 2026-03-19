@@ -35,6 +35,7 @@ export default function AccountPage() {
       setPlan((data.user.user_metadata?.plan as PlanKey) ?? 'free')
       setLoading(false)
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleSignOut() {

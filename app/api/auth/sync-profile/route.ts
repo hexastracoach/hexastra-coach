@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server'
 import { createSupabaseServer } from '@/lib/auth/supabaseServer'
 import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
 import { logger } from '@/lib/utils/logger'

@@ -9,9 +9,6 @@
 
 import type { ProfileContext } from './profileModule'
 import type { MemoryContext } from './memoryModule'
-import type { MomentType } from './timingModule'
-import type { DominantPotential } from './potentialModule'
-import type { NeurokuaResult } from './neurokuaModule'
 
 type ChatMsg = { role: 'user' | 'assistant'; content: string }
 

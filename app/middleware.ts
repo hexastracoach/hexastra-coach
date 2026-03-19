@@ -4,7 +4,6 @@ import type { NextRequest } from 'next/server'
 import type { PlanKey } from '@/types/subscription'
 import { mapDbPlanToPlanKey, downgradeIfInactive } from '@/lib/permissions/plan'
 import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
-import { logger } from '@/lib/utils/logger'
 
 const PUBLIC_PATHS = [
   '/',

@@ -6,8 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test:ks": "vitest run tests/ks",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "list:vector-docs": "node ./scripts/list-vector-store-documents.mjs"
   },
   "dependencies": {
@@ -16,7 +18,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.35.1",
     "lucide-react": "^0.577.0",
-    "next": "16.1.6",
+    "next": "^16.2.0",
     "openai": "^6.31.0",
     "react": "^19",
     "react-dom": "^19",
@@ -24,9 +26,14 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.0",
     "pnpm": "^10.32.1",
     "typescript": "^5",
     "vitest": "^4.1.0"
