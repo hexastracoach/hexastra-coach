@@ -50,6 +50,20 @@ function IconChevron({ open }: { open: boolean }) {
   )
 }
 
+function IconArrow() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path
+        d="M3.5 7H10.5M10.5 7L7.75 4.25M10.5 7L7.75 9.75"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 export default function MenuDock({
   items,
   title = 'Explorer un angle',
@@ -135,6 +149,9 @@ export default function MenuDock({
                   aria-controls={hasSubmenu ? `submenu-${item.key}` : undefined}
                 >
                   <span className="hx-menu-dock-chip-text">
+                    <span className="hx-menu-dock-chip-eyebrow">
+                      {hasSubmenu ? 'Menu' : 'Lecture directe'}
+                    </span>
                     <span className="hx-menu-dock-chip-title">{item.label}</span>
                     {item.description ? (
                       <span className="hx-menu-dock-chip-desc">{item.description}</span>
@@ -145,7 +162,11 @@ export default function MenuDock({
                     <span className="hx-menu-dock-chip-chevron">
                       <IconChevron open={isOpen} />
                     </span>
-                  ) : null}
+                  ) : (
+                    <span className="hx-menu-dock-chip-chevron is-action">
+                      <IconArrow />
+                    </span>
+                  )}
                 </button>
               </div>
 
@@ -154,6 +175,10 @@ export default function MenuDock({
                   id={`submenu-${item.key}`}
                   className="hx-menu-dock-inline-submenu"
                 >
+                  <div className="hx-menu-dock-submenu-head">
+                    <span className="hx-menu-dock-submenu-kicker">Sous-menus</span>
+                    <span className="hx-menu-dock-submenu-title">{item.label}</span>
+                  </div>
                   {item.submenu!.map((sub) => (
                     <button
                       key={sub.key}
@@ -164,6 +189,7 @@ export default function MenuDock({
                         onSelect(sub, item)
                       }}
                     >
+                      <span className="hx-menu-dock-inline-subbutton-kicker">Sous-angle</span>
                       <span className="hx-menu-dock-inline-subbutton-title">
                         {sub.label}
                       </span>
@@ -172,6 +198,10 @@ export default function MenuDock({
                           {sub.description}
                         </small>
                       ) : null}
+                      <span className="hx-menu-dock-inline-subbutton-cta">
+                        Explorer
+                        <IconArrow />
+                      </span>
                     </button>
                   ))}
                 </div>

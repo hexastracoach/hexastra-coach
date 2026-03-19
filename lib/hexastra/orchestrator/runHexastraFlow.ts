@@ -58,8 +58,9 @@ import {
   resolveScienceSubanalysisSelection,
 } from '@/lib/hexastra/orchestrator/contextualSelection'
 
-import { generateConversation } from '@/lib/hexastra/openai/generateConversation'
-import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
+import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInput'
+import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
+import type { OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
@@ -1185,6 +1186,7 @@ export async function runHexastraFlow(input: {
     const fallbackLanguage = input.language ?? detectLanguageFromMessages(normalizedMessages, 'fr')
     const fallbackPlan = normalizePlan(input.plan)
     let journeyEnabled = normalizedJourneyToggle
+    let orchestrationTrace: OrchestrationTrace | null = null
 
     logger.debug('[runHexastraFlow] normalized input', {
       plan: input.plan,
@@ -1363,6 +1365,53 @@ export async function runHexastraFlow(input: {
         ? 'chat'
         : input.requestType
 
+    const orchestrationLegacyIntent =
+      isGreeting
+        ? 'greeting'
+        : uiAction === 'open_menu'
+          ? 'menu'
+          : uiAction === 'restart_flow'
+            ? 'birth_update'
+            : latestUserMessage.trim()
+              ? 'analysis'
+              : 'conversation'
+    const orchestrationNormalized = buildNormalizedInput({
+      requestType: effectiveRequestType,
+      selectedMenuKey,
+      selectedSubmenuKey,
+      userMessage: latestUserMessage,
+      plan,
+      quotaState: 'ok',
+      birthData: normalizeBirthData(userContext.birthData),
+      language: userContext.language ?? fallbackLanguage,
+      memoryAvailable: Boolean(userContext.memory),
+      uiAction,
+      contextType: selectedContextType,
+      practitionerUsage: userContext.practitionerUsage ?? normalizedPractitionerUsage,
+      conversationId,
+      hasExplicitGuidance: Boolean(selectedMenuKey || selectedSubmenuKey || uiAction !== 'send_message'),
+      journeyEnabled,
+      messages: limitedMessages,
+    })
+    const orchestration = evaluateOrchestration({
+      normalized: orchestrationNormalized,
+      legacyIntent: orchestrationLegacyIntent,
+    })
+    const {
+      menuContract,
+      inference: orchestrationInference,
+      policy: orchestrationDecision,
+      execution: orchestrationExecution,
+      trace,
+    } = orchestration
+    orchestrationTrace = trace
+    flowLog('debug', 'orchestration trace', {
+      branch: orchestrationDecision.branch,
+      route: orchestrationDecision.effectiveRoute,
+      renderTemplate: orchestrationExecution.renderTemplate,
+      reasons: orchestrationDecision.reasonCodes,
+    })
+
     const isBirthNeeded = !isBirthComplete(userContext.birthData)
     const needsPreciseBirthContext = requiresPreciseBirthContext(latestUserMessage)
     const isPreciseBirthContextMissing =
@@ -1387,6 +1436,7 @@ export async function runHexastraFlow(input: {
           practitionerUsage: userContext.practitionerUsage ?? null,
           shouldPersistMemory: false,
           journeyEnabled,
+          orchestrationTrace,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -1419,6 +1469,7 @@ export async function runHexastraFlow(input: {
           emotionalState: null,
           timing: null,
           journeyEnabled,
+          orchestrationTrace,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -1451,6 +1502,7 @@ export async function runHexastraFlow(input: {
           journeyEnabled,
           contextFrame: 'Mode Praticien',
           clarificationQuestion: 'Choisis le numero de l axe que tu veux explorer.',
+          orchestrationTrace,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -1494,6 +1546,7 @@ export async function runHexastraFlow(input: {
           journeyEnabled,
           contextFrame: selectedMenu.label,
           clarificationQuestion: 'Choisis un sous-angle ou pose directement ta question.',
+          orchestrationTrace,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -1526,6 +1579,7 @@ export async function runHexastraFlow(input: {
           journeyEnabled,
           contextFrame: 'Analyse par science',
           clarificationQuestion: 'Choisis la science que tu veux explorer.',
+          orchestrationTrace,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -1564,6 +1618,7 @@ export async function runHexastraFlow(input: {
           journeyEnabled,
           contextFrame: activeScienceLabel ?? 'Mode Praticien',
           clarificationQuestion: 'Donne maintenant le domaine exact a analyser.',
+          orchestrationTrace,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -1607,6 +1662,7 @@ export async function runHexastraFlow(input: {
             journeyEnabled,
             contextFrame: selectedSubmenuLabel ?? 'Analyse par science',
             clarificationQuestion: 'Choisis maintenant le sous-angle a explorer.',
+            orchestrationTrace,
           },
           updatedEvolutionProfile: input.evolutionProfile ?? null,
         }
@@ -1657,6 +1713,7 @@ export async function runHexastraFlow(input: {
           clarificationQuestion:
             selectionExecutionContractPreview?.clarificationQuestion ??
             'Pose maintenant ta question dans ce cadre.',
+          orchestrationTrace,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
@@ -1833,6 +1890,7 @@ export async function runHexastraFlow(input: {
     }
 
     const selectedPromptHint =
+      menuContract?.promptHint ??
       selectionExecutionContract?.promptHint ??
       freeformContract?.promptHint ??
       selectedSubmenuPromptHint ??
@@ -1840,14 +1898,17 @@ export async function runHexastraFlow(input: {
       menuInstruction ??
       null
     const selectedOutputStructure =
+      menuContract?.outputStructure ??
       selectionExecutionContract?.outputStructure ??
       freeformContract?.outputStructure ??
       null
     const selectedContextFrame =
+      menuContract?.contextFrame ??
       selectionExecutionContract?.contextFrame ??
       freeformContract?.contextFrame ??
       null
     const selectedClarificationQuestion =
+      menuContract?.clarificationQuestion ??
       selectionExecutionContract?.clarificationQuestion ??
       freeformContract?.clarificationQuestion ??
       null
@@ -2123,6 +2184,7 @@ export async function runHexastraFlow(input: {
             submodules: ksSummary.submodules,
           },
           readingSummary: normalizedReadingSummary,
+          orchestrationTrace,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       } as HexastraApiResponse;
@@ -2142,6 +2204,7 @@ export async function runHexastraFlow(input: {
         metadata: {
           shouldPersistMemory: false,
           journeyEnabled,
+          orchestrationTrace,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       } as unknown as HexastraApiResponse;
@@ -2173,6 +2236,7 @@ export async function runHexastraFlow(input: {
       metadata: {
         shouldPersistMemory: false,
         journeyEnabled,
+        orchestrationTrace: null,
       },
       updatedEvolutionProfile: input.evolutionProfile ?? null,
     } as unknown as HexastraApiResponse

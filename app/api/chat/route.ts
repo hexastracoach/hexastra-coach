@@ -18,11 +18,13 @@ import { validateEnv } from '@/lib/utils/env'
 import { getOrCreateProfile } from '@/lib/profiles/getOrCreateProfile'
 import { generateConversation } from '@/lib/hexastra/openai/generateConversation'
 import { formatAnalysis } from '@/lib/hexastra/openai/formatAnalysis'
-import { classifyIntent } from '@/lib/hexastra/openai/classifyIntent'
 import { generateSuggestions } from '@/lib/hexastra/suggestions/generateSuggestions'
 import { getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
-import { routeUserQuery } from '@/lib/chat/queryRouter'
+import { getPlanQuotaLimit, getPlanResponseDepth, getQuotaState } from '@/lib/hexastra/orchestration/planContracts'
+import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInput'
+import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
+import type { ExecutionPlan, OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
 
 const memoryCache = new Map<string, { value: unknown; expires: number }>()
 const CACHE_TTL_MS = 10 * 60 * 1000
@@ -31,7 +33,6 @@ export const runtime = 'nodejs'
 
 type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien'
 type UsageFeature = 'chat_api'
-type ResponseDepth = 'short' | 'medium' | 'long' | 'expert'
 type ChatResponsePayload = Record<string, unknown> & {
   message?: string
   reply?: string
@@ -47,30 +48,10 @@ type ChatResponsePayload = Record<string, unknown> & {
 const SUPPORTED_LANGUAGES = ['fr', 'en', 'es', 'pt', 'de', 'it'] as const
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 
-const PLAN_LIMITS: Record<PlanKey, number | null> = {
-  free: 10,
-  essential: 60,
-  premium: null,
-  practitioner: null,
-}
-
 const REQUIRED_ENV = {
   NEXT_PUBLIC_SUPABASE_URL: {},
   NEXT_PUBLIC_SUPABASE_ANON_KEY: {},
   SUPABASE_SERVICE_ROLE_KEY: {},
-}
-
-function getResponseDepth(plan: PlanKey): ResponseDepth {
-  switch (plan) {
-    case 'free':
-    case 'essential':
-    case 'premium':
-      return 'long'
-    case 'practitioner':
-      return 'expert'
-    default:
-      return 'long'
-  }
 }
 
 function normalizeText(value: string): string {
@@ -85,6 +66,115 @@ function normalizeText(value: string): string {
 
 const DEFAULT_FALLBACK_MESSAGE = 'Je suis là. Dis-moi ce dont tu as besoin.'
 const DEFAULT_EMPTY_MENU = { visible: false, items: [] }
+
+function withTrace(payload: ChatResponsePayload, trace?: OrchestrationTrace | null): ChatResponsePayload {
+  if (!trace) return payload
+  return {
+    ...payload,
+    metadata: {
+      ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}),
+      orchestrationTrace: trace,
+    },
+  }
+}
+
+function buildGreetingBranchResponse(params: {
+  plan: PlanKey
+  birthData: BirthProfile | null
+  conversationId?: string | null
+  trace?: OrchestrationTrace | null
+}) {
+  const { plan, birthData, conversationId, trace } = params
+  const canOpenMenu = isBirthProfileComplete(birthData)
+  const greetingMenu = canOpenMenu ? getMenuForMode(getModeForPlan(plan)) : []
+  const payload = withTrace(
+    {
+      content: canOpenMenu
+        ? 'Bienvenue.\n\nJe suis HexAstra Coach.\nChaque réponse te donne une lecture claire, une mise en perspective et une action concrète.\n\nTu peux aussi mettre a jour tes donnees de naissance depuis le formulaire dans la barre de chat.\n\nQue souhaites-tu explorer ?'
+        : 'Bienvenue.\n\nJe suis HexAstra Coach.\nUn outil de lecture stratégique pour t’aider à comprendre ta situation, ton timing et la meilleure direction à prendre.\n\nPour lancer ta premiere lecture automatique, ouvre le formulaire de donnees de naissance dans la barre de chat et remplis-le une seule fois.',
+      type: 'greeting',
+      plan,
+      mode: plan,
+      conversationId: conversationId ?? randomUUID(),
+      flowState: { step: canOpenMenu ? 'menu' : 'conversation', completed: true },
+      menu: {
+        visible: canOpenMenu,
+        items: greetingMenu,
+      },
+      metadata: {
+        contextType: 'general',
+        selectedMenuKey: null,
+        selectedSubmenuKey: null,
+        intentDetected: 'greeting',
+      },
+    },
+    trace
+  )
+
+  return buildConsistentResponse(payload, {
+    type: 'greeting',
+    plan,
+    mode: plan,
+    conversationId: conversationId ?? undefined,
+    flowState: { step: canOpenMenu ? 'menu' : 'conversation', completed: true },
+    menu: {
+      visible: canOpenMenu,
+      items: greetingMenu,
+    },
+  })
+}
+
+function shouldFormatAnalysisResponse(params: {
+  plan: PlanKey
+  execution: ExecutionPlan
+  explicitGuidance: boolean
+  response: ChatResponsePayload
+}) {
+  const { plan, execution, explicitGuidance, response } = params
+  return (
+    plan !== 'free' &&
+    execution.callConversationFormatter &&
+    !explicitGuidance &&
+    response?.flowState?.step !== 'menu' &&
+    !(response?.menu?.visible) &&
+    typeof response?.message === 'string' &&
+    response.message.trim().length > 0 &&
+    !String((response?.metadata as Record<string, unknown> | undefined)?.selectedSubmenuKey ?? '').startsWith('science_') &&
+    (response?.metadata as Record<string, unknown> | undefined)?.contextType !== 'science' &&
+    !looksAlreadyStructured(response.message)
+  )
+}
+
+async function applyAnalysisResponsePolicy(params: {
+  response: ChatResponsePayload
+  plan: PlanKey
+  execution: ExecutionPlan
+  explicitGuidance: boolean
+}) {
+  const { response, plan, execution, explicitGuidance } = params
+  const shouldRephrase = shouldFormatAnalysisResponse({
+    plan,
+    execution,
+    explicitGuidance,
+    response,
+  })
+
+  if (!shouldRephrase || typeof response.message !== 'string') {
+    return response
+  }
+
+  const reformatted = await formatAnalysis(response.message)
+  if (!reformatted) return response
+
+  const withSuggestions = `${reformatted}\n\n${generateSuggestions(response.message).join('\n')}`
+
+  return {
+    ...response,
+    message: withSuggestions,
+    reply: withSuggestions,
+    content: withSuggestions,
+  }
+}
 
 function buildConsistentResponse(
   payload: ChatResponsePayload,
@@ -260,13 +350,6 @@ function detectIntentLocal(
     return 'birth_update'
   }
   return 'conversation'
-}
-
-function isWithinHexastraScope(message: string, history: ChatMessage[]) {
-  if (isReadingFollowUp(message, history)) return true
-
-  const routing = routeUserQuery(message)
-  return routing.decision === 'allowed'
 }
 
 function buildOutOfScopeResponse(plan: PlanKey, mode: string, conversationId?: string | null) {
@@ -556,7 +639,7 @@ async function resolveEffectivePlan(req: NextRequest): Promise<{ plan: PlanKey; 
 async function enforceDailyQuota(params: { req: NextRequest; userId: string | null; plan: PlanKey; feature: UsageFeature }) {
   const { req, userId, plan, feature } = params
 
-  const limit = PLAN_LIMITS[plan]
+  const limit = getPlanQuotaLimit(plan)
   if (limit === null) {
     return {
       blocked: false as const,
@@ -663,13 +746,27 @@ export async function POST(req: NextRequest) {
     const { plan: effectivePlan, userId } = await resolveEffectivePlan(req)
     log('info', 'effective plan resolved', { effectivePlan, userId })
 
-    const responseDepth = getResponseDepth(effectivePlan)
+    const responseDepth = getPlanResponseDepth(effectivePlan)
     const journeyEnabled =
       typeof (body as Record<string, unknown>).journeyEnabled === 'boolean'
         ? ((body as Record<string, unknown>).journeyEnabled as boolean)
         : false
 
     const bodyRecord = body as Record<string, unknown>
+    const normalizedBirthData = normalizeBirthData(bodyRecord.birthData)
+    const normalizedPractitionerUsage = normalizePractitionerUsage(bodyRecord.practitionerUsage)
+    const normalizedContextType = normalizeContextType(bodyRecord.contextType)
+    const normalizedUiAction = normalizeUiAction(bodyRecord.uiAction)
+    const requestedLanguage = resolveRequestedLanguage(bodyRecord, sanitizedMessages)
+    const explicitGuidance = hasExplicitGuidance(bodyRecord)
+    const requestedEvolutionProfile =
+      bodyRecord.evolutionProfile && typeof bodyRecord.evolutionProfile === 'object'
+        ? (bodyRecord.evolutionProfile as Record<string, unknown>)
+        : null
+    const requestedApiConversationId =
+      typeof bodyRecord.conversationId === 'string'
+        ? (bodyRecord.conversationId as string)
+        : null
     const requestedSelectedMenuKey =
       typeof bodyRecord.selectedMenuKey === 'string' ? (bodyRecord.selectedMenuKey as string) : null
     const requestedSelectedSubmenuKey =
@@ -683,72 +780,57 @@ export async function POST(req: NextRequest) {
     )
     log('info', 'intent detected', { intentLocal })
 
-    if (
-      intentLocal !== 'greeting' &&
-      intentLocal !== 'menu' &&
-      intentLocal !== 'birth_update' &&
-      !isWithinHexastraScope(lastUserMessage, sanitizedMessages)
-    ) {
-      log('info', 'branch chosen', { branch: 'out_of_scope' })
-      const outOfScopeResponse = buildOutOfScopeResponse(
-        effectivePlan,
-        effectivePlan,
-        requestedConversationId ?? null
-      )
-      log('info', 'response normalized', {
-        branch: 'out_of_scope',
-        ...getNormalizationDiagnostics(outOfScopeResponse),
-      })
-      return NextResponse.json(outOfScopeResponse, { status: 200 })
+    const sharedFlowInput = {
+      plan: effectivePlan,
+      responseDepth,
+      language: requestedLanguage,
+      birthData: normalizedBirthData,
+      practitionerUsage: normalizedPractitionerUsage,
+      conversationId: requestedApiConversationId,
+      messages: sanitizedMessages,
+      evolutionProfile: requestedEvolutionProfile,
+      journeyEnabled,
     }
 
-    if (intentLocal === 'greeting') {
-      log('info', 'branch chosen', { branch: 'greeting' })
-      const normalizedBirthData = normalizeBirthData((body as Record<string, unknown>).birthData)
-      const canOpenMenu = isBirthProfileComplete(normalizedBirthData)
-      const greetingMenu = canOpenMenu ? getMenuForMode(getModeForPlan(effectivePlan)) : []
-      const payload = {
-        content: canOpenMenu
-          ? 'Bienvenue.\n\nJe suis HexAstra Coach.\nChaque réponse te donne une lecture claire, une mise en perspective et une action concrète.\n\nTu peux aussi mettre a jour tes donnees de naissance depuis le formulaire dans la barre de chat.\n\nQue souhaites-tu explorer ?'
-          : 'Bienvenue.\n\nJe suis HexAstra Coach.\nUn outil de lecture stratégique pour t’aider à comprendre ta situation, ton timing et la meilleure direction à prendre.\n\nPour lancer ta premiere lecture automatique, ouvre le formulaire de donnees de naissance dans la barre de chat et remplis-le une seule fois.',
-        type: 'greeting',
+    const preQuotaEvaluation = evaluateOrchestration({
+      normalized: buildNormalizedInput({
+        requestType,
+        selectedMenuKey: requestedSelectedMenuKey,
+        selectedSubmenuKey: requestedSelectedSubmenuKey,
+        userMessage: lastUserMessage,
         plan: effectivePlan,
-        mode: effectivePlan,
-        conversationId: requestedConversationId ?? randomUUID(),
-        flowState: { step: canOpenMenu ? 'menu' : 'conversation', completed: true },
-        menu: {
-          visible: canOpenMenu,
-          items: greetingMenu,
-        },
-        metadata: {
-          contextType: 'general',
-          selectedMenuKey: null,
-          selectedSubmenuKey: null,
-          intentDetected: 'greeting',
-        },
-      }
-      const resp = buildConsistentResponse(payload, {
-        type: 'greeting',
-        plan: effectivePlan,
-        mode: effectivePlan,
-        conversationId: requestedConversationId ?? undefined,
-        flowState: { step: canOpenMenu ? 'menu' : 'conversation', completed: true },
-        menu: {
-          visible: canOpenMenu,
-          items: greetingMenu,
-        },
-      })
-      log('info', 'response normalized', {
-        branch: 'greeting',
-        ...getNormalizationDiagnostics(payload),
-      })
-      return NextResponse.json(resp, { status: 200 })
-    }
+        quotaState: 'ok',
+        birthData: normalizedBirthData,
+        language: requestedLanguage,
+        memoryAvailable: Boolean(userId),
+        uiAction: normalizedUiAction,
+        contextType: normalizedContextType,
+        practitionerUsage: normalizedPractitionerUsage,
+        conversationId: requestedApiConversationId,
+        hasExplicitGuidance: explicitGuidance,
+        journeyEnabled,
+        messages: sanitizedMessages,
+      }),
+      legacyIntent: intentLocal,
+    })
+    const {
+      menuContract,
+      inference: preQuotaInference,
+      policy: preQuotaDecision,
+      execution: preQuotaExecution,
+      trace: preQuotaTrace,
+    } = preQuotaEvaluation
 
-    const cacheKey = buildCacheKey(userId, lastUserMessage, normalizeBirthData((body as Record<string, unknown>).birthData))
+    log('info', 'orchestration pre-quota', {
+      branch: preQuotaDecision.branch,
+      route: preQuotaDecision.effectiveRoute,
+      reasons: preQuotaDecision.reasonCodes,
+    })
+
+    const cacheKey = buildCacheKey(userId, lastUserMessage, normalizedBirthData)
     const cached = getCache(cacheKey)
     if (cached) {
-      const cachedResponse = buildConsistentResponse(cached as ChatResponsePayload, {
+      const cachedResponse = buildConsistentResponse(withTrace(cached as ChatResponsePayload, preQuotaTrace), {
         plan: effectivePlan,
         mode: effectivePlan,
         conversationId: requestedConversationId ?? undefined,
@@ -762,88 +844,123 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(cachedResponse, { status: 200 })
     }
 
-    if (intentLocal === 'menu') {
-      log('info', 'branch chosen', { branch: 'menu' })
-      const menuResponse = await runHexastraFlow({
-        plan: effectivePlan,
-        responseDepth,
-        language: resolveRequestedLanguage(body as Record<string, unknown>, sanitizedMessages),
-        requestType: 'chat',
-        birthData: normalizeBirthData((body as Record<string, unknown>).birthData),
-        practitionerUsage: normalizePractitionerUsage((body as Record<string, unknown>).practitionerUsage),
-        contextType: 'general',
-        selectedMenuKey: null,
-        selectedSubmenuKey: null,
-        uiAction: 'open_menu',
-        conversationId:
-          typeof (body as Record<string, unknown>).conversationId === 'string'
-            ? ((body as Record<string, unknown>).conversationId as string)
-            : null,
-        messages: sanitizedMessages,
-        evolutionProfile:
-          (body as Record<string, unknown>).evolutionProfile &&
-          typeof (body as Record<string, unknown>).evolutionProfile === 'object'
-            ? ((body as Record<string, unknown>).evolutionProfile as Record<string, unknown>)
-            : null,
-        journeyEnabled,
-      })
-      const normalizedMenuResponse = buildConsistentResponse(menuResponse as ChatResponsePayload, {
-        type: 'menu',
-        plan: effectivePlan,
-        mode: effectivePlan,
-        conversationId: requestedConversationId ?? undefined,
-        flowState: { step: 'menu', completed: true },
-        menu: DEFAULT_EMPTY_MENU,
-      })
-      setCache(cacheKey, normalizedMenuResponse)
-      log('info', 'response normalized', {
-        branch: 'menu',
-        ...getNormalizationDiagnostics(menuResponse as ChatResponsePayload),
-      })
-      const status = normalizedMenuResponse.flowState?.step === 'error' ? 500 : 200
-      return NextResponse.json(normalizedMenuResponse, { status })
-    }
+    const preQuotaHandler = ({
+      out_of_scope: async () => {
+        log('info', 'branch chosen', { branch: 'out_of_scope' })
+        const outOfScopeResponse = withTrace(
+          buildOutOfScopeResponse(effectivePlan, effectivePlan, requestedConversationId ?? null),
+          preQuotaTrace
+        )
+        log('info', 'response normalized', {
+          branch: 'out_of_scope',
+          ...getNormalizationDiagnostics(outOfScopeResponse),
+        })
+        return NextResponse.json(outOfScopeResponse, { status: 200 })
+      },
+      greeting: async () => {
+        log('info', 'branch chosen', { branch: 'greeting' })
+        const greetingResponse = buildGreetingBranchResponse({
+          plan: effectivePlan,
+          birthData: normalizedBirthData,
+          conversationId: requestedConversationId ?? null,
+          trace: preQuotaTrace,
+        })
+        log('info', 'response normalized', {
+          branch: 'greeting',
+          ...getNormalizationDiagnostics(greetingResponse),
+        })
+        return NextResponse.json(greetingResponse, { status: 200 })
+      },
+      menu: async () => {
+        log('info', 'branch chosen', { branch: 'menu' })
+        const menuResponse = await runHexastraFlow({
+          ...sharedFlowInput,
+          requestType: 'chat',
+          contextType: 'general',
+          selectedMenuKey: null,
+          selectedSubmenuKey: null,
+          uiAction: 'open_menu',
+        })
+        const normalizedMenuResponse = buildConsistentResponse(
+          withTrace(menuResponse as ChatResponsePayload, preQuotaTrace),
+          {
+            type: 'menu',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? undefined,
+            flowState: { step: 'menu', completed: true },
+            menu: DEFAULT_EMPTY_MENU,
+          }
+        )
+        setCache(cacheKey, normalizedMenuResponse)
+        log('info', 'response normalized', {
+          branch: 'menu',
+          ...getNormalizationDiagnostics(menuResponse as ChatResponsePayload),
+        })
+        const status = normalizedMenuResponse.flowState?.step === 'error' ? 500 : 200
+        return NextResponse.json(normalizedMenuResponse, { status })
+      },
+      birth_update: async () => {
+        log('info', 'branch chosen', { branch: 'birth_update' })
+        const birthResponse = await runHexastraFlow({
+          ...sharedFlowInput,
+          requestType: 'chat',
+          contextType: 'general',
+          selectedMenuKey: null,
+          selectedSubmenuKey: null,
+          uiAction: 'restart_flow',
+        })
+        const normalizedBirthResponse = buildConsistentResponse(
+          withTrace(birthResponse as ChatResponsePayload, preQuotaTrace),
+          {
+            type: 'birth_update',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? undefined,
+            flowState: { step: 'birthdata', completed: true },
+            menu: DEFAULT_EMPTY_MENU,
+          }
+        )
+        setCache(cacheKey, normalizedBirthResponse)
+        log('info', 'response normalized', {
+          branch: 'birth_update',
+          ...getNormalizationDiagnostics(birthResponse as ChatResponsePayload),
+        })
+        const status = normalizedBirthResponse.flowState?.step === 'error' ? 500 : 200
+        return NextResponse.json(normalizedBirthResponse, { status })
+      },
+      clarification: async () => {
+        log('info', 'branch chosen', { branch: 'clarification' })
+        const clarificationResponse = await runHexastraFlow({
+          ...sharedFlowInput,
+          requestType,
+          contextType: normalizedContextType,
+          selectedMenuKey: requestedSelectedMenuKey,
+          selectedSubmenuKey: requestedSelectedSubmenuKey,
+          uiAction: normalizedUiAction,
+        })
+        const normalizedClarificationResponse = buildConsistentResponse(
+          withTrace(clarificationResponse as ChatResponsePayload, preQuotaTrace),
+          {
+            type: 'analysis',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? undefined,
+            menu: DEFAULT_EMPTY_MENU,
+          }
+        )
+        setCache(cacheKey, normalizedClarificationResponse)
+        log('info', 'response normalized', {
+          branch: 'clarification',
+          ...getNormalizationDiagnostics(clarificationResponse as ChatResponsePayload),
+        })
+        const status = normalizedClarificationResponse.flowState?.step === 'error' ? 500 : 200
+        return NextResponse.json(normalizedClarificationResponse, { status })
+      },
+    } as const)[preQuotaDecision.branch]
 
-    if (intentLocal === 'birth_update') {
-      log('info', 'branch chosen', { branch: 'birth_update' })
-      const birthResponse = await runHexastraFlow({
-        plan: effectivePlan,
-        responseDepth,
-        language: resolveRequestedLanguage(body as Record<string, unknown>, sanitizedMessages),
-        requestType: 'chat',
-        birthData: normalizeBirthData((body as Record<string, unknown>).birthData),
-        practitionerUsage: normalizePractitionerUsage((body as Record<string, unknown>).practitionerUsage),
-        contextType: 'general',
-        selectedMenuKey: null,
-        selectedSubmenuKey: null,
-        uiAction: 'restart_flow',
-        conversationId:
-          typeof (body as Record<string, unknown>).conversationId === 'string'
-            ? ((body as Record<string, unknown>).conversationId as string)
-            : null,
-        messages: sanitizedMessages,
-        evolutionProfile:
-          (body as Record<string, unknown>).evolutionProfile &&
-          typeof (body as Record<string, unknown>).evolutionProfile === 'object'
-            ? ((body as Record<string, unknown>).evolutionProfile as Record<string, unknown>)
-            : null,
-        journeyEnabled,
-      })
-      const normalizedBirthResponse = buildConsistentResponse(birthResponse as ChatResponsePayload, {
-        type: 'birth_update',
-        plan: effectivePlan,
-        mode: effectivePlan,
-        conversationId: requestedConversationId ?? undefined,
-        flowState: { step: 'birthdata', completed: true },
-        menu: DEFAULT_EMPTY_MENU,
-      })
-      setCache(cacheKey, normalizedBirthResponse)
-      log('info', 'response normalized', {
-        branch: 'birth_update',
-        ...getNormalizationDiagnostics(birthResponse as ChatResponsePayload),
-      })
-      const status = normalizedBirthResponse.flowState?.step === 'error' ? 500 : 200
-      return NextResponse.json(normalizedBirthResponse, { status })
+    if (preQuotaHandler) {
+      return await preQuotaHandler()
     }
 
     const quota = await enforceDailyQuota({
@@ -855,222 +972,218 @@ export async function POST(req: NextRequest) {
 
     log('debug', 'quota', quota as any)
 
-    if (quota.blocked && quota.limit !== null) {
-      log('warn', 'quota blocked', { userId, plan: effectivePlan, used: quota.used })
-      const quotaResponse = buildQuotaErrorResponse({
+    const postQuotaEvaluation = evaluateOrchestration({
+      normalized: buildNormalizedInput({
+        requestType,
+        selectedMenuKey: requestedSelectedMenuKey,
+        selectedSubmenuKey: requestedSelectedSubmenuKey,
+        userMessage: lastUserMessage,
         plan: effectivePlan,
-        used: quota.used,
-        limit: quota.limit,
-        resetAt: quota.resetAt,
-      })
-      log('info', 'response normalized', {
-        branch: 'quota',
-        ...getNormalizationDiagnostics(quotaResponse),
-      })
-      return NextResponse.json(
-        quotaResponse,
-        { status: 429 }
-      )
-    }
+        quotaState: getQuotaState({
+          plan: effectivePlan,
+          blocked: quota.blocked,
+          remaining: quota.remaining,
+        }),
+        birthData: normalizedBirthData,
+        language: requestedLanguage,
+        memoryAvailable: Boolean(userId),
+        uiAction: normalizedUiAction,
+        contextType: normalizedContextType,
+        practitionerUsage: normalizedPractitionerUsage,
+        conversationId: requestedApiConversationId,
+        hasExplicitGuidance: explicitGuidance,
+        journeyEnabled,
+        messages: sanitizedMessages,
+      }),
+      legacyIntent: intentLocal,
+      menuContract,
+    })
+    const {
+      inference: postQuotaInference,
+      policy: postQuotaDecision,
+      execution: postQuotaExecution,
+      trace: postQuotaTrace,
+    } = postQuotaEvaluation
 
-    if (intentLocal === 'conversation') {
-      log('info', 'branch chosen', { branch: 'conversation' })
-      try {
-        const content = await generateConversation(lastUserMessage || 'Bonjour.')
-        const convResponse = buildConsistentResponse(
-          {
-            content,
-            type: 'conversation',
+    const postQuotaHandler = ({
+      quota: async () => {
+        if (quota.limit === null) return null
+        log('warn', 'quota blocked', { userId, plan: effectivePlan, used: quota.used })
+        const quotaResponse = withTrace(
+          buildQuotaErrorResponse({
             plan: effectivePlan,
-            mode: effectivePlan,
-            conversationId: requestedConversationId ?? randomUUID(),
-            flowState: { step: 'conversation', completed: true },
-            menu: DEFAULT_EMPTY_MENU,
-          },
-          {
+            used: quota.used,
+            limit: quota.limit,
+            resetAt: quota.resetAt,
+          }),
+          postQuotaTrace
+        )
+        log('info', 'response normalized', {
+          branch: 'quota',
+          ...getNormalizationDiagnostics(quotaResponse),
+        })
+        return NextResponse.json(quotaResponse, { status: 429 })
+      },
+      conversation: async () => {
+        log('info', 'branch chosen', { branch: 'conversation' })
+        try {
+          const content = await generateConversation(lastUserMessage || 'Bonjour.')
+          const convResponse = buildConsistentResponse(
+            withTrace(
+              {
+                content,
+                type: 'conversation',
+                plan: effectivePlan,
+                mode: effectivePlan,
+                conversationId: requestedConversationId ?? randomUUID(),
+                flowState: { step: 'conversation', completed: true },
+                menu: DEFAULT_EMPTY_MENU,
+              },
+              postQuotaTrace
+            ),
+            {
+              type: 'conversation',
+              plan: effectivePlan,
+              mode: effectivePlan,
+              conversationId: requestedConversationId ?? undefined,
+              flowState: { step: 'conversation', completed: true },
+              menu: DEFAULT_EMPTY_MENU,
+            }
+          )
+          setCache(cacheKey, convResponse)
+          log('info', 'response normalized', {
+            branch: 'conversation',
+            ...getNormalizationDiagnostics({ content }),
+          })
+          return NextResponse.json(convResponse, { status: 200 })
+        } catch (error) {
+          log('warn', 'simple conversation failed, fallback local', { error: (error as Error)?.message })
+          const payload = withTrace(
+            {
+              type: 'conversation',
+              plan: effectivePlan,
+              mode: effectivePlan,
+              conversationId: requestedConversationId ?? randomUUID(),
+              flowState: { step: 'conversation', completed: true },
+              menu: DEFAULT_EMPTY_MENU,
+            },
+            postQuotaTrace
+          )
+          const convResponse = buildConsistentResponse(payload, {
             type: 'conversation',
             plan: effectivePlan,
             mode: effectivePlan,
             conversationId: requestedConversationId ?? undefined,
             flowState: { step: 'conversation', completed: true },
             menu: DEFAULT_EMPTY_MENU,
+          })
+          log('info', 'response normalized', {
+            branch: 'conversation_fallback',
+            ...getNormalizationDiagnostics(payload),
+          })
+          return NextResponse.json(convResponse, { status: 200 })
+        }
+      },
+      analysis: async () => {
+        log('info', 'branch chosen', { branch: 'analysis' })
+        const response = await runHexastraFlow({
+          ...sharedFlowInput,
+          requestType,
+          contextType: normalizedContextType,
+          selectedMenuKey: requestedSelectedMenuKey,
+          selectedSubmenuKey: requestedSelectedSubmenuKey,
+          uiAction: normalizedUiAction,
+        })
+
+        const analysisResponse = await applyAnalysisResponsePolicy({
+          response: response as ChatResponsePayload,
+          plan: effectivePlan,
+          execution: postQuotaExecution,
+          explicitGuidance,
+        })
+
+        const finalResponse = buildConsistentResponse(
+          withTrace(analysisResponse, postQuotaTrace),
+          {
+            type: 'analysis',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? undefined,
+            menu: DEFAULT_EMPTY_MENU,
           }
         )
-        setCache(cacheKey, convResponse)
-        log('info', 'response normalized', {
-          branch: 'conversation',
-          ...getNormalizationDiagnostics({ content }),
-        })
-        return NextResponse.json(convResponse, { status: 200 })
-      } catch (error) {
-        log('warn', 'simple conversation failed, fallback local', { error: (error as Error)?.message })
-        const payload = {
-          type: 'conversation',
+
+        setCache(cacheKey, finalResponse)
+
+        const enriched = enrichReadingResponse({
+          response: finalResponse as any,
           plan: effectivePlan,
-          mode: effectivePlan,
-          conversationId: requestedConversationId ?? randomUUID(),
-          flowState: { step: 'conversation', completed: true },
-          menu: DEFAULT_EMPTY_MENU,
-        }
-        const convResponse = buildConsistentResponse(payload, {
-          type: 'conversation',
+          birthDate: (finalResponse as any)?.birthData?.date ?? (body as any)?.birthData?.date,
+          solarSign: (finalResponse as any)?.birthData?.solarSign ?? (body as any)?.birthData?.solarSign,
+          contextType: finalResponse?.metadata?.contextType ?? (body as any)?.contextType,
+          domainRoute: (finalResponse as any)?.domainRoute ?? (body as any)?.domainRoute,
+          selectedMenuKey:
+            (finalResponse?.metadata as any)?.selectedMenuKey ??
+            (body as any)?.selectedMenuKey ??
+            null,
+          selectedSubmenuKey:
+            (finalResponse?.metadata as any)?.selectedSubmenuKey ??
+            (body as any)?.selectedSubmenuKey ??
+            null,
+          explicitGuidance,
+        })
+
+        const normalizedEnriched = buildConsistentResponse(enriched as ChatResponsePayload, {
+          type:
+            typeof finalResponse.type === 'string'
+              ? finalResponse.type
+              : 'analysis',
           plan: effectivePlan,
           mode: effectivePlan,
           conversationId: requestedConversationId ?? undefined,
-          flowState: { step: 'conversation', completed: true },
           menu: DEFAULT_EMPTY_MENU,
         })
+
         log('info', 'response normalized', {
-          branch: 'conversation_fallback',
-          ...getNormalizationDiagnostics(payload),
+          branch: 'analysis',
+          ...getNormalizationDiagnostics(enriched as ChatResponsePayload),
         })
-        return NextResponse.json(convResponse, { status: 200 })
-      }
-    }
-
-    const intent =
-      intentLocal === 'analysis'
-        ? await classifyIntent(lastUserMessage).catch((error) => {
-            log('warn', 'classifyIntent failed; keep intentLocal', { error })
-            return intentLocal
-          })
-        : intentLocal
-
-    if (intentLocal === 'analysis' && intent && intent !== intentLocal) {
-      log('info', 'intent classifyIntent', { intent })
-    }
-
-    log('info', 'branch chosen', { branch: 'analysis' })
-    const response = await runHexastraFlow({
-      plan: effectivePlan,
-      responseDepth,
-      language: resolveRequestedLanguage(body as Record<string, unknown>, sanitizedMessages),
-      requestType,
-      birthData: normalizeBirthData((body as Record<string, unknown>).birthData),
-      practitionerUsage: normalizePractitionerUsage((body as Record<string, unknown>).practitionerUsage),
-      contextType: normalizeContextType((body as Record<string, unknown>).contextType),
-      selectedMenuKey:
-        typeof (body as Record<string, unknown>).selectedMenuKey === 'string'
-          ? ((body as Record<string, unknown>).selectedMenuKey as string)
-          : null,
-      selectedSubmenuKey:
-        typeof (body as Record<string, unknown>).selectedSubmenuKey === 'string'
-          ? ((body as Record<string, unknown>).selectedSubmenuKey as string)
-          : null,
-      uiAction: normalizeUiAction((body as Record<string, unknown>).uiAction),
-      conversationId:
-        typeof (body as Record<string, unknown>).conversationId === 'string'
-          ? ((body as Record<string, unknown>).conversationId as string)
-          : null,
-      messages: sanitizedMessages,
-      evolutionProfile:
-        (body as Record<string, unknown>).evolutionProfile &&
-        typeof (body as Record<string, unknown>).evolutionProfile === 'object'
-          ? ((body as Record<string, unknown>).evolutionProfile as Record<string, unknown>)
-          : null,
-      journeyEnabled,
-    })
-
-    const explicitGuidance = hasExplicitGuidance(body as Record<string, unknown>)
-    const shouldRephrase =
-      effectivePlan !== 'free' &&
-      intentLocal === 'analysis' &&
-      !explicitGuidance &&
-      response?.flowState?.step !== 'menu' &&
-      !(response?.menu?.visible) &&
-      typeof response?.message === 'string' &&
-      response?.message.trim().length > 0 &&
-      !String((response?.metadata as Record<string, unknown> | undefined)?.selectedSubmenuKey ?? '').startsWith('science_') &&
-      (response?.metadata as Record<string, unknown> | undefined)?.contextType !== 'science' &&
-      !looksAlreadyStructured(response.message)
-
-    const reformatted =
-      shouldRephrase && response.message
-        ? await formatAnalysis(response.message)
-        : response.message
-
-    const withSuggestions =
-      reformatted && shouldRephrase
-        ? `${reformatted}\n\n${generateSuggestions(response.message).join('\n')}`
-        : reformatted
-
-    const finalResponse = buildConsistentResponse(
-      withSuggestions
-        ? ({ ...response, message: withSuggestions, reply: withSuggestions, content: withSuggestions } as ChatResponsePayload)
-        : (response as ChatResponsePayload),
-      {
-        type: 'analysis',
-        plan: effectivePlan,
-        mode: effectivePlan,
-        conversationId: requestedConversationId ?? undefined,
-        menu: DEFAULT_EMPTY_MENU,
-      }
-    )
-
-    setCache(cacheKey, finalResponse)
-
-    const enriched = enrichReadingResponse({
-      response: finalResponse as any,
-      plan: effectivePlan,
-      birthDate: (finalResponse as any)?.birthData?.date ?? (body as any)?.birthData?.date,
-      solarSign: (finalResponse as any)?.birthData?.solarSign ?? (body as any)?.birthData?.solarSign,
-      contextType: finalResponse?.metadata?.contextType ?? (body as any)?.contextType,
-      domainRoute: (finalResponse as any)?.domainRoute ?? (body as any)?.domainRoute,
-      selectedMenuKey:
-        (finalResponse?.metadata as any)?.selectedMenuKey ??
-        (body as any)?.selectedMenuKey ??
-        null,
-      selectedSubmenuKey:
-        (finalResponse?.metadata as any)?.selectedSubmenuKey ??
-        (body as any)?.selectedSubmenuKey ??
-        null,
-      explicitGuidance,
-    })
-
-    const normalizedEnriched = buildConsistentResponse(enriched as ChatResponsePayload, {
-      type:
-        typeof finalResponse.type === 'string'
-          ? finalResponse.type
-          : 'analysis',
-      plan: effectivePlan,
-      mode: effectivePlan,
-      conversationId: requestedConversationId ?? undefined,
-      menu: DEFAULT_EMPTY_MENU,
-    })
-
-    log('info', 'response normalized', {
-      branch: 'analysis',
-      ...getNormalizationDiagnostics(enriched as ChatResponsePayload),
-    })
-    log('info', 'return final payload', {
-      step: enriched?.flowState?.step ?? finalResponse?.flowState?.step,
-      menuVisible: enriched?.menu?.visible ?? finalResponse?.menu?.visible,
-      intentDetected: intent,
-    })
-    const finalStatus = normalizedEnriched.flowState?.step === 'error' ? 500 : 200
-    return NextResponse.json(
-      {
-        ...normalizedEnriched,
-        plan: effectivePlan,
-        mode: effectivePlan,
-        metadata: {
-          ...(((normalizedEnriched as ChatResponsePayload)?.metadata as Record<string, unknown> | undefined) ??
-            ((finalResponse as ChatResponsePayload)?.metadata as Record<string, unknown> | undefined) ??
-            {}),
-          quota: {
-            used: quota.used,
-            limit: quota.limit,
-            remaining: quota.remaining,
-            resetAt: quota.resetAt,
-            windowStartedAt: quota.windowStartedAt,
+        log('info', 'return final payload', {
+          step: enriched?.flowState?.step ?? finalResponse?.flowState?.step,
+          menuVisible: enriched?.menu?.visible ?? finalResponse?.menu?.visible,
+          intentDetected: postQuotaInference.explicitIntent,
+        })
+        const finalStatus = normalizedEnriched.flowState?.step === 'error' ? 500 : 200
+        return NextResponse.json(
+          {
+            ...normalizedEnriched,
+            plan: effectivePlan,
+            mode: effectivePlan,
+            metadata: {
+              ...(((normalizedEnriched as ChatResponsePayload)?.metadata as Record<string, unknown> | undefined) ??
+                ((finalResponse as ChatResponsePayload)?.metadata as Record<string, unknown> | undefined) ??
+                {}),
+              quota: {
+                used: quota.used,
+                limit: quota.limit,
+                remaining: quota.remaining,
+                resetAt: quota.resetAt,
+                windowStartedAt: quota.windowStartedAt,
+              },
+              responseDepth,
+              journeyEnabled,
+              intentDetected: postQuotaInference.explicitIntent,
+            },
           },
-          responseDepth,
-          journeyEnabled,
-          intentDetected: intent,
-        },
+          { status: finalStatus }
+        )
       },
-      { status: finalStatus }
-    )
+    } as const)[postQuotaDecision.branch]
+
+    if (postQuotaHandler) {
+      const postQuotaResponse = await postQuotaHandler()
+      if (postQuotaResponse) return postQuotaResponse
+    }
   } catch (error) {
     log('error', 'fatal error', { error })
     const safeErrorResponse = buildSafeErrorResponse()

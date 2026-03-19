@@ -273,6 +273,21 @@ export default function BirthDataInlineForm({
       onSubmit={handleSubmit}
       aria-label="Données de naissance"
     >
+      <div className="hx-birth-inline-head">
+        <span className="hx-birth-inline-kicker">Formulaire naissance</span>
+        <p className="hx-birth-inline-title">Renseigne les données utiles pour les lectures d&apos;HexAstra.</p>
+        <p className="hx-birth-inline-hint">
+          Le premier enregistrement complet sert de base de lecture. Ensuite, tu peux aussi enregistrer les données
+          d&apos;un proche pour des lectures croisées ou contextuelles.
+        </p>
+      </div>
+
+      <section className="hx-birth-inline-section" aria-label="Vos données de naissance">
+        <div className="hx-birth-inline-section-head">
+          <span className="hx-birth-inline-section-kicker">Profil principal</span>
+          <p className="hx-birth-inline-section-title">Tes données de naissance</p>
+        </div>
+
       <div className="hx-birth-inline-grid">
 
         {/* Prénom */}
@@ -433,17 +448,27 @@ export default function BirthDataInlineForm({
 
       </div>
 
-      <label className="hx-birth-inline-unknown" style={{ marginTop: -4 }}>
-        <input
-          type="checkbox"
-          checked={dualMode}
-          onChange={(e) => setDualMode(e.target.checked)}
-        />
-        <span>Lecture croisée : ajouter les données d'une autre personne (optionnel)</span>
-      </label>
+      </section>
+
+      <div className="hx-birth-inline-toggle-card">
+        <label className="hx-birth-inline-unknown" style={{ marginTop: 0 }}>
+          <input
+            type="checkbox"
+            checked={dualMode}
+            onChange={(e) => setDualMode(e.target.checked)}
+          />
+          <span>Lecture croisée : ajouter les données d'une autre personne (optionnel)</span>
+        </label>
+      </div>
 
       {dualMode && (
-        <div className="hx-birth-inline-grid" aria-label="Autre personne">
+        <section className="hx-birth-inline-section" aria-label="Autre personne">
+          <div className="hx-birth-inline-section-head">
+            <span className="hx-birth-inline-section-kicker">Lecture croisée</span>
+            <p className="hx-birth-inline-section-title">Données d'une autre personne</p>
+          </div>
+
+          <div className="hx-birth-inline-grid">
           <label className="hx-birth-inline-field">
             <span className="hx-birth-inline-label">Prénom (autre) <span aria-hidden="true">*</span></span>
             <input
@@ -592,9 +617,11 @@ export default function BirthDataInlineForm({
               <p className="hx-birth-time-unknown-note">{fieldError(!dualMode || !!partnerForm.birthCity.trim(), 'Ville requise.')}</p>
             )}
           </div>
-        </div>
+          </div>
+        </section>
       )}
 
+      <div className="hx-birth-inline-footer">
       <button
         type="submit"
         className="hx-birth-inline-submit"
@@ -606,6 +633,7 @@ export default function BirthDataInlineForm({
       <p className="hx-birth-time-unknown-note" style={{ marginTop: 10 }}>
         HexAstra utilise vos données de naissance pour générer une analyse personnalisée. Une heure de naissance précise améliore la qualité du résultat.
       </p>
+      </div>
     </form>
   )
 }

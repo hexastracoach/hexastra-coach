@@ -1,4 +1,5 @@
 import type { PlanKey } from '@/lib/plans'
+import type { OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
 
 export type HexastraMode = 'libre' | 'libre_avance' | 'libre_approfondi' | 'praticien'
 
@@ -145,6 +146,7 @@ export type HexastraApiResponse = {
     }
     contextFrame?: string | null
     clarificationQuestion?: string | null
+    orchestrationTrace?: OrchestrationTrace
   }
   updatedEvolutionProfile?: Record<string, unknown> | null
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_BIRTH_DATA, type BirthData } from '@/app/chat/_lib/chat'
 import { computeBootstrapStep } from '@/lib/chat/bootstrapMachine'
+import { getBootstrapMicroRequestType, resolveBootstrapUiState } from '@/lib/chat/bootstrapPolicy'
 import { buildChatPayload } from '@/lib/chat/chatPayloadBuilder'
 import { normalizeNominatimResult } from '@/lib/location/normalizeNominatimResult'
 import { normalizeOpenCageResult } from '@/lib/location/normalizeOpenCageResult'
@@ -47,6 +48,16 @@ describe('birth bootstrap and location normalization', () => {
     })
 
     expect(step).toBe('micro_profile_pending')
+  })
+
+  it('derives bootstrap UI state from a single resolver', () => {
+    const practitionerState = resolveBootstrapUiState('practitioner_usage_needed')
+    const microState = resolveBootstrapUiState('micro_year_pending')
+
+    expect(practitionerState.overlayKind).toBe('practitioner_usage')
+    expect(practitionerState.chatReady).toBe(true)
+    expect(microState.isMicroPending).toBe(true)
+    expect(getBootstrapMicroRequestType('micro_year_pending')).toBe('micro_year')
   })
 
   it('builds micro instructions with the exact welcome bootstrap endings', () => {

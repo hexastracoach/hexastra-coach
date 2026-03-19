@@ -1,5 +1,5 @@
-import { PLAN_CAPABILITIES } from '@/lib/plans'
 import type { PlanKey } from '@/lib/plans'
+import { getPlanContract } from '@/lib/hexastra/orchestration/planContracts'
 
 export type ChatMode = 'essentiel' | 'premium' | 'praticien'
 
@@ -14,24 +14,24 @@ export type Entitlements = {
 }
 
 export function getEntitlements(plan: PlanKey): Entitlements {
-  const caps = PLAN_CAPABILITIES[plan]
+  const contract = getPlanContract(plan)
 
-  const chatMode: ChatMode = caps.canUsePractitionerMode
+  const chatMode: ChatMode = contract.features.practitionerStructure
     ? 'praticien'
-    : caps.availableModes.includes('premium')
+    : contract.mode === 'libre_approfondi'
     ? 'premium'
     : 'essentiel'
 
   const maxTokens =
-    caps.analysisDepth === 'expert' ? 2000 :
-    caps.analysisDepth === 'high'   ? 1600 :
-    caps.analysisDepth === 'medium' ? 1600 : 1600
+    contract.responseDepth === 'expert' ? 2000 :
+    contract.responseDepth === 'long'   ? 1600 :
+    contract.responseDepth === 'medium' ? 1400 : 1200
 
   return {
-    canChat: caps.canUseChat,
-    canMicroReadings: true,            // all plans get micro-readings
-    canPractitionerMode: caps.canUsePractitionerMode,
-    canAskPractitionerUsage: caps.canAnalyzeForClients,
+    canChat: true,
+    canMicroReadings: contract.features.microReadings,
+    canPractitionerMode: contract.features.practitionerStructure,
+    canAskPractitionerUsage: contract.features.clientUsage,
     chatMode,
     maxTokens,
   }

@@ -30,6 +30,10 @@ import {
   computeBootstrapStep,
   isBirthDataComplete,
 } from '@/lib/chat/bootstrapMachine'
+import {
+  getBootstrapMicroRequestType,
+  resolveBootstrapUiState,
+} from '@/lib/chat/bootstrapPolicy'
 import { getEntitlements } from '@/lib/chat/entitlements'
 import { getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
@@ -462,14 +466,10 @@ export default function ChatPageClient() {
     microReadings,
     allowAutomaticMicroReadings: autoBirthIntroPending,
   })
-
-  const isMicroBootstrapPending =
-    step === 'micro_profile_pending' ||
-    step === 'micro_year_pending' ||
-    step === 'micro_month_pending'
-
-  // The composer should stay usable once the blocking bootstrap steps are over.
-  const chatStep = step === 'loading' ? 'loading' : 'conversation_ready'
+  const bootstrapUi = resolveBootstrapUiState(step)
+  const isMicroBootstrapPending = bootstrapUi.isMicroPending
+  const chatStep = bootstrapUi.chatStep
+  const pendingMicroRequestType = getBootstrapMicroRequestType(step)
 
   useEffect(() => {
     if (isBirthDataComplete(birthData)) {
@@ -1115,11 +1115,7 @@ export default function ChatPageClient() {
   }, [userPlan])
 
   useEffect(() => {
-    if (
-      step !== 'micro_profile_pending' &&
-      step !== 'micro_year_pending' &&
-      step !== 'micro_month_pending'
-    ) {
+    if (!pendingMicroRequestType) {
       return
     }
 
@@ -1130,15 +1126,8 @@ export default function ChatPageClient() {
     if (microTriggerRef.current === step) return
     microTriggerRef.current = step
 
-    const requestType: RequestType =
-      step === 'micro_profile_pending'
-        ? 'micro_profile'
-        : step === 'micro_year_pending'
-          ? 'micro_year'
-          : 'micro_month'
-
-    void triggerMicroReading(requestType)
-  }, [step, isWelcome])
+    void triggerMicroReading(pendingMicroRequestType)
+  }, [isWelcome, pendingMicroRequestType])
 
   useEffect(() => {
     if (step === 'conversation_ready') {
@@ -1821,23 +1810,12 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
       </div>
     ) : null
 
-  const bootstrapOverlay = (() => {
-    if (step === 'loading') return null
-
-    if (step === 'birthdata_missing') {
-      return null
-    }
-
-    if (step === 'practitioner_usage_needed') {
-      return (
-        <div className="hx-bootstrap-overlay">
-          <PractitionerUsageStep onSelect={handlePractitionerUsageSelect} />
-        </div>
-      )
-    }
-
-    return null
-  })()
+  const bootstrapOverlay =
+    bootstrapUi.overlayKind === 'practitioner_usage' ? (
+      <div className="hx-bootstrap-overlay">
+        <PractitionerUsageStep onSelect={handlePractitionerUsageSelect} />
+      </div>
+    ) : null
 
   const composerProps = {
     value: input,
@@ -1850,7 +1828,7 @@ Si tu veux continuer maintenant, tu peux passer Ã  Essentiel.`,
     onRemoveAttach: () => setAttachedFile(null),
     onBirthFormOpen: () => setShowInlineBirthForm((v) => !v),
     highlightBirth: isWelcome && !isBirthDataComplete(birthData),
-    disabled: chatStep !== 'conversation_ready' || isMicroBootstrapPending || isLimitReached || isTyping,
+    disabled: !bootstrapUi.chatReady || isMicroBootstrapPending || isLimitReached || isTyping,
   }
 
   return (
