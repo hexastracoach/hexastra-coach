@@ -1,6 +1,6 @@
 import type { BirthData } from '@/app/chat/_lib/chat'
 import type { MicroReadings } from './bootstrapTypes'
-import { MICRO_READINGS_STORAGE_KEY } from './bootstrapTypes'
+import { BIRTH_AUTO_INTRO_STORAGE_KEY, MICRO_READINGS_STORAGE_KEY } from './bootstrapTypes'
 import { birthDataProfileKey, currentYearKey, currentMonthKey } from './bootstrapMachine'
 
 export function loadMicroReadings(): MicroReadings {
@@ -61,4 +61,20 @@ export function resetMicroReadings(): MicroReadings {
   const empty: MicroReadings = { profileKey: null, yearKey: null, monthKey: null }
   persist(empty)
   return empty
+}
+
+export function loadBirthAutoIntroCompleted(): boolean {
+  try {
+    return localStorage.getItem(BIRTH_AUTO_INTRO_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function markBirthAutoIntroCompleted(): void {
+  try {
+    localStorage.setItem(BIRTH_AUTO_INTRO_STORAGE_KEY, '1')
+  } catch {
+    // noop
+  }
 }

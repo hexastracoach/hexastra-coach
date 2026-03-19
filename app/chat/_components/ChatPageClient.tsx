@@ -35,9 +35,12 @@ import { getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import {
   loadMicroReadings,
+  loadBirthAutoIntroCompleted,
+  markBirthAutoIntroCompleted,
   markProfileDone,
   markYearDone,
   markMonthDone,
+  resetMicroReadings,
 } from '@/lib/chat/microReadingScheduler'
 import {
   buildChatPayload,
@@ -124,17 +127,23 @@ function getWelcomeContent(language: string) {
       return `Hello.
 
 I'm HexAstra Coach.
-I'm here to help you understand your situation, your timing, and the most useful direction to take.`
+I'm here to help you understand your situation, your timing, and the most useful direction to take.
+
+To launch your first automatic reading, open the birth data form in the chat bar and fill it in once.`
     case 'es':
       return `Hola.
 
 Soy HexAstra Coach.
-Estoy aqui para ayudarte a comprender tu situacion, tu timing y la direccion mas util a seguir.`
+Estoy aqui para ayudarte a comprender tu situacion, tu timing y la direccion mas util a seguir.
+
+Para lanzar tu primera lectura automatica, abre el formulario de datos de nacimiento en la barra de chat y completalo una vez.`
     default:
       return `Bonjour.
 
 Je suis HexAstra Coach.
-Un outil de lecture strategique pour t'aider a comprendre ta situation, ton timing et la meilleure direction a prendre.`
+Un outil de lecture strategique pour t'aider a comprendre ta situation, ton timing et la meilleure direction a prendre.
+
+Pour lancer ta premiere lecture automatique, ouvre le formulaire de donnees de naissance dans la barre de chat et remplis-le une seule fois.`
   }
 }
 
@@ -256,7 +265,7 @@ function buildMenuSelectionRequest(item: HexastraMenuItem, parent?: HexastraMenu
   const targetLabel = parent ? item.label : null
   const contextLabel = targetLabel ? `${parentLabel} -> ${targetLabel}` : parentLabel
 
-  return `Je veux une lecture ${contextLabel} à partir de mes données enregistrées. Donne-moi directement le bilan ou l'analyse utile, sans me redemander de décrire mon état sauf si c'est indispensable.`
+  return `Contexte choisi : ${contextLabel}. N ouvre pas encore de lecture. Garde simplement cet angle comme cadre, puis demande-moi ma vraie question avant d analyser.`
 }
 
 function buildMenuSelectionDisplay(item: HexastraMenuItem, parent?: HexastraMenuItem) {
@@ -422,6 +431,8 @@ export default function ChatPageClient() {
     yearKey: null,
     monthKey: null,
   })
+  const [birthAutoIntroCompleted, setBirthAutoIntroCompleted] = useState(false)
+  const [autoBirthIntroPending, setAutoBirthIntroPending] = useState(false)
   const [showInlineBirthForm, setShowInlineBirthForm] = useState(false)
 
   const [evolutionProfile, setEvolutionProfile] = useState<UserEvolutionProfile | null>(null)
@@ -449,6 +460,7 @@ export default function ChatPageClient() {
     practitionerUsage,
     birthData,
     microReadings,
+    allowAutomaticMicroReadings: autoBirthIntroPending,
   })
 
   const isMicroBootstrapPending =
@@ -530,7 +542,9 @@ export default function ChatPageClient() {
     assistantAskedForBirthData(lastAssistantMessage) && pendingReadingRequest.trim().length > 0
   const birthSubmitLabel = shouldResumeAfterBirthSave
     ? 'Envoyer mes données et reprendre ma demande ->'
-    : 'Enregistrer mes données ->'
+    : birthAutoIntroCompleted
+      ? 'Enregistrer ces données pour mes prochaines lectures ->'
+      : "Enregistrer et lancer ma lecture d'accueil ->"
   const shouldShowMenuDock =
     chatStep === 'conversation_ready' &&
     menuItems.length > 0 &&
@@ -1003,6 +1017,26 @@ export default function ChatPageClient() {
   }, [])
 
   useEffect(() => {
+    const storedCompleted = loadBirthAutoIntroCompleted()
+    if (storedCompleted) {
+      setBirthAutoIntroCompleted(true)
+      return
+    }
+
+    try {
+      const storedBirthData = localStorage.getItem(STORAGE_KEYS.birthData)
+      if (!storedBirthData) return
+      const parsed = JSON.parse(storedBirthData) as BirthData
+      if (parsed && typeof parsed === 'object' && isBirthDataComplete(mergeBirthData(parsed))) {
+        setBirthAutoIntroCompleted(true)
+        markBirthAutoIntroCompleted()
+      }
+    } catch {
+      // noop
+    }
+  }, [])
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem(PRACTITIONER_USAGE_KEY)
       if (stored === 'personal' || stored === 'client') {
@@ -1109,8 +1143,13 @@ export default function ChatPageClient() {
   useEffect(() => {
     if (step === 'conversation_ready') {
       forceMicroBootstrapRef.current = false
+      if (autoBirthIntroPending) {
+        setAutoBirthIntroPending(false)
+        setBirthAutoIntroCompleted(true)
+        markBirthAutoIntroCompleted()
+      }
     }
-  }, [step])
+  }, [autoBirthIntroPending, step])
 
   useEffect(() => {
     return () => {
@@ -1138,16 +1177,27 @@ export default function ChatPageClient() {
     } catch {}
   }, [])
 
-    const handleBirthDataSave = useCallback(
+  const appendBirthDataSavedMessage = useCallback((content: string) => {
+    setMessages((prev) => {
+      const base = prev[0]?.id === 'welcome' ? [] : prev
+      return [
+        ...base,
+        {
+          id: `${Date.now()}-birth-saved`,
+          role: 'assistant' as const,
+          content,
+          created_at: new Date().toISOString(),
+        },
+      ]
+    })
+  }, [])
+
+  const handleBirthDataSave = useCallback(
     (next: BirthData, partnerNext: BirthData) => {
       const normalized = mergeBirthData(next)
       const normalizedPartner = mergeBirthData(partnerNext)
       handleBirthDataChange(normalized)
       handlePartnerBirthDataChange(normalizedPartner)
-
-      const reset = loadMicroReadings()
-      setMicroReadings({ ...reset, profileKey: null })
-      microTriggerRef.current = null
 
       if (normalized.firstName) {
         setEvolutionProfile((prev) => {
@@ -1168,19 +1218,6 @@ export default function ChatPageClient() {
       if (normalized.birthCity) parts.push(`à ${normalized.birthCity}`)
       if (normalized.birthCountryName) parts.push(normalized.birthCountryName)
 
-      if (parts.length) {
-        if (shouldResumeAfterBirthSave) {
-          void sendStructuredAction({
-            message: `Mes données de naissance sont maintenant enregistrées (${parts.join(', ')}). Reprends ma demande précédente et fais la lecture demandée : ${pendingReadingRequest}`,
-            displayMessage: 'Mes données de naissance sont enregistrées. Reprends ma demande précédente.',
-            contextType: activeContextType,
-            uiAction: 'restart_flow',
-          })
-        } else {
-          forceMicroBootstrapRef.current = true
-        }
-      }
-
       const partnerParts: string[] = []
       if (normalizedPartner.firstName) partnerParts.push(`prénom ${normalizedPartner.firstName}`)
       if (normalizedPartner.birthDate) partnerParts.push(`né(e) le ${normalizedPartner.birthDate}`)
@@ -1192,16 +1229,45 @@ export default function ChatPageClient() {
       if (normalizedPartner.birthCity) partnerParts.push(`à ${normalizedPartner.birthCity}`)
       if (normalizedPartner.birthCountryName) partnerParts.push(normalizedPartner.birthCountryName)
 
-      if (partnerParts.length) {
+      const hasPrimaryBirthData = isBirthDataComplete(normalized)
+      const shouldRunInitialAutoReading =
+        hasPrimaryBirthData && !birthAutoIntroCompleted && !shouldResumeAfterBirthSave
+
+      if (parts.length && shouldResumeAfterBirthSave) {
+        setBirthAutoIntroCompleted(true)
+        setAutoBirthIntroPending(false)
+        markBirthAutoIntroCompleted()
         void sendStructuredAction({
-          message: `Lecture croisée — données de l'autre personne mises à jour : ${partnerParts.join(', ')}.`,
+          message: `Mes données de naissance sont maintenant enregistrées (${parts.join(', ')}). Reprends ma demande précédente et fais la lecture demandée : ${pendingReadingRequest}`,
+          displayMessage: 'Mes données de naissance sont enregistrées. Reprends ma demande précédente.',
           contextType: activeContextType,
           uiAction: 'restart_flow',
         })
+        return
+      }
+
+      if (shouldRunInitialAutoReading) {
+        setMicroReadings(resetMicroReadings())
+        microTriggerRef.current = null
+        forceMicroBootstrapRef.current = true
+        setAutoBirthIntroPending(true)
+        return
+      }
+
+      if (parts.length || partnerParts.length) {
+        forceMicroBootstrapRef.current = false
+        setAutoBirthIntroPending(false)
+        appendBirthDataSavedMessage(
+          partnerParts.length > 0
+            ? 'Les données de naissance sont enregistrées. HexAstra pourra les utiliser pour tes prochaines lectures, pour toi comme pour un proche.'
+            : 'Tes données de naissance sont enregistrées. HexAstra pourra les utiliser pour tes prochaines lectures.'
+        )
       }
     },
     [
       activeContextType,
+      appendBirthDataSavedMessage,
+      birthAutoIntroCompleted,
       handleBirthDataChange,
       handlePartnerBirthDataChange,
       pendingReadingRequest,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { adjustResponseDepth } from '@/lib/chat/adaptiveDepthEngine'
+import { moderateMessage } from '@/lib/chat/conversationLayer'
 import { generateContextualSuggestions } from '@/lib/hexastra/response/contextualSuggestions'
 import { enrichReadingResponse } from '@/lib/hexastra/response/enrichReadingResponse'
 import { buildSystemPrompt } from '@/lib/hexastra/prompts/buildSystemPrompt'
@@ -14,6 +15,10 @@ describe('render style controls', () => {
     })
 
     expect(reply).toBe('Salut, oui ca va.')
+  })
+
+  it('does not block short numeric choices used in guided flows', () => {
+    expect(moderateMessage('3')).toBe('SAFE')
   })
 
   it('does not generate automatic contextual suggestions for the free plan', () => {

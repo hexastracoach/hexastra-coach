@@ -106,10 +106,14 @@ function inferSubtheme(message: string, theme: string) {
 
 function inferScience(message: string, domainRoute: DomainRoute) {
   const text = normalizeText(message)
+  const refersToHumanDesign =
+    text.includes('human design') ||
+    text.includes('porteum') ||
+    (/\bhd\b/i.test(text) && /(porte|portes|canal|canaux|centre|centres|profil|autorite|strategie)/i.test(text))
 
   if (text.includes('neurokua')) return 'neurokua'
   if (text.includes('astrologie') || text.includes('astrolex') || text.includes('theme natal') || text.includes('theme astral')) return 'astrolex'
-  if (text.includes('human design') || text.includes('porteum')) return 'human_design'
+  if (refersToHumanDesign) return 'human_design'
   if (text.includes('numerologie') || text.includes('triangle') || text.includes('numeris')) return 'numerologie'
   if (text.includes('ennea')) return 'enneatype'
   if (text.includes('kua')) return domainRoute === 'gps_kua' ? 'kua' : 'kua'

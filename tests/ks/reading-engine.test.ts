@@ -45,6 +45,17 @@ describe('HexAstra reading engine', () => {
     expect(reading.keyRisk).toContain('forcer')
   })
 
+  it('detects Human Design when the user says HD with Human Design terms', () => {
+    const reading = generateHexastraReading({
+      latestUserMessage: 'Donne moi mes portes en HD',
+      domainRoute: 'science',
+      contextType: 'general',
+      practitionerUsage: 'self',
+    })
+
+    expect(reading.detectedScience).toBe('human_design')
+  })
+
   it('uses practitioner structure when analysis is for a client', () => {
     const reading = generateHexastraReading({
       latestUserMessage: 'Analyse professionnelle pour un client sur une decision',

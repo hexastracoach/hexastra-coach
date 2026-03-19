@@ -13,7 +13,7 @@ type Props = {
 }
 
 async function searchCities(query: string): Promise<NormalizedPlace[]> {
-  if (query.trim().length < 3) return []
+  if (query.trim().length < 2) return []
   try {
     const res = await fetch(`/api/locations/search?q=${encodeURIComponent(query)}`)
     if (!res.ok) return []

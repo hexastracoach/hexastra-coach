@@ -1,10 +1,10 @@
 import type { BirthData } from '@/app/chat/_lib/chat'
-import type { PlanKey } from '@/lib/plans'
-import type { PractitionerUsage } from './bootstrapTypes'
-import type { UserEvolutionProfile } from '@/types/evolution'
-import { buildPlanApiContext } from '@/lib/plans'
-import { getEntitlements } from './entitlements'
 import type { ContextType, UiAction } from '@/lib/hexastra/types'
+import { buildPlanApiContext } from '@/lib/plans'
+import type { PlanKey } from '@/lib/plans'
+import type { UserEvolutionProfile } from '@/types/evolution'
+import { getEntitlements } from './entitlements'
+import type { PractitionerUsage } from './bootstrapTypes'
 
 export type RequestType = 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
 
@@ -63,18 +63,47 @@ function toApiBirthData(bd: BirthData): ApiBirthData {
 }
 
 function microReadingInstruction(requestType: RequestType, bd: BirthData): string | null {
-  const name = bd.firstName?.trim() || 'l\'utilisateur'
+  const name = bd.firstName?.trim() || "l'utilisateur"
 
   if (requestType === 'micro_profile') {
-    return `[INSTRUCTION MICRO-PROFIL — GÉNÉRER MAINTENANT]\nGénère le Micro-Profil pour ${name} selon la structure HexAstra : essence, fonctionnement, sensibilité, force, vigilance. Format : 6-10 lignes. Aucune question.`
+    return `[INSTRUCTION MICRO-PROFIL - GENERER MAINTENANT]
+Genere le Micro-Profil pour ${name}.
+Contraintes obligatoires :
+- 6 a 10 lignes, fluides, humaines, non techniques, probabilistes.
+- Eviter la formulation "Tu es".
+- Preferer des formulations comme "Ton fonctionnement naturel semble..." ou "Tu as tendance a...".
+- Decrire le fonctionnement de base, la sensibilite dominante, l'atout principal, la vigilance et l'equilibre.
+- Finir exactement par :
+Cette lecture decrit ton fonctionnement de base.
+Nous pouvons maintenant explorer ta situation actuelle.
+- Aucune question.`.trim()
   }
+
   if (requestType === 'micro_year') {
     const year = new Date().getFullYear()
-    return `[INSTRUCTION MICRO-ANNÉE — GÉNÉRER MAINTENANT]\nGénère la Micro-Année ${year} pour ${name} selon la structure HexAstra : phase, mouvement, opportunité, vigilance, attitude optimale. Format : 5-8 lignes. Aucune question.`
+    return `[INSTRUCTION MICRO-ANNEE - GENERER MAINTENANT]
+Genere la Micro-Annee ${year} pour ${name}.
+Contraintes obligatoires :
+- 5 a 8 lignes, strategiques, encourageantes, non techniques, probabilistes.
+- Decrire la phase, le mouvement, l'opportunite, la vigilance et l'attitude juste.
+- Finir exactement par :
+Ce cycle donne le contexte de ton annee.
+Explorons maintenant ta situation actuelle.
+- Aucune question.`.trim()
   }
+
   if (requestType === 'micro_month') {
-    return `[INSTRUCTION MICRO-MOIS — GÉNÉRER MAINTENANT]\nGénère le Micro-Mois pour ${name} selon la structure HexAstra : thème principal, favorable, vigilance, conseil clé. Format : 2-4 lignes. Puis prépare la transition vers le menu.`
+    return `[INSTRUCTION MICRO-MOIS - GENERER MAINTENANT]
+Genere le Micro-Mois pour ${name}.
+Contraintes obligatoires :
+- 2 a 4 lignes, directes, utiles, non techniques, probabilistes.
+- Decrire le theme principal du mois, le point favorable, la vigilance et le conseil cle.
+- Puis ajouter exactement cette transition finale :
+Ton profil, ton annee et ton contexte actuel sont maintenant poses.
+Que souhaites-tu explorer ?
+- Aucune question supplementaire.`.trim()
   }
+
   return null
 }
 

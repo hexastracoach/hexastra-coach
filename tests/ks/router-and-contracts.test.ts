@@ -18,6 +18,10 @@ describe('KS routing and contracts', () => {
     expect(classifyQuery('Fais-moi une lecture Astrolex')).toBe('science')
   })
 
+  it('routes HD gate questions to science when HD clearly means Human Design', () => {
+    expect(classifyQuery('Quelles sont mes portes en HD ?')).toBe('science')
+  })
+
   it('routes Kua orientation requests to gps_kua', () => {
     expect(classifyQuery('Je veux une lecture Kua pour mon orientation')).toBe('gps_kua')
   })
@@ -44,5 +48,31 @@ describe('KS routing and contracts', () => {
       expect.arrayContaining(['KS.Planetarium', 'KS.Domus', 'KS.Aspectum', 'KS.AethericMap'])
     )
     expect(contract?.submoduleContracts.some((entry) => entry.key === 'KS.Planetarium')).toBe(true)
+  })
+
+  it('exposes a Porteum selection contract without the old visible four-step HD structure', () => {
+    const contract = getKsSelectionExecutionContract('science_porteum')
+
+    expect(contract).not.toBeNull()
+    expect(contract?.modules).toContain('KS.PORTEUM.V1')
+    expect(contract?.submodules).toEqual(
+      expect.arrayContaining(['KS.TypeProfile', 'KS.ChannelMap', 'KS.GateMap', 'KS.AuthorityStrategy'])
+    )
+    expect(contract?.outputStructure).toContain('Narration fluide Human Design')
+    expect(contract?.outputStructure).not.toContain('Fonctionnement naturel -> zone sensible -> bon reflexe -> ajustement')
+  })
+
+  it('exposes focused subscience contracts for Human Design gates and Astro synastry', () => {
+    const gatesContract = getKsSelectionExecutionContract('science_porteum_gates')
+    const synastryContract = getKsSelectionExecutionContract('science_astrolex_synastry')
+
+    expect(gatesContract?.label).toBe('Portes')
+    expect(gatesContract?.submodules).toEqual(['KS.GateMap'])
+    expect(gatesContract?.promptHint).toContain('portes actives')
+
+    expect(synastryContract?.label).toBe('Synastrie')
+    expect(synastryContract?.submodules).toEqual(
+      expect.arrayContaining(['KS.Planetarium', 'KS.Aspectum', 'KS.Synastria'])
+    )
   })
 })

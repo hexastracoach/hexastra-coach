@@ -1,5 +1,6 @@
 import type { DomainRoute } from '@/lib/hexastra/types'
 import { getKsSubmoduleContracts, type KsSubmoduleContract } from './moduleRegistry'
+import { SCIENCE_SUBANALYSIS_LIST } from '@/lib/hexastra/orchestrator/contextualSelection'
 
 export const KS_EXECUTION_STAGES = [
   'interface_utilisateur',
@@ -16,6 +17,7 @@ type KsDomainConfig = {
 }
 
 type KsSelectionConfig = {
+  label?: string
   modules: string[]
   narrativeContract: string
   promptHint?: string
@@ -27,6 +29,7 @@ type KsSelectionConfig = {
 }
 
 export type KsExecutionContract = {
+  label?: string
   modules: string[]
   narrativeContract: string
   promptHint?: string
@@ -204,7 +207,8 @@ const KS_SELECTION_REGISTRY: Record<string, KsSelectionConfig> = {
     modules: ['KS.PORTEUM.V1', 'KS.ChannelMap', 'KS.PolarityMap', 'KS.SENTINEL'],
     narrativeContract:
       'Lire le fonctionnement Human Design, les appuis, les centres sensibles, les profils et la logique de decision.',
-    outputStructure: 'Fonctionnement naturel -> zone sensible -> bon reflexe -> ajustement',
+    outputStructure:
+      'Narration fluide Human Design centree sur les centres, les canaux, les portes, le profil, l autorite et la strategie, sans titres visibles automatiques.',
     contextFrame:
       "Science Human Design centree sur le fonctionnement reel, les centres d'appui, les canaux, les portes, les profils et la maniere optimale de decider.",
     clarificationQuestion:
@@ -302,6 +306,22 @@ const KS_SELECTION_REGISTRY: Record<string, KsSelectionConfig> = {
       'Veux-tu une fusion complete generale, ou une fusion appliquee a une question ou un domaine precis ?',
     executionStrategy: 'api_first',
   },
+  ...Object.fromEntries(
+    SCIENCE_SUBANALYSIS_LIST.map((entry) => [
+      entry.key,
+      {
+        label: entry.label,
+        modules: entry.modules,
+        narrativeContract: `Traiter ${entry.label} comme un angle focalise qui sert de contexte actif avant la lecture, puis repondre dans ce cadre sans perdre la science de reference.`,
+        promptHint: entry.promptHint,
+        outputStructure: entry.outputStructure,
+        contextFrame: entry.contextFrame,
+        clarificationQuestion: entry.clarificationQuestion,
+        submodules: entry.submodules,
+        executionStrategy: entry.executionStrategy,
+      } satisfies KsSelectionConfig,
+    ]),
+  ),
 }
 
 export function getKsDomainConfig(domain: DomainRoute): KsDomainConfig {

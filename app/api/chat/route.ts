@@ -177,7 +177,7 @@ function isReadingFollowUp(message: string, history: ChatMessage[]): boolean {
 
   const assistantNorm = normalizeText(lastAssistantMessage)
   return (
-    /(signature de naissance|axes dominants|orientation actuelle|lecture|theme natal|theme astral|maison 1|maison i|oppos[ée]e|astrol|neurokua|forces|vigilances|ce qui se joue|ce qui compte|direction|action concrete)/i.test(
+    /(signature de naissance|axes dominants|orientation actuelle|lecture|theme natal|theme astral|maison 1|maison i|oppos[ée]e|astrol|neurokua|human design|porteum|portes|canaux|centres|autorite|strategie|forces|vigilances|ce qui se joue|ce qui compte|direction|action concrete)/i.test(
       assistantNorm
     ) ||
     looksAlreadyStructured(lastAssistantMessage)
@@ -196,6 +196,20 @@ function isContextualFlowCommand(
   const hasActiveSelection = Boolean(selectedMenuKey || selectedSubmenuKey)
   const isShortChoice = /^\d{1,2}$/.test(norm) || /^niveau\s*\d+$/.test(norm)
   const isCompositeChoice = /^\d{1,2}\s*(et|&|\+|puis|then)\s*\d{1,2}$/.test(norm)
+  const isActiveScienceFollowUp =
+    hasActiveSelection &&
+    /(\bhd\b|human design|porteum|portes?|canaux?|centres?|profil|autorite|strategie|astrologie|astrolex|maisons?|aspects?|synastrie|geo astrologie|neurokua|baseline|balance|overload|recalibration|numerologie|enneagramme|kua)/.test(
+      norm
+    )
+  const isActiveContextQuestion =
+    hasActiveSelection &&
+    (
+      message.includes('?') ||
+      /\b(quels?|quelle?s?|comment|pourquoi|est ce|peux tu|peut tu|donne moi|fais moi|analyse|explique|dis moi|pour moi|sur moi|applique|regarde|parle moi|montre moi)\b/.test(
+        norm
+      ) ||
+      norm.split(' ').length >= 4
+    )
   const isModeSwitch =
     norm === 'mode praticien' ||
     norm === 'menu praticien' ||
@@ -210,6 +224,8 @@ function isContextualFlowCommand(
     norm === 'redonne moi les science'
 
   if (isModeSwitch) return true
+  if (isActiveScienceFollowUp) return true
+  if (isActiveContextQuestion) return true
   if (!isShortChoice && !isCompositeChoice) return false
 
   const lastAssistantMessage = [...history].reverse().find((entry) => entry.role === 'assistant')?.content ?? ''
@@ -233,7 +249,7 @@ function detectIntentLocal(
   if (/(menu|angle|angles|option|choix|navigation)/.test(norm)) return 'menu'
   if (isContextualFlowCommand(message, history, selectedMenuKey, selectedSubmenuKey)) return 'analysis'
   if (isReadingFollowUp(message, history)) return 'analysis'
-  if (/(profil|analyse|lecture|theme|thème|astral|natal|astro|relation|travail|periode|période|decision|décision|blocage|question|hexastra|neurokua|kua|etat du jour|état du jour)/.test(norm)) {
+  if (/(profil|analyse|lecture|theme|thème|astral|natal|astro|human design|porteum|\bhd\b|porte|portes|canal|canaux|centre|centres|autorite|strategie|relation|travail|periode|période|decision|décision|blocage|question|hexastra|neurokua|kua|etat du jour|état du jour)/.test(norm)) {
     return 'analysis'
   }
   if (
@@ -693,8 +709,8 @@ export async function POST(req: NextRequest) {
       const greetingMenu = canOpenMenu ? getMenuForMode(getModeForPlan(effectivePlan)) : []
       const payload = {
         content: canOpenMenu
-          ? 'Bienvenue.\n\nJe suis HexAstra Coach.\nChaque réponse te donne une lecture claire, une mise en perspective et une action concrète.\n\nQue souhaites-tu explorer ?'
-          : 'Bienvenue.\n\nJe suis HexAstra Coach.\nUn outil de lecture stratégique pour t’aider à comprendre ta situation, ton timing et la meilleure direction à prendre.',
+          ? 'Bienvenue.\n\nJe suis HexAstra Coach.\nChaque réponse te donne une lecture claire, une mise en perspective et une action concrète.\n\nTu peux aussi mettre a jour tes donnees de naissance depuis le formulaire dans la barre de chat.\n\nQue souhaites-tu explorer ?'
+          : 'Bienvenue.\n\nJe suis HexAstra Coach.\nUn outil de lecture stratégique pour t’aider à comprendre ta situation, ton timing et la meilleure direction à prendre.\n\nPour lancer ta premiere lecture automatique, ouvre le formulaire de donnees de naissance dans la barre de chat et remplis-le une seule fois.',
         type: 'greeting',
         plan: effectivePlan,
         mode: effectivePlan,
@@ -957,12 +973,15 @@ export async function POST(req: NextRequest) {
 
     const explicitGuidance = hasExplicitGuidance(body as Record<string, unknown>)
     const shouldRephrase =
+      effectivePlan !== 'free' &&
       intentLocal === 'analysis' &&
       !explicitGuidance &&
       response?.flowState?.step !== 'menu' &&
       !(response?.menu?.visible) &&
       typeof response?.message === 'string' &&
       response?.message.trim().length > 0 &&
+      !String((response?.metadata as Record<string, unknown> | undefined)?.selectedSubmenuKey ?? '').startsWith('science_') &&
+      (response?.metadata as Record<string, unknown> | undefined)?.contextType !== 'science' &&
       !looksAlreadyStructured(response.message)
 
     const reformatted =

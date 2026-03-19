@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { normalizeOpenCageResult, type NormalizedPlace } from '@/lib/location/normalizeOpenCageResult'
-import { formatLocationLabel } from '@/lib/location/formatLocationLabel'
+import { normalizeNominatimResult } from '@/lib/location/normalizeNominatimResult'
 import {
   getCached,
   setCache,
@@ -18,7 +18,21 @@ type LocationSearchResponse = {
   cached?: boolean
 }
 
-const MIN_LEN = 3
+const MIN_LEN = 2
+
+function scorePlaceMatch(place: NormalizedPlace, query: string): number {
+  const normalizedQuery = normalizeKey(query)
+  const city = normalizeKey(place.city)
+  const label = normalizeKey(place.label)
+
+  if (city === normalizedQuery) return 120
+  if (label === normalizedQuery) return 110
+  if (city.startsWith(normalizedQuery)) return 100
+  if (label.startsWith(normalizedQuery)) return 90
+  if (city.includes(normalizedQuery)) return 80
+  if (label.includes(normalizedQuery)) return 70
+  return 0
+}
 
 async function fetchOpenCage(query: string, country?: string): Promise<NormalizedPlace[]> {
   const key = process.env.OPENCAGE_API_KEY
@@ -29,6 +43,7 @@ async function fetchOpenCage(query: string, country?: string): Promise<Normalize
     url.searchParams.set('limit', '10')
     url.searchParams.set('no_annotations', '1')
     url.searchParams.set('pretty', '0')
+    url.searchParams.set('language', 'en')
     if (country) url.searchParams.set('countrycode', country.toLowerCase())
 
     const res = await fetch(url.toString(), { next: { revalidate: 0 } })
@@ -45,51 +60,18 @@ async function fetchOpenCage(query: string, country?: string): Promise<Normalize
   url.searchParams.set('format', 'json')
   url.searchParams.set('limit', '10')
   url.searchParams.set('addressdetails', '1')
-  url.searchParams.set('featuretype', 'city')
+  url.searchParams.set('namedetails', '1')
+  url.searchParams.set('dedupe', '1')
   if (country) url.searchParams.set('countrycodes', country.toLowerCase())
 
   const res = await fetch(url.toString(), {
-    headers: { 'Accept-Language': 'fr', 'User-Agent': 'HexAstra-Coach/1.0' },
+    headers: { 'Accept-Language': 'fr,en', 'User-Agent': 'HexAstra-Coach/1.0' },
     next: { revalidate: 0 },
   })
   if (!res.ok) return []
   const json = await res.json()
   return (json as any[])
-    .map((r: any): NormalizedPlace => {
-      const addr = r.address || {}
-      const city =
-        addr.city ||
-        addr.town ||
-        addr.village ||
-        addr.municipality ||
-        addr.hamlet ||
-        addr.locality ||
-        ''
-      const postalCode = addr.postcode || ''
-      const region =
-        addr.state ||
-        addr.region ||
-        addr.county ||
-        addr.province ||
-        addr.state_district ||
-        ''
-      const countryName = addr.country || ''
-      const label = formatLocationLabel({
-        city,
-        postalCode,
-        region,
-        country: countryName,
-      })
-      return {
-        city,
-        postalCode: postalCode || undefined,
-        region: region || undefined,
-        country: countryName,
-        lat: Number(r.lat),
-        lng: Number(r.lon),
-        label,
-      }
-    })
+    .map((r: any): NormalizedPlace => normalizeNominatimResult(r))
     .filter((p) => p.city && p.country)
 }
 
@@ -131,7 +113,10 @@ export async function GET(req: Request) {
       fresh.reduce((map, place) => map.set(normalizeKey(place.label), place), new Map<string, NormalizedPlace>())
         .values()
     )
-    return setCache(query, deduped, false)
+    const ranked = deduped
+      .sort((a, b) => scorePlaceMatch(b, query) - scorePlaceMatch(a, query))
+      .slice(0, 10)
+    return setCache(query, ranked, false)
   })()
 
   setInflight(query, promise)

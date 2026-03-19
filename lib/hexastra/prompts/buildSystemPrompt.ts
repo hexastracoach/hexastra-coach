@@ -65,13 +65,13 @@ Jargon technique des sciences: disponible a la demande.
 
 function requestDirective(input: BuildPromptInput): string {
   if (input.requestType === 'micro_profile') {
-    return 'Genere uniquement la micro-lecture profil en 6 a 10 lignes. Structure: essence, fonctionnement, sensibilite, force, vigilance. Ne pose aucune question.'
+    return 'Genere uniquement la micro-lecture profil en 6 a 10 lignes. Style humain, non technique, probabiliste. Eviter "Tu es". Preferer "Ton fonctionnement naturel semble..." ou "Tu as tendance a...". Fin obligatoire: "Cette lecture decrit ton fonctionnement de base." puis "Nous pouvons maintenant explorer ta situation actuelle.". Ne pose aucune question.'
   }
   if (input.requestType === 'micro_year') {
-    return 'Genere uniquement la micro-lecture annee en 5 a 8 lignes. Structure: phase, mouvement, opportunite, vigilance, attitude optimale. Ne pose aucune question.'
+    return 'Genere uniquement la micro-lecture annee en 5 a 8 lignes. Style strategique, encourageant, non technique, probabiliste. Fin obligatoire: "Ce cycle donne le contexte de ton annee." puis "Explorons maintenant ta situation actuelle.". Ne pose aucune question.'
   }
   if (input.requestType === 'micro_month') {
-    return 'Genere uniquement la micro-lecture mois en 2 a 4 lignes puis ajoute une transition douce vers la suite. Ne pose aucune question.'
+    return 'Genere uniquement la micro-lecture mois en 2 a 4 lignes, directe et utile, puis ajoute exactement: "Ton profil, ton annee et ton contexte actuel sont maintenant poses." puis "Que souhaites-tu explorer ?". Ne pose aucune question.'
   }
   return 'Reponds selon le step de session: menu -> orienter avec souplesse ; clarification -> affiner ; decision -> trancher avec prudence ; sensitive_support -> simplifier ; analysis/deep_reading -> analyser et orienter.'
 }

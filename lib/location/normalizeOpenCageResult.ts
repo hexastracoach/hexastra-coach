@@ -1,4 +1,5 @@
 import { formatLocationLabel } from './formatLocationLabel'
+import { preferDisplayName, splitLocationSegments } from './locationNameUtils'
 
 export type NormalizedPlace = {
   city: string
@@ -12,27 +13,35 @@ export type NormalizedPlace = {
 
 export function normalizeOpenCageResult(result: any): NormalizedPlace {
   const c = result?.components || {}
+  const formattedSegments = splitLocationSegments(result?.formatted)
 
-  const city =
+  const city = preferDisplayName(
     c.city ||
     c.town ||
     c.village ||
     c.municipality ||
     c.hamlet ||
     c.locality ||
-    ''
+    c.city_district ||
+    c._normalized_city ||
+    c.state ||
+    '',
+    [formattedSegments[0]],
+  )
 
   const postalCode = c.postcode || ''
 
-  const region =
+  const region = preferDisplayName(
     c.state ||
     c.region ||
     c.county ||
     c.province ||
     c.state_district ||
-    ''
+    '',
+    [formattedSegments.length > 2 ? formattedSegments[formattedSegments.length - 2] : ''],
+  )
 
-  const country = c.country || ''
+  const country = preferDisplayName(c.country || '', [formattedSegments[formattedSegments.length - 1]])
 
   const lat = result?.geometry?.lat
   const lng = result?.geometry?.lng

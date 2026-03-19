@@ -60,4 +60,26 @@ describe('KS deterministic submodule execution', () => {
     expect(results.map((entry) => entry.key)).toEqual(['KS.SignalReader', 'KS.PlantInterface'])
     expect(results.at(-1)?.result.publicSummary).toContain('Ajustement environnemental')
   })
+
+  it('executes a Human Design stack with gates, profile and authority details', () => {
+    const results = executeKsSubmodules({
+      submodules: ['KS.TypeProfile', 'KS.ProfileMap', 'KS.ChannelMap', 'KS.GateMap', 'KS.AuthorityStrategy', 'KS.IncarnationCross'],
+      birthData,
+      latestUserMessage: 'Je veux connaitre mes portes en HD',
+      domainRoute: 'science',
+      practitionerUsage: 'self',
+    })
+
+    expect(results.map((entry) => entry.key)).toEqual([
+      'KS.TypeProfile',
+      'KS.ProfileMap',
+      'KS.ChannelMap',
+      'KS.GateMap',
+      'KS.AuthorityStrategy',
+      'KS.IncarnationCross',
+    ])
+    expect(results.find((entry) => entry.key === 'KS.GateMap')?.result.publicSummary).toContain('Portes mises en avant')
+    expect(results.find((entry) => entry.key === 'KS.ProfileMap')?.result.publicSummary).toContain('Profil Human Design')
+    expect(results.find((entry) => entry.key === 'KS.AuthorityStrategy')?.result.publicSummary).toContain('Autorite interieure')
+  })
 })

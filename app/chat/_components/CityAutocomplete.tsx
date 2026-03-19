@@ -32,7 +32,7 @@ export default function CityAutocomplete({ value, countryCode, onSelect }: Props
   function handleInput(v: string) {
     setQuery(v)
     if (timerRef.current) clearTimeout(timerRef.current)
-    if (v.trim().length < 3) { setResults([]); setOpen(false); return }
+    if (v.trim().length < 2) { setResults([]); setOpen(false); return }
     timerRef.current = setTimeout(async () => {
       setLoading(true)
       try {

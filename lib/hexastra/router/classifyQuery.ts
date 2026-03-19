@@ -2,6 +2,9 @@ import type { DomainRoute } from '@/lib/hexastra/types'
 
 export function classifyQuery(message: string): DomainRoute {
   const text = message.toLowerCase()
+  const refersToHumanDesign =
+    /(human design|porteum)/i.test(text) ||
+    (/\bhd\b/i.test(text) && /(porte|portes|canal|canaux|centre|centres|profil|autorite|strategie)/i.test(text))
 
   if (/(\bkua\b|direction|orientation|boussole|feng|gps)/i.test(text)) return 'gps_kua'
   if (/(theme natal|theme astral|carte du ciel|hexastral)/i.test(text)) return 'fusion'
@@ -14,7 +17,8 @@ export function classifyQuery(message: string): DomainRoute {
   if (/(bien-etre|recentrage|confiance|motivation interieure)/i.test(text)) return 'wellbeing'
   if (/(maslow|pyramide de maslow)/i.test(text)) return 'wellbeing'
   if (
-    /(science|astrologie|astrolex|human design|porteum|triangle|enneagram|numerologie|neurokua|kua|spiritlex|mutalex|totemlex)/i.test(
+    refersToHumanDesign ||
+    /(science|astrologie|astrolex|triangle|enneagram|numerologie|neurokua|kua|spiritlex|mutalex|totemlex)/i.test(
       text,
     )
   ) {

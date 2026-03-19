@@ -23,3 +23,4 @@ export type BootstrapStep =
 
 export const MICRO_READINGS_STORAGE_KEY = 'hexastra.micro.v1'
 export const PRACTITIONER_USAGE_KEY = 'hexastra.practitioner.usage'
+export const BIRTH_AUTO_INTRO_STORAGE_KEY = 'hexastra.birthIntro.completed.v1'

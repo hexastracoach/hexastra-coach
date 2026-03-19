@@ -41,12 +41,14 @@ export function computeBootstrapStep({
   practitionerUsage,
   birthData,
   microReadings,
+  allowAutomaticMicroReadings = false,
 }: {
   planLoaded: boolean
   plan: PlanKey
   practitionerUsage: PractitionerUsage
   birthData: BirthData
   microReadings: MicroReadings
+  allowAutomaticMicroReadings?: boolean
 }): BootstrapStep {
   if (!planLoaded) return 'loading'
 
@@ -60,7 +62,10 @@ export function computeBootstrapStep({
   // 2. Birth data stays mandatory before any real reading.
   if (!isBirthDataComplete(birthData)) return 'birthdata_missing'
 
-  // 3. Micro-readings in strict order
+  // 3. Automatic micro-readings only run during the one-shot welcome bootstrap.
+  if (!allowAutomaticMicroReadings) return 'conversation_ready'
+
+  // 4. Micro-readings in strict order
   const profileKey = birthDataProfileKey(birthData)
   if (microReadings.profileKey !== profileKey) return 'micro_profile_pending'
 

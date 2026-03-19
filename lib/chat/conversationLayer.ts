@@ -37,6 +37,7 @@ export function moderateMessage(message: string): ModerationClass {
   if (!text) return 'CONFUSED'
   if (SPAM_MARKERS.test(text)) return 'OUT_OF_SCOPE'
   if (PROFANITY.test(text) || HOSTILE_MARKERS.test(text)) return 'HOSTILE'
+  if (/^\d{1,2}$/.test(text)) return 'SAFE'
   if (text.length < 3) return 'CONFUSED'
   if (text.length > 1400) return 'SUSPICIOUS'
   return 'SAFE'

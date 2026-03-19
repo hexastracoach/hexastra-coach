@@ -249,6 +249,240 @@ function buildNumCycleResult(birthData: BirthProfile | null, latestUserMessage: 
   }
 }
 
+function buildTypeProfileResult(birthData: BirthProfile | null) {
+  const anchor = inferBirthAnchor(birthData)
+  const types = [
+    {
+      type: 'Generator',
+      signature: 'satisfaction',
+      notSelf: 'frustration',
+      strategy: 'repondre a ce qui se presente avant de forcer',
+      authority: 'sacrale',
+    },
+    {
+      type: 'Manifesting Generator',
+      signature: 'satisfaction en mouvement',
+      notSelf: 'frustration impatiente',
+      strategy: 'repondre puis informer avant d accelerer',
+      authority: 'sacrale',
+    },
+    {
+      type: 'Projector',
+      signature: 'reconnaissance juste',
+      notSelf: 'amertume',
+      strategy: 'attendre la bonne invitation',
+      authority: 'splenique',
+    },
+    {
+      type: 'Manifestor',
+      signature: 'paix par l initiative juste',
+      notSelf: 'colere',
+      strategy: 'informer avant de lancer le mouvement',
+      authority: 'emotionnelle',
+    },
+    {
+      type: 'Reflector',
+      signature: 'surprise lucide',
+      notSelf: 'deception',
+      strategy: 'laisser passer un cycle avant de conclure',
+      authority: 'lunaire',
+    },
+  ] as const
+
+  const profile = types[anchor % types.length] ?? types[0]
+
+  return {
+    module_version: 'v1',
+    phase_hint: 'stabilisation',
+    zone_hint: 'identity',
+    notes: 'Type, signature et non-soi Human Design derives du profil de naissance disponible.',
+    dominantSignals: [`type_${profile.type.toLowerCase().replace(/\s+/g, '_')}`],
+    signals: [
+      {
+        tag: `type_${profile.type.toLowerCase().replace(/\s+/g, '_')}`,
+        description: 'Type Human Design dominant pour la lecture en cours.',
+        intensity: 0.79,
+        confidence: 0.72,
+      },
+    ],
+    type_label: profile.type,
+    signature: profile.signature,
+    not_self: profile.notSelf,
+    strategy: profile.strategy,
+    authority_hint: profile.authority,
+    publicSummary: `Type Human Design dominant: ${profile.type}. Signature: ${profile.signature}. Non-soi: ${profile.notSelf}.`,
+  }
+}
+
+function buildProfileMapResult(birthData: BirthProfile | null) {
+  const anchor = inferBirthAnchor(birthData)
+  const lineA = (anchor % 6) + 1
+  const lineB = ((anchor + 2) % 6) + 1
+  const profile = `${lineA}/${lineB}`
+
+  return {
+    module_version: 'v1',
+    phase_hint: 'stabilisation',
+    zone_hint: 'identity',
+    notes: 'Lecture du profil Human Design et du style naturel d incarnation.',
+    dominantSignals: [`profil_${lineA}_${lineB}`],
+    signals: [
+      {
+        tag: `profil_${lineA}_${lineB}`,
+        description: 'Profil Human Design le plus structurant.',
+        intensity: 0.75,
+        confidence: 0.7,
+      },
+    ],
+    profile,
+    publicSummary: `Profil Human Design: ${profile}. Il colore ta posture naturelle, ton style d apprentissage et ta maniere d entrer en relation avec l experience.`,
+  }
+}
+
+function buildChannelMapResult(birthData: BirthProfile | null) {
+  const anchor = inferBirthAnchor(birthData)
+  const channels = ['1-8', '2-14', '10-20', '13-33', '21-45', '29-46', '34-57', '35-36', '48-16', '57-20']
+  const first = channels[anchor % channels.length] ?? channels[0]
+  const second = channels[(anchor + 3) % channels.length] ?? channels[1]
+
+  return {
+    module_version: 'v1',
+    phase_hint: 'stabilisation',
+    zone_hint: 'expression',
+    notes: 'Lecture des canaux Human Design dominants et de leur circulation.',
+    dominantSignals: ['canaux_hd_dominants'],
+    signals: [
+      {
+        tag: 'canaux_hd_dominants',
+        description: 'Canaux Human Design les plus utiles a regarder maintenant.',
+        intensity: 0.74,
+        confidence: 0.7,
+      },
+    ],
+    channels: [first, second],
+    publicSummary: `Canaux mis en avant: ${first} et ${second}. Ils parlent de ta circulation naturelle entre expression, direction et mise en mouvement.`,
+  }
+}
+
+function describeGate(gate: number) {
+  if (gate <= 8) return 'expression et contribution'
+  if (gate <= 16) return 'focalisation et talent'
+  if (gate <= 24) return 'mental et clarification'
+  if (gate <= 32) return 'valeur, instinct et engagement'
+  if (gate <= 40) return 'experience et transmission'
+  if (gate <= 48) return 'profondeur et pression evolutive'
+  if (gate <= 56) return 'relation et stimulation'
+  return 'intuition et finesse de perception'
+}
+
+function buildGateMapResult(birthData: BirthProfile | null, latestUserMessage: string) {
+  const anchor = inferBirthAnchor(birthData)
+  const message = normalizeText(latestUserMessage)
+  const gates = [
+    ((anchor % 64) || 64),
+    (((anchor + 11) % 64) || 64),
+    (((anchor + 27) % 64) || 64),
+  ]
+
+  const gateLabels = gates.map((gate) => `${gate} (${describeGate(gate)})`)
+  const emphasis =
+    message.includes('porte') || message.includes('hd')
+      ? 'Ce sont celles a regarder en priorite dans ta question actuelle.'
+      : 'Elles donnent le ton de ta dynamique Human Design du moment.'
+
+  return {
+    module_version: 'v1',
+    phase_hint: 'stabilisation',
+    zone_hint: 'identity',
+    notes: 'Lecture des portes Human Design les plus saillantes dans le contexte actuel.',
+    dominantSignals: ['portes_hd_actives'],
+    signals: [
+      {
+        tag: 'portes_hd_actives',
+        description: 'Portes Human Design dominantes pour la lecture en cours.',
+        intensity: 0.77,
+        confidence: 0.71,
+      },
+    ],
+    gates,
+    publicSummary: `Portes mises en avant: ${gateLabels.join(', ')}. ${emphasis}`,
+  }
+}
+
+function buildAuthorityStrategyResult(birthData: BirthProfile | null) {
+  const typeProfile = buildTypeProfileResult(birthData)
+  const authority = typeof typeProfile.authority_hint === 'string' ? typeProfile.authority_hint : 'interieure'
+  const strategy = typeof typeProfile.strategy === 'string' ? typeProfile.strategy : 'attendre un signal clair avant d agir'
+
+  return {
+    module_version: 'v1',
+    phase_hint: 'stabilisation',
+    zone_hint: 'direction',
+    notes: 'Lecture de l autorite interieure et de la strategie de decision Human Design.',
+    dominantSignals: ['autorite_et_strategie_hd'],
+    signals: [
+      {
+        tag: 'autorite_et_strategie_hd',
+        description: 'Mode de decision Human Design le plus fiable dans ce contexte.',
+        intensity: 0.78,
+        confidence: 0.72,
+      },
+    ],
+    authority,
+    strategy,
+    publicSummary: `Autorite interieure: ${authority}. Strategie conseillee: ${strategy}.`,
+  }
+}
+
+function buildPolarityMapResult(birthData: BirthProfile | null) {
+  const anchor = inferBirthAnchor(birthData)
+  const polarity =
+    anchor % 2 === 0
+      ? 'equilibre entre perception et action'
+      : 'equilibre entre receptivite et impulsion'
+
+  return {
+    module_version: 'v1',
+    phase_hint: 'stabilisation',
+    zone_hint: 'identity',
+    notes: 'Lecture des polarites utiles pour arbitrer la dynamique Human Design.',
+    dominantSignals: ['polarite_hd'],
+    signals: [
+      {
+        tag: 'polarite_hd',
+        description: 'Polarite dominante a harmoniser dans la lecture Human Design.',
+        intensity: 0.73,
+        confidence: 0.69,
+      },
+    ],
+    publicSummary: `Polarite dominante: ${polarity}.`,
+  }
+}
+
+function buildIncarnationCrossResult(results: ExecutedKsSubmodule[]) {
+  const profile = findExecuted(results, 'KS.ProfileMap')
+  const gates = findExecuted(results, 'KS.GateMap')
+  const profileLabel = typeof profile?.profile === 'string' ? profile.profile : 'profil a preciser'
+  const gateList = Array.isArray(gates?.gates) ? gates.gates.join(', ') : 'portes a confirmer'
+
+  return {
+    module_version: 'v1',
+    phase_hint: 'stabilisation',
+    zone_hint: 'meaning',
+    notes: 'Lecture simplifiee de l axe d incarnation a partir du profil et des portes dominantes.',
+    dominantSignals: ['croix_d_incarnation'],
+    signals: [
+      {
+        tag: 'croix_d_incarnation',
+        description: 'Axe directeur de l incarnation Human Design.',
+        intensity: 0.71,
+        confidence: 0.67,
+      },
+    ],
+    publicSummary: `Axe d incarnation suggere: profil ${profileLabel}, avec un accent sur les portes ${gateList}.`,
+  }
+}
+
 function buildSignalReaderResult(birthData: BirthProfile | null, latestUserMessage: string) {
   const anchor = inferBirthAnchor(birthData)
   const message = normalizeText(latestUserMessage)
@@ -455,6 +689,62 @@ export function executeKsSubmodules(params: {
       results.push({
         key,
         result: buildNumCycleResult(params.birthData, params.latestUserMessage),
+      })
+      continue
+    }
+
+    if (key === 'KS.TypeProfile') {
+      results.push({
+        key,
+        result: buildTypeProfileResult(params.birthData),
+      })
+      continue
+    }
+
+    if (key === 'KS.ProfileMap') {
+      results.push({
+        key,
+        result: buildProfileMapResult(params.birthData),
+      })
+      continue
+    }
+
+    if (key === 'KS.ChannelMap') {
+      results.push({
+        key,
+        result: buildChannelMapResult(params.birthData),
+      })
+      continue
+    }
+
+    if (key === 'KS.GateMap') {
+      results.push({
+        key,
+        result: buildGateMapResult(params.birthData, params.latestUserMessage),
+      })
+      continue
+    }
+
+    if (key === 'KS.AuthorityStrategy') {
+      results.push({
+        key,
+        result: buildAuthorityStrategyResult(params.birthData),
+      })
+      continue
+    }
+
+    if (key === 'KS.PolarityMap') {
+      results.push({
+        key,
+        result: buildPolarityMapResult(params.birthData),
+      })
+      continue
+    }
+
+    if (key === 'KS.IncarnationCross') {
+      results.push({
+        key,
+        result: buildIncarnationCrossResult(results),
       })
       continue
     }
