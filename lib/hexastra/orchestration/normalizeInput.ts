@@ -55,6 +55,10 @@ export function buildNormalizedInput(params: {
   hasExplicitGuidance: boolean
   journeyEnabled: boolean
   messages: ChatMessage[]
+  analysisMode?: 'science_by_science' | 'hexastra_fusion' | null
+  renderMode?: 'simple' | 'approfondie' | 'praticien' | null
+  selectedScience?: string | null
+  selectedSubcategory?: string | null
 }): NormalizedInput {
   const birthDataCompleteness = resolveBirthDataCompleteness(params.birthData)
 
@@ -79,5 +83,9 @@ export function buildNormalizedInput(params: {
     journeyEnabled: params.journeyEnabled,
     birthData: params.birthData,
     messages: params.messages,
+    analysisMode: params.analysisMode ?? null,
+    renderMode: params.renderMode ?? null,
+    selectedScience: params.selectedScience ?? null,
+    selectedSubcategory: params.selectedSubcategory ?? null,
   }
 }
