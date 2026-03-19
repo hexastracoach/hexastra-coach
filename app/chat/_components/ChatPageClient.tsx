@@ -9,6 +9,8 @@ import LeftSidebar from './LeftSidebar'
 import MessageList from './MessageList'
 import BirthDataInlineForm from './BirthDataInlineForm'
 import PractitionerUsageStep from './PractitionerUsageStep'
+import AnalysisModeStep from './AnalysisModeStep'
+import RenderModeStep from './RenderModeStep'
 import PaywallBanner from './PaywallBanner'
 import {
   STORAGE_KEYS,
@@ -54,9 +56,12 @@ import {
 } from '@/lib/chat/chatPayloadBuilder'
 import {
   PRACTITIONER_USAGE_KEY,
+  ANALYSIS_MODE_KEY,
+  RENDER_MODE_KEY,
   type MicroReadings,
   type PractitionerUsage,
 } from '@/lib/chat/bootstrapTypes'
+import type { AnalysisMode, RenderMode } from '@/lib/hexastra/sciences/scienceTaxonomy'
 import {
   resolveClientSendPolicy,
   resolveSelectionContext,
@@ -367,6 +372,8 @@ export default function ChatPageClient() {
   const [planLoaded, setPlanLoaded] = useState(false)
 
   const [practitionerUsage, setPractitionerUsage] = useState<PractitionerUsage>(null)
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode | null>(null)
+  const [renderMode, setRenderMode] = useState<RenderMode | null>(null)
 
   const [microReadings, setMicroReadings] = useState<MicroReadings>({
     profileKey: null,
@@ -398,6 +405,8 @@ export default function ChatPageClient() {
     planLoaded,
     plan: userPlan,
     practitionerUsage,
+    analysisMode,
+    renderMode,
     birthData,
     microReadings,
     allowAutomaticMicroReadings: autoBirthIntroPending,
@@ -730,6 +739,8 @@ export default function ChatPageClient() {
         selectedSubmenuKey: submenuKey ?? null,
         uiAction,
         journeyEnabled,
+        analysisMode,
+        renderMode,
       })
 
       try {
@@ -936,6 +947,19 @@ export default function ChatPageClient() {
       const stored = localStorage.getItem(PRACTITIONER_USAGE_KEY)
       if (stored === 'personal' || stored === 'client') {
         setPractitionerUsage(stored)
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    try {
+      const storedMode = localStorage.getItem(ANALYSIS_MODE_KEY)
+      if (storedMode === 'science_by_science' || storedMode === 'hexastra_fusion') {
+        setAnalysisMode(storedMode)
+      }
+      const storedRender = localStorage.getItem(RENDER_MODE_KEY)
+      if (storedRender === 'simple' || storedRender === 'approfondie' || storedRender === 'praticien') {
+        setRenderMode(storedRender)
       }
     } catch {}
   }, [])
@@ -1172,6 +1196,20 @@ export default function ChatPageClient() {
     } catch {}
   }, [])
 
+  const handleAnalysisModeSelect = useCallback((mode: AnalysisMode) => {
+    setAnalysisMode(mode)
+    try {
+      localStorage.setItem(ANALYSIS_MODE_KEY, mode)
+    } catch {}
+  }, [])
+
+  const handleRenderModeSelect = useCallback((mode: RenderMode) => {
+    setRenderMode(mode)
+    try {
+      localStorage.setItem(RENDER_MODE_KEY, mode)
+    } catch {}
+  }, [])
+
   const persistReadings = useCallback((next: Reading[]) => {
     setReadings(next)
     localStorage.setItem(STORAGE_KEYS.readings, JSON.stringify(next))
@@ -1243,6 +1281,8 @@ export default function ChatPageClient() {
       selectedSubmenuKey,
       uiAction: 'send_message',
       journeyEnabled,
+      analysisMode,
+      renderMode,
     })
 
     try {
@@ -1503,6 +1543,8 @@ export default function ChatPageClient() {
         selectedSubmenuKey,
         uiAction: 'send_message',
         journeyEnabled,
+        analysisMode,
+        renderMode,
       })
       const requestSeq = ++requestSequenceRef.current
 
@@ -1666,6 +1708,14 @@ export default function ChatPageClient() {
     bootstrapUi.overlayKind === 'practitioner_usage' ? (
       <div className="hx-bootstrap-overlay">
         <PractitionerUsageStep onSelect={handlePractitionerUsageSelect} />
+      </div>
+    ) : step === 'analysis_mode_selection' ? (
+      <div className="hx-bootstrap-overlay">
+        <AnalysisModeStep onSelect={handleAnalysisModeSelect} />
+      </div>
+    ) : step === 'render_mode_selection' ? (
+      <div className="hx-bootstrap-overlay">
+        <RenderModeStep onSelect={handleRenderModeSelect} />
       </div>
     ) : null
 

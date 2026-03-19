@@ -9,6 +9,10 @@ export type Entitlements = {
   canPractitionerMode: boolean
   /** Ask personal vs client before starting (practitioner plan only) */
   canAskPractitionerUsage: boolean
+  /** Ask science-by-science vs fusion (essentiel / premium / praticien — not free) */
+  canSelectAnalysisMode: boolean
+  /** Ask render depth (praticien only) */
+  canSelectRenderMode: boolean
   chatMode: ChatMode
   maxTokens: number
 }
@@ -32,6 +36,8 @@ export function getEntitlements(plan: PlanKey): Entitlements {
     canMicroReadings: contract.features.microReadings,
     canPractitionerMode: contract.features.practitionerStructure,
     canAskPractitionerUsage: contract.features.clientUsage,
+    canSelectAnalysisMode: plan !== 'free',
+    canSelectRenderMode: contract.features.practitionerStructure,
     chatMode,
     maxTokens,
   }

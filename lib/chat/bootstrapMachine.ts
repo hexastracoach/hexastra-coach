@@ -1,6 +1,7 @@
 import type { BirthData } from '@/app/chat/_lib/chat'
 import type { PlanKey } from '@/lib/plans'
 import type { PractitionerUsage, MicroReadings, BootstrapStep } from './bootstrapTypes'
+import type { AnalysisMode, RenderMode } from '@/lib/hexastra/sciences/scienceTaxonomy'
 import { getEntitlements } from './entitlements'
 
 /** Minimum fields needed to generate a reading */
@@ -39,6 +40,8 @@ export function computeBootstrapStep({
   planLoaded,
   plan,
   practitionerUsage,
+  analysisMode,
+  renderMode,
   birthData,
   microReadings,
   allowAutomaticMicroReadings = false,
@@ -46,6 +49,8 @@ export function computeBootstrapStep({
   planLoaded: boolean
   plan: PlanKey
   practitionerUsage: PractitionerUsage
+  analysisMode: AnalysisMode | null
+  renderMode: RenderMode | null
   birthData: BirthData
   microReadings: MicroReadings
   allowAutomaticMicroReadings?: boolean
@@ -54,18 +59,28 @@ export function computeBootstrapStep({
 
   const ents = getEntitlements(plan)
 
-  // 1. Practitioner plan asks the usage first to mirror the guided GPT flow.
+  // 1. Practitioner plan asks usage first (personal vs client).
   if (ents.canAskPractitionerUsage && !practitionerUsage) {
     return 'practitioner_usage_needed'
   }
 
-  // 2. Birth data stays mandatory before any real reading.
+  // 2. Ask analysis mode (essentiel / premium / praticien — not free).
+  if (ents.canSelectAnalysisMode && !analysisMode) {
+    return 'analysis_mode_selection'
+  }
+
+  // 3. Ask render mode (praticien only).
+  if (ents.canSelectRenderMode && !renderMode) {
+    return 'render_mode_selection'
+  }
+
+  // 4. Birth data stays mandatory before any real reading.
   if (!isBirthDataComplete(birthData)) return 'birthdata_missing'
 
-  // 3. Automatic micro-readings only run during the one-shot welcome bootstrap.
+  // 5. Automatic micro-readings only run during the one-shot welcome bootstrap.
   if (!allowAutomaticMicroReadings) return 'conversation_ready'
 
-  // 4. Micro-readings in strict order
+  // 6. Micro-readings in strict order
   const profileKey = birthDataProfileKey(birthData)
   if (microReadings.profileKey !== profileKey) return 'micro_profile_pending'
 

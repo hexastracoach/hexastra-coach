@@ -35,6 +35,14 @@ export const HEXASTRA_DOMAINS: ScopeDomain[] = [
     ],
   },
   {
+    id: 'enneagramme',
+    keywords: [
+      /\b(enn[eé]agramme?|enn[eé]a\b|type\s+enn[eé]|profil\s+enn[eé])\b/i,
+      /\b(type\s+[1-9]\b|aile\s+[1-9]\b|instinct\s+(de\s+)?(conservation|social|sexuel|transpersonnel))\b/i,
+      /\b(centre\s+(instinctif|[eé]motionnel|mental)|niveau\s+d.int[eé]gration|m[eé]canisme\s+de\s+d[eé]fense)\b/i,
+    ],
+  },
+  {
     id: 'kua_fengshui',
     keywords: [
       /\b(kua\b|feng\s+shui|gps\s+kua|nombre\s+kua|direction\s+(favorable|kua)|[eé]nergie\s+kua)\b/i,

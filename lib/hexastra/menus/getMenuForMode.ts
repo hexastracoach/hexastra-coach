@@ -1,174 +1,135 @@
 import type { HexastraMenuItem, HexastraMode } from '@/lib/hexastra/types'
 
-const libreMenu: HexastraMenuItem[] = [
+/**
+ * Science-first menu architecture.
+ * Level 1 = 6 sciences. Level 2 = subcategories per science.
+ * Same structure for all modes; prompt hints differ for praticien.
+ */
+
+const scienceMenu: HexastraMenuItem[] = [
   {
-    key: 'neurokua',
-    label: 'NeuroKua™',
-    description: 'Regle ton etat interieur et ton energie du moment.',
-    contextType: 'energy',
-    domainRoute: 'neurokua',
-    promptHint: 'Active le module NeuroKua et la logique GPS/Kua si utile.',
-    submenu: [
-      { key: 'state_today', label: 'Mon etat du jour', description: 'Un scan simple de ton etat global.', contextType: 'energy', domainRoute: 'neurokua', promptHint: 'Produire directement un scan NeuroKua du jour.' },
-      { key: 'fatigue_recharge', label: 'Fatigue / recharge', description: 'Comprendre et recharger ce qui manque.', contextType: 'wellbeing', domainRoute: 'neurokua', promptHint: 'Diagnostiquer la fatigue et prioriser la recharge.' },
-      { key: 'stress_overload', label: 'Stress / surcharge', description: 'Identifier la tension et la faire redescendre.', contextType: 'wellbeing', domainRoute: 'neurokua', promptHint: 'Identifier la surcharge et donner un levier simple de stabilisation.' },
-      { key: 'stability_or_action', label: 'Stabilite ou action', description: 'Savoir s il faut agir ou consolider.', contextType: 'decision', domainRoute: 'neurokua', promptHint: 'Dire clairement si le moment demande action, consolidation ou recuperation.' },
-      { key: 'quick_adjustment', label: 'Ajustement rapide', description: 'Une action courte qui change le ressenti.', contextType: 'energy', domainRoute: 'neurokua', promptHint: 'Donner un ajustement bref et immediat.' },
-    ],
-  },
-  {
-    key: 'energy_now',
-    label: 'Energie du moment',
-    description: "Lis la tendance du jour et ce qu'elle active en toi.",
-    contextType: 'energy',
-    domainRoute: 'general',
-    submenu: [
-      { key: 'emotional_state', label: 'Etat emotionnel', description: "Nommer l'ambiance interieure du jour.", contextType: 'energy' },
-      { key: 'motivation', label: 'Motivation / elan', description: 'Mesurer ton niveau d elan reel.', contextType: 'energy' },
-      { key: 'act_or_rest', label: 'Agir ou recuperer', description: 'Choisir le bon rythme aujourd hui.', contextType: 'decision' },
-      { key: 'priority_zone', label: 'Zone prioritaire', description: 'Voir ou la vie te pousse a regarder.', contextType: 'general' },
-    ],
-  },
-  {
-    key: 'relations',
-    label: 'Amour / Relations',
-    description: 'Clarifie tes dynamiques affectives et sociales.',
-    contextType: 'relationship',
-    domainRoute: 'relationship',
-    submenu: [
-      { key: 'single', label: 'Celibataire', description: 'Attirer juste sans se trahir.', contextType: 'relationship' },
-      { key: 'couple', label: 'En couple', description: 'Ajuster le lien et la communication.', contextType: 'relationship' },
-      { key: 'complex_relation', label: 'Relation compliquee', description: 'Clarifier le noeud et le levier.', contextType: 'relationship' },
-      { key: 'family', label: 'Famille / proches', description: 'Pacifier et mieux poser tes limites.', contextType: 'relationship' },
-      { key: 'specific_person', label: 'Une personne precise', description: 'Comprendre la dynamique entre vous.', contextType: 'relationship' },
-    ],
-  },
-  {
-    key: 'career',
-    label: 'Travail / Argent',
-    description: 'Oriente tes choix pro et ta stabilite materielle.',
-    contextType: 'career',
-    domainRoute: 'career',
-    submenu: [
-      { key: 'current_situation', label: 'Situation actuelle', description: 'Lire ce qui est en train de se jouer.', contextType: 'career' },
-      { key: 'evolution', label: 'Evolution / changement', description: 'Choisir ta prochaine marche.', contextType: 'career' },
-      { key: 'conflicts', label: 'Ambiance / conflits', description: 'Reduire la friction et gagner en stabilite.', contextType: 'career' },
-      { key: 'money_security', label: 'Argent / securite', description: 'Securiser et prioriser sans panique.', contextType: 'career' },
-      { key: 'personal_project', label: 'Projet perso', description: 'Avancer avec un plan realiste.', contextType: 'career' },
-    ],
-  },
-  {
-    key: 'wellbeing',
-    label: 'Bien-etre / Etat interieur',
-    description: 'Apaise, recentre et retrouve ton axe.',
-    contextType: 'wellbeing',
-    domainRoute: 'wellbeing',
-    submenu: [
-      { key: 'stress', label: 'Stress', description: 'Retrouver du calme mental.', contextType: 'wellbeing' },
-      { key: 'fatigue', label: 'Fatigue', description: 'Reprendre de la force sans te forcer.', contextType: 'wellbeing' },
-      { key: 'confidence', label: 'Confiance', description: 'Reactiver ton assurance.', contextType: 'wellbeing' },
-      { key: 'motivation_wb', label: 'Motivation', description: 'Relancer ton moteur interne.', contextType: 'wellbeing' },
-      { key: 'recenter', label: 'Recentrage', description: 'Revenir a ton axe et a l essentiel.', contextType: 'wellbeing' },
-    ],
-  },
-  {
-    key: 'decision',
-    label: 'Decision a prendre',
-    description: 'Compare tes options et choisis avec clarte.',
-    contextType: 'decision',
-    domainRoute: 'decision',
-    submenu: [
-      { key: 'decision_pro', label: 'Pro', description: 'Choisir avec logique et timing.', contextType: 'decision' },
-      { key: 'decision_relation', label: 'Relationnel', description: 'Choisir sans te perdre.', contextType: 'decision' },
-      { key: 'decision_project', label: 'Projet', description: 'Valider la direction et l energie.', contextType: 'decision' },
-      { key: 'change_or_wait', label: 'Changer ou attendre', description: 'Savoir quand bouger et quand tenir.', contextType: 'decision' },
-      { key: 'global_decision', label: 'Analyse globale', description: 'Trancher avec une vue complete.', contextType: 'decision' },
-    ],
-  },
-  {
-    key: 'timing',
-    label: 'Vision des prochains mois',
-    description: 'Anticipe la phase a venir et ton timing.',
+    key: 'science_astrologie',
+    label: 'Astrologie',
+    description: 'Cycles planétaires, maisons, aspects et timing astral.',
     contextType: 'timing',
     domainRoute: 'timing',
+    promptHint: 'Lecture astrologique du cycle, des maisons, des aspects et du timing.',
     submenu: [
-      { key: 'general_trends', label: 'Tendances generales', description: 'Voir la meteo globale de ta phase.', contextType: 'timing' },
-      { key: 'when_act', label: 'Periode pour agir', description: 'Reperer les fenetres d action.', contextType: 'timing' },
-      { key: 'when_stabilize', label: 'Periode pour stabiliser', description: 'Consolider ce qui doit tenir.', contextType: 'timing' },
-      { key: 'watch_domains', label: 'Domaines a surveiller', description: 'Anticiper les points sensibles.', contextType: 'timing' },
-      { key: 'strategic_advice', label: 'Conseils strategiques', description: 'Plan simple pour avancer.', contextType: 'timing' },
+      { key: 'astro_signes', label: 'Signes / Zodiaque', description: 'Lecture du signe solaire et ses qualités.', contextType: 'general', domainRoute: 'science', promptHint: 'Analyser le signe solaire, ses forces, ses défis et sa vibration du moment.' },
+      { key: 'astro_ascendant', label: 'Ascendant', description: 'Masque social, apparence et premier contact.', contextType: 'general', domainRoute: 'science', promptHint: 'Lire l ascendant et son interaction avec le signe solaire dans la situation actuelle.' },
+      { key: 'astro_maisons', label: 'Maisons astrologiques', description: 'Les 12 domaines de vie activés en ce moment.', contextType: 'general', domainRoute: 'science', promptHint: 'Identifier les maisons actives et les domaines de vie concernés.' },
+      { key: 'astro_planetes', label: 'Planètes', description: 'Planètes dominantes, leur force et leur message.', contextType: 'energy', domainRoute: 'science', promptHint: 'Lire les planètes dominantes dans la configuration actuelle.' },
+      { key: 'astro_aspects', label: 'Aspects', description: 'Tensions et harmonies entre les planètes.', contextType: 'general', domainRoute: 'science', promptHint: 'Lire les aspects majeurs et leur tension ou synergie dans la situation.' },
+      { key: 'astro_transits', label: 'Transits', description: 'Les mouvements planétaires actifs en ce moment.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Analyser les transits actifs et leur effet sur la période actuelle.' },
+      { key: 'astro_compatibilite', label: 'Compatibilité', description: 'Dynamique astrale entre deux personnes.', contextType: 'relationship', domainRoute: 'relationship', promptHint: 'Lire la compatibilité astrologique entre les deux profils.' },
+      { key: 'astro_theme_natal', label: 'Thème natal', description: 'Lecture complète du thème de naissance.', contextType: 'hexastraReading', domainRoute: 'fusion', promptHint: 'Synthèse du thème natal complet avec dominantes et axes majeurs.' },
+      { key: 'astro_vocation', label: 'Vocation', description: 'Potentiel et direction de vie astrologique.', contextType: 'general', domainRoute: 'science', promptHint: 'Lire le potentiel vocationnel et le chemin de vie inscrit dans le thème.' },
+      { key: 'astro_amour', label: 'Amour', description: 'Vénus, maison 7 et dynamique relationnelle.', contextType: 'relationship', domainRoute: 'relationship', promptHint: 'Analyser la vie amoureuse à travers Vénus, la maison 7 et les aspects relationnels.' },
+      { key: 'astro_travail', label: 'Travail / Carrière', description: 'Maison 10, Saturne et axe professionnel.', contextType: 'career', domainRoute: 'career', promptHint: 'Lire l axe professionnel via la maison 10 et les planètes associées.' },
+      { key: 'astro_cycles', label: 'Cycles', description: 'Cycles de vie, retours solaires et phases majeures.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Identifier les cycles actifs (retour solaire, progressions, transits lents).' },
     ],
   },
   {
-    key: 'general',
-    label: 'Lecture generale pour moi',
-    description: 'Synthese complete de ton moment actuel.',
+    key: 'science_numerologie',
+    label: 'Numérologie',
+    description: 'Cycles personnels, vibrations et temporalité numérologique.',
+    contextType: 'timing',
+    domainRoute: 'timing',
+    promptHint: 'Lecture numérologique du cycle dominant et de la temporalité.',
+    submenu: [
+      { key: 'num_chemin_vie', label: 'Chemin de vie', description: 'Le nombre fondamental qui structure l existence.', contextType: 'general', domainRoute: 'science', promptHint: 'Lire le chemin de vie et son expression dans la situation actuelle.' },
+      { key: 'num_annee_perso', label: 'Année personnelle', description: 'Le thème et la vibration de l année en cours.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Analyser l année personnelle en cours et ses implications stratégiques.' },
+      { key: 'num_nom_prenom', label: 'Nom / Prénom', description: 'Les vibrations inscrites dans l identité.', contextType: 'general', domainRoute: 'science', promptHint: 'Lire les nombres d expression, d âme et de personnalité via le nom et le prénom.' },
+      { key: 'num_compatibilite', label: 'Compatibilité', description: 'Résonance entre deux profils numériques.', contextType: 'relationship', domainRoute: 'relationship', promptHint: 'Analyser la compatibilité numérologique entre les deux profils.' },
+      { key: 'num_cycles', label: 'Cycles numériques', description: 'Pinnacles, épreuves et périodes actives.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Identifier le cycle actif (pinnacle, épreuve, période) et son enseignement.' },
+      { key: 'num_vocation', label: 'Vocation', description: 'L orientation naturelle et le potentiel d expression.', contextType: 'general', domainRoute: 'science', promptHint: 'Lire la vocation et le potentiel d expression à travers les nombres clés.' },
+      { key: 'num_decision', label: 'Décision', description: 'Aide à la décision par la vibration du moment.', contextType: 'decision', domainRoute: 'decision', promptHint: 'Utiliser la numérologie pour éclairer une décision en cours.' },
+    ],
+  },
+  {
+    key: 'science_human_design',
+    label: 'Human Design',
+    description: 'Fonctionnement naturel, centres, portes et décision.',
+    contextType: 'energy',
+    domainRoute: 'science',
+    promptHint: 'Lecture Human Design centrée sur le fonctionnement naturel, les centres et la décision.',
+    submenu: [
+      { key: 'hd_type', label: 'Type', description: 'Générateur, Projecteur, Manifesteur ou Réflecteur.', contextType: 'energy', domainRoute: 'science', promptHint: 'Lire le type HD et sa stratégie naturelle dans la situation.' },
+      { key: 'hd_strategie', label: 'Stratégie', description: 'La bonne façon d agir selon le type.', contextType: 'decision', domainRoute: 'science', promptHint: 'Appliquer la stratégie HD à la situation ou à la demande exprimée.' },
+      { key: 'hd_autorite', label: 'Autorité intérieure', description: 'Comment ce profil prend ses décisions justes.', contextType: 'decision', domainRoute: 'science', promptHint: 'Lire l autorité intérieure et son application dans une décision.' },
+      { key: 'hd_profil', label: 'Profil', description: 'Le rôle et la dynamique de vie (1/3, 2/4, etc.).', contextType: 'general', domainRoute: 'science', promptHint: 'Analyser le profil HD et son influence sur le rôle de vie actuel.' },
+      { key: 'hd_centres', label: 'Centres', description: 'Centres définis et indéfinis — forces et vulnérabilités.', contextType: 'energy', domainRoute: 'neurokua', promptHint: 'Lire les centres HD définis et indéfinis et leurs implications concrètes.' },
+      { key: 'hd_portes', label: 'Portes actives', description: 'Les fréquences et thèmes dominants du design.', contextType: 'energy', domainRoute: 'science', promptHint: 'Identifier les portes actives et leurs thèmes dominants.' },
+      { key: 'hd_canaux', label: 'Canaux', description: 'Les connexions énergétiques complètes du profil.', contextType: 'energy', domainRoute: 'science', promptHint: 'Analyser les canaux définis et leur rôle dans le fonctionnement du profil.' },
+      { key: 'hd_croix', label: 'Croix d\'incarnation', description: 'Le thème de vie majeur et la direction.', contextType: 'general', domainRoute: 'science', promptHint: 'Lire la croix d incarnation et son sens dans la trajectoire de vie actuelle.' },
+      { key: 'hd_compatibilite', label: 'Compatibilité', description: 'Interaction entre deux designs.', contextType: 'relationship', domainRoute: 'relationship', promptHint: 'Analyser la dynamique entre deux designs HD.' },
+      { key: 'hd_transits', label: 'Transits HD', description: 'Influences planétaires sur le design en ce moment.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Lire les transits HD actifs et leur effet sur la configuration du moment.' },
+    ],
+  },
+  {
+    key: 'science_enneagramme',
+    label: 'Ennéagramme',
+    description: 'Types, mécanismes profonds et leviers de développement.',
+    contextType: 'relationship',
+    domainRoute: 'science',
+    promptHint: 'Lecture archétypale des mécanismes, défenses et leviers selon l ennéagramme.',
+    submenu: [
+      { key: 'enn_type', label: 'Type de personnalité', description: 'Le type ennéagramme dominant (1 à 9).', contextType: 'general', domainRoute: 'science', promptHint: 'Identifier ou lire le type ennéagramme et ses dynamiques dans la situation.' },
+      { key: 'enn_aile', label: 'Aile', description: 'La nuance du type par l aile adjacente.', contextType: 'general', domainRoute: 'science', promptHint: 'Intégrer l aile dans la lecture pour affiner le profil.' },
+      { key: 'enn_centre', label: 'Centre', description: 'Centre instinctif, émotionnel ou mental.', contextType: 'energy', domainRoute: 'science', promptHint: 'Lire le centre dominant et son activation dans la situation actuelle.' },
+      { key: 'enn_instinct', label: 'Instinct dominant', description: 'Conservation, social ou sexuel (transpersonnel).', contextType: 'energy', domainRoute: 'science', promptHint: 'Analyser l instinct dominant et sa manifestation dans la demande.' },
+      { key: 'enn_niveau', label: 'Niveau d\'intégration', description: 'Niveau de santé psychologique actuel.', contextType: 'wellbeing', domainRoute: 'wellbeing', promptHint: 'Évaluer le niveau d intégration apparent et son influence sur la situation.' },
+      { key: 'enn_relations', label: 'Relations', description: 'Dynamiques relationnelles typiques du profil.', contextType: 'relationship', domainRoute: 'relationship', promptHint: 'Lire les dynamiques relationnelles caractéristiques du type dans la situation.' },
+      { key: 'enn_travail', label: 'Travail / Vocation', description: 'Expression professionnelle du type.', contextType: 'career', domainRoute: 'career', promptHint: 'Analyser l expression professionnelle et vocationnelle du type ennéagramme.' },
+      { key: 'enn_evolution', label: 'Évolution', description: 'Piste de croissance et direction d intégration.', contextType: 'general', domainRoute: 'science', promptHint: 'Donner la piste d évolution et d intégration pour ce type dans ce contexte.' },
+    ],
+  },
+  {
+    key: 'science_kua',
+    label: 'Kua',
+    description: 'Orientation, directions favorables et positionnement optimal.',
+    contextType: 'decision',
+    domainRoute: 'gps_kua',
+    promptHint: 'Lecture Kua de l orientation et du positionnement utile.',
+    submenu: [
+      { key: 'kua_nombre', label: 'Nombre Kua', description: 'Le nombre personnel et son groupe d appartenance.', contextType: 'general', domainRoute: 'gps_kua', promptHint: 'Calculer ou lire le nombre Kua et ses implications de base.' },
+      { key: 'kua_directions', label: 'Directions favorables', description: 'Les 4 directions bénéfiques personnelles.', contextType: 'decision', domainRoute: 'gps_kua', promptHint: 'Identifier les 4 directions favorables et leur usage concret.' },
+      { key: 'kua_habitat', label: 'Orientation habitat', description: 'Positionnement dans l espace de vie.', contextType: 'energy', domainRoute: 'gps_kua', promptHint: 'Lire le positionnement optimal dans l espace de vie selon le Kua.' },
+      { key: 'kua_bureau', label: 'Orientation bureau', description: 'Direction de travail et de concentration.', contextType: 'career', domainRoute: 'gps_kua', promptHint: 'Donner la direction de travail et de bureau optimale selon le Kua.' },
+      { key: 'kua_sommeil', label: 'Direction de sommeil', description: 'Tête du lit et récupération optimale.', contextType: 'wellbeing', domainRoute: 'gps_kua', promptHint: 'Lire la direction de sommeil optimale pour la récupération.' },
+      { key: 'kua_gps_global', label: 'GPS Kua global', description: 'Synthèse de positionnement optimal complet.', contextType: 'decision', domainRoute: 'gps_kua', promptHint: 'Fournir une synthèse GPS complète du positionnement Kua dans toutes les zones.' },
+    ],
+  },
+  {
+    key: 'science_fusion',
+    label: 'Fusion Hexastra',
+    description: 'Lecture multi-sciences croisée — le niveau de synthèse le plus puissant.',
     contextType: 'hexastraReading',
     domainRoute: 'fusion',
+    promptHint: 'Fusionner tous les signaux disponibles, résoudre les contradictions, extraire les dominantes.',
     submenu: [
-      { key: 'quick_summary', label: 'Synthese rapide', description: 'L essentiel en peu de lignes.', contextType: 'general' },
-      { key: 'detailed_reading', label: 'Lecture detaillee', description: 'Une lecture plus profonde et structuree.', contextType: 'hexastraReading', domainRoute: 'fusion', promptHint: 'Produire une lecture fusionnee detaillee et directement utile.' },
-      { key: 'current_strengths', label: 'Forces du moment', description: 'Ce qui te porte naturellement.', contextType: 'general' },
-      { key: 'vigilance_points', label: 'Vigilances', description: 'Ce qui peut te freiner si tu forces.', contextType: 'general' },
-      { key: 'orientation', label: 'Orientation', description: 'La direction prioritaire a suivre.', contextType: 'general' },
-    ],
-  },
-  {
-    key: 'science',
-    label: 'Analyse par science',
-    description: 'Choisis une science pour eclairer la situation avec un angle specifique.',
-    contextType: 'science',
-    domainRoute: 'science',
-    submenu: [
-      { key: 'science_astrolex', label: 'Astrologie™', description: 'Cycles, maisons, aspects et timing.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Lecture astrologique du cycle, des maisons, des aspects et du timing.' },
-      { key: 'science_porteum', label: 'Human Design™', description: 'Fonctionnement naturel, centres et decision.', contextType: 'energy', domainRoute: 'science', promptHint: 'Lecture Human Design centree sur le fonctionnement naturel, les centres et la decision.' },
-      { key: 'science_enneagram', label: 'Enneagramme™', description: 'Reactions automatiques et leviers.', contextType: 'relationship', domainRoute: 'science', promptHint: 'Lecture archetypale des reactions, defenses et leviers.' },
-      { key: 'science_kua', label: 'Kua™', description: 'Orientation et environnement personnel.', contextType: 'decision', domainRoute: 'gps_kua', promptHint: 'Lecture Kua de l orientation et du positionnement utile.' },
-      { key: 'science_neurokua', label: 'NeuroKua™', description: 'Equilibre interne, axe dominant et reglage sensoriel.', contextType: 'energy', domainRoute: 'neurokua', promptHint: 'Lecture NeuroKua specialisee sur les 4 dynamiques, l axe correctif et les ajustements spatiaux ou sensoriels.' },
-      { key: 'science_triangle', label: 'Numerologie™', description: 'Cycle actuel, vibration et periode active.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Lecture de numerologie sur le cycle dominant et la temporalite.' },
+      { key: 'fusion_generale', label: 'Lecture générale fusionnée', description: 'Synthèse complète multi-sciences du moment actuel.', contextType: 'hexastraReading', domainRoute: 'fusion', promptHint: 'Produire une lecture fusionnée complète avec croisement de toutes les sciences disponibles.' },
+      { key: 'fusion_ultra_precise', label: 'Lecture ultra précise', description: 'Analyse approfondie avec maximum de signaux croisés.', contextType: 'hexastraReading', domainRoute: 'fusion', promptHint: 'Produire la lecture la plus précise possible en croisant tous les systèmes et en résolvant les contradictions.' },
+      { key: 'fusion_compatibilite', label: 'Compatibilité fusionnée', description: 'Compatibilité multi-sciences entre deux personnes.', contextType: 'relationship', domainRoute: 'relationship', promptHint: 'Analyser la compatibilité en croisant astrologie, numérologie, Human Design et Ennéagramme.' },
+      { key: 'fusion_decision', label: 'Décision fusionnée', description: 'Aide à la décision avec vue multi-sciences.', contextType: 'decision', domainRoute: 'decision', promptHint: 'Croiser tous les signaux disponibles pour éclairer une décision avec la meilleure précision possible.' },
+      { key: 'fusion_timing', label: 'Timing fusionné', description: 'Lecture des cycles et fenêtres d action croisées.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Croiser les cycles astrologiques, numériques et HD pour identifier les fenêtres d action optimales.' },
+      { key: 'fusion_praticien', label: 'Lecture praticien', description: 'Synthèse structurée à usage professionnel.', contextType: 'practitioner', domainRoute: 'fusion', promptHint: 'Produire une lecture structurée selon le format praticien avec vocabulaire technique autorisé.' },
+      { key: 'fusion_synthese_croisee', label: 'Synthèse croisée', description: 'Extraction des dominantes et leviers majeurs.', contextType: 'hexastraReading', domainRoute: 'fusion', promptHint: 'Extraire les dominantes communes et les leviers d action prioritaires en croisant tous les systèmes.' },
     ],
   },
 ]
 
-const practitionerMenu: HexastraMenuItem[] = [
-  {
-    key: 'pract_neurokua',
-    label: 'NeuroKua™',
-    description: 'Diagnostic de l etat interne et reglages d equilibre.',
-    contextType: 'energy',
-    domainRoute: 'neurokua',
-    submenu: [
-      { key: 'balance', label: 'Equilibre global', description: 'Mesure de coherence et stabilite interne.', contextType: 'energy', domainRoute: 'neurokua' },
-      { key: 'dominant_imbalance', label: 'Desequilibre dominant', description: 'Identifier l axe principal de correction.', contextType: 'energy', domainRoute: 'neurokua' },
-      { key: 'recovery', label: 'Surcharge / recuperation', description: 'Evaluer le risque d epuisement.', contextType: 'wellbeing', domainRoute: 'neurokua' },
-      { key: 'prioritized_adjustments', label: 'Ajustements prioritaires', description: 'Actions a fort effet immediat.', contextType: 'decision', domainRoute: 'neurokua' },
-      { key: 'protocol', label: 'Protocole court', description: 'Routine simple de stabilisation.', contextType: 'energy', domainRoute: 'neurokua' },
-    ],
-  },
-  { key: 'pract_relation', label: 'Relationnel™', description: 'Lecture des dynamiques, tensions et leviers relationnels.', contextType: 'relationship', domainRoute: 'relationship' },
-  { key: 'pract_professional', label: 'Professionnel™', description: 'Analyse de positionnement, risques et strategie d evolution.', contextType: 'career', domainRoute: 'career' },
-  { key: 'pract_cycle', label: 'Cycle a venir™', description: 'Projection de phase et timing d action a moyen terme.', contextType: 'timing', domainRoute: 'timing' },
-  { key: 'pract_decision', label: 'Decision precise™', description: 'Comparatif structure A/B avec risques et plan.', contextType: 'decision', domainRoute: 'decision' },
-  { key: 'pract_general', label: 'Lecture generale actuelle™', description: 'Synthese multidimensionnelle exploitable.', contextType: 'hexastraReading', domainRoute: 'fusion' },
-  {
-    key: 'science',
-    label: 'Analyses par science',
-    description: 'Choisis une science pour eclairer la situation.',
-    contextType: 'science',
-    domainRoute: 'science',
-    submenu: [
-      { key: 'science_astrolex', label: 'Astrologie™', description: 'Cycles, maisons, aspects et timing.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Lecture praticienne astrologique centree sur la phase, les maisons, les aspects et le timing.' },
-      { key: 'science_porteum', label: 'Human Design™', description: 'Centres, canaux, portes et decision.', contextType: 'energy', domainRoute: 'science', promptHint: 'Lecture praticienne Human Design du fonctionnement naturel et decisionnel.' },
-      { key: 'science_enneagram', label: 'Enneagramme™', description: 'Defense, reaction, levier.', contextType: 'relationship', domainRoute: 'science', promptHint: 'Lecture praticienne archetypale des mecanismes et du levier.' },
-      { key: 'science_kua', label: 'Kua™', description: 'Orientation et environnement.', contextType: 'decision', domainRoute: 'gps_kua', promptHint: 'Lecture praticienne Kua/GPS du positionnement optimal.' },
-      { key: 'science_neurokua', label: 'NeuroKua™', description: '4 dynamiques, axe correctif et reglage sensoriel.', contextType: 'energy', domainRoute: 'neurokua', promptHint: 'Lecture praticienne NeuroKua centree sur les 4 dynamiques, l axe correctif et les ajustements spatiaux ou sensoriels.' },
-      { key: 'science_triangle', label: 'Numerologie™', description: 'Cycle, vibration et temporalite.', contextType: 'timing', domainRoute: 'timing', promptHint: 'Lecture praticienne de numerologie sur les cycles et la vibration active.' },
-    ],
-  },
-]
+/**
+ * Free plan gets the same science menu but without Fusion Hexastra.
+ * Each science limited to a single request at a time with lighter depth.
+ */
+const freeMenu: HexastraMenuItem[] = scienceMenu.filter(
+  (item) => item.key !== 'science_fusion',
+)
 
-export function getMenuForMode(mode: HexastraMode): HexastraMenuItem[] {
-  return mode === 'praticien' ? practitionerMenu : libreMenu
+export function getMenuForMode(mode: HexastraMode, plan?: string): HexastraMenuItem[] {
+  if (plan === 'free') return freeMenu
+  return scienceMenu
 }
 
 export function findMenuItem(items: HexastraMenuItem[], key?: string | null): HexastraMenuItem | null {

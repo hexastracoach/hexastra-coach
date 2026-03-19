@@ -303,6 +303,30 @@ function depthDirective(depth?: string): string {
   }
 }
 
+function analysisModeDirective(input: BuildPromptInput): string {
+  const parts: string[] = []
+
+  if (input.analysisMode === 'science_by_science') {
+    parts.push('Mode de lecture choisi: SCIENCE PAR SCIENCE. L utilisateur travaille science par science. Respecter l angle de la science selectionnee sans fusion non demandee. Si aucune science n est selectionnee dans le menu, demander laquelle.')
+  } else if (input.analysisMode === 'hexastra_fusion') {
+    parts.push('Mode de lecture choisi: FUSION HEXASTRA. L utilisateur veut une lecture multi-sciences croisee. Toujours croiser au moins 2-3 sciences disponibles et resoudre les contradictions. Privilegier la synthese fusionnee.')
+  }
+
+  if (input.renderMode === 'simple') {
+    parts.push('Niveau de restitution: SIMPLE. Clair, accessible, sans jargon inutile. Structure legere.')
+  } else if (input.renderMode === 'approfondie') {
+    parts.push('Niveau de restitution: APPROFONDIE. Analyse complete, structuree, jargon technique autorise, dynamiques et leviers inclus.')
+  } else if (input.renderMode === 'praticien') {
+    parts.push('Niveau de restitution: SYNTHESE PRATICIEN. Structure obligatoire: Situation / Phase / Dynamique / Risques / Levier / Recommandation. Vocabulaire technique pleinement autorise.')
+  }
+
+  if (input.selectedScience) {
+    parts.push(`Science selectionnee dans le menu: ${input.selectedScience}. Centrer la lecture sur cette science en priorite.`)
+  }
+
+  return parts.join('\n')
+}
+
 function scopeDirective(): string {
   return `
 Perimetre strict:
@@ -416,6 +440,9 @@ Niveau de profondeur maximum: ${planConfig.maxDepth}
 Profondeur de reponse demandee: ${input.responseDepth ?? 'non definie'}
 Contexte d'analyse: ${input.contextType}
 Usage praticien: ${input.practitionerUsage ?? 'non renseigne'}
+Mode d'analyse: ${input.analysisMode ?? 'non defini'}
+Niveau de restitution: ${input.renderMode ?? 'non defini'}
+Science selectionnee: ${input.selectedScience ?? 'aucune'}
 Entree UI: ${labels || 'aucune'}
 Domaine route: ${input.domainRoute ?? 'general'}
 Step de session: ${input.flowStep ?? 'analysis'}
@@ -440,6 +467,7 @@ ${responseStrategyDirective(input)}
 ${stepDirective(input)}
 ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}
+${analysisModeDirective(input)}
 ${scopeDirective()}
 `
 

@@ -53,6 +53,14 @@ export type NormalizedInput = {
   journeyEnabled: boolean
   birthData: BirthProfile | null
   messages: ChatMessage[]
+  /** Selected science key from the science-first menu (e.g. 'astrologie') */
+  selectedScience: string | null
+  /** Selected subcategory key within a science (e.g. 'astro_transits') */
+  selectedSubcategory: string | null
+  /** How the user prefers to read: per science or full fusion */
+  analysisMode: 'science_by_science' | 'hexastra_fusion' | null
+  /** Depth of restitution (praticien plan only) */
+  renderMode: 'simple' | 'approfondie' | 'praticien' | null
 }
 
 export type InferenceResult = {

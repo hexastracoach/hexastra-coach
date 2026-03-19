@@ -5,6 +5,7 @@ import type { PlanKey } from '@/lib/plans'
 import type { UserEvolutionProfile } from '@/types/evolution'
 import { getEntitlements } from './entitlements'
 import type { PractitionerUsage } from './bootstrapTypes'
+import type { AnalysisMode, RenderMode } from '@/lib/hexastra/sciences/scienceTaxonomy'
 
 export type RequestType = 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
 
@@ -128,6 +129,8 @@ export type ChatPayload = {
   selectedSubmenuKey?: string | null
   uiAction?: UiAction
   journeyEnabled?: boolean
+  analysisMode?: AnalysisMode | null
+  renderMode?: RenderMode | null
 }
 
 export function buildChatPayload({
@@ -145,6 +148,8 @@ export function buildChatPayload({
   selectedSubmenuKey = null,
   uiAction = 'send_message',
   journeyEnabled = false,
+  analysisMode = null,
+  renderMode = null,
 }: {
   requestType: RequestType
   plan: PlanKey
@@ -160,6 +165,8 @@ export function buildChatPayload({
   selectedSubmenuKey?: string | null
   uiAction?: UiAction
   journeyEnabled?: boolean
+  analysisMode?: AnalysisMode | null
+  renderMode?: RenderMode | null
 }): ChatPayload {
   const planCtx = buildPlanApiContext(plan)
   const ents = getEntitlements(plan)
@@ -193,5 +200,7 @@ export function buildChatPayload({
     selectedSubmenuKey,
     uiAction,
     journeyEnabled,
+    analysisMode,
+    renderMode,
   }
 }

@@ -1,6 +1,8 @@
 import type { PlanKey } from '@/lib/plans'
 import type { OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
 
+export type { ScienceKey, AnalysisMode, RenderMode } from '@/lib/hexastra/sciences/scienceTaxonomy'
+
 export type HexastraMode = 'libre' | 'libre_avance' | 'libre_approfondi' | 'praticien'
 
 export type FlowStep =
@@ -8,6 +10,8 @@ export type FlowStep =
   | 'birthdata'
   | 'birthdata_missing'
   | 'practitioner_usage'
+  | 'analysis_mode_selection'
+  | 'render_mode_selection'
   | 'micro_profile'
   | 'micro_year'
   | 'micro_month'
@@ -229,4 +233,10 @@ export type BuildPromptInput = {
 
   /** profondeur de réponse selon le plan */
   responseDepth?: 'short' | 'medium' | 'long' | 'expert'
+  /** Mode d'analyse choisi par l'utilisateur au bootstrap */
+  analysisMode?: 'science_by_science' | 'hexastra_fusion' | null
+  /** Niveau de restitution praticien choisi au bootstrap */
+  renderMode?: 'simple' | 'approfondie' | 'praticien' | null
+  /** Science sélectionnée dans le menu (clé du menu level 1) */
+  selectedScience?: string | null
 }
