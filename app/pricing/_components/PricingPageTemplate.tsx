@@ -18,6 +18,7 @@ export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
   const supabase = createClient()
   const [checkoutHref, setCheckoutHref] = useState<string>(`/auth?plan=${planKey}`)
   const [loading, setLoading] = useState(false)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
       return
     }
     setLoading(true)
+    setCheckoutError(null)
     try {
       const { data: session } = await supabase.auth.getSession()
       const token = session.session?.access_token
@@ -53,11 +55,13 @@ export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
       const json = await res.json().catch(() => null)
       if (res.ok && json?.url) {
         window.location.href = json.url
-      } else {
+      } else if (res.status === 401) {
         router.push(`/auth?plan=${planKey}`)
+      } else {
+        setCheckoutError(json?.error ?? 'Une erreur est survenue. Veuillez réessayer.')
       }
     } catch {
-      router.push(`/auth?plan=${planKey}`)
+      setCheckoutError('Impossible de contacter le serveur. Vérifiez votre connexion.')
     } finally {
       setLoading(false)
     }
@@ -118,6 +122,10 @@ export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
           >
             {loading ? t('pricing.loading') ?? 'Redirection…' : plan.cta}
           </Link>
+
+          {checkoutError && (
+            <p className="hx-pricing-checkout-error" role="alert">{checkoutError}</p>
+          )}
 
           <p className="hx-pricing-legal">
             {t('pricing.legal')}

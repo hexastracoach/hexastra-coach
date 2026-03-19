@@ -4,7 +4,7 @@ import { mapDbPlanToPlanKey } from '@/lib/permissions/plan'
 export type StripePriceKey = 'essentiel_monthly' | 'premium_monthly' | 'praticien_monthly'
 
 export const STRIPE_PRICE_MAP: Record<StripePriceKey, string | undefined> = {
-  essentiel_monthly: process.env.STRIPE_ESSENTIEL_MONTHLY,
+  essentiel_monthly: process.env.STRIPE_PRICE_ESSENTIEL_MONTHLY ?? process.env.STRIPE_ESSENTIEL_MONTHLY,
   premium_monthly: process.env.STRIPE_PRICE_PREMIUM_MONTHLY,
   praticien_monthly: process.env.STRIPE_PRICE_PRATICIEN_MONTHLY,
 }
