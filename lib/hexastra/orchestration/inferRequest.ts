@@ -1,6 +1,5 @@
-import { routeUserQuery } from '@/lib/chat/queryRouter'
 import { classifyQuery } from '@/lib/hexastra/router/classifyQuery'
-import type { MenuContract, NormalizedInput, InferenceResult } from './types'
+import type { MenuContract, NormalizedInput, InferenceResult, ScopeResult } from './types'
 
 function includesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text))
@@ -58,10 +57,10 @@ export function inferRequest(params: {
   normalized: NormalizedInput
   menuContract: MenuContract | null
   legacyIntent?: InferenceResult['explicitIntent'] | null
+  scopeResult?: ScopeResult | null
 }): InferenceResult {
-  const { normalized, menuContract, legacyIntent } = params
-  const routing = routeUserQuery(normalized.userMessage)
-  const scopeAllowed = routing.decision === 'allowed'
+  const { normalized, menuContract, legacyIntent, scopeResult } = params
+  const scopeAllowed = scopeResult ? scopeResult.verdict !== 'out_of_universe' : true
   const dominantDomain = menuContract?.route ?? classifyQuery(normalized.userMessage)
   const isShortChoice =
     /^\d{1,2}$/.test(normalized.normalizedUserMessage) ||

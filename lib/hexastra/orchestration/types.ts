@@ -111,6 +111,16 @@ export type PlanContract = {
   }
 }
 
+export type ScopeVerdict = 'in_universe' | 'ambiguous' | 'out_of_universe'
+
+export type ScopeResult = {
+  verdict: ScopeVerdict
+  confidence: number
+  matchedDomains: string[]
+  matchedKeywords: string[]
+  reasonCodes: string[]
+}
+
 export type PolicyDecision = {
   allowed: boolean
   branch: RequestBranch
@@ -122,6 +132,7 @@ export type PolicyDecision = {
   askClarification: boolean
   fallbackMode: FallbackMode
   upsellEligible: boolean
+  needsReframing: boolean
 }
 
 export type ExecutionPlan = {

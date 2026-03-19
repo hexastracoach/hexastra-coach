@@ -18,6 +18,7 @@ export type FlowStep =
   | 'deep_reading'
   | 'sensitive_support'
   | 'quota_limit'
+  | 'out_of_scope'
   | 'error'
 
 export type ContextType =

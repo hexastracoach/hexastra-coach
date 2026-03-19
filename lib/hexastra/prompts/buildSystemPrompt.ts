@@ -303,6 +303,16 @@ function depthDirective(depth?: string): string {
   }
 }
 
+function scopeDirective(): string {
+  return `
+Perimetre strict:
+- Tu es specialise dans l'analyse humaine via les sciences HexAstra (astrologie, numerologie, Human Design, energie Kua, NeuroKua fusion).
+- Si une demande est clairement hors de ce perimetre (code informatique, recette de cuisine, diagnostic medical, devoir scolaire, information generale), decline poliment et invite l'utilisateur a reformuler dans le cadre HexAstra.
+- Ne jamais improviser une reponse hors perimetre pour "faire plaisir".
+- Si la demande est ambigue, cherche d'abord l'angle HexAstra avant de decliner.
+`.trim()
+}
+
 function conversationDirective(_input: BuildPromptInput): string {
   return `
 Style conversationnel obligatoire:
@@ -430,6 +440,7 @@ ${responseStrategyDirective(input)}
 ${stepDirective(input)}
 ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}
+${scopeDirective()}
 `
 
   return applySafetySuffix(base)

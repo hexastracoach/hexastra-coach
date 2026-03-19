@@ -6,6 +6,7 @@ import { decidePolicy } from '@/lib/hexastra/orchestration/policyEngine'
 import { buildExecutionPlan } from '@/lib/hexastra/orchestration/executionPlanner'
 import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
 import { getPlanContract, getPlanQuotaLimit, getQuotaState } from '@/lib/hexastra/orchestration/planContracts'
+import { detectScope } from '@/lib/hexastra/orchestration/detectScope'
 
 describe('orchestration policy layer', () => {
   it('requires clarification when a submenu is selected without a real question', () => {
@@ -111,12 +112,14 @@ describe('orchestration policy layer', () => {
       messages: [{ role: 'user', content: 'Aide moi a corriger une erreur TypeScript dans mon code' }],
     })
 
+    const scopeResult = detectScope(normalized.userMessage)
     const inference = inferRequest({
       normalized,
       menuContract: null,
       legacyIntent: 'conversation',
+      scopeResult,
     })
-    const decision = decidePolicy({ normalized, inference, menuContract: null })
+    const decision = decidePolicy({ normalized, inference, menuContract: null, scopeResult })
 
     expect(inference.scopeAllowed).toBe(false)
     expect(decision.branch).toBe('out_of_scope')

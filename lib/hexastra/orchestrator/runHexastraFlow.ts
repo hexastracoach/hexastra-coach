@@ -58,6 +58,7 @@ import {
 
 import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInput'
 import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
+import { buildScopeRefusalResponse } from '@/lib/hexastra/orchestration/scopeRefusalTemplate'
 import type { OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
@@ -1416,6 +1417,31 @@ export async function runHexastraFlow(input: {
     const needsPreciseBirthContext = requiresPreciseBirthContext(latestUserMessage)
     const isPreciseBirthContextMissing =
       needsPreciseBirthContext && !hasPreciseBirthContext(userContext.birthData)
+
+    if (orchestrationDecision.branch === 'out_of_scope' && input.requestType === 'chat' && !isGreeting) {
+      const message = buildScopeRefusalResponse(userContext.language ?? fallbackLanguage)
+      flowLog('info', 'flow step final', {
+        step: 'out_of_scope',
+        finalMessageLength: message.length,
+      })
+      return {
+        message,
+        reply: message,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: 'out_of_scope', completed: false },
+        menu: { visible: false, items: [] },
+        metadata: {
+          contextType: normalizedContextType,
+          practitionerUsage: userContext.practitionerUsage ?? null,
+          shouldPersistMemory: false,
+          journeyEnabled,
+          orchestrationTrace,
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      }
+    }
 
     if (plan === 'practitioner' && input.requestType === 'chat' && !normalizedPractitionerUsage) {
       const message = buildPractitionerUsageMessage(userContext.language ?? fallbackLanguage)

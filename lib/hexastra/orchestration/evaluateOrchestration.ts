@@ -2,6 +2,7 @@ import { resolveMenuContract } from './menuContracts'
 import { inferRequest } from './inferRequest'
 import { decidePolicy } from './policyEngine'
 import { buildExecutionPlan } from './executionPlanner'
+import { detectScope } from './detectScope'
 import type {
   InferenceResult,
   MenuContract,
@@ -9,11 +10,13 @@ import type {
   OrchestrationTrace,
   PolicyDecision,
   ExecutionPlan,
+  ScopeResult,
 } from './types'
 
 export type OrchestrationEvaluation = {
   menuContract: MenuContract | null
   normalized: NormalizedInput
+  scope: ScopeResult
   inference: InferenceResult
   policy: PolicyDecision
   execution: ExecutionPlan
@@ -61,16 +64,20 @@ export function evaluateOrchestration(params: {
       selectedSubmenuKey: params.normalized.selectedSubmenu,
     })
 
+  const scope = detectScope(params.normalized.userMessage)
+
   const inference = inferRequest({
     normalized: params.normalized,
     menuContract,
     legacyIntent: params.legacyIntent,
+    scopeResult: scope,
   })
 
   const policy = decidePolicy({
     normalized: params.normalized,
     inference,
     menuContract,
+    scopeResult: scope,
   })
 
   const execution = buildExecutionPlan({
@@ -82,6 +89,7 @@ export function evaluateOrchestration(params: {
   return {
     menuContract,
     normalized: params.normalized,
+    scope,
     inference,
     policy,
     execution,

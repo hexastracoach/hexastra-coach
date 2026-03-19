@@ -1,6 +1,6 @@
 import { getPlanContract } from './planContracts'
 import { resolveFallbackMode } from './fallbackPolicy'
-import type { InferenceResult, MenuContract, NormalizedInput, PolicyDecision } from './types'
+import type { InferenceResult, MenuContract, NormalizedInput, PolicyDecision, ScopeResult } from './types'
 
 const DEPTH_RANK = {
   light: 1,
@@ -16,8 +16,9 @@ export function decidePolicy(params: {
   normalized: NormalizedInput
   inference: InferenceResult
   menuContract: MenuContract | null
+  scopeResult?: ScopeResult | null
 }): PolicyDecision {
-  const { normalized, inference, menuContract } = params
+  const { normalized, inference, menuContract, scopeResult } = params
   const planContract = getPlanContract(normalized.plan)
   const reasonCodes: string[] = []
 
@@ -63,6 +64,9 @@ export function decidePolicy(params: {
     menuContract,
   })
 
+  const needsReframing =
+    scopeResult?.verdict === 'ambiguous' && branch !== 'out_of_scope' && branch !== 'quota'
+
   return {
     allowed: branch !== 'out_of_scope' && branch !== 'quota',
     branch,
@@ -76,5 +80,6 @@ export function decidePolicy(params: {
     upsellEligible:
       normalized.quotaState === 'hard_limit' ||
       Boolean(menuContract && !menuContract.planCompatibility.includes(normalized.plan)),
+    needsReframing,
   }
 }
