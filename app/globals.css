@@ -8581,3 +8581,157 @@ select {
   }
 }
 
+
+/* ═══════════════════════════════════════════════════
+   SUGGESTION CHIPS — suggestions contextuelles
+   ═══════════════════════════════════════════════════ */
+
+.hx-suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 2px 0 4px;
+  animation: hx-chips-in 220ms ease both;
+}
+
+@keyframes hx-chips-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.hx-suggestion-chip {
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(113, 227, 212, 0.18);
+  background: rgba(113, 227, 212, 0.06);
+  color: rgba(200, 232, 228, 0.88);
+  font-size: 0.83rem;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;
+  white-space: nowrap;
+}
+
+.hx-suggestion-chip:hover {
+  background: rgba(113, 227, 212, 0.13);
+  border-color: rgba(113, 227, 212, 0.35);
+  color: #71e3d4;
+  transform: translateY(-1px);
+}
+
+.hx-suggestion-chip:active {
+  transform: translateY(0);
+}
+
+/* ═══════════════════════════════════════════════════
+   SCIENCE SELECTOR — sélecteur de sciences scrollable
+   ═══════════════════════════════════════════════════ */
+
+.hx-science-selector {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 6px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  animation: hx-chips-in 200ms ease both;
+}
+
+.hx-science-selector::-webkit-scrollbar {
+  display: none;
+}
+
+.hx-science-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(220, 232, 244, 0.7);
+  font-size: 0.78rem;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 120ms ease;
+}
+
+.hx-science-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(220, 232, 244, 0.95);
+  transform: translateY(-1px);
+}
+
+.hx-science-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.hx-science-btn.is-locked {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+/* Accents par science */
+.hx-science-btn--astrology:hover:not(:disabled) {
+  border-color: rgba(180, 140, 255, 0.4);
+  color: #c9a8ff;
+  background: rgba(180, 140, 255, 0.08);
+}
+.hx-science-btn--numerology:hover:not(:disabled) {
+  border-color: rgba(88, 226, 194, 0.4);
+  color: #58e2c2;
+  background: rgba(88, 226, 194, 0.08);
+}
+.hx-science-btn--human_design:hover:not(:disabled) {
+  border-color: rgba(100, 180, 255, 0.4);
+  color: #7bc8ff;
+  background: rgba(100, 180, 255, 0.08);
+}
+.hx-science-btn--enneagram:hover:not(:disabled) {
+  border-color: rgba(255, 170, 100, 0.4);
+  color: #ffb870;
+  background: rgba(255, 170, 100, 0.08);
+}
+.hx-science-btn--kua:hover:not(:disabled) {
+  border-color: rgba(255, 210, 80, 0.4);
+  color: #ffd860;
+  background: rgba(255, 210, 80, 0.08);
+}
+.hx-science-btn--fusion:hover:not(:disabled) {
+  border-color: rgba(200, 150, 255, 0.5);
+  color: #d4a8ff;
+  background: linear-gradient(135deg, rgba(180,140,255,0.1), rgba(88,226,194,0.1));
+}
+
+.hx-science-btn-icon {
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+.hx-science-btn-label {
+  font-size: 0.78rem;
+}
+
+.hx-science-btn-lock {
+  font-size: 0.6rem;
+  opacity: 0.6;
+  margin-left: 2px;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .hx-suggestion-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .hx-suggestion-chips::-webkit-scrollbar { display: none; }
+  .hx-suggestion-chip { font-size: 0.8rem; padding: 6px 12px; }
+  .hx-science-btn { font-size: 0.74rem; padding: 5px 10px; }
+}

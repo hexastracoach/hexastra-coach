@@ -3,6 +3,7 @@ import { inferRequest } from './inferRequest'
 import { decidePolicy } from './policyEngine'
 import { buildExecutionPlan } from './executionPlanner'
 import { detectScope } from './detectScope'
+import { detectSubcategory } from './detectSubcategory'
 import type {
   InferenceResult,
   MenuContract,
@@ -66,11 +67,15 @@ export function evaluateOrchestration(params: {
 
   const scope = detectScope(params.normalized.userMessage)
 
+  // PRIORITY ABSOLUTE: subcategory > science > intent > fallback
+  const subcategoryDetection = detectSubcategory(params.normalized.userMessage)
+
   const inference = inferRequest({
     normalized: params.normalized,
     menuContract,
     legacyIntent: params.legacyIntent,
     scopeResult: scope,
+    subcategoryDetection: subcategoryDetection.subcategory ? subcategoryDetection : null,
   })
 
   const policy = decidePolicy({
@@ -84,6 +89,7 @@ export function evaluateOrchestration(params: {
     normalized: params.normalized,
     decision: policy,
     menuContract,
+    subcategoryDetection: subcategoryDetection.subcategory ? subcategoryDetection : null,
   })
 
   return {

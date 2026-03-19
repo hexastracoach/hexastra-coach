@@ -152,6 +152,20 @@ export type ExecutionPlan = {
   callMemory: boolean
   callConversationFormatter: boolean
   maxOutputLength: 'short' | 'medium' | 'long'
+  /** Primary detected subcategory key (highest score) */
+  detectedSubcategory: string | null
+  /** Primary detected science */
+  detectedScience: string | null
+  /** All detected subcategory keys, ordered by score */
+  detectedSubcategories: string[]
+  /** All detected sciences (unique) */
+  detectedSciences: string[]
+  /** Response type: structured_data | analysis | fusion_reading (primary match) or fused type */
+  responseType: 'structured_data' | 'analysis' | 'fusion_reading' | 'structured' | 'explanation' | 'fusion' | null
+  /** single | multi | fusion */
+  multiAnalysisMode: 'single' | 'multi' | 'fusion'
+  /** Fusion type when multi-match */
+  fusionType: 'internal' | 'inter_science' | 'hexastra' | null
 }
 
 export type OrchestrationTrace = {

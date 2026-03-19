@@ -38,6 +38,7 @@ import {
   resolveBootstrapUiState,
 } from '@/lib/chat/bootstrapPolicy'
 import { getEntitlements } from '@/lib/chat/entitlements'
+import { readConversationMessages } from '@/lib/hexastra/memory/sessionMemory'
 import { getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import {
@@ -85,6 +86,7 @@ import {
 } from '@/lib/chat/userMemoryEngine'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
+import { buildContextualSuggestions } from '@/lib/chat/suggestions'
 import type {
   ContextType,
   HexastraApiResponse,
@@ -472,6 +474,13 @@ export default function ChatPageClient() {
   const lastUserMessage = userMessages[userMessages.length - 1]?.content ?? ''
   const lastAssistantMessage =
     [...messages].reverse().find((message) => message.role === 'assistant')?.content ?? ''
+
+  const contextualSuggestions = useMemo(
+    () => buildContextualSuggestions({ messages, plan: userPlan }),
+    // Recalcule uniquement quand le dernier message ou le plan change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages.length, userPlan],
+  )
   const pendingReadingRequest = [...userMessages]
     .reverse()
     .find((message) => {
@@ -880,6 +889,23 @@ export default function ChatPageClient() {
     } catch {}
   }, [conversationId])
 
+  // Reload conversation history from Supabase after a page refresh
+  useEffect(() => {
+    if (!conversationId || messages.length > 0) return
+    readConversationMessages(supabase, conversationId).then((rows) => {
+      if (rows.length === 0) return
+      setMessages(
+        rows.map((r) => ({
+          id: r.id,
+          role: r.role,
+          content: r.content,
+          created_at: r.created_at,
+        })),
+      )
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId])
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.birthData)
@@ -1238,6 +1264,7 @@ export default function ChatPageClient() {
               : 'Mode Praticien',
         date: new Date().toISOString(),
         preview: lastAssistant.content.slice(0, 220),
+        fullContent: lastAssistant.content,
       }
 
       persistReadings([reading, ...readings].slice(0, 80))
@@ -1673,7 +1700,7 @@ export default function ChatPageClient() {
       {
         id: `reading-${reading.id}`,
         role: 'assistant',
-        content: `Lecture sauvegardÃ©e\n\n${reading.preview}`,
+        content: reading.fullContent ?? reading.preview,
         created_at: reading.date,
       },
     ])
@@ -1731,6 +1758,13 @@ export default function ChatPageClient() {
     onBirthFormOpen: () => setShowInlineBirthForm((v) => !v),
     highlightBirth: isWelcome && !isBirthDataComplete(birthData),
     disabled: !bootstrapUi.chatReady || isMicroBootstrapPending || isLimitReached || isTyping,
+    // Suggestions contextuelles dynamiques
+    suggestions: bootstrapUi.chatReady && !isLimitReached ? contextualSuggestions : [],
+    onSuggestionSelect: (v: string) => void handleSend(v),
+    // Sélecteur de sciences
+    showScienceSelector: bootstrapUi.chatReady && !isLimitReached,
+    onScienceSelect: (prompt: string) => void handleSend(prompt),
+    sciencePlan: userPlan,
   }
 
   return (

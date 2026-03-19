@@ -21,6 +21,8 @@ describe('birth bootstrap and location normalization', () => {
       planLoaded: true,
       plan: 'free',
       practitionerUsage: null,
+      analysisMode: null,
+      renderMode: null,
       birthData: COMPLETE_BIRTH_DATA,
       microReadings: {
         profileKey: null,
@@ -38,6 +40,8 @@ describe('birth bootstrap and location normalization', () => {
       planLoaded: true,
       plan: 'free',
       practitionerUsage: null,
+      analysisMode: null,
+      renderMode: null,
       birthData: COMPLETE_BIRTH_DATA,
       microReadings: {
         profileKey: null,

@@ -38,6 +38,26 @@ export async function ensureConversation(
   }
 }
 
+export async function readConversationMessages(
+  supabase: SupabaseClient | null,
+  conversationId: string | null,
+  limit = 100,
+): Promise<{ id: string; role: 'user' | 'assistant'; content: string; created_at: string }[]> {
+  if (!supabase || !conversationId) return []
+  try {
+    const { data, error } = await supabase
+      .from('conversation_messages')
+      .select('id, role, content, created_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(limit)
+    if (error || !data) return []
+    return data as { id: string; role: 'user' | 'assistant'; content: string; created_at: string }[]
+  } catch {
+    return []
+  }
+}
+
 export async function persistConversationMessage(
   supabase: SupabaseClient | null,
   conversationId: string,

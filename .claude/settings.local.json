@@ -5,7 +5,11 @@
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
       "Bash(xargs grep:*)",
-      "Bash(ls -la c:/Users/colom/Documents/GitHub/hexastra-coach/.env*)"
+      "Bash(ls -la c:/Users/colom/Documents/GitHub/hexastra-coach/.env*)",
+      "Bash(grep -r conversation_messages /c/Users/colom/Documents/GitHub/hexastra-coach/lib /c/Users/colom/Documents/GitHub/hexastra-coach/app --include=*.ts --include=*.tsx)",
+      "Bash(grep -r \"select.*conversation_messages\\\\|\\\\.select\\\\\\(\\\\\\).*conversation_messages\" /c/Users/colom/Documents/GitHub/hexastra-coach --include=*.ts --include=*.tsx)",
+      "Bash(grep -r \"getConversation\\\\|loadConversation\\\\|readConversation\" /c/Users/colom/Documents/GitHub/hexastra-coach --include=*.ts --include=*.tsx)",
+      "Bash(npx vitest:*)"
     ]
   }
 }

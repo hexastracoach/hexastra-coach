@@ -23,6 +23,7 @@ export type Reading = {
   science: string
   date: string
   preview: string
+  fullContent?: string
   projectId?: string
 }
 

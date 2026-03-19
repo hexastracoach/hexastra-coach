@@ -1,5 +1,7 @@
 import { classifyQuery } from '@/lib/hexastra/router/classifyQuery'
 import type { MenuContract, NormalizedInput, InferenceResult, ScopeResult } from './types'
+import type { SubcategoryDetectionResult } from './detectSubcategory'
+import type { DomainRoute } from '@/lib/hexastra/types'
 
 function includesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text))
@@ -53,15 +55,43 @@ function inferExplicitIntent(params: {
   return 'analysis'
 }
 
+/** Map a single SubcategoryScience to DomainRoute */
+function scienceToDomainRoute(science: string): DomainRoute {
+  switch (science) {
+    case 'kua': return 'neurokua'
+    case 'hexastra_fusion': return 'fusion'
+    default: return 'science'
+  }
+}
+
+/** Resolve dominant domain for multi-science detection */
+function resolveDominantDomain(
+  subcategoryDetection: SubcategoryDetectionResult | null | undefined,
+  menuContract: MenuContract | null,
+  userMessage: string,
+): DomainRoute {
+  if (!subcategoryDetection?.primary) {
+    return menuContract?.route ?? classifyQuery(userMessage)
+  }
+  const uniqueSciences = [...new Set(subcategoryDetection.matches.map((m) => m.science))]
+  // Multiple different sciences → fusion route
+  if (uniqueSciences.length >= 2) return 'fusion'
+  // Single science (possibly multiple subcats) → map to route
+  return scienceToDomainRoute(subcategoryDetection.primary.science)
+}
+
 export function inferRequest(params: {
   normalized: NormalizedInput
   menuContract: MenuContract | null
   legacyIntent?: InferenceResult['explicitIntent'] | null
   scopeResult?: ScopeResult | null
+  subcategoryDetection?: SubcategoryDetectionResult | null
 }): InferenceResult {
-  const { normalized, menuContract, legacyIntent, scopeResult } = params
+  const { normalized, menuContract, legacyIntent, scopeResult, subcategoryDetection } = params
   const scopeAllowed = scopeResult ? scopeResult.verdict !== 'out_of_universe' : true
-  const dominantDomain = menuContract?.route ?? classifyQuery(normalized.userMessage)
+
+  // PRIORITY ABSOLUTE: subcategory > science > menu > classifyQuery > fallback
+  const dominantDomain: DomainRoute = resolveDominantDomain(subcategoryDetection, menuContract, normalized.userMessage)
   const isShortChoice =
     /^\d{1,2}$/.test(normalized.normalizedUserMessage) ||
     /^niveau\s*\d+$/.test(normalized.normalizedUserMessage)

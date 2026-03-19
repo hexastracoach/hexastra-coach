@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { QUICK_PROMPTS } from '../_lib/chat'
+import SuggestionChips from './SuggestionChips'
+import ScienceSelector from './ScienceSelector'
+import type { PlanKey } from '@/types/subscription'
 
 type Props = {
   value: string
@@ -15,6 +17,13 @@ type Props = {
   onBirthFormOpen?: () => void
   highlightBirth?: boolean
   disabled?: boolean
+  /** Suggestions contextuelles dynamiques */
+  suggestions?: string[]
+  onSuggestionSelect?: (value: string) => void
+  /** Sélecteur de sciences */
+  showScienceSelector?: boolean
+  onScienceSelect?: (prompt: string) => void
+  sciencePlan?: PlanKey
 }
 
 export default function Composer({
@@ -29,6 +38,11 @@ export default function Composer({
   onBirthFormOpen,
   highlightBirth,
   disabled,
+  suggestions,
+  onSuggestionSelect,
+  showScienceSelector,
+  onScienceSelect,
+  sciencePlan = 'free',
 }: Props) {
   const [focused, setFocused] = useState(false)
   const [recording, setRecording] = useState(false)
@@ -92,10 +106,26 @@ export default function Composer({
 
   return (
     <div className="hx-composer-wrap">
-      {/* Quick prompts */}
-      {showQuickPrompts && (
+      {/* Science selector */}
+      {showScienceSelector && onScienceSelect && (
+        <ScienceSelector
+          plan={sciencePlan}
+          onSelect={(prompt) => {
+            onScienceSelect(prompt)
+          }}
+          disabled={disabled}
+        />
+      )}
+
+      {/* Suggestions contextuelles dynamiques */}
+      {suggestions && suggestions.length > 0 && onSuggestionSelect && (
+        <SuggestionChips suggestions={suggestions} onSelect={onSuggestionSelect} />
+      )}
+
+      {/* Quick prompts legacy (gardé pour compat) */}
+      {showQuickPrompts && !suggestions?.length && (
         <div className="hx-composer-suggestions">
-          {QUICK_PROMPTS.map((p) => (
+          {['Découvrir mon profil', 'Comprendre mon ascendant', 'Faire un bilan', 'Analyser ma situation'].map((p) => (
             <button key={p} type="button" onClick={() => onQuickPrompt(p)} className="hx-chip">
               {p}
             </button>
