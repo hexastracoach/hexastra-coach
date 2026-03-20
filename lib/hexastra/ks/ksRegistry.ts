@@ -345,8 +345,12 @@ export function getKsSelectionExecutionContract(key?: string | null): KsExecutio
   }
 }
 
+function deaccent(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function getKsFreeformContract(message?: string | null): KsSelectionConfig | null {
-  const text = (message ?? '').toLowerCase()
+  const text = deaccent((message ?? '').toLowerCase())
   if (!text.trim()) return null
 
   if (text.includes('theme natal') || text.includes('theme astral') || text.includes('carte du ciel')) {

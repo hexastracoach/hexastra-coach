@@ -1,7 +1,11 @@
 import type { DomainRoute } from '@/lib/hexastra/types'
 
+function deaccent(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
 export function classifyQuery(message: string): DomainRoute {
-  const text = message.toLowerCase()
+  const text = deaccent((message || '').toLowerCase())
   const refersToHumanDesign =
     /(human design|porteum)/i.test(text) ||
     (/\bhd\b/i.test(text) && /(porte|portes|canal|canaux|centre|centres|profil|autorite|strategie)/i.test(text))
