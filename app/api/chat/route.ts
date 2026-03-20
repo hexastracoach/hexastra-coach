@@ -26,6 +26,8 @@ import { getPlanQuotaLimit, getPlanResponseDepth, getQuotaState } from '@/lib/he
 import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInput'
 import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
 import type { ExecutionPlan, OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
+import { updateUserEvolutionProfile } from '@/lib/evolution/evolutionEngine'
+import type { UserEvolutionProfile } from '@/types/evolution'
 
 const memoryCache = new Map<string, { value: unknown; expires: number }>()
 const CACHE_TTL_MS = 10 * 60 * 1000
@@ -1152,12 +1154,32 @@ export async function POST(req: NextRequest) {
           menuVisible: enriched?.menu?.visible ?? finalResponse?.menu?.visible,
           intentDetected: postQuotaInference.explicitIntent,
         })
+        // ── Evolution memory — pure sync, zero latency ──────────────────
+        const assistantReply =
+          typeof (normalizedEnriched as Record<string, unknown>).message === 'string'
+            ? ((normalizedEnriched as Record<string, unknown>).message as string)
+            : typeof (normalizedEnriched as Record<string, unknown>).reply === 'string'
+              ? ((normalizedEnriched as Record<string, unknown>).reply as string)
+              : typeof (normalizedEnriched as Record<string, unknown>).content === 'string'
+                ? ((normalizedEnriched as Record<string, unknown>).content as string)
+                : ''
+
+        const evolutionDecision = updateUserEvolutionProfile({
+          userMessage: lastUserMessage,
+          assistantResponse: assistantReply,
+          currentProfile: (requestedEvolutionProfile as UserEvolutionProfile | null) ?? null,
+        })
+
         const finalStatus = normalizedEnriched.flowState?.step === 'error' ? 500 : 200
         return NextResponse.json(
           {
             ...normalizedEnriched,
             plan: effectivePlan,
             mode: effectivePlan,
+            // Retourné au client → sauvegardé en localStorage par ChatPageClient
+            updatedEvolutionProfile: evolutionDecision.shouldUpdate
+              ? evolutionDecision.nextProfile
+              : (requestedEvolutionProfile ?? null),
             metadata: {
               ...(((normalizedEnriched as ChatResponsePayload)?.metadata as Record<string, unknown> | undefined) ??
                 ((finalResponse as ChatResponsePayload)?.metadata as Record<string, unknown> | undefined) ??

@@ -87,6 +87,8 @@ import {
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import MenuDock from './MenuDock'
 import { buildContextualSuggestions } from '@/lib/chat/suggestions'
+import { buildUserInsights } from '@/lib/hexastra/memory/insightEngine'
+import MemoryHint from './MemoryHint'
 import type {
   ContextType,
   HexastraApiResponse,
@@ -480,6 +482,12 @@ export default function ChatPageClient() {
     // Recalcule uniquement quand le dernier message ou le plan change
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [messages.length, userPlan],
+  )
+
+  const activeInsight = useMemo(
+    () => buildUserInsights(messages).dominant,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages.length],
   )
   const pendingReadingRequest = [...userMessages]
     .reverse()
@@ -1890,6 +1898,15 @@ export default function ChatPageClient() {
 
           <div className="hx-app-bottom">
             <div className="hx-app-composer-wrap">
+              {/* Memory hint — affiché subtilement quand un pattern récurrent est détecté */}
+              {activeInsight && activeInsight.confidence >= 0.55 && bootstrapUi.chatReady && !isLimitReached && (
+                <MemoryHint
+                  hint={activeInsight.memoryHint}
+                  suggestionPrompt={activeInsight.suggestionPrompt}
+                  onPrompt={(v) => void handleSend(v)}
+                />
+              )}
+
               {showInlineBirthForm && (
                 <div className="hx-inline-birth">
                   <BirthDataInlineForm

@@ -174,6 +174,12 @@ export type SessionStateRecord = {
   last_timing?: TimingIntensity | string | null
   last_precision?: PrecisionLevel | string | null
   last_reading_level?: string | null
+  /** Dernière science utilisée (ex: 'astrology', 'numerology') */
+  last_science_used?: string | null
+  /** Dernière sous-catégorie détectée (ex: 'transits', 'ascendant') */
+  last_subcategory?: string | null
+  /** Dernier mode d'analyse choisi */
+  last_analysis_mode?: 'science_by_science' | 'hexastra_fusion' | null
 }
 
 export type UserMemoryRecord = {
@@ -239,4 +245,9 @@ export type BuildPromptInput = {
   renderMode?: 'simple' | 'approfondie' | 'praticien' | null
   /** Science sélectionnée dans le menu (clé du menu level 1) */
   selectedScience?: string | null
+  /**
+   * Profil d'évolution utilisateur — envoyé depuis le client (localStorage).
+   * Injecté dans le prompt système via buildEvolutionContext().
+   */
+  evolutionProfile?: Record<string, unknown> | null
 }

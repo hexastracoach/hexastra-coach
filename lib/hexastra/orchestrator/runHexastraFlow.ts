@@ -2039,6 +2039,8 @@ export async function runHexastraFlow(input: {
       precision: sessionContext.precision,
       retrievalProfile,
       responseStrategy,
+      evolutionProfile: input.evolutionProfile ?? null,
+      messages: limitedMessages,
     })
 
     const messagesForLLM = limitedMessages.length

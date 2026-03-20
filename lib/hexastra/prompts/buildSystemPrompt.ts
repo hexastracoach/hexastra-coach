@@ -1,5 +1,8 @@
 import { PLAN_MODE_MAP } from '@/lib/hexastra/config/planModeMap'
 import { applySafetySuffix } from '@/lib/hexastra/guards/safety'
+import { buildEvolutionContext } from '@/lib/evolution/evolutionContextBuilder'
+import { buildInsightContext } from '@/lib/hexastra/memory/insightEngine'
+import type { UserEvolutionProfile } from '@/types/evolution'
 import type { BuildPromptInput } from '@/lib/hexastra/types'
 
 function modeDirective(mode: BuildPromptInput['mode']): string {
@@ -471,5 +474,18 @@ ${analysisModeDirective(input)}
 ${scopeDirective()}
 `
 
-  return applySafetySuffix(base)
+  // ── Mémoire utilisateur (< 200 tokens) ──────────────────────────────
+  const evolutionBlock = buildEvolutionContext(
+    (input.evolutionProfile as UserEvolutionProfile | null | undefined) ?? null,
+  )
+  const insightBlock = buildInsightContext(input.messages ?? [])
+
+  const memorySection = [
+    evolutionBlock.block,
+    insightBlock,
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  return applySafetySuffix(memorySection ? `${base}\n${memorySection}` : base)
 }
