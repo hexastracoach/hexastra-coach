@@ -60,6 +60,13 @@ import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInpu
 import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
 import { buildScopeRefusalResponse } from '@/lib/hexastra/orchestration/scopeRefusalTemplate'
 import type { OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
+import {
+  requiresExactData,
+  hasResolvedExactData,
+  formatExactDataBlock,
+  buildExactDataAuditLog,
+} from '@/lib/hexastra/guards/exactDataGuard'
+import { buildExactDataUnavailableResponse } from '@/lib/hexastra/guards/exactDataResponse'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
@@ -1142,6 +1149,7 @@ export async function runHexastraFlow(input: {
   requestType: 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
   birthData: BirthProfile | null
   practitionerUsage: PractitionerUsageHex
+  practitionerContext?: PractitionerUsageHex
   contextType?: ContextType
   selectedMenuKey?: string | null
   selectedSubmenuKey?: string | null
@@ -1150,6 +1158,8 @@ export async function runHexastraFlow(input: {
   messages: ChatMessage[]
   evolutionProfile?: Record<string, unknown> | null
   journeyEnabled?: boolean
+  analysisMode?: 'science_by_science' | 'hexastra_fusion' | null
+  renderMode?: 'simple' | 'approfondie' | 'praticien' | null
 }): Promise<HexastraApiResponse> {
   flowLog('info', 'enter runHexastraFlow', {
     plan: input.plan,
@@ -1390,10 +1400,13 @@ export async function runHexastraFlow(input: {
       uiAction,
       contextType: selectedContextType,
       practitionerUsage: userContext.practitionerUsage ?? normalizedPractitionerUsage,
+      practitionerContext: input.practitionerContext ?? normalizedPractitionerUsage,
       conversationId,
       hasExplicitGuidance: Boolean(selectedMenuKey || selectedSubmenuKey || uiAction !== 'send_message'),
       journeyEnabled,
       messages: limitedMessages,
+      analysisMode: input.analysisMode ?? null,
+      renderMode: input.renderMode ?? null,
     })
     const orchestration = evaluateOrchestration({
       normalized: orchestrationNormalized,
@@ -1845,10 +1858,77 @@ export async function runHexastraFlow(input: {
       }
       flowLog('warn', 'fallback module used', { domainRoute, source: specializedResult.source })
     }
+    // ── Exact Data Guard ────────────────────────────────────────────────────
+    // For subcategories that require deterministic calculated data (ascendant,
+    // houses, HD type, Kua number, etc.), block the LLM response if the API
+    // could not resolve the exact data. Never let the LLM hallucinate.
+    const detectedSubcategoryForGuard = orchestrationExecution.detectedSubcategory
+    const exactDataNeeded = requiresExactData(detectedSubcategoryForGuard)
+    const exactDataResolved = hasResolvedExactData(specializedResult)
+
+    // Build birth data field list for diagnostic (used in refusal message)
+    const birthDataForGuard = normalizeBirthData(userContext.birthData)
+    const presentBirthFields = [
+      birthDataForGuard?.firstName?.trim() ? 'prénom' : null,
+      birthDataForGuard?.date?.trim() ?? birthDataForGuard?.birthDateISO?.trim() ? 'date de naissance' : null,
+      birthDataForGuard?.time?.trim() ? 'heure de naissance' : null,
+      birthDataForGuard?.place?.trim() ? 'lieu de naissance' : null,
+    ].filter(Boolean) as string[]
+    const needsPreciseTime = ['ascendant', 'maisons', 'theme_natal'].includes(detectedSubcategoryForGuard ?? '')
+    const missingBirthFields: string[] = []
+    if (!birthDataForGuard?.firstName?.trim()) missingBirthFields.push('prénom')
+    if (!birthDataForGuard?.date?.trim() && !birthDataForGuard?.birthDateISO?.trim()) missingBirthFields.push('date de naissance')
+    if (needsPreciseTime && !birthDataForGuard?.time?.trim()) missingBirthFields.push("heure de naissance (indispensable pour l'ascendant et les maisons)")
+    if (!birthDataForGuard?.place?.trim()) missingBirthFields.push('lieu de naissance')
+
+    // Audit log
+    const auditLog = buildExactDataAuditLog({
+      subcategory: detectedSubcategoryForGuard,
+      requiresExact: exactDataNeeded,
+      resolvedExact: exactDataResolved,
+      hasRaw: Boolean(specializedResult?.raw && Object.keys(specializedResult.raw).length > 0),
+      specializedSource: specializedResult?.source ?? null,
+      birthDataPresent: presentBirthFields.length >= 3,
+      birthDataFields: presentBirthFields,
+    })
+    flowLog('info', 'exact_data_audit', auditLog)
+
+    if (exactDataNeeded && !exactDataResolved && input.requestType === 'chat') {
+      const refusalMessage = buildExactDataUnavailableResponse({
+        language: userContext.language ?? fallbackLanguage,
+        subcategory: detectedSubcategoryForGuard!,
+        missingBirthFields,
+      })
+      flowLog('warn', 'exact_data_guard_triggered', {
+        subcategory: detectedSubcategoryForGuard,
+        missingFields: missingBirthFields,
+        specializedSource: specializedResult?.source ?? null,
+      })
+      return {
+        message: refusalMessage,
+        reply: refusalMessage,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: 'analysis', completed: false },
+        menu: { visible: false, items: [] },
+        metadata: {
+          contextType: normalizedContextType,
+          practitionerUsage: userContext.practitionerUsage ?? null,
+          shouldPersistMemory: false,
+          journeyEnabled,
+          orchestrationTrace,
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      }
+    }
+
     flowLog('info', 'specializedResult', {
       hasResult: Boolean(specializedResult),
       source: specializedResult?.source,
       shouldUseApiBackbone,
+      exactDataNeeded,
+      exactDataResolved,
     })
     const selectionModules =
       selectionExecutionContract?.modules ??
@@ -2014,6 +2094,12 @@ export async function runHexastraFlow(input: {
       birthDataComplete: isBirthComplete(userContext.birthData),
     })
 
+    // Build exact data block to inject into the system prompt when raw data is available
+    const exactDataBlockForPrompt =
+      exactDataNeeded && exactDataResolved && specializedResult?.raw
+        ? formatExactDataBlock(specializedResult.raw)
+        : null
+
     const systemPrompt = buildSystemPrompt({
       plan,
       mode,
@@ -2021,6 +2107,7 @@ export async function runHexastraFlow(input: {
       firstName: userContext.firstName ?? userContext.name ?? null,
       contextType: normalizedContextType,
       practitionerUsage: userContext.practitionerUsage ?? null,
+      practitionerContext: input.practitionerContext ?? normalizedPractitionerUsage,
       selectedMenuLabel,
       selectedSubmenuLabel,
       selectedPromptHint,
@@ -2041,6 +2128,10 @@ export async function runHexastraFlow(input: {
       responseStrategy,
       evolutionProfile: input.evolutionProfile ?? null,
       messages: limitedMessages,
+      analysisMode: input.analysisMode ?? null,
+      renderMode: input.renderMode ?? null,
+      exactDataBlock: exactDataBlockForPrompt,
+      requiresExactData: exactDataNeeded,
     })
 
     const messagesForLLM = limitedMessages.length

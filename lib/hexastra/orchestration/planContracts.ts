@@ -18,6 +18,9 @@ export const PLAN_CONTRACTS: Record<PlanKey, PlanContract> = {
       clientUsage: false,
       scienceMenu: false,
       externalCalculation: true,
+      allowedAnalysisModes: [],
+      allowedRenderModes: [],
+      allowsPractitionerContext: false,
     },
     fallback: {
       quotaExceeded: 'quota_notice',
@@ -42,6 +45,9 @@ export const PLAN_CONTRACTS: Record<PlanKey, PlanContract> = {
       clientUsage: false,
       scienceMenu: true,
       externalCalculation: true,
+      allowedAnalysisModes: ['science_by_science', 'hexastra_fusion'],
+      allowedRenderModes: [],
+      allowsPractitionerContext: false,
     },
     fallback: {
       quotaExceeded: 'quota_notice',
@@ -66,6 +72,9 @@ export const PLAN_CONTRACTS: Record<PlanKey, PlanContract> = {
       clientUsage: false,
       scienceMenu: true,
       externalCalculation: true,
+      allowedAnalysisModes: ['science_by_science', 'hexastra_fusion'],
+      allowedRenderModes: ['simple', 'approfondie'],
+      allowsPractitionerContext: false,
     },
     fallback: {
       quotaExceeded: 'quota_notice',
@@ -90,6 +99,9 @@ export const PLAN_CONTRACTS: Record<PlanKey, PlanContract> = {
       clientUsage: true,
       scienceMenu: true,
       externalCalculation: true,
+      allowedAnalysisModes: ['science_by_science', 'hexastra_fusion'],
+      allowedRenderModes: ['simple', 'approfondie', 'praticien'],
+      allowsPractitionerContext: true,
     },
     fallback: {
       quotaExceeded: 'quota_notice',

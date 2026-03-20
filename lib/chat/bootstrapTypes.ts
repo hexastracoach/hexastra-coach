@@ -3,7 +3,7 @@ import type { PlanKey } from '@/lib/plans'
 
 export type { Lang, PlanKey }
 
-export type PractitionerUsage = 'personal' | 'client' | null
+export type PractitionerUsage = 'personal' | 'client' | 'duo' | null
 
 /** Keys track whether each micro-reading is current and valid */
 export type MicroReadings = {
@@ -25,6 +25,7 @@ export type BootstrapStep =
 
 export const MICRO_READINGS_STORAGE_KEY = 'hexastra.micro.v1'
 export const PRACTITIONER_USAGE_KEY = 'hexastra.practitioner.usage'
+export const PRACTITIONER_CONTEXT_KEY = 'hexastra.practitioner.context'
 export const ANALYSIS_MODE_KEY = 'hexastra.analysis.mode'
 export const RENDER_MODE_KEY = 'hexastra.render.mode'
 export const BIRTH_AUTO_INTRO_STORAGE_KEY = 'hexastra.birthIntro.completed.v1'

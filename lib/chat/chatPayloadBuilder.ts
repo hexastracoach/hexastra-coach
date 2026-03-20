@@ -119,7 +119,7 @@ export type ChatPayload = {
   practitionerEnabled: boolean
   longResponseAllowed: boolean
   professionalUseAllowed: boolean
-  practitionerUsage: PractitionerUsage | 'self' | 'client'
+  practitionerUsage: PractitionerUsage | 'self' | 'client' | 'duo'
   birthData: ApiBirthData | null
   partnerBirthData?: ApiBirthData | null
   messages: ChatMessage[]

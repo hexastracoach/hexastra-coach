@@ -758,6 +758,14 @@ export async function POST(req: NextRequest) {
     const bodyRecord = body as Record<string, unknown>
     const normalizedBirthData = normalizeBirthData(bodyRecord.birthData)
     const normalizedPractitionerUsage = normalizePractitionerUsage(bodyRecord.practitionerUsage)
+    const requestedAnalysisMode =
+      bodyRecord.analysisMode === 'science_by_science' || bodyRecord.analysisMode === 'hexastra_fusion'
+        ? (bodyRecord.analysisMode as 'science_by_science' | 'hexastra_fusion')
+        : null
+    const requestedRenderMode =
+      bodyRecord.renderMode === 'simple' || bodyRecord.renderMode === 'approfondie' || bodyRecord.renderMode === 'praticien'
+        ? (bodyRecord.renderMode as 'simple' | 'approfondie' | 'praticien')
+        : null
     const normalizedContextType = normalizeContextType(bodyRecord.contextType)
     const normalizedUiAction = normalizeUiAction(bodyRecord.uiAction)
     const requestedLanguage = resolveRequestedLanguage(bodyRecord, sanitizedMessages)
@@ -789,10 +797,13 @@ export async function POST(req: NextRequest) {
       language: requestedLanguage,
       birthData: normalizedBirthData,
       practitionerUsage: normalizedPractitionerUsage,
+      practitionerContext: normalizedPractitionerUsage,
       conversationId: requestedApiConversationId,
       messages: sanitizedMessages,
       evolutionProfile: requestedEvolutionProfile,
       journeyEnabled,
+      analysisMode: requestedAnalysisMode,
+      renderMode: requestedRenderMode,
     }
 
     const preQuotaEvaluation = evaluateOrchestration({
@@ -809,10 +820,13 @@ export async function POST(req: NextRequest) {
         uiAction: normalizedUiAction,
         contextType: normalizedContextType,
         practitionerUsage: normalizedPractitionerUsage,
+        practitionerContext: normalizedPractitionerUsage,
         conversationId: requestedApiConversationId,
         hasExplicitGuidance: explicitGuidance,
         journeyEnabled,
         messages: sanitizedMessages,
+        analysisMode: requestedAnalysisMode,
+        renderMode: requestedRenderMode,
       }),
       legacyIntent: intentLocal,
     })
@@ -991,10 +1005,13 @@ export async function POST(req: NextRequest) {
         uiAction: normalizedUiAction,
         contextType: normalizedContextType,
         practitionerUsage: normalizedPractitionerUsage,
+        practitionerContext: normalizedPractitionerUsage,
         conversationId: requestedApiConversationId,
         hasExplicitGuidance: explicitGuidance,
         journeyEnabled,
         messages: sanitizedMessages,
+        analysisMode: requestedAnalysisMode,
+        renderMode: requestedRenderMode,
       }),
       legacyIntent: intentLocal,
       menuContract,
@@ -1226,7 +1243,7 @@ function normalizeUiAction(value: unknown): UiAction {
 }
 
 function normalizePractitionerUsage(value: unknown): PractitionerUsageHex {
-  if (value === 'self' || value === 'client') return value
+  if (value === 'self' || value === 'client' || value === 'duo') return value
   if (value === 'personal') return 'self'
   return null
 }

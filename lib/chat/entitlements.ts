@@ -13,6 +13,8 @@ export type Entitlements = {
   canSelectAnalysisMode: boolean
   /** Ask render depth (praticien only) */
   canSelectRenderMode: boolean
+  /** Ask self / client / duo context (practitioner plan only) */
+  canSelectPractitionerContext: boolean
   chatMode: ChatMode
   maxTokens: number
 }
@@ -38,6 +40,7 @@ export function getEntitlements(plan: PlanKey): Entitlements {
     canAskPractitionerUsage: contract.features.clientUsage,
     canSelectAnalysisMode: plan !== 'free',
     canSelectRenderMode: contract.features.practitionerStructure,
+    canSelectPractitionerContext: contract.features.allowsPractitionerContext,
     chatMode,
     maxTokens,
   }

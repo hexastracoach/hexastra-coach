@@ -59,6 +59,7 @@ export function buildNormalizedInput(params: {
   renderMode?: 'simple' | 'approfondie' | 'praticien' | null
   selectedScience?: string | null
   selectedSubcategory?: string | null
+  practitionerContext?: 'self' | 'client' | 'duo' | null
 }): NormalizedInput {
   const birthDataCompleteness = resolveBirthDataCompleteness(params.birthData)
 
@@ -87,5 +88,6 @@ export function buildNormalizedInput(params: {
     renderMode: params.renderMode ?? null,
     selectedScience: params.selectedScience ?? null,
     selectedSubcategory: params.selectedSubcategory ?? null,
+    practitionerContext: params.practitionerContext ?? null,
   }
 }

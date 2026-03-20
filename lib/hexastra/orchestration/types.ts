@@ -29,6 +29,8 @@ export type RequestBranch =
   | 'clarification'
   | 'out_of_scope'
   | 'quota'
+  | 'collect_analysis_choices'
+  | 'collect_practitioner_choices'
 export type OrchestrationResponseDepth = 'short' | 'medium' | 'long' | 'expert'
 export type MenuDataRequirement = 'none' | 'birth_basic' | 'birth_precise'
 
@@ -61,6 +63,8 @@ export type NormalizedInput = {
   analysisMode: 'science_by_science' | 'hexastra_fusion' | null
   /** Depth of restitution (praticien plan only) */
   renderMode: 'simple' | 'approfondie' | 'praticien' | null
+  /** Practitioner context: self = personal, client = for a client, duo = crossed reading (practitioner plan only) */
+  practitionerContext: 'self' | 'client' | 'duo' | null
 }
 
 export type InferenceResult = {
@@ -110,6 +114,12 @@ export type PlanContract = {
     clientUsage: boolean
     scienceMenu: boolean
     externalCalculation: boolean
+    /** Which analysisMode values are unlocked (empty = none) */
+    allowedAnalysisModes: ('science_by_science' | 'hexastra_fusion')[]
+    /** Which renderMode values are unlocked (empty = none) */
+    allowedRenderModes: ('simple' | 'approfondie' | 'praticien')[]
+    /** Whether PractitionerContext (self/client/duo) selection is unlocked */
+    allowsPractitionerContext: boolean
   }
   fallback: {
     quotaExceeded: FallbackMode

@@ -316,15 +316,96 @@ function analysisModeDirective(input: BuildPromptInput): string {
   }
 
   if (input.renderMode === 'simple') {
-    parts.push('Niveau de restitution: SIMPLE. Clair, accessible, sans jargon inutile. Structure legere.')
+    parts.push('Niveau de restitution: SIMPLE. Clair, accessible, sans jargon inutile. Structure legere. 1 a 3 paragraphes fluides.')
   } else if (input.renderMode === 'approfondie') {
-    parts.push('Niveau de restitution: APPROFONDIE. Analyse complete, structuree, jargon technique autorise, dynamiques et leviers inclus.')
+    parts.push('Niveau de restitution: APPROFONDIE. Analyse complete, structuree, jargon technique autorise, dynamiques et leviers inclus. 4 a 6 sections de contenu dense.')
   } else if (input.renderMode === 'praticien') {
-    parts.push('Niveau de restitution: SYNTHESE PRATICIEN. Structure obligatoire: Situation / Phase / Dynamique / Risques / Levier / Recommandation. Vocabulaire technique pleinement autorise.')
+    parts.push(`Niveau de restitution: SYNTHESE PRATICIEN PROFESSIONNEL.
+Structure obligatoire en 7 sections (titres visibles, format professionnel):
+1. **Situation** — Reformulation precise du contexte clinique ou de la demande.
+2. **Phase** — Periode de vie ou cycle actif (astrologique, numerologique, HD, Kua).
+3. **Dynamique** — Motif ou tension principale en jeu. Ce qui se passe reellement.
+4. **Risques** — Points de vigilance identifies. Ce qui peut freiner, bloquer ou aggraver.
+5. **Levier** — La force ou ressource principale actionnable maintenant.
+6. **Recommandation** — Orientation nette, 1 action prioritaire ou 1 direction concrete.
+7. **Notes praticien** — Elements complementaires pour le praticien: sources KS activees, nuances a surveiller, hypotheses secondaires si pertinentes.
+Vocabulaire technique pleinement autorise. Ton professionnel, dense, direct.
+Interdire: tournures floues, phrases de consolation, longueur ornementale.
+Ce format est reserve a l usage praticien uniquement. Ne jamais l utiliser sur d autres plans.`)
   }
 
   if (input.selectedScience) {
     parts.push(`Science selectionnee dans le menu: ${input.selectedScience}. Centrer la lecture sur cette science en priorite.`)
+  }
+
+  return parts.join('\n')
+}
+
+function practitionerContextDirective(input: BuildPromptInput): string {
+  if (input.plan !== 'practitioner') return ''
+
+  const ctx = input.practitionerContext
+  if (!ctx) return ''
+
+  if (ctx === 'self') {
+    return `Contexte praticien: USAGE PERSONNEL.
+- L utilisateur effectue une lecture pour lui-meme dans un cadre praticien.
+- Ton: analytique, direct, sans condescendance.
+- Privilegier la lisibilite professionnelle meme pour une lecture personnelle.`
+  }
+
+  if (ctx === 'client') {
+    return `Contexte praticien: USAGE CLIENT.
+- Le praticien effectue une lecture pour un(e) client(e).
+- Les donnees de naissance utilisees sont celles du client, pas du praticien.
+- Ton: objectif, analytique, comme un rapport de consultation.
+- Ne jamais adresser le texte directement au client final (utiliser "votre client" ou "la personne" si besoin de reference).
+- Structurer la restitution pour faciliter l usage professionnel du praticien.`
+  }
+
+  if (ctx === 'duo') {
+    return `Contexte praticien: LECTURE CROISEE DEUX PERSONNES.
+- Analyse de la dynamique entre deux individus.
+- Deux profils de naissance sont disponibles (profil principal + profil secondaire).
+- Structure la lecture en 3 niveaux:
+  1. Profil individuel A (personne 1)
+  2. Profil individuel B (personne 2)
+  3. Dynamique croisee: complementarites, tensions, leviers relationnels
+- Utiliser les sciences compatibles avec la lecture relationnelle (synastrie, compatibilite numerologique, Kua relationnel, HD connexion).
+- Identifier clairement le role de chaque profil dans la dynamique.
+- Ton: professionnel, analytique, sans romanticisme ni jugement.`
+  }
+
+  return ''
+}
+
+function exactDataDirective(input: BuildPromptInput): string {
+  if (!input.exactDataBlock && !input.requiresExactData) return ''
+
+  const parts: string[] = []
+
+  if (input.exactDataBlock) {
+    parts.push(`
+DONNÉES EXACTES CALCULÉES — SOURCE DE VÉRITÉ ABSOLUE:
+${input.exactDataBlock}
+
+RÈGLES STRICTES SUR CES DONNÉES:
+- Ces valeurs sont calculées de façon déterministe. Elles sont exactes.
+- Ne jamais les corriger, remplacer, compléter ou nuancer par d'autres valeurs.
+- Ne jamais citer une valeur différente pour les champs listés ci-dessus.
+- L'interprétation doit partir de ces données, pas les ignorer.
+- Si une donnée semble incohérente, la citer telle quelle et noter l'observation, ne jamais substituer.
+`.trim())
+  }
+
+  if (input.requiresExactData && !input.exactDataBlock) {
+    parts.push(`
+AVERTISSEMENT DONNÉES EXACTES:
+Cette lecture concerne des données qui doivent être calculées (ascendant, type HD, nombre Kua, etc.).
+- INTERDIT: inventer, estimer ou approximer ces valeurs.
+- Si des données calculées ne sont pas disponibles dans le contexte, indiquer honnêtement qu'elles ne peuvent pas être fournies sans calcul API.
+- Ne jamais produire une réponse interprétative comme si la donnée existait alors qu'elle est absente.
+`.trim())
   }
 
   return parts.join('\n')
@@ -443,6 +524,7 @@ Niveau de profondeur maximum: ${planConfig.maxDepth}
 Profondeur de reponse demandee: ${input.responseDepth ?? 'non definie'}
 Contexte d'analyse: ${input.contextType}
 Usage praticien: ${input.practitionerUsage ?? 'non renseigne'}
+Contexte praticien: ${input.practitionerContext ?? 'non defini'}
 Mode d'analyse: ${input.analysisMode ?? 'non defini'}
 Niveau de restitution: ${input.renderMode ?? 'non defini'}
 Science selectionnee: ${input.selectedScience ?? 'aucune'}
@@ -471,6 +553,8 @@ ${stepDirective(input)}
 ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}
 ${analysisModeDirective(input)}
+${practitionerContextDirective(input)}
+${exactDataDirective(input)}
 ${scopeDirective()}
 `
 

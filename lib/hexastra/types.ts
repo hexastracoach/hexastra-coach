@@ -45,7 +45,8 @@ export type UiAction =
   | 'send_message'
   | 'restart_flow'
 
-export type PractitionerUsageHex = 'self' | 'client' | null
+export type PractitionerUsageHex = 'self' | 'client' | 'duo' | null
+export type PractitionerContext = 'self' | 'client' | 'duo'
 
 export type BirthProfile = {
   name?: string
@@ -245,6 +246,15 @@ export type BuildPromptInput = {
   renderMode?: 'simple' | 'approfondie' | 'praticien' | null
   /** Science sélectionnée dans le menu (clé du menu level 1) */
   selectedScience?: string | null
+  /** Contexte praticien: self = perso, client = pour un client, duo = lecture croisée 2 personnes */
+  practitionerContext?: 'self' | 'client' | 'duo' | null
+  /**
+   * Bloc de données exactes calculées (ascendant, type HD, nombre Kua, etc.).
+   * Injecté dans le prompt comme source de vérité — le LLM ne doit jamais contredire ces valeurs.
+   */
+  exactDataBlock?: string | null
+  /** Whether this request requires exact calculated data */
+  requiresExactData?: boolean
   /**
    * Profil d'évolution utilisateur — envoyé depuis le client (localStorage).
    * Injecté dans le prompt système via buildEvolutionContext().

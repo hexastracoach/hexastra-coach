@@ -18,7 +18,7 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
       </div>
 
       <div className="hx-practitioner-step-meta">
-        <span className="hx-practitioner-step-meta-kicker">Type d'usage</span>
+        <span className="hx-practitioner-step-meta-kicker">Type d&apos;usage</span>
         <p className="hx-practitioner-step-question">Cette analyse est pour :</p>
       </div>
 
@@ -47,6 +47,20 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
             <span className="hx-practitioner-btn-kicker">Usage client</span>
             <strong>2 - Usage client</strong>
             <span className="hx-practitioner-btn-sub">Lecture pour un(e) client(e)</span>
+            <span className="hx-practitioner-btn-cta">Ouvrir ce cadre</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="hx-practitioner-btn"
+          onClick={() => onSelect('duo')}
+        >
+          <span className="hx-practitioner-btn-icon" aria-hidden="true">3</span>
+          <span className="hx-practitioner-btn-copy">
+            <span className="hx-practitioner-btn-kicker">Lecture croisee</span>
+            <strong>3 - Lecture croisee</strong>
+            <span className="hx-practitioner-btn-sub">Analyse de la dynamique entre deux personnes</span>
             <span className="hx-practitioner-btn-cta">Ouvrir ce cadre</span>
           </span>
         </button>
