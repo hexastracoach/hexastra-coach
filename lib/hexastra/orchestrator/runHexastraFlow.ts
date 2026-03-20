@@ -80,6 +80,7 @@ import {
   asksForHDProfile,
   isReliableHumanDesignProfile,
 } from '@/lib/humandesign/profile'
+import { buildCompactHumanDesignContext } from '@/lib/humandesign/compactContext'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
@@ -1383,8 +1384,20 @@ export async function runHexastraFlow(input: {
         semanticCtx.contextType === 'astro_exact' ||
         semanticCtx.contextType === 'astro_followup'
 
+      // human_design_exact: HD chart request ("design humain", "mon hd", "bodygraph", etc.)
+      const isHumanDesignExact = semanticCtx.contextType === 'human_design_exact'
+
+      if (isHumanDesignExact) {
+        flowLog('info', 'HUMAN_DESIGN_EXACT_DETECTED', {
+          message: latestUserMessage.slice(0, 80),
+          confidence: semanticCtx.confidence,
+          action: 'routing to HD exact pipeline — no vector search — API backbone forced',
+        })
+      }
+
       const blockMicroProfile =
         isAstroExact ||
+        isHumanDesignExact ||
         (semanticCtx.contextType !== 'profile' &&
           semanticCtx.contextType !== 'unknown' &&
           semanticCtx.confidence >= 0.8)
@@ -1394,6 +1407,7 @@ export async function runHexastraFlow(input: {
         confidence: semanticCtx.confidence,
         fromHistory: semanticCtx.fromHistory ?? false,
         isAstroExact,
+        isHumanDesignExact,
         blockMicroProfile,
         message: latestUserMessage.slice(0, 80),
       })
@@ -1899,15 +1913,15 @@ export async function runHexastraFlow(input: {
       specializedSource: null,
     }) as any
 
-    // ── Skip vector retrieval for astro_exact requests ────────────────────
-    // When isAstroExact, the exact data from Railway is already the source of truth.
-    // Vector search adds latency, 400 errors, and unnecessary knowledge blocks
-    // that bloat the prompt and trigger OpenAI timeout on free plan.
-    const skipVectorRetrieval = isAstroExact
+    // ── Skip vector retrieval for astro_exact / human_design_exact requests ──
+    // When exact data from Railway is the source of truth, vector search adds latency,
+    // 400 errors, and unnecessary knowledge blocks that bloat the prompt.
+    const skipVectorRetrieval = isAstroExact || isHumanDesignExact
     if (skipVectorRetrieval) {
-      flowLog('info', 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_ASTRO', {
+      flowLog('info', isHumanDesignExact ? 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_HUMAN_DESIGN' : 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_ASTRO', {
         semanticContextType: semanticCtx.contextType,
         isAstroExact,
+        isHumanDesignExact,
         reason: 'exact data from Railway is source of truth — vector search unnecessary',
       })
     }
@@ -1970,9 +1984,10 @@ export async function runHexastraFlow(input: {
 
     const domainConfigForApi = getKsDomainConfig(effectiveDomainForApi)
 
-    // Force API call for astro exact requests and any subcategory requiring deterministic data
+    // Force API call for astro/HD exact requests and any subcategory requiring deterministic data
     const shouldUseApiBackbone =
       isAstroExact ||
+      isHumanDesignExact ||
       isExactDataSubcategory ||
       effectiveExecutionContract?.executionStrategy === 'api_first' ||
       (!effectiveExecutionContract && domainConfigForApi.executionStrategy === 'api_first')
@@ -2099,6 +2114,14 @@ export async function runHexastraFlow(input: {
       birthDataFields: presentBirthFields,
     })
     flowLog('info', 'exact_data_audit', auditLog)
+
+    if (isHumanDesignExact && exactDataResolved) {
+      flowLog('info', 'HUMAN_DESIGN_EXACT_DATA_RESOLVED', {
+        subcategory: detectedSubcategoryForGuard,
+        rawKeys: specializedResult?.raw ? Object.keys(specializedResult.raw).length : 0,
+        source: specializedResult?.source ?? null,
+      })
+    }
 
     if (exactDataNeeded && !exactDataResolved && input.requestType === 'chat') {
       const birthDataComplete = missingBirthFields.length === 0 && presentBirthFields.length >= 3
@@ -2369,6 +2392,44 @@ export async function runHexastraFlow(input: {
       }
     }
 
+    // ── Human Design Exact Compact route flag ─────────────────────────────────
+    // Activates when: semantic context is human_design_exact AND exact data resolved.
+    // Effects: skip vector search (already done), compact HD context block logged.
+    const isHumanDesignExactCompact = isHumanDesignExact && exactDataResolved
+
+    if (isHumanDesignExactCompact) {
+      flowLog('info', 'HUMAN_DESIGN_ROUTE_SELECTED', {
+        subcategory: detectedSubcategoryForGuard,
+        semanticContextType: semanticCtx.contextType,
+        plan,
+        exactDataResolved,
+        action: 'HD compact context — no vector knowledge — reduced history',
+      })
+
+      if (specializedResult?.raw) {
+        const hdCompactCtx = buildCompactHumanDesignContext(specializedResult.raw)
+        flowLog('info', 'HUMAN_DESIGN_COMPACT_CONTEXT_BUILT', {
+          hdType: hdCompactCtx.hdType,
+          hdProfile: hdCompactCtx.hdProfile,
+          hdAuthority: hdCompactCtx.hdAuthority,
+          hdStrategy: hdCompactCtx.hdStrategy,
+          hdSignature: hdCompactCtx.hdSignature,
+          hdNotSelfTheme: hdCompactCtx.hdNotSelfTheme,
+          hdDefinedCentersCount: hdCompactCtx.hdDefinedCenters.length,
+          hdOpenCentersCount: hdCompactCtx.hdOpenCenters.length,
+          hdActivatedGatesCount: hdCompactCtx.hdActivatedGates.length,
+          compactDataBlockChars: hdCompactCtx.compactDataBlock.length,
+        })
+      }
+    } else if (isHumanDesignExact && !exactDataResolved) {
+      flowLog('warn', 'HUMAN_DESIGN_RENDER_BLOCKED_NO_RELIABLE_DATA', {
+        subcategory: detectedSubcategoryForGuard,
+        hasSpecializedResult: Boolean(specializedResult),
+        hasRaw: Boolean(specializedResult?.raw),
+        reason: 'exact data not resolved — cannot guarantee HD values — fallback to general flow',
+      })
+    }
+
     // ── Deterministic HD profile block ───────────────────────────────────────
     // When the user asks for their HD profile and exact data is resolved,
     // extract personalityLine/designLine deterministically from raw API data
@@ -2376,6 +2437,8 @@ export async function runHexastraFlow(input: {
     let hdProfileBlock: string | null = null
     const isHdProfileSubcategory =
       detectedSubcategoryForGuard === 'profil_hd' ||
+      detectedSubcategoryForGuard === 'human_design_exact' ||
+      isHumanDesignExact ||
       asksForHDProfile(latestUserMessage)
 
     if (isHdProfileSubcategory && exactDataResolved && specializedResult?.raw) {
@@ -2437,7 +2500,7 @@ export async function runHexastraFlow(input: {
       exactDataBlock: exactDataBlockForPrompt,
       requiresExactData: exactDataNeeded,
       hdProfileBlock,
-      isAstroExactCompact,
+      isAstroExactCompact: isAstroExactCompact || isHumanDesignExactCompact,
     })
 
     const messagesForLLM = limitedMessages.length
@@ -2453,15 +2516,16 @@ export async function runHexastraFlow(input: {
       flowStep,
       readingPacket,
       knowledgePacket,
-      isAstroExactCompact,
+      isAstroExactCompact: isAstroExactCompact || isHumanDesignExactCompact,
     })
 
-    if (isAstroExactCompact) {
-      flowLog('info', 'OPENAI_PAYLOAD_REDUCED_FOR_EXACT_ASTRO', {
+    if (isAstroExactCompact || isHumanDesignExactCompact) {
+      flowLog('info', isHumanDesignExactCompact ? 'HUMAN_DESIGN_ROUTE_SELECTED' : 'OPENAI_PAYLOAD_REDUCED_FOR_EXACT_ASTRO', {
         systemPromptChars: systemPrompt.length,
         inputMessages: payload.input.length,
         maxOutputTokens: payload.max_output_tokens,
         plan,
+        isHumanDesignExactCompact,
         hint: 'compact route: no knowledge packets, 2-msg history, compact system prompt',
       })
     }
@@ -2472,25 +2536,27 @@ export async function runHexastraFlow(input: {
     // Compact route: use a tighter timeout budget since the payload is much smaller.
     // Non-compact astro_exact: bump free plan from 13s to 20s to accommodate the
     // larger exact data block that may still be present.
-    const openAiTimeoutMs = isAstroExactCompact
-      ? Math.min(resolveOpenAiTimeoutMs(plan), 18000)   // compact: at most 18s (fast path)
-      : isAstroExact
-        ? Math.max(resolveOpenAiTimeoutMs(plan), 20000) // non-compact astro: at least 20s
+    const isCompactRoute = isAstroExactCompact || isHumanDesignExactCompact
+    const openAiTimeoutMs = isCompactRoute
+      ? Math.min(resolveOpenAiTimeoutMs(plan), 18000)    // compact: at most 18s (fast path)
+      : (isAstroExact || isHumanDesignExact)
+        ? Math.max(resolveOpenAiTimeoutMs(plan), 20000)  // non-compact exact: at least 20s
         : resolveOpenAiTimeoutMs(plan)
 
     // ── Max output tokens ─────────────────────────────────────────────────
     // buildChatPayload already sets 900 for compact; keep previous free-plan cap for non-compact.
     const effectiveMaxOutputTokens =
-      !isAstroExactCompact && plan === 'free' && (isAstroExact || isExactDataSubcategory)
+      !isCompactRoute && plan === 'free' && (isAstroExact || isHumanDesignExact || isExactDataSubcategory)
         ? Math.min(payload.max_output_tokens ?? 950, 700)
         : payload.max_output_tokens
 
-    if (isAstroExactCompact) {
+    if (isCompactRoute) {
       flowLog('info', 'TIMEOUT_SAFE_MODE_ENABLED', {
         openAiTimeoutMs,
         effectiveMaxOutputTokens,
         plan,
         isAstroExactCompact,
+        isHumanDesignExactCompact,
       })
     }
 
@@ -2508,16 +2574,24 @@ export async function runHexastraFlow(input: {
     const totalMs = Date.now() - flowStartMs
 
     if (openAiMs < openAiTimeoutMs) {
-      flowLog('info', isAstroExactCompact ? 'ASTRO_EXACT_RENDER_SUCCESS' : '[FLOW] openai success', {
+      const successLabel = isHumanDesignExactCompact
+        ? 'HUMAN_DESIGN_RENDER_SUCCESS'
+        : isAstroExactCompact ? 'ASTRO_EXACT_RENDER_SUCCESS' : '[FLOW] openai success'
+      flowLog('info', successLabel, {
         openAiMs,
         openAiTimeoutMs,
         isAstroExactCompact,
+        isHumanDesignExactCompact,
       })
     } else {
-      flowLog('warn', isAstroExactCompact ? 'ASTRO_EXACT_RENDER_TIMEOUT' : '[FLOW] openai near-timeout', {
+      const timeoutLabel = isHumanDesignExactCompact
+        ? 'HUMAN_DESIGN_RENDER_SUCCESS'
+        : isAstroExactCompact ? 'ASTRO_EXACT_RENDER_TIMEOUT' : '[FLOW] openai near-timeout'
+      flowLog('warn', timeoutLabel, {
         openAiMs,
         openAiTimeoutMs,
         isAstroExactCompact,
+        isHumanDesignExactCompact,
       })
     }
 

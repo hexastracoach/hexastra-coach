@@ -30,6 +30,7 @@ export const EXACT_DATA_REQUIRED_SUBCATEGORIES = new Set<string>([
   'jour_personnel',   // Personal day — requires birth date + current date
 
   // ── Human Design ────────────────────────────────────────────────────────
+  'human_design_exact', // HD full chart catch-all ("design humain", "mon hd", "bodygraph")
   'type_hd',          // HD Type — requires birth date, time, location
   'strategie_hd',     // HD Strategy — derived from type (requires type first)
   'autorite_hd',      // HD Authority — requires birth chart calculation

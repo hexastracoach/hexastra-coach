@@ -332,6 +332,20 @@ export const SUBCATEGORY_ENTRIES: SubcategoryEntry[] = [
       /\b(compatibilit[eé] hd|compatibilit[eé] human design|comparison hd|connexion hd)\b/i,
     ],
   },
+  {
+    // Catch-all for generic HD chart requests: "design humain", "human design", "bodygraph", "mon hd"
+    // French word order "design humain" ≠ "human design" — must be explicit here.
+    // Does NOT match specific subcategories (profil_hd, type_hd, etc.) to preserve their weight priority.
+    // Weight kept low (4) so any specific HD subcategory match always wins on score.
+    key: 'human_design_exact',
+    science: 'human_design',
+    responseType: 'structured_data',
+    weight: 4,
+    patterns: [
+      /\b(design humain|human design|bodygraph|mon hd complet|mon design humain|quel est mon design|hd complet)\b/i,
+      /\b(mon hd|lecture (hd|human design))\b/i,
+    ],
+  },
 
   // ─────────────────────────────────────────────
   // ENNEAGRAM

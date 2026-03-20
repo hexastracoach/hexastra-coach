@@ -7,8 +7,9 @@ function deaccent(s: string): string {
 export function classifyQuery(message: string): DomainRoute {
   const text = deaccent((message || '').toLowerCase())
   const refersToHumanDesign =
-    /(human design|porteum)/i.test(text) ||
-    (/\bhd\b/i.test(text) && /(porte|portes|canal|canaux|centre|centres|profil|autorite|strategie)/i.test(text))
+    /(human design|design humain|bodygraph|porteum)/i.test(text) ||
+    /\bmon hd\b/i.test(text) ||
+    (/\bhd\b/i.test(text) && /(porte|portes|canal|canaux|centre|centres|profil|autorite|strategie|type|design)/i.test(text))
 
   if (/(\bkua\b|direction|orientation|boussole|feng|gps)/i.test(text)) return 'gps_kua'
   if (/(theme natal|theme astral|carte du ciel|hexastral)/i.test(text)) return 'fusion'

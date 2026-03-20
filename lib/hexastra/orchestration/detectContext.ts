@@ -17,14 +17,15 @@
 import type { ChatMessage } from '@/lib/chat/chatPayloadBuilder'
 
 export type SemanticContextType =
-  | 'profile'           // Who am I? My nature, my strengths (generic profile read)
-  | 'astro_exact'       // Explicit astrology calculation: natal chart, transits, aspects, houses
-  | 'astro_followup'    // Short contradiction / re-check after a previous astro exact turn
-  | 'current'           // What's happening now? My current situation
-  | 'timing'            // Future phases, upcoming periods, cycles
-  | 'decision'          // Should I? Which option? What to choose?
-  | 'compatibility'     // My relationship with another person
-  | 'unknown'           // Could not determine — use fallback routing
+  | 'profile'              // Who am I? My nature, my strengths (generic profile read)
+  | 'astro_exact'          // Explicit astrology calculation: natal chart, transits, aspects, houses
+  | 'astro_followup'       // Short contradiction / re-check after a previous astro exact turn
+  | 'human_design_exact'   // Human Design chart request: type, profile, authority, centers, gates
+  | 'current'              // What's happening now? My current situation
+  | 'timing'               // Future phases, upcoming periods, cycles
+  | 'decision'             // Should I? Which option? What to choose?
+  | 'compatibility'        // My relationship with another person
+  | 'unknown'              // Could not determine — use fallback routing
 
 export type SemanticContext = {
   contextType: SemanticContextType
@@ -131,10 +132,21 @@ export function detectContext(message: string, history?: ChatMessage[]): Semanti
     return { contextType: 'astro_exact', confidence: 0.95 }
   }
 
+  // ── HUMAN_DESIGN_EXACT — HD chart request (type, profil, autorité, centres, etc.) ──
+  // Must fire BEFORE 'profile' — "mon design humain" is HD-exact, not a generic profile read.
+  // Covers: "design humain", "human design", "mon hd", "bodygraph", "mon type + profil + autorité" combos.
+  if (
+    /(design humain|human design|bodygraph|mon hd complet|mon (type|profil|autorit[eé]) (hd|human design)|type hd|profil hd|autorit[eé] hd|strat[eé]gie hd|centres? hd|portes? hd|canaux hd|ma croix (d.incarnation|hd)|d[eé]finition hd|quel est mon (type|profil|design)|mon design|mes centres d[eé]finis|mes portes activ[eé]es?|ma d[eé]finition hd|projector|manifestor|manifesteur|g[eé]n[eé]rateur|r[eé]flecteur)/.test(
+      text,
+    )
+  ) {
+    return { contextType: 'human_design_exact', confidence: 0.93 }
+  }
+
   // ── PROFILE — who am I, my nature (generic, non-astro) ───────────────────
   // Intentionally excludes astro-specific patterns (covered above)
   if (
-    /(qui suis-?je|mon profil|ma nature profonde|mes forces|mes talents|mes potentiels|mes atouts|connaitre mon profil|who am i|my profile|my chart|my nature|my strengths|my talents|ma personnalite|mon type hd|mon profil hd|mon profil numerologique|mon chemin de vie|mon nombre|mon type (human design|hd))/.test(
+    /(qui suis-?je|mon profil|ma nature profonde|mes forces|mes talents|mes potentiels|mes atouts|connaitre mon profil|who am i|my profile|my chart|my nature|my strengths|my talents|ma personnalite|mon profil numerologique|mon chemin de vie|mon nombre)/.test(
       text,
     )
   ) {
