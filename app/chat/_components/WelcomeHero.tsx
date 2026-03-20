@@ -19,12 +19,12 @@ const entryCards = [
     text: 'Décris ce que tu traverses, ton dilemme ou ta question. Pas besoin de tout expliquer — le point de départ suffit.',
   },
   {
-    title: 'La lecture s'ajuste à toi.',
-    text: 'Le système approfondit seulement quand c'est utile. L'expérience reste légère, même si le moteur est dense.',
+    title: "La lecture s'ajuste à toi.",
+    text: "Le système approfondit seulement quand c'est utile. L'expérience reste légère, même si le moteur est dense.",
   },
   {
     title: 'Plusieurs angles, une seule lecture.',
-    text: 'HexAstra croise plusieurs approches d'observation humaine pour donner une image plus complète de ta situation.',
+    text: "HexAstra croise plusieurs approches d'observation humaine pour donner une image plus complète de ta situation.",
   },
 ]
 
