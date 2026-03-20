@@ -6,10 +6,10 @@ const metadataBaseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim() || 'https://hex
 
 export const metadata: Metadata = {
   metadataBase: new URL(metadataBaseUrl),
-  title: 'HexAstra - Comprenez votre moment de vie',
+  title: 'HexAstra — Clarté intérieure, décisions, profondeur',
   description:
-    'HexAstra analyse votre situation et vous donne des cles concretes pour vos relations, vos decisions et votre evolution personnelle.',
-  keywords: ['astrologie', 'human design', 'analyse personnelle', 'IA', 'lecture natale'],
+    'HexAstra lit ta situation à travers plusieurs angles d\'observation humaine — astrologie, Human Design, numérologie — pour t\'aider à décider, comprendre et avancer avec plus de clarté.',
+  keywords: ['astrologie', 'human design', 'numérologie', 'clarté intérieure', 'lecture de situation', 'IA'],
   authors: [{ name: 'HexAstra' }],
   alternates: {
     canonical: '/',
@@ -28,8 +28,8 @@ export const metadata: Metadata = {
     shortcut: '/favicon/favicon-32x32.png',
   },
   openGraph: {
-    title: 'HexAstra - Comprenez votre moment de vie',
-    description: 'Analyse personnalisee par IA. Astrologie. Human Design. PDF + Audio.',
+    title: 'HexAstra — Clarté intérieure, décisions, profondeur',
+    description: 'Lecture de situation par IA — astrologie, Human Design, numérologie. Un espace pour comprendre ce que tu traverses.',
     url: 'https://hexastra.app',
     siteName: 'HexAstra',
     images: [
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
         url: '/social/hexastra-og-image.png',
         width: 1200,
         height: 1200,
-        alt: 'HexAstra - Intelligence Personnelle',
+        alt: 'HexAstra — GPS intérieur',
       },
     ],
     locale: 'fr_FR',
@@ -45,8 +45,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'HexAstra - Comprenez votre moment de vie',
-    description: 'Analyse personnalisee par IA. Astrologie. Human Design. PDF + Audio.',
+    title: 'HexAstra — Clarté intérieure, décisions, profondeur',
+    description: 'Lecture de situation par IA — astrologie, Human Design, numérologie. Un espace pour comprendre ce que tu traverses.',
     images: ['/social/hexastra-twitter.png'],
   },
   manifest: '/manifest.json',

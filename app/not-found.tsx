@@ -12,17 +12,17 @@ export default function NotFound() {
         </Link>
 
         <div className="hx-error-code">404</div>
-        <h1 className="hx-error-title">Page introuvable</h1>
+        <h1 className="hx-error-title">On ne trouve pas cette page.</h1>
         <p className="hx-error-lead">
-          Cette page n&apos;existe pas ou a été déplacée.
+          L&apos;adresse a peut-être changé. Reviens à l&apos;accueil — tout est là.
         </p>
 
         <div className="hx-error-actions">
           <Link href="/" className="hx-error-btn-primary">
-            Retour à l&apos;accueil
+            Revenir à l&apos;accueil
           </Link>
           <Link href="/chat" className="hx-error-btn-secondary">
-            Ouvrir le coach
+            Ouvrir HexAstra
           </Link>
         </div>
       </div>

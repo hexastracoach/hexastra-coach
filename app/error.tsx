@@ -25,9 +25,9 @@ export default function GlobalError({
         </Link>
 
         <div className="hx-error-code">500</div>
-        <h1 className="hx-error-title">Une erreur inattendue s&apos;est produite</h1>
+        <h1 className="hx-error-title">Quelque chose n&apos;a pas fonctionné.</h1>
         <p className="hx-error-lead">
-          Quelque chose s&apos;est mal passé de notre côté. Nos équipes ont été notifiées.
+          Une erreur de notre côté. Nos équipes en sont informées. Tu peux réessayer — ça devrait passer.
         </p>
 
         <div className="hx-error-actions">
@@ -35,7 +35,7 @@ export default function GlobalError({
             Réessayer
           </button>
           <Link href="/" className="hx-error-btn-secondary">
-            Retour à l&apos;accueil
+            Revenir à l&apos;accueil
           </Link>
         </div>
 

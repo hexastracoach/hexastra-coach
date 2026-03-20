@@ -10,10 +10,10 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
   return (
     <div className="hx-practitioner-step">
       <div className="hx-practitioner-step-head">
-        <span className="hx-practitioner-step-kicker">Mode praticien</span>
-        <p className="hx-practitioner-step-question">Mode Praticien actif.</p>
+        <span className="hx-practitioner-step-kicker">Mode Praticien</span>
+        <p className="hx-practitioner-step-question">Tu es en mode Praticien.</p>
         <p className="hx-practitioner-step-copy">
-          Ce mode permet une analyse plus precise, plus structuree, et un vocabulaire plus technique si utile.
+          Ce mode permet une analyse plus précise, plus structurée, et un vocabulaire plus technique si utile.
         </p>
       </div>
 
@@ -32,7 +32,7 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
           <span className="hx-practitioner-btn-copy">
             <span className="hx-practitioner-btn-kicker">Usage personnel</span>
             <strong>1 - Usage personnel</strong>
-            <span className="hx-practitioner-btn-sub">Lecture pour moi-meme</span>
+            <span className="hx-practitioner-btn-sub">Lecture pour moi-même</span>
             <span className="hx-practitioner-btn-cta">Ouvrir ce cadre</span>
           </span>
         </button>
@@ -58,8 +58,8 @@ export default function PractitionerUsageStep({ onSelect }: Props) {
         >
           <span className="hx-practitioner-btn-icon" aria-hidden="true">3</span>
           <span className="hx-practitioner-btn-copy">
-            <span className="hx-practitioner-btn-kicker">Lecture croisee</span>
-            <strong>3 - Lecture croisee</strong>
+            <span className="hx-practitioner-btn-kicker">Lecture croisée</span>
+            <strong>3 - Lecture croisée</strong>
             <span className="hx-practitioner-btn-sub">Analyse de la dynamique entre deux personnes</span>
             <span className="hx-practitioner-btn-cta">Ouvrir ce cadre</span>
           </span>

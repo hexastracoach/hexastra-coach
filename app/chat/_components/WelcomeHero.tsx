@@ -7,24 +7,24 @@ type WelcomeHeroProps = {
 }
 
 const quickPrompts = [
-  'Je me sens bloqué en ce moment',
-  'Est-ce le bon timing pour agir ?',
-  'Pourquoi cette relation me travaille autant ?',
-  'Quelle direction devient plus naturelle ?',
+  ‘Je me sens bloqué en ce moment.’,
+  ‘Est-ce le bon moment pour agir ?’,
+  ‘Pourquoi cette relation me prend autant de place ?’,
+  ‘Quelle direction semble la plus juste pour moi ?’,
 ]
 
 const entryCards = [
   {
-    title: 'Clarté immédiate',
-    text: 'Tu poses ton ressenti, ton dilemme ou ta question. HexAstra commence simple, sans te noyer dans la matière.',
+    title: ‘Tu poses. HexAstra écoute.’,
+    text: ‘Décris ce que tu traverses, ton dilemme ou ta question. Pas besoin de tout expliquer — le point de départ suffit.’,
   },
   {
-    title: 'Lecture guidée',
-    text: 'Le système approfondit seulement quand c’est utile. L’expérience reste légère, même si le moteur est dense.',
+    title: ‘La lecture s’ajuste à toi.’,
+    text: ‘Le système approfondit seulement quand c’est utile. L’expérience reste légère, même si le moteur est dense.’,
   },
   {
-    title: 'Confort durable',
-    text: 'L’interface est pensée pour rester longtemps sans fatigue visuelle, mentale ou émotionnelle.',
+    title: ‘Plusieurs angles, une seule lecture.’,
+    text: ‘HexAstra croise plusieurs approches d’observation humaine pour donner une image plus complète de ta situation.’,
   },
 ]
 
@@ -60,7 +60,7 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
               fontFamily: DS.monoFont,
             }}
           >
-            Interface de clarté assistée par IA
+            GPS intérieur — HexAstra
           </div>
 
           <div
@@ -86,11 +86,11 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
               fontFamily: DS.titleFont,
             }}
           >
-            Un espace clair
+            Ce que tu portes
             <br />
-            pour retrouver
+            mérite d’être
             <br />
-            de l’air intérieur.
+            compris.
           </h1>
 
           <p
@@ -102,16 +102,16 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
               maxWidth: 720,
             }}
           >
-            HexAstra t’aide à lire ton moment sans te noyer dans la complexité. Tu commences par parler. Le système écoute, clarifie, puis approfondit seulement si c’est nécessaire.
+            Pose ce que tu traverses — une situation, un doute, une décision. HexAstra croise plusieurs angles d’observation pour t’aider à voir ce qui se joue vraiment.
           </p>
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 24 }}>
             <button onClick={() => onPrompt('Je veux une lecture claire de ma situation actuelle.')} style={primaryButton}>
-              Commencer maintenant
+              Commencer ma lecture
             </button>
 
             <button onClick={() => onPrompt('Explique-moi comment fonctionne HexAstra Coach.')} style={secondaryButton}>
-              Comprendre le fonctionnement
+              Comment ça fonctionne ?
             </button>
           </div>
 
@@ -190,7 +190,7 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
           }}
         >
           <PreviewBubble>
-            Bienvenue. Dis-moi ce que tu veux comprendre, trancher ou mieux sentir aujourd’hui.
+            Dis-moi ce que tu traverses. Je t’aide à y voir plus clair.
           </PreviewBubble>
 
           <PreviewBubble user>
@@ -198,7 +198,7 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
           </PreviewBubble>
 
           <PreviewBubble>
-            On peut clarifier cela en 3 temps : ton état actuel, le vrai nœud de décision, puis le bon timing d’action.
+            Il y a peut-être moins quelque chose à forcer qu’un mouvement à comprendre. On peut clarifier ton état actuel, puis regarder ce que le bon timing d’action dit vraiment.
           </PreviewBubble>
         </div>
       </div>
