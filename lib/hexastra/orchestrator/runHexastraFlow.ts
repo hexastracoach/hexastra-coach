@@ -68,6 +68,11 @@ import {
   buildExactDataAuditLog,
 } from '@/lib/hexastra/guards/exactDataGuard'
 import { buildExactDataUnavailableResponse } from '@/lib/hexastra/guards/exactDataResponse'
+import {
+  extractCoreAstroPlacements,
+  formatCoreAstroBlock,
+  asksForCorePlacements,
+} from '@/lib/hexastra/guards/extractCoreAstro'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
@@ -1362,8 +1367,15 @@ export async function runHexastraFlow(input: {
         latestUserMessage,
       })
 
-      const semanticCtx = detectContext(latestUserMessage)
-      const isAstroExact = semanticCtx.contextType === 'astro_exact'
+      // Pass conversation history so detectContext can detect astro follow-ups
+      // (e.g. "non ce n'est pas ça" after an astro_exact reading)
+      const semanticCtx = detectContext(latestUserMessage, limitedMessages)
+
+      // astro_followup is treated as astro_exact everywhere downstream
+      const isAstroExact =
+        semanticCtx.contextType === 'astro_exact' ||
+        semanticCtx.contextType === 'astro_followup'
+
       const blockMicroProfile =
         isAstroExact ||
         (semanticCtx.contextType !== 'profile' &&
@@ -1373,10 +1385,19 @@ export async function runHexastraFlow(input: {
       flowLog('debug', 'semantic_context_detected', {
         contextDetected: semanticCtx.contextType,
         confidence: semanticCtx.confidence,
+        fromHistory: semanticCtx.fromHistory ?? false,
         isAstroExact,
         blockMicroProfile,
         message: latestUserMessage.slice(0, 80),
       })
+
+      if (semanticCtx.contextType === 'astro_followup') {
+        flowLog('info', '[ASTRO_FOLLOWUP] previous exact astro context detected', {
+          message: latestUserMessage.slice(0, 80),
+          confidence: semanticCtx.confidence,
+          action: 'forcing isAstroExact=true + shouldUseApiBackbone=true',
+        })
+      }
 
       const computedFlowStep = computeFlowStep({
         requestType: input.requestType,
@@ -1941,9 +1962,19 @@ export async function runHexastraFlow(input: {
       effectiveDomainForApi,
       isAstroExact,
       isExactDataSubcategory,
+      semanticContextType: semanticCtx.contextType,
       detectedSubcategory: orchestrationExecution.detectedSubcategory,
       shouldUseApiBackbone,
     })
+
+    if (semanticCtx.contextType === 'astro_followup' && shouldUseApiBackbone) {
+      flowLog('info', '[ASTRO_FOLLOWUP] contradiction follow-up forced to astro_exact', {
+        message: latestUserMessage.slice(0, 80),
+        effectiveDomainForApi,
+        shouldUseApiBackbone,
+        action: 'reusing exactData or recalling backbone',
+      })
+    }
 
     if (isAstroExact || isExactDataSubcategory) {
       const bDataForLog = normalizeBirthData(userContext.birthData)
@@ -2258,10 +2289,39 @@ export async function runHexastraFlow(input: {
     // Build exact data block — capped at 4000 chars to avoid prompt explosion.
     // A full /chart/fusion response can be 50k–150k chars; we only need key fields.
     const exactDataMaxChars = plan === 'practitioner' ? 6000 : plan === 'premium' ? 5000 : 4000
-    const exactDataBlockForPrompt =
+    const rawExactDataBlock =
       exactDataNeeded && exactDataResolved && specializedResult?.raw
         ? formatExactDataBlockCapped(specializedResult.raw, exactDataMaxChars)
         : null
+
+    // ── Deterministic core placements block (Bug 3) ──────────────────────────
+    // When the user explicitly asks for sun/moon/rising, extract these values
+    // deterministically from raw data and pin them ABOVE the capped block.
+    // This prevents the LLM from reformulating or hallucinating different values.
+    let coreAstroBlock: string | null = null
+    if (
+      isAstroExact &&
+      exactDataResolved &&
+      specializedResult?.raw &&
+      asksForCorePlacements(latestUserMessage)
+    ) {
+      const corePlacements = extractCoreAstroPlacements(specializedResult.raw)
+      if (corePlacements.sun || corePlacements.moon || corePlacements.rising) {
+        coreAstroBlock = formatCoreAstroBlock(corePlacements, userContext.language ?? 'fr')
+        flowLog('info', '[ASTRO_FOLLOWUP] reusing exactData or recalling backbone', {
+          sun: corePlacements.sun?.sign ?? null,
+          moon: corePlacements.moon?.sign ?? null,
+          rising: corePlacements.rising?.sign ?? null,
+          allResolved: corePlacements.allResolved,
+          missing: corePlacements.missing,
+        })
+      }
+    }
+
+    // Combine: core block first (pinned), then capped raw block
+    const exactDataBlockForPrompt = [coreAstroBlock, rawExactDataBlock]
+      .filter(Boolean)
+      .join('\n\n') || null
 
     const systemPrompt = buildSystemPrompt({
       plan,
