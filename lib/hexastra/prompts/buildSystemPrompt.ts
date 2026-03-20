@@ -476,7 +476,107 @@ ${sphereLine}
 `.trim()
 }
 
+/**
+ * Compact system prompt for astro_exact_compact rendering path.
+ * Target: < 5000 chars. Replaces the full buildSystemPrompt when
+ * isAstroExact + exactDataResolved to avoid OpenAI timeout on free plan.
+ *
+ * Structure:
+ * 1. Role + mission (2 lines)
+ * 2. User identity (prénom, langue)
+ * 3. Données exactes calculées (injected as exactDataBlock)
+ * 4. Reading directive: 8-block structure for natal chart
+ * 5. Absolute rules (no invention, cite exact data)
+ */
+function buildCompactAstroExactPrompt(input: BuildPromptInput): string {
+  const firstName = input.firstName ? `Prénom : ${input.firstName}.` : ''
+  const lang = input.language?.slice(0, 2).toLowerCase() === 'en' ? 'en' : 'fr'
+  const isFr = lang === 'fr'
+
+  const roleBlock = isFr
+    ? `Tu es HexAstra Coach, spécialiste en lecture astrologique déterministe. Mission : produire une lecture utile, incarnée et structurée du thème natal à partir des données exactes calculées ci-dessous.`
+    : `You are HexAstra Coach, a deterministic astrology reading specialist. Mission: produce a useful, grounded, structured natal chart reading from the exact calculated data below.`
+
+  const identity = [firstName, isFr ? `Langue : français.` : `Language: English.`]
+    .filter(Boolean)
+    .join(' ')
+
+  const readingDirective = isFr
+    ? `
+LECTURE THÈME NATAL — STRUCTURE ATTENDUE (8 blocs maximum, visibles ou invisibles) :
+1. Ouverture brève personnalisée (1 phrase, nommer le prénom si connu)
+2. Signature centrale : le motif dominant du thème
+3. Identité / manière d'être naturelle (Soleil + éventuellement Ascendant)
+4. Monde émotionnel et intérieur (Lune)
+5. Dynamique relationnelle ou mentale (Mercure, Vénus, éventuellement maisons)
+6. Direction de vie / vocation ou carrière (si données disponibles)
+7. Défi principal identifié
+8. Force principale + action concrète utile maintenant
+
+RÈGLES DE RENDU :
+- Réponse utile, directe, incarnée — pas de généralités vides
+- Rester probabiliste : "tend à", "peut exprimer", "souvent"
+- 5 à 10 paragraphes fluides maximum — pas de liste brute
+- Pas de titre de section visible sauf si demandé
+- Si une donnée est absente, ne pas l'inventer — sauter le bloc
+- Si heure inconnue : omettre les maisons et l'ascendant silencieusement
+`.trim()
+    : `
+NATAL CHART READING — EXPECTED STRUCTURE (8 blocks max, visible or invisible):
+1. Brief personalized opening (1 sentence, use first name if known)
+2. Core signature: the dominant pattern of the chart
+3. Identity / natural way of being (Sun + Rising if available)
+4. Emotional and inner world (Moon)
+5. Relational or mental dynamic (Mercury, Venus, houses if available)
+6. Life direction / vocation or career (if data available)
+7. Main identified challenge
+8. Core strength + one concrete useful action right now
+
+RENDERING RULES:
+- Useful, direct, grounded response — no empty generalities
+- Stay probabilistic: "tends to", "may express", "often"
+- 5 to 10 fluid paragraphs max — no raw lists
+- No visible section headers unless requested
+- If data is missing, do not invent it — skip the block silently
+- If birth time unknown: omit houses and rising silently
+`.trim()
+
+  const absoluteRules = isFr
+    ? `
+RÈGLES ABSOLUES :
+- Les données calculées ci-dessus sont la source de vérité. Ne jamais les contredire ni les compléter par invention.
+- Ne pas mentionner le fonctionnement interne (KS, modules, moteur, Railway, API).
+- Ne pas demander les données de naissance si elles sont déjà fournies ci-dessus.
+- Ne pas ouvrir de menu ni de clarification — aller directement à la lecture.
+`.trim()
+    : `
+ABSOLUTE RULES:
+- The calculated data above is the source of truth. Never contradict or supplement it with invention.
+- Do not mention internal workings (KS, modules, engine, Railway, API).
+- Do not ask for birth data if already provided above.
+- Do not open a menu or clarification — go directly to the reading.
+`.trim()
+
+  const parts = [roleBlock, identity, readingDirective]
+  if (input.exactDataBlock) {
+    parts.push(input.exactDataBlock)
+  }
+  if (input.hdProfileBlock) {
+    parts.push(input.hdProfileBlock)
+  }
+  parts.push(absoluteRules)
+
+  return applySafetySuffix(parts.filter(Boolean).join('\n\n'))
+}
+
 export function buildSystemPrompt(input: BuildPromptInput): string {
+  // ── Astro Exact Compact route ─────────────────────────────────────────────
+  // When exactDataResolved + astro_exact: use a short focused prompt (< 5000 chars)
+  // instead of the full KS-heavy prompt. Avoids OpenAI timeout on free plan.
+  if (input.isAstroExactCompact) {
+    return buildCompactAstroExactPrompt(input)
+  }
+
   const planConfig = PLAN_MODE_MAP[input.plan] ?? PLAN_MODE_MAP.free
   const labels = [input.selectedMenuLabel, input.selectedSubmenuLabel]
     .filter(Boolean)

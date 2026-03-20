@@ -150,6 +150,166 @@ export function formatExactDataBlockCapped(
   return lines.join('\n')
 }
 
+// ── Astro-only keys for compact natal reading context ────────────────────────
+// HD, numerology, kua fields are excluded — not needed for natal chart readings.
+const NATAL_ASTRO_KEYS = new Set([
+  'sun', 'moon', 'ascendant', 'rising', 'mercury', 'venus', 'mars',
+  'jupiter', 'saturn', 'uranus', 'neptune', 'pluto', 'chiron',
+  'soleil', 'lune', 'ascendant_sign', 'rising_sign',
+  'houses', 'maisons', 'house_cusps',
+  'aspects', 'aspects_principaux', 'major_aspects',
+  'dominant_signs', 'dominant_elements', 'dominant_modalities',
+  'stelliums', 'chart_shape',
+  'publicSummary', 'publicsummary', 'summary', 'synthese', 'reading',
+])
+
+export type CompactNatalContext = {
+  sunSign: string | null
+  sunDegree: number | null
+  moonSign: string | null
+  moonDegree: number | null
+  risingSign: string | null
+  risingDegree: number | null
+  dominantSigns: string[]
+  dominantElements: string[]
+  dominantModalities: string[]
+  stelliums: string[]
+  keyAspects: string[]
+  dominantHouses: string[]
+  chartShape: string | null
+  natalSummarySeeds: string[]
+  /** Raw data block filtered to astro-only fields, capped at maxChars */
+  compactDataBlock: string
+}
+
+function extractStr(obj: Record<string, unknown>, ...keys: string[]): string | null {
+  for (const k of keys) {
+    const v = obj[k]
+    if (typeof v === 'string' && v.trim()) return v.trim()
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const nested = v as Record<string, unknown>
+      const sign = nested.sign ?? nested.signe ?? nested.sign_name ?? nested.name
+      if (typeof sign === 'string' && sign.trim()) return sign.trim()
+    }
+  }
+  return null
+}
+
+function extractNum(obj: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const k of keys) {
+    const v = obj[k]
+    if (typeof v === 'number' && !isNaN(v)) return Math.round(v * 10) / 10
+    if (typeof v === 'string') {
+      const n = parseFloat(v)
+      if (!isNaN(n)) return Math.round(n * 10) / 10
+    }
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const nested = v as Record<string, unknown>
+      const deg = nested.degree ?? nested.degre ?? nested.pos
+      if (typeof deg === 'number') return Math.round(deg * 10) / 10
+    }
+  }
+  return null
+}
+
+function extractList(obj: Record<string, unknown>, ...keys: string[]): string[] {
+  for (const k of keys) {
+    const v = obj[k]
+    if (Array.isArray(v)) {
+      return v
+        .map((item) => (typeof item === 'string' ? item : typeof item === 'object' && item ? JSON.stringify(item).slice(0, 80) : null))
+        .filter(Boolean) as string[]
+    }
+    if (typeof v === 'string' && v.includes(',')) return v.split(',').map((s) => s.trim()).filter(Boolean)
+  }
+  return []
+}
+
+/**
+ * Extract a minimal, astrology-only context from /chart/fusion raw data.
+ * Used for the `astro_exact_compact` rendering path to dramatically reduce
+ * the OpenAI payload size — ignores HD, numerology, Kua fields entirely.
+ *
+ * @param raw    Raw /chart/fusion response object
+ * @param maxChars  Max chars for the compact data block (default 2000)
+ */
+export function buildCompactNatalReadingContext(
+  raw: Record<string, unknown>,
+  maxChars = 2000,
+): CompactNatalContext {
+  // ── Extract core positions ─────────────────────────────────────────────
+  const sunSign    = extractStr(raw, 'sun', 'soleil', 'Sun')
+  const sunDegree  = extractNum(raw, 'sun', 'soleil', 'Sun')
+  const moonSign   = extractStr(raw, 'moon', 'lune', 'Moon')
+  const moonDegree = extractNum(raw, 'moon', 'lune', 'Moon')
+  const risingSign = extractStr(raw, 'ascendant', 'rising', 'asc', 'Ascendant', 'ascending_sign', 'rising_sign')
+  const risingDegree = extractNum(raw, 'ascendant', 'rising', 'asc')
+
+  // ── Extract structural data ───────────────────────────────────────────
+  const dominantSigns    = extractList(raw, 'dominant_signs', 'signes_dominants', 'dominant_sign')
+  const dominantElements = extractList(raw, 'dominant_elements', 'elements_dominants', 'dominant_element')
+  const dominantModalities = extractList(raw, 'dominant_modalities', 'modalites_dominantes', 'dominant_modality')
+  const stelliums        = extractList(raw, 'stelliums', 'stellium')
+  const chartShape       = extractStr(raw, 'chart_shape', 'forme_theme', 'chart_pattern') ?? null
+
+  // ── Extract key aspects (cap at 5) ────────────────────────────────────
+  const aspectsRaw = raw.aspects ?? raw.aspects_principaux ?? raw.major_aspects
+  const keyAspects: string[] = []
+  if (Array.isArray(aspectsRaw)) {
+    aspectsRaw.slice(0, 5).forEach((a) => {
+      if (typeof a === 'string') keyAspects.push(a)
+      else if (typeof a === 'object' && a) keyAspects.push(JSON.stringify(a).slice(0, 100))
+    })
+  }
+
+  // ── Extract dominant houses (cap at 3) ────────────────────────────────
+  const housesRaw = raw.houses ?? raw.maisons ?? raw.house_cusps
+  const dominantHouses: string[] = []
+  if (Array.isArray(housesRaw)) {
+    housesRaw.slice(0, 3).forEach((h) => {
+      if (typeof h === 'string') dominantHouses.push(h)
+      else if (typeof h === 'object' && h) dominantHouses.push(JSON.stringify(h).slice(0, 80))
+    })
+  }
+
+  // ── Extract summary seeds ─────────────────────────────────────────────
+  const natalSummarySeeds: string[] = []
+  for (const k of ['publicSummary', 'publicsummary', 'summary', 'synthese', 'reading', 'interpretation', 'bilan']) {
+    const v = raw[k]
+    if (typeof v === 'string' && v.trim()) {
+      natalSummarySeeds.push(v.slice(0, 300))
+      break
+    }
+  }
+
+  // ── Build compact data block (astro-only, capped) ─────────────────────
+  const astroOnlyEntries = Object.entries(raw).filter(([k]) =>
+    NATAL_ASTRO_KEYS.has(k) || NATAL_ASTRO_KEYS.has(k.toLowerCase()),
+  )
+
+  const blockLines = ['DONNÉES THÈME NATAL (source de vérité — citer exactement):']
+  for (const [key, value] of astroOnlyEntries) {
+    const formattedKey = key.replace(/_/g, ' ').toUpperCase()
+    const raw_str = typeof value === 'object' ? JSON.stringify(value).slice(0, 200) : String(value)
+    blockLines.push(`- ${formattedKey}: ${raw_str}`)
+    if (blockLines.join('\n').length >= maxChars) {
+      blockLines.push(`…[données supplémentaires disponibles — non affichées pour limiter le contexte]`)
+      break
+    }
+  }
+
+  return {
+    sunSign, sunDegree,
+    moonSign, moonDegree,
+    risingSign, risingDegree,
+    dominantSigns, dominantElements, dominantModalities,
+    stelliums, keyAspects, dominantHouses,
+    chartShape,
+    natalSummarySeeds,
+    compactDataBlock: blockLines.join('\n'),
+  }
+}
+
 /**
  * Logs the data source audit for a given request.
  * Returns a log-friendly object — log it externally with your logger.

@@ -261,6 +261,12 @@ export type BuildPromptInput = {
    */
   hdProfileBlock?: string | null
   /**
+   * Route compacte dédiée aux lectures astro exactes (thème natal, ascendant, etc.)
+   * quand les données API sont résolues. Active un prompt court, pas de KS verbose,
+   * pas de vector knowledge, historique réduit à 2 messages.
+   */
+  isAstroExactCompact?: boolean
+  /**
    * Profil d'évolution utilisateur — envoyé depuis le client (localStorage).
    * Injecté dans le prompt système via buildEvolutionContext().
    */

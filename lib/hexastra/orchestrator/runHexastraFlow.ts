@@ -66,6 +66,7 @@ import {
   hasResolvedExactData,
   formatExactDataBlockCapped,
   buildExactDataAuditLog,
+  buildCompactNatalReadingContext,
 } from '@/lib/hexastra/guards/exactDataGuard'
 import { buildExactDataUnavailableResponse } from '@/lib/hexastra/guards/exactDataResponse'
 import {
@@ -1897,8 +1898,22 @@ export async function runHexastraFlow(input: {
       domainRoute,
       specializedSource: null,
     }) as any
+
+    // ── Skip vector retrieval for astro_exact requests ────────────────────
+    // When isAstroExact, the exact data from Railway is already the source of truth.
+    // Vector search adds latency, 400 errors, and unnecessary knowledge blocks
+    // that bloat the prompt and trigger OpenAI timeout on free plan.
+    const skipVectorRetrieval = isAstroExact
+    if (skipVectorRetrieval) {
+      flowLog('info', 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_ASTRO', {
+        semanticContextType: semanticCtx.contextType,
+        isAstroExact,
+        reason: 'exact data from Railway is source of truth — vector search unnecessary',
+      })
+    }
+
     const retrievalResults =
-      VECTOR_STORE_ID && process.env.OPENAI_API_KEY
+      !skipVectorRetrieval && VECTOR_STORE_ID && process.env.OPENAI_API_KEY
         ? await multiLayerRetrieval({
             query: retrievalQuery || latestUserMessage,
             plan,
@@ -2324,6 +2339,36 @@ export async function runHexastraFlow(input: {
       }
     }
 
+    // ── Astro Exact Compact route flag ────────────────────────────────────────
+    // Activates the compact rendering path when:
+    // - semantic context is astro_exact or astro_followup
+    // - exact data is resolved from Railway
+    // Effects: compact system prompt, no knowledge packets, 2-msg history, faster timeout.
+    const isAstroExactCompact = isAstroExact && exactDataResolved
+
+    if (isAstroExactCompact) {
+      flowLog('info', 'ASTRO_EXACT_ROUTE_SELECTED', {
+        subcategory: detectedSubcategoryForGuard,
+        semanticContextType: semanticCtx.contextType,
+        plan,
+        exactDataResolved,
+        action: 'compact prompt + no vector knowledge + reduced history',
+      })
+
+      if (specializedResult?.raw) {
+        const compactCtx = buildCompactNatalReadingContext(specializedResult.raw)
+        flowLog('info', 'ASTRO_COMPACT_CONTEXT_BUILT', {
+          sunSign: compactCtx.sunSign,
+          moonSign: compactCtx.moonSign,
+          risingSign: compactCtx.risingSign,
+          keyAspectsCount: compactCtx.keyAspects.length,
+          dominantHousesCount: compactCtx.dominantHouses.length,
+          stelliumsCount: compactCtx.stelliums.length,
+          compactDataBlockChars: compactCtx.compactDataBlock.length,
+        })
+      }
+    }
+
     // ── Deterministic HD profile block ───────────────────────────────────────
     // When the user asks for their HD profile and exact data is resolved,
     // extract personalityLine/designLine deterministically from raw API data
@@ -2392,6 +2437,7 @@ export async function runHexastraFlow(input: {
       exactDataBlock: exactDataBlockForPrompt,
       requiresExactData: exactDataNeeded,
       hdProfileBlock,
+      isAstroExactCompact,
     })
 
     const messagesForLLM = limitedMessages.length
@@ -2407,16 +2453,46 @@ export async function runHexastraFlow(input: {
       flowStep,
       readingPacket,
       knowledgePacket,
+      isAstroExactCompact,
     })
 
-    openAiStartMs = Date.now()
-    const openAiTimeoutMs = resolveOpenAiTimeoutMs(plan)
+    if (isAstroExactCompact) {
+      flowLog('info', 'OPENAI_PAYLOAD_REDUCED_FOR_EXACT_ASTRO', {
+        systemPromptChars: systemPrompt.length,
+        inputMessages: payload.input.length,
+        maxOutputTokens: payload.max_output_tokens,
+        plan,
+        hint: 'compact route: no knowledge packets, 2-msg history, compact system prompt',
+      })
+    }
 
-    // For free plan + astro reading: reduce token budget to avoid timeout
+    openAiStartMs = Date.now()
+
+    // ── Per-plan OpenAI timeout ────────────────────────────────────────────
+    // Compact route: use a tighter timeout budget since the payload is much smaller.
+    // Non-compact astro_exact: bump free plan from 13s to 20s to accommodate the
+    // larger exact data block that may still be present.
+    const openAiTimeoutMs = isAstroExactCompact
+      ? Math.min(resolveOpenAiTimeoutMs(plan), 18000)   // compact: at most 18s (fast path)
+      : isAstroExact
+        ? Math.max(resolveOpenAiTimeoutMs(plan), 20000) // non-compact astro: at least 20s
+        : resolveOpenAiTimeoutMs(plan)
+
+    // ── Max output tokens ─────────────────────────────────────────────────
+    // buildChatPayload already sets 900 for compact; keep previous free-plan cap for non-compact.
     const effectiveMaxOutputTokens =
-      plan === 'free' && (isAstroExact || isExactDataSubcategory)
+      !isAstroExactCompact && plan === 'free' && (isAstroExact || isExactDataSubcategory)
         ? Math.min(payload.max_output_tokens ?? 950, 700)
         : payload.max_output_tokens
+
+    if (isAstroExactCompact) {
+      flowLog('info', 'TIMEOUT_SAFE_MODE_ENABLED', {
+        openAiTimeoutMs,
+        effectiveMaxOutputTokens,
+        plan,
+        isAstroExactCompact,
+      })
+    }
 
     const rawMessage = await callOpenAIResponse({
       ...payload,
@@ -2430,6 +2506,21 @@ export async function runHexastraFlow(input: {
     const astroMs = (astroStartMs && astroEndMs) ? astroEndMs - astroStartMs : 0
     const openAiMs = (openAiStartMs && openAiEndMs) ? openAiEndMs - openAiStartMs : 0
     const totalMs = Date.now() - flowStartMs
+
+    if (openAiMs < openAiTimeoutMs) {
+      flowLog('info', isAstroExactCompact ? 'ASTRO_EXACT_RENDER_SUCCESS' : '[FLOW] openai success', {
+        openAiMs,
+        openAiTimeoutMs,
+        isAstroExactCompact,
+      })
+    } else {
+      flowLog('warn', isAstroExactCompact ? 'ASTRO_EXACT_RENDER_TIMEOUT' : '[FLOW] openai near-timeout', {
+        openAiMs,
+        openAiTimeoutMs,
+        isAstroExactCompact,
+      })
+    }
+
     flowLog('info', '[FLOW] stage durations', {
       contextMs,
       astroMs,
@@ -2437,6 +2528,7 @@ export async function runHexastraFlow(input: {
       totalMs,
       plan,
       isAstroExact,
+      isAstroExactCompact,
       effectiveMaxOutputTokens,
       exactDataBlockChars: exactDataBlockForPrompt?.length ?? 0,
     })
