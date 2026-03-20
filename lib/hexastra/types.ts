@@ -271,4 +271,22 @@ export type BuildPromptInput = {
    * Injecté dans le prompt système via buildEvolutionContext().
    */
   evolutionProfile?: Record<string, unknown> | null
+  /**
+   * Directive de mode de réponse (exact_list, exact_card, interpretive_reading, compact_timeout_safe).
+   * Générée par selectResponseMode() + buildResponseModeDirective() dans runHexastraFlow.
+   * Injectée dans le prompt pour guider le format de sortie du LLM.
+   */
+  responseModeDirective?: string | null
+  /**
+   * Règles anti-hallucination (8 règles absolues).
+   * Injectées uniquement quand exactDataNeeded=true.
+   * Source: ANTI_HALLUCINATION_RULES depuis hallucinationGuard.ts.
+   */
+  antiHallucinationRules?: string | null
+  /**
+   * Directive anti-contradiction.
+   * Injectée quand l'utilisateur conteste une valeur exacte (astro_followup).
+   * Source: ANTI_CONTRADICTION_DIRECTIVE depuis hallucinationGuard.ts.
+   */
+  antiContradictionDirective?: string | null
 }

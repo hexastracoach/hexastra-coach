@@ -657,13 +657,16 @@ ${technicalLanguageDirective(input)}
 ${requestDirective(input)}
 ${detailedReadingDirective(input)}
 ${responseStrategyDirective(input)}
+${input.responseModeDirective ? input.responseModeDirective : ''}
 ${stepDirective(input)}
 ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}
 ${analysisModeDirective(input)}
 ${practitionerContextDirective(input)}
 ${hdProfileDirective(input)}
+${input.antiHallucinationRules ? input.antiHallucinationRules : ''}
 ${exactDataDirective(input)}
+${input.antiContradictionDirective ? input.antiContradictionDirective : ''}
 ${scopeDirective()}
 `
 

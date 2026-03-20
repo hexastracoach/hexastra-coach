@@ -81,6 +81,17 @@ import {
   isReliableHumanDesignProfile,
 } from '@/lib/humandesign/profile'
 import { buildCompactHumanDesignContext } from '@/lib/humandesign/compactContext'
+import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
+import { selectResponseMode, buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
+import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
+import { isReliableExactData } from '@/lib/exact-data/reliability'
+import {
+  shouldBlockFalsePlanLimitation,
+  containsFalsePlanLimitation,
+  ANTI_HALLUCINATION_RULES,
+  ANTI_CONTRADICTION_DIRECTIVE,
+  detectResponseModeMismatch,
+} from '@/lib/hexastra/guards/hallucinationGuard'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
@@ -1379,6 +1390,20 @@ export async function runHexastraFlow(input: {
       // (e.g. "non ce n'est pas ça" after an astro_exact reading)
       const semanticCtx = detectContext(latestUserMessage, limitedMessages)
 
+      // Universal classification: intent + science + subcategory + requestKind in one call
+      const universalClassif = classifyMessage(latestUserMessage, limitedMessages)
+      flowLog('info', 'CLASSIFICATION_RESOLVED', {
+        intent: universalClassif.intent,
+        science: universalClassif.science,
+        subcategory: universalClassif.subcategory,
+        requestKind: universalClassif.requestKind,
+        needsExactData: universalClassif.needsExactData,
+        needsInterpretation: universalClassif.needsInterpretation,
+        needsVectorEnrichment: universalClassif.needsVectorEnrichment,
+        confidence: universalClassif.confidence,
+        domainRoute: universalClassif.domainRoute,
+      })
+
       // astro_followup is treated as astro_exact everywhere downstream
       const isAstroExact =
         semanticCtx.contextType === 'astro_exact' ||
@@ -1386,6 +1411,15 @@ export async function runHexastraFlow(input: {
 
       // human_design_exact: HD chart request ("design humain", "mon hd", "bodygraph", etc.)
       const isHumanDesignExact = semanticCtx.contextType === 'human_design_exact'
+
+      flowLog('info', 'SCIENCE_ROUTE_SELECTED', {
+        science: universalClassif.science,
+        isAstroExact,
+        isHumanDesignExact,
+        requestKind: universalClassif.requestKind,
+        subcategory: universalClassif.subcategory,
+        confidence: universalClassif.confidence,
+      })
 
       if (isHumanDesignExact) {
         flowLog('info', 'HUMAN_DESIGN_EXACT_DETECTED', {
@@ -1913,13 +1947,24 @@ export async function runHexastraFlow(input: {
       specializedSource: null,
     }) as any
 
-    // ── Skip vector retrieval for astro_exact / human_design_exact requests ──
-    // When exact data from Railway is the source of truth, vector search adds latency,
-    // 400 errors, and unnecessary knowledge blocks that bloat the prompt.
-    const skipVectorRetrieval = isAstroExact || isHumanDesignExact
+    // ── Skip vector retrieval based on universal vector policy ────────────────
+    // Policy: exact fact/profile → skip; interpretation/guidance → enrich.
+    // Legacy astro_exact / human_design_exact → always skip.
+    const skipVectorRetrieval = resolveVectorSkip(
+      isAstroExact,
+      isHumanDesignExact,
+      universalClassif.requestKind,
+      false, // exactDataResolved not yet known at this point — conservative skip
+    )
     if (skipVectorRetrieval) {
-      flowLog('info', isHumanDesignExact ? 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_HUMAN_DESIGN' : 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_ASTRO', {
+      const skipReason = isHumanDesignExact
+        ? 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_HUMAN_DESIGN'
+        : isAstroExact
+          ? 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_ASTRO'
+          : 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_QUERY'
+      flowLog('info', skipReason, {
         semanticContextType: semanticCtx.contextType,
+        requestKind: universalClassif.requestKind,
         isAstroExact,
         isHumanDesignExact,
         reason: 'exact data from Railway is source of truth — vector search unnecessary',
@@ -2087,6 +2132,51 @@ export async function runHexastraFlow(input: {
     const detectedSubcategoryForGuard = orchestrationExecution.detectedSubcategory
     const exactDataNeeded = requiresExactData(detectedSubcategoryForGuard)
     const exactDataResolved = hasResolvedExactData(specializedResult)
+
+    // Universal reliability check — validates field completeness per science
+    const reliabilityResult = isReliableExactData(
+      universalClassif.science,
+      universalClassif.subcategory ?? detectedSubcategoryForGuard,
+      specializedResult?.raw ?? null,
+    )
+    flowLog(reliabilityResult.reliable ? 'info' : 'warn', 'EXACT_DATA_RELIABLE', {
+      science: universalClassif.science,
+      subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
+      reliable: reliabilityResult.reliable,
+      completeness: reliabilityResult.completeness,
+      missingFields: reliabilityResult.missingFields,
+      exactDataResolved,
+    })
+
+    // False plan limitation guard: if data is resolved and reliable, block plan-restriction messages
+    const blockFalsePlanLimitation = shouldBlockFalsePlanLimitation(exactDataResolved, reliabilityResult.reliable)
+    if (blockFalsePlanLimitation) {
+      flowLog('info', 'FALSE_PLAN_LIMITATION_BLOCKED', {
+        reason: 'exact data is resolved and reliable — any plan limitation message would be a false negative',
+        science: universalClassif.science,
+        subcategory: universalClassif.subcategory,
+      })
+    }
+
+    // Response mode selection
+    const responseMode = selectResponseMode({
+      requestKind: universalClassif.requestKind,
+      subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
+      plan,
+      exactDataResolved,
+    })
+    flowLog('info', 'RESPONSE_MODE_SELECTED', {
+      responseMode,
+      requestKind: universalClassif.requestKind,
+      subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
+      plan,
+      exactDataResolved,
+    })
+
+    const responseModeDirective = buildResponseModeDirective(responseMode)
+
+    // Anti-contradiction directive: inject when astro follow-up contradicts a value
+    const antiContradictionActive = semanticCtx.contextType === 'astro_followup'
 
     // Build birth data field list for diagnostic (used in refusal message)
     const birthDataForGuard = normalizeBirthData(userContext.birthData)
@@ -2501,6 +2591,9 @@ export async function runHexastraFlow(input: {
       requiresExactData: exactDataNeeded,
       hdProfileBlock,
       isAstroExactCompact: isAstroExactCompact || isHumanDesignExactCompact,
+      responseModeDirective,
+      antiHallucinationRules: exactDataNeeded ? ANTI_HALLUCINATION_RULES : undefined,
+      antiContradictionDirective: antiContradictionActive ? ANTI_CONTRADICTION_DIRECTIVE : undefined,
     })
 
     const messagesForLLM = limitedMessages.length
@@ -2573,25 +2666,50 @@ export async function runHexastraFlow(input: {
     const openAiMs = (openAiStartMs && openAiEndMs) ? openAiEndMs - openAiStartMs : 0
     const totalMs = Date.now() - flowStartMs
 
+    // ── Post-render guards ────────────────────────────────────────────────────
+    // Detect false plan limitation in the generated response (observability only)
+    if (blockFalsePlanLimitation && containsFalsePlanLimitation(rawMessage)) {
+      flowLog('warn', 'FALSE_PLAN_LIMITATION_DETECTED_IN_RESPONSE', {
+        plan,
+        exactDataResolved,
+        reliabilityReliable: reliabilityResult.reliable,
+        responseExcerpt: rawMessage.slice(0, 120),
+        hint: 'LLM output contains a false plan limitation despite exact data being resolved. Review system prompt rules.',
+      })
+    }
+
+    // Detect response mode mismatch (observability only)
+    if (detectResponseModeMismatch(rawMessage, responseMode, exactDataResolved)) {
+      flowLog('warn', 'RESPONSE_MODE_MISMATCH_DETECTED', {
+        expectedMode: responseMode,
+        requestKind: universalClassif.requestKind,
+        responseExcerpt: rawMessage.slice(0, 120),
+        hint: 'Response appears to be prose for a fact/list request. Check mode directive injection.',
+      })
+    }
+
     if (openAiMs < openAiTimeoutMs) {
       const successLabel = isHumanDesignExactCompact
         ? 'HUMAN_DESIGN_RENDER_SUCCESS'
-        : isAstroExactCompact ? 'ASTRO_EXACT_RENDER_SUCCESS' : '[FLOW] openai success'
+        : isAstroExactCompact ? 'ASTRO_EXACT_RENDER_SUCCESS' : 'FINAL_RENDER_SUCCESS'
       flowLog('info', successLabel, {
         openAiMs,
         openAiTimeoutMs,
         isAstroExactCompact,
         isHumanDesignExactCompact,
+        responseMode,
+        requestKind: universalClassif.requestKind,
       })
     } else {
       const timeoutLabel = isHumanDesignExactCompact
         ? 'HUMAN_DESIGN_RENDER_SUCCESS'
-        : isAstroExactCompact ? 'ASTRO_EXACT_RENDER_TIMEOUT' : '[FLOW] openai near-timeout'
+        : isAstroExactCompact ? 'ASTRO_EXACT_RENDER_TIMEOUT' : 'FINAL_RENDER_SUCCESS'
       flowLog('warn', timeoutLabel, {
         openAiMs,
         openAiTimeoutMs,
         isAstroExactCompact,
         isHumanDesignExactCompact,
+        responseMode,
       })
     }
 
