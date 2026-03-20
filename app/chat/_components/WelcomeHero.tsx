@@ -7,24 +7,24 @@ type WelcomeHeroProps = {
 }
 
 const quickPrompts = [
-  ‘Je me sens bloqué en ce moment.’,
-  ‘Est-ce le bon moment pour agir ?’,
-  ‘Pourquoi cette relation me prend autant de place ?’,
-  ‘Quelle direction semble la plus juste pour moi ?’,
+  'Je me sens bloqué en ce moment.',
+  'Est-ce le bon moment pour agir ?',
+  'Pourquoi cette relation me prend autant de place ?',
+  'Quelle direction semble la plus juste pour moi ?',
 ]
 
 const entryCards = [
   {
-    title: ‘Tu poses. HexAstra écoute.’,
-    text: ‘Décris ce que tu traverses, ton dilemme ou ta question. Pas besoin de tout expliquer — le point de départ suffit.’,
+    title: 'Tu poses. HexAstra écoute.',
+    text: 'Décris ce que tu traverses, ton dilemme ou ta question. Pas besoin de tout expliquer — le point de départ suffit.',
   },
   {
-    title: ‘La lecture s’ajuste à toi.’,
-    text: ‘Le système approfondit seulement quand c’est utile. L’expérience reste légère, même si le moteur est dense.’,
+    title: 'La lecture s'ajuste à toi.',
+    text: 'Le système approfondit seulement quand c'est utile. L'expérience reste légère, même si le moteur est dense.',
   },
   {
-    title: ‘Plusieurs angles, une seule lecture.’,
-    text: ‘HexAstra croise plusieurs approches d’observation humaine pour donner une image plus complète de ta situation.’,
+    title: 'Plusieurs angles, une seule lecture.',
+    text: 'HexAstra croise plusieurs approches d'observation humaine pour donner une image plus complète de ta situation.',
   },
 ]
 
@@ -88,7 +88,7 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
           >
             Ce que tu portes
             <br />
-            mérite d’être
+            mérite d'être
             <br />
             compris.
           </h1>
@@ -102,7 +102,7 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
               maxWidth: 720,
             }}
           >
-            Pose ce que tu traverses — une situation, un doute, une décision. HexAstra croise plusieurs angles d’observation pour t’aider à voir ce qui se joue vraiment.
+            Pose ce que tu traverses — une situation, un doute, une décision. HexAstra croise plusieurs angles d'observation pour t'aider à voir ce qui se joue vraiment.
           </p>
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 24 }}>
@@ -190,15 +190,15 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
           }}
         >
           <PreviewBubble>
-            Dis-moi ce que tu traverses. Je t’aide à y voir plus clair.
+            Dis-moi ce que tu traverses. Je t'aide à y voir plus clair.
           </PreviewBubble>
 
           <PreviewBubble user>
-            J’hésite entre continuer mon activité actuelle ou lancer autre chose.
+            J'hésite entre continuer mon activité actuelle ou lancer autre chose.
           </PreviewBubble>
 
           <PreviewBubble>
-            Il y a peut-être moins quelque chose à forcer qu’un mouvement à comprendre. On peut clarifier ton état actuel, puis regarder ce que le bon timing d’action dit vraiment.
+            Il y a peut-être moins quelque chose à forcer qu'un mouvement à comprendre. On peut clarifier ton état actuel, puis regarder ce que le bon timing d'action dit vraiment.
           </PreviewBubble>
         </div>
       </div>
