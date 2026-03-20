@@ -94,11 +94,11 @@ export const PLANS_UI: PlanUiData[] = [
     desc: 'Pour entrer dans HexAstra sans engagement. Gratuit, direct, sans carte.',
     features: [
       'Lectures complètes avec quota quotidien',
-      'Accès au cœur de l'expérience HexAstra',
+      "Accès au cœur de l'expérience HexAstra",
       'Toutes les approches disponibles',
       'Sans carte bancaire requise',
     ],
-    cta: 'Commencer — c'est gratuit',
+    cta: "Commencer — c'est gratuit",
     href: '/chat',
   },
   {
@@ -138,7 +138,7 @@ export const PLANS_UI: PlanUiData[] = [
     label: 'Praticien',
     price: '24,90\u20ac',
     period: '/mois',
-    desc: 'Pour aller plus loin — ou accompagner d'autres personnes.',
+    desc: "Pour aller plus loin — ou accompagner d'autres personnes.",
     features: [
       'Mode Praticien avec vocabulaire avancé',
       'Lectures pour soi ou pour un client',
