@@ -2,15 +2,29 @@ import { getPlanContract } from './planContracts'
 import { buildFusionContext } from './fusionEngine'
 import type { ExecutionPlan, MenuContract, NormalizedInput, PolicyDecision } from './types'
 import type { SubcategoryDetectionResult } from './detectSubcategory'
+import type { SemanticContextType } from './detectContext'
 
 export function buildExecutionPlan(params: {
   normalized: NormalizedInput
   decision: PolicyDecision
   menuContract: MenuContract | null
   subcategoryDetection?: SubcategoryDetectionResult | null
+  semanticContext?: SemanticContextType | null
 }): ExecutionPlan {
-  const { normalized, decision, menuContract, subcategoryDetection } = params
+  const { normalized, decision, menuContract, subcategoryDetection, semanticContext } = params
   const planContract = getPlanContract(normalized.plan)
+
+  function resolveAnalysisTemplate(): string {
+    if (menuContract?.outputStructure) return 'guided_analysis'
+    switch (semanticContext) {
+      case 'current':        return 'situation_reading'
+      case 'timing':         return 'timing_reading'
+      case 'decision':       return 'decision_guidance'
+      case 'compatibility':  return 'compatibility_reading'
+      case 'profile':        return 'micro_profile'
+      default:               return 'analysis'
+    }
+  }
 
   const renderTemplate =
     decision.branch === 'greeting'
@@ -25,9 +39,7 @@ export function buildExecutionPlan(params: {
               ? 'conversation'
               : decision.branch === 'clarification'
                 ? 'clarification'
-                : menuContract?.outputStructure
-                  ? 'guided_analysis'
-                  : 'analysis'
+                : resolveAnalysisTemplate()
 
   // Resolve fusion context when multiple subcategories are detected
   const matches = subcategoryDetection?.matches ?? []

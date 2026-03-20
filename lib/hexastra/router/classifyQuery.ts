@@ -25,5 +25,14 @@ export function classifyQuery(message: string): DomainRoute {
     return 'science'
   }
 
+  // Situational / current moment — avoid falling to 'general' for these
+  if (
+    /(situation actuelle|analyser? ma situation|analyser? la situation|bilan (actuel|du moment)|comment [çc]a se passe|comment je me sens|je me sens|ce qui se passe|ma vie en ce moment|[eé]tat actuel|[eé]tat du moment)/i.test(
+      text,
+    )
+  ) {
+    return 'wellbeing'
+  }
+
   return 'general'
 }

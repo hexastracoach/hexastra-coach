@@ -59,6 +59,7 @@ import {
 import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInput'
 import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
 import { buildScopeRefusalResponse } from '@/lib/hexastra/orchestration/scopeRefusalTemplate'
+import { detectContext } from '@/lib/hexastra/orchestration/detectContext'
 import type { OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
 import {
   requiresExactData,
@@ -1306,6 +1307,19 @@ export async function runHexastraFlow(input: {
         latestUserMessage,
       })
 
+      const semanticCtx = detectContext(latestUserMessage)
+      const blockMicroProfile =
+        semanticCtx.contextType !== 'profile' &&
+        semanticCtx.contextType !== 'unknown' &&
+        semanticCtx.confidence >= 0.8
+
+      flowLog('debug', 'semantic_context_detected', {
+        contextDetected: semanticCtx.contextType,
+        confidence: semanticCtx.confidence,
+        blockMicroProfile,
+        message: latestUserMessage.slice(0, 80),
+      })
+
       const computedFlowStep = computeFlowStep({
         requestType: input.requestType,
         uiAction,
@@ -1318,7 +1332,15 @@ export async function runHexastraFlow(input: {
         emotionalState: 'neutral',
         timing: 'exploration',
         precision: 'medium',
+        blockMicroProfile,
       } as Parameters<typeof computeFlowStep>[0])
+
+      if (blockMicroProfile && computedFlowStep !== 'micro_profile') {
+        flowLog('debug', 'blocked_profile_fallback', {
+          reason: `semantic context '${semanticCtx.contextType}' blocked micro_profile — routed to '${computedFlowStep}'`,
+        })
+      }
+
       const flowStep =
         forceDirectReading && computedFlowStep !== 'sensitive_support'
           ? 'analysis'
@@ -1411,6 +1433,7 @@ export async function runHexastraFlow(input: {
     const orchestration = evaluateOrchestration({
       normalized: orchestrationNormalized,
       legacyIntent: orchestrationLegacyIntent,
+      semanticContext: semanticCtx?.contextType ?? null,
     })
     const {
       menuContract,
@@ -1424,6 +1447,9 @@ export async function runHexastraFlow(input: {
       route: orchestrationDecision.effectiveRoute,
       renderTemplate: orchestrationExecution.renderTemplate,
       reasons: orchestrationDecision.reasonCodes,
+      routeChosenReason: orchestrationDecision.effectiveRoute === 'general' ? 'fallback_general' : 'explicit_match',
+      fallbackUsed: orchestrationDecision.effectiveRoute === 'general',
+      semanticContext: semanticCtx?.contextType ?? 'unknown',
     })
 
     const isBirthNeeded = !isBirthComplete(userContext.birthData)

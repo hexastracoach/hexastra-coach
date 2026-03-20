@@ -20,6 +20,8 @@ export function computeFlowStep(args: {
   emotionalState: EmotionalState
   timing: TimingIntensity
   precision: PrecisionLevel
+  /** When true, skip micro_profile even if birthData is present and micro readings haven't been shown */
+  blockMicroProfile?: boolean
 }): FlowStep {
   if (args.practitionerNeedsUsage && args.requestType === 'chat') return 'practitioner_usage'
   if (!args.hasBirthData && args.requestType === 'chat') return 'birthdata'
@@ -30,7 +32,7 @@ export function computeFlowStep(args: {
 
   if (args.uiAction === 'open_menu' || args.uiAction === 'restart_flow') return 'menu'
 
-  if (args.hasBirthData && !args.hasShownMicroReadings) return 'micro_profile'
+  if (args.hasBirthData && !args.hasShownMicroReadings && !args.blockMicroProfile) return 'micro_profile'
 
   if (args.emotionalState === 'surcharge' || args.timing === 'high_tension') {
     return 'sensitive_support'

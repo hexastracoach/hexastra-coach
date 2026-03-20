@@ -4,6 +4,7 @@ import { decidePolicy } from './policyEngine'
 import { buildExecutionPlan } from './executionPlanner'
 import { detectScope } from './detectScope'
 import { detectSubcategory } from './detectSubcategory'
+import type { SemanticContextType } from './detectContext'
 import type {
   InferenceResult,
   MenuContract,
@@ -56,6 +57,7 @@ export function evaluateOrchestration(params: {
   normalized: NormalizedInput
   legacyIntent?: InferenceResult['explicitIntent'] | null
   menuContract?: MenuContract | null
+  semanticContext?: SemanticContextType | null
 }): OrchestrationEvaluation {
   const menuContract =
     params.menuContract ??
@@ -90,6 +92,7 @@ export function evaluateOrchestration(params: {
     decision: policy,
     menuContract,
     subcategoryDetection: subcategoryDetection.subcategory ? subcategoryDetection : null,
+    semanticContext: params.semanticContext ?? null,
   })
 
   return {
