@@ -256,6 +256,11 @@ export type BuildPromptInput = {
   /** Whether this request requires exact calculated data */
   requiresExactData?: boolean
   /**
+   * Bloc profil Human Design déterministe (PersonnalityLine/DesignLine calculé depuis l'API).
+   * Injecté AVANT le exactDataBlock pour bloquer toute invention du LLM.
+   */
+  hdProfileBlock?: string | null
+  /**
    * Profil d'évolution utilisateur — envoyé depuis le client (localStorage).
    * Injecté dans le prompt système via buildEvolutionContext().
    */

@@ -379,8 +379,16 @@ function practitionerContextDirective(input: BuildPromptInput): string {
   return ''
 }
 
+function hdProfileDirective(input: BuildPromptInput): string {
+  if (!input.hdProfileBlock) return ''
+
+  return `
+${input.hdProfileBlock}
+`.trim()
+}
+
 function exactDataDirective(input: BuildPromptInput): string {
-  if (!input.exactDataBlock && !input.requiresExactData) return ''
+  if (!input.exactDataBlock && !input.requiresExactData && !input.hdProfileBlock) return ''
 
   const parts: string[] = []
 
@@ -554,6 +562,7 @@ ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}
 ${analysisModeDirective(input)}
 ${practitionerContextDirective(input)}
+${hdProfileDirective(input)}
 ${exactDataDirective(input)}
 ${scopeDirective()}
 `

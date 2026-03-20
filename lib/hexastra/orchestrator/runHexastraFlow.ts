@@ -73,6 +73,12 @@ import {
   formatCoreAstroBlock,
   asksForCorePlacements,
 } from '@/lib/hexastra/guards/extractCoreAstro'
+import {
+  extractHDProfileFromRaw,
+  formatHDProfileBlock,
+  asksForHDProfile,
+  isReliableHumanDesignProfile,
+} from '@/lib/humandesign/profile'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
@@ -2318,6 +2324,36 @@ export async function runHexastraFlow(input: {
       }
     }
 
+    // ── Deterministic HD profile block ───────────────────────────────────────
+    // When the user asks for their HD profile and exact data is resolved,
+    // extract personalityLine/designLine deterministically from raw API data
+    // and pin the profile BEFORE the raw data block. Blocks LLM invention.
+    let hdProfileBlock: string | null = null
+    const isHdProfileSubcategory =
+      detectedSubcategoryForGuard === 'profil_hd' ||
+      asksForHDProfile(latestUserMessage)
+
+    if (isHdProfileSubcategory && exactDataResolved && specializedResult?.raw) {
+      const hdResult = extractHDProfileFromRaw(specializedResult.raw)
+      if (isReliableHumanDesignProfile(hdResult)) {
+        hdProfileBlock = formatHDProfileBlock(hdResult, userContext.language ?? 'fr')
+        flowLog('info', '[HD_PROFILE] deterministic profile extracted', {
+          profile: hdResult.profile,
+          personalityLine: hdResult.personalityLine,
+          designLine: hdResult.designLine,
+          source: hdResult.source,
+          calculated: hdResult.calculated,
+        })
+      } else {
+        flowLog('warn', '[HD_PROFILE] could not extract reliable profile from raw data', {
+          subcategory: detectedSubcategoryForGuard,
+          hdResult,
+          rawKeys: specializedResult.raw ? Object.keys(specializedResult.raw).slice(0, 20) : [],
+          hint: 'Check /chart/fusion response for personality_line / design_line fields',
+        })
+      }
+    }
+
     // Combine: core block first (pinned), then capped raw block
     const exactDataBlockForPrompt = [coreAstroBlock, rawExactDataBlock]
       .filter(Boolean)
@@ -2355,6 +2391,7 @@ export async function runHexastraFlow(input: {
       renderMode: input.renderMode ?? null,
       exactDataBlock: exactDataBlockForPrompt,
       requiresExactData: exactDataNeeded,
+      hdProfileBlock,
     })
 
     const messagesForLLM = limitedMessages.length
