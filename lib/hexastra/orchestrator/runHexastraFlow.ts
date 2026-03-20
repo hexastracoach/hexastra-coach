@@ -64,7 +64,7 @@ import type { OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
 import {
   requiresExactData,
   hasResolvedExactData,
-  formatExactDataBlock,
+  formatExactDataBlockCapped,
   buildExactDataAuditLog,
 } from '@/lib/hexastra/guards/exactDataGuard'
 import { buildExactDataUnavailableResponse } from '@/lib/hexastra/guards/exactDataResponse'
@@ -72,7 +72,20 @@ import { buildExactDataUnavailableResponse } from '@/lib/hexastra/guards/exactDa
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
 const API_KEY = process.env.HEXASTRA_API_KEY || ''
-const GLOBAL_FLOW_TIMEOUT_MS = 18000
+
+// Global: just under Vercel/Railway function limit (30 s)
+const GLOBAL_FLOW_TIMEOUT_MS = 29000
+
+// Per-plan OpenAI call timeout — leaves headroom for context-build + Supabase after
+const OPENAI_TIMEOUT_BY_PLAN: Record<string, number> = {
+  free:          13000,
+  essential:     17000,
+  premium:       22000,
+  practitioner:  26000,
+}
+function resolveOpenAiTimeoutMs(plan: string): number {
+  return OPENAI_TIMEOUT_BY_PLAN[plan] ?? OPENAI_TIMEOUT_BY_PLAN.free
+}
 const flowLog = (
   level: 'info' | 'debug' | 'warn' | 'error',
   msg: string,
@@ -970,11 +983,35 @@ async function callOpenAIResponse(payload: {
   input: { role: 'system' | 'user' | 'assistant'; content: string }[]
   temperature?: number
   max_output_tokens?: number
+  timeoutMs?: number
 }) {
   const openai = getOpenAIClient()
   const started = Date.now()
-  flowLog('info', 'before OpenAI call', { model: payload.model })
-  const response = await openai.responses.create({
+  const timeoutMs = payload.timeoutMs ?? OPENAI_TIMEOUT_BY_PLAN.free
+
+  const charCount =
+    payload.instructions.length +
+    payload.input.reduce((acc, m) => acc + m.content.length, 0)
+  const rawDataKeys = payload.input
+    .map((m) => m.content)
+    .filter((c) => c.startsWith('DONNÉES EXACTES'))
+    .length > 0
+    ? 'exactDataBlock=yes'
+    : 'exactDataBlock=no'
+
+  flowLog('info', '[OPENAI] preparing payload', {
+    model: payload.model,
+    messagesCount: payload.input.length + 1, // +1 for system
+    systemPromptChars: payload.instructions.length,
+    inputChars: charCount,
+    maxOutputTokens: payload.max_output_tokens,
+    temperature: payload.temperature,
+    timeoutMs,
+    rawDataKeys,
+  })
+  flowLog('info', '[OPENAI] call started', { model: payload.model })
+
+  const callPromise = openai.responses.create({
     model: payload.model,
     input: [
       { role: 'system', content: payload.instructions },
@@ -984,11 +1021,23 @@ async function callOpenAIResponse(payload: {
     max_output_tokens: payload.max_output_tokens,
   })
 
-  const text = response.output_text ?? ''
-  flowLog('info', 'after OpenAI call', {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    const id = setTimeout(() => {
+      flowLog('error', '[OPENAI] timeout reached', { model: payload.model, timeoutMs })
+      reject(new Error(`OpenAI call timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+    callPromise.finally(() => clearTimeout(id)).catch(() => {})
+  })
+
+  const response = await Promise.race([callPromise, timeoutPromise])
+  const text = (response as Awaited<typeof callPromise>).output_text ?? ''
+  const durationMs = Date.now() - started
+
+  flowLog('info', '[OPENAI] call finished', {
     model: payload.model,
-    durationMs: Date.now() - started,
-    finalTextLength: text.length,
+    durationMs,
+    outputChars: text.length,
+    withinTimeout: durationMs < timeoutMs,
   })
   return text
 }
@@ -1170,6 +1219,12 @@ export async function runHexastraFlow(input: {
   })
 
   const executeFlow = async (): Promise<HexastraApiResponse> => {
+    const flowStartMs = Date.now()
+    let astroStartMs: number | null = null
+    let astroEndMs: number | null = null
+    let openAiStartMs: number | null = null
+    let openAiEndMs: number | null = null
+
     // Central input normalization to keep the flow crash-proof
     const normalizedMessages = safeArray<ChatMessage>(input.messages)
     const normalizedContextType: ContextType = input.contextType ?? 'general'
@@ -1910,6 +1965,7 @@ export async function runHexastraFlow(input: {
       }
     }
 
+    astroStartMs = Date.now()
     let specializedResult = shouldUseApiBackbone
       ? await runSpecializedModule({
           domainRoute: effectiveDomainForApi,
@@ -1918,12 +1974,18 @@ export async function runHexastraFlow(input: {
           messages: limitedMessages,
         })
       : null
+    astroEndMs = Date.now()
 
     if (isAstroExact || isExactDataSubcategory) {
-      if (specializedResult?.raw && Object.keys(specializedResult.raw).length > 0) {
+      const rawKeyCount = specializedResult?.raw ? Object.keys(specializedResult.raw).length : 0
+      const rawTotalChars = specializedResult?.raw ? JSON.stringify(specializedResult.raw).length : 0
+      if (specializedResult?.raw && rawKeyCount > 0) {
         flowLog('info', '[ASTRO] exact data resolved', {
           source: specializedResult.source,
           rawKeys: Object.keys(specializedResult.raw),
+          rawKeyCount,
+          rawTotalChars,
+          astroMs: astroEndMs - astroStartMs,
         })
       } else {
         flowLog('warn', '[ASTRO] exact data failed', {
@@ -1931,6 +1993,7 @@ export async function runHexastraFlow(input: {
           hasRaw: Boolean(specializedResult?.raw),
           source: specializedResult?.source ?? null,
           shouldUseApiBackbone,
+          astroMs: astroEndMs - astroStartMs,
         })
       }
     }
@@ -2192,10 +2255,12 @@ export async function runHexastraFlow(input: {
       birthDataComplete: isBirthComplete(userContext.birthData),
     })
 
-    // Build exact data block to inject into the system prompt when raw data is available
+    // Build exact data block — capped at 4000 chars to avoid prompt explosion.
+    // A full /chart/fusion response can be 50k–150k chars; we only need key fields.
+    const exactDataMaxChars = plan === 'practitioner' ? 6000 : plan === 'premium' ? 5000 : 4000
     const exactDataBlockForPrompt =
       exactDataNeeded && exactDataResolved && specializedResult?.raw
-        ? formatExactDataBlock(specializedResult.raw)
+        ? formatExactDataBlockCapped(specializedResult.raw, exactDataMaxChars)
         : null
 
     const systemPrompt = buildSystemPrompt({
@@ -2247,10 +2312,38 @@ export async function runHexastraFlow(input: {
       knowledgePacket,
     })
 
+    openAiStartMs = Date.now()
+    const openAiTimeoutMs = resolveOpenAiTimeoutMs(plan)
+
+    // For free plan + astro reading: reduce token budget to avoid timeout
+    const effectiveMaxOutputTokens =
+      plan === 'free' && (isAstroExact || isExactDataSubcategory)
+        ? Math.min(payload.max_output_tokens ?? 950, 700)
+        : payload.max_output_tokens
+
     const rawMessage = await callOpenAIResponse({
       ...payload,
+      max_output_tokens: effectiveMaxOutputTokens,
       input: payload.input as { role: 'system' | 'user' | 'assistant'; content: string }[],
+      timeoutMs: openAiTimeoutMs,
     })
+    openAiEndMs = Date.now()
+
+    const contextMs = astroStartMs ? astroStartMs - flowStartMs : Date.now() - flowStartMs
+    const astroMs = (astroStartMs && astroEndMs) ? astroEndMs - astroStartMs : 0
+    const openAiMs = (openAiStartMs && openAiEndMs) ? openAiEndMs - openAiStartMs : 0
+    const totalMs = Date.now() - flowStartMs
+    flowLog('info', '[FLOW] stage durations', {
+      contextMs,
+      astroMs,
+      openAiMs,
+      totalMs,
+      plan,
+      isAstroExact,
+      effectiveMaxOutputTokens,
+      exactDataBlockChars: exactDataBlockForPrompt?.length ?? 0,
+    })
+
     let message = applySentinel(rawMessage)
     if (!message || !message.trim()) {
       message =

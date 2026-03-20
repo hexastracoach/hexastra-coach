@@ -3,8 +3,10 @@ import type { HexastraSessionContext } from '@/lib/hexastra/context/buildSession
 import type { HexastraUserContext } from '@/lib/hexastra/context/buildUserContext'
 import type { FlowStep } from '@/lib/hexastra/types'
 
+// Keep last 6 messages (3 user + 2 assistant typically) — matches limitedMessages in runHexastraFlow.
+// The orchestrator already slices to 6 before calling buildChatPayload; this is a safety cap.
 function trimMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.slice(-12)
+  return messages.slice(-6)
 }
 
 function buildKnowledgeHierarchyMessage(knowledgePacket?: Record<string, unknown> | null) {
@@ -91,6 +93,28 @@ export function buildChatPayload({
 
   const knowledgeHierarchyMessage = buildKnowledgeHierarchyMessage(knowledgePacket)
 
+  const trimmed = trimMessages(messages)
+  const compactContextStr = JSON.stringify(compactContext)
+  const totalInputChars =
+    systemPrompt.length +
+    compactContextStr.length +
+    trimmed.reduce((acc, m) => acc + m.content.length, 0)
+
+  // Log payload size for observability — helps detect prompt-bloat regressions
+  if (process.env.NODE_ENV !== 'test') {
+    console.info('[OPENAI] preparing payload', {
+      messagesCount: trimmed.length + 1,      // +1 for compactContext user message
+      systemPromptChars: systemPrompt.length,
+      compactContextChars: compactContextStr.length,
+      historyChars: trimmed.reduce((acc, m) => acc + m.content.length, 0),
+      totalInputChars,
+      plan: userContext.plan,
+      hasReadingPacket: Boolean(readingPacket),
+      hasKnowledgePacket: Boolean(knowledgePacket),
+      hasKnowledgeBlock: Boolean(knowledgeBlock),
+    })
+  }
+
   return {
     model: process.env.OPENAI_HEXASTRA_MODEL || 'gpt-4o',
     instructions: systemPrompt,
@@ -126,7 +150,7 @@ export function buildChatPayload({
           ]
         : []),
       ...(knowledgeBlock ? [{ role: 'assistant' as const, content: knowledgeBlock }] : []),
-      ...trimMessages(messages),
+      ...trimmed,
     ],
   }
 }

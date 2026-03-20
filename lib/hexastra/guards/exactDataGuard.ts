@@ -83,6 +83,74 @@ export function formatExactDataBlock(raw: Record<string, unknown>): string {
 }
 
 /**
+ * Keys that carry interpretive value for astro/HD/numerology/Kua readings.
+ * Listed first when building the capped block — everything else is secondary.
+ */
+const PRIORITY_EXACT_KEYS = new Set([
+  // Astrology — core positions
+  'sun', 'moon', 'ascendant', 'mercury', 'venus', 'mars',
+  'jupiter', 'saturn', 'uranus', 'neptune', 'pluto', 'chiron',
+  'soleil', 'lune', 'mercure', 'mars_planet',
+  // Astrology — structure
+  'houses', 'maisons', 'house_cusps',
+  'aspects', 'aspects_principaux', 'major_aspects',
+  'dominant_signs', 'dominant_elements', 'dominant_modalities',
+  'stelliums', 'chart_shape',
+  // Transits
+  'transits', 'current_transits', 'transits_actifs',
+  // Numerology
+  'chemin_de_vie', 'life_path', 'expression', 'ame', 'soul',
+  'annee_personnelle', 'personal_year', 'mois_personnel', 'personal_month',
+  // Human Design
+  'type_hd', 'hd_type', 'type', 'autorite_hd', 'authority',
+  'profil_hd', 'profile', 'centres_hd', 'defined_centers',
+  'croix_incarnation', 'incarnation_cross',
+  // Kua
+  'nombre_kua', 'kua_number', 'kua', 'direction_kua',
+  // Summary fields (may already be compacted by Railway)
+  'publicsummary', 'publicSummary', 'summary', 'synthese', 'synthesis',
+  'reading', 'interpretation', 'bilan',
+])
+
+/**
+ * Capped version of formatExactDataBlock.
+ * Prioritises the most interpretively relevant keys, truncates at maxChars.
+ * Use this in place of formatExactDataBlock for the system prompt — avoids
+ * injecting 30 000+ char API dumps that blow up the OpenAI context window.
+ */
+export function formatExactDataBlockCapped(
+  raw: Record<string, unknown>,
+  maxChars = 4000,
+): string {
+  const header = 'DONNÉES EXACTES CALCULÉES (source de vérité — ne jamais contredire ni compléter par invention):'
+  const lines: string[] = [header]
+
+  const entries = Object.entries(raw).filter(([, v]) => v !== null && v !== undefined && v !== '')
+  const priority = entries.filter(([k]) => PRIORITY_EXACT_KEYS.has(k) || PRIORITY_EXACT_KEYS.has(k.toLowerCase()))
+  const secondary = entries.filter(([k]) => !PRIORITY_EXACT_KEYS.has(k) && !PRIORITY_EXACT_KEYS.has(k.toLowerCase()))
+
+  for (const [key, value] of [...priority, ...secondary]) {
+    const formattedKey = key.replace(/_/g, ' ').toUpperCase()
+    let formattedValue: string
+    if (typeof value === 'object') {
+      const json = JSON.stringify(value)
+      // Nested objects: keep first 400 chars to preserve structure but avoid explosion
+      formattedValue = json.length > 400 ? json.slice(0, 400) + '…' : json
+    } else {
+      formattedValue = String(value)
+    }
+    lines.push(`- ${formattedKey}: ${formattedValue}`)
+
+    if (lines.join('\n').length >= maxChars) {
+      lines.push(`…[${entries.length - lines.length + 1} champs supplémentaires disponibles — non affichés pour limiter le contexte]`)
+      break
+    }
+  }
+
+  return lines.join('\n')
+}
+
+/**
  * Logs the data source audit for a given request.
  * Returns a log-friendly object — log it externally with your logger.
  */
