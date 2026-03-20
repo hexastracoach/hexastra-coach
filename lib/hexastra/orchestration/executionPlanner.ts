@@ -17,6 +17,7 @@ export function buildExecutionPlan(params: {
   function resolveAnalysisTemplate(): string {
     if (menuContract?.outputStructure) return 'guided_analysis'
     switch (semanticContext) {
+      case 'astro_exact':    return 'astro_reading'
       case 'current':        return 'situation_reading'
       case 'timing':         return 'timing_reading'
       case 'decision':       return 'decision_guidance'

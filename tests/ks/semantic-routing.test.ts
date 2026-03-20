@@ -18,16 +18,18 @@ describe('detectContext', () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.8)
   })
 
-  it('détecte "profile" pour "Qui suis-je selon mon thème natal"', () => {
+  // "thème natal" → astro_exact (priorité sur 'profile' — c'est une lecture calculée, pas un profil générique)
+  it('détecte "astro_exact" pour "Qui suis-je selon mon thème natal"', () => {
     const result = detectContext('Qui suis-je selon mon thème natal')
-    expect(result.contextType).toBe('profile')
-    expect(result.confidence).toBeGreaterThanOrEqual(0.8)
+    expect(result.contextType).toBe('astro_exact')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9)
   })
 
-  it('détecte "timing" pour "Mes transits du moment"', () => {
+  // "transits" → astro_exact (priorité sur 'timing' — les transits sont un calcul astro exact)
+  it('détecte "astro_exact" pour "Mes transits du moment"', () => {
     const result = detectContext('Mes transits du moment')
-    expect(result.contextType).toBe('timing')
-    expect(result.confidence).toBeGreaterThanOrEqual(0.8)
+    expect(result.contextType).toBe('astro_exact')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9)
   })
 
   it('détecte "decision" pour "Dois-je changer de travail ?"', () => {
@@ -45,6 +47,24 @@ describe('detectContext', () => {
   it('détecte "compatibility" pour "Notre compatibilité de couple"', () => {
     const result = detectContext('Notre compatibilité de couple')
     expect(result.contextType).toBe('compatibility')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.8)
+  })
+
+  it('détecte "astro_exact" pour "Je veux mon thème natal"', () => {
+    const result = detectContext('Je veux mon thème natal à partir de mes données de naissance')
+    expect(result.contextType).toBe('astro_exact')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9)
+  })
+
+  it('détecte "astro_exact" pour "Je veux explorer mes transits astrologiques"', () => {
+    const result = detectContext('Je veux explorer mon thème natal et mes transits astrologiques')
+    expect(result.contextType).toBe('astro_exact')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9)
+  })
+
+  it('détecte "profile" pur pour "Qui suis-je" sans mention astro', () => {
+    const result = detectContext('Qui suis-je ? Quels sont mes talents et mes forces ?')
+    expect(result.contextType).toBe('profile')
     expect(result.confidence).toBeGreaterThanOrEqual(0.8)
   })
 

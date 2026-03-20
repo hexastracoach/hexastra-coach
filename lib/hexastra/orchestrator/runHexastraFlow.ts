@@ -1308,14 +1308,17 @@ export async function runHexastraFlow(input: {
       })
 
       const semanticCtx = detectContext(latestUserMessage)
+      const isAstroExact = semanticCtx.contextType === 'astro_exact'
       const blockMicroProfile =
-        semanticCtx.contextType !== 'profile' &&
-        semanticCtx.contextType !== 'unknown' &&
-        semanticCtx.confidence >= 0.8
+        isAstroExact ||
+        (semanticCtx.contextType !== 'profile' &&
+          semanticCtx.contextType !== 'unknown' &&
+          semanticCtx.confidence >= 0.8)
 
       flowLog('debug', 'semantic_context_detected', {
         contextDetected: semanticCtx.contextType,
         confidence: semanticCtx.confidence,
+        isAstroExact,
         blockMicroProfile,
         message: latestUserMessage.slice(0, 80),
       })
@@ -1856,33 +1859,96 @@ export async function runHexastraFlow(input: {
       getKsSelectionExecutionContract(selectedMenuKey ?? null)
     const freeformContract = getKsFreeformExecutionContract(latestUserMessage)
     const effectiveExecutionContract = selectionExecutionContract ?? freeformContract
-    const domainConfig = getKsDomainConfig(domainRoute)
+
+    // Exact subcategory from orchestration — used to force API call regardless of domain
+    const isExactDataSubcategory = requiresExactData(orchestrationExecution.detectedSubcategory)
+
+    // Effective domain for API: prefer orchestration route over legacy 'general' fallback.
+    // When orchestration detected 'science' or 'fusion' but legacy classifyQuery returned 'general'
+    // (e.g. accent mismatch, unlisted pattern), use the orchestration result.
+    const effectiveDomainForApi: DomainRoute =
+      orchestrationExecution.route !== 'general'
+        ? orchestrationExecution.route
+        : domainRoute
+
+    const domainConfigForApi = getKsDomainConfig(effectiveDomainForApi)
+
+    // Force API call for astro exact requests and any subcategory requiring deterministic data
     const shouldUseApiBackbone =
+      isAstroExact ||
+      isExactDataSubcategory ||
       effectiveExecutionContract?.executionStrategy === 'api_first' ||
-      (!effectiveExecutionContract && domainConfig.executionStrategy === 'api_first')
+      (!effectiveExecutionContract && domainConfigForApi.executionStrategy === 'api_first')
+
+    flowLog('debug', 'api_backbone_resolution', {
+      legacyDomainRoute: domainRoute,
+      orchestrationRoute: orchestrationExecution.route,
+      effectiveDomainForApi,
+      isAstroExact,
+      isExactDataSubcategory,
+      detectedSubcategory: orchestrationExecution.detectedSubcategory,
+      shouldUseApiBackbone,
+    })
+
+    if (isAstroExact || isExactDataSubcategory) {
+      const bDataForLog = normalizeBirthData(userContext.birthData)
+      flowLog('info', '[ASTRO] entering astrology_exact resolver', {
+        contextType: semanticCtx.contextType,
+        subcategory: orchestrationExecution.detectedSubcategory,
+        science: orchestrationExecution.detectedScience,
+        effectiveDomainForApi,
+        shouldUseApiBackbone,
+      })
+      flowLog('info', '[ASTRO] stored birth data loaded', {
+        hasFirstName: Boolean(bDataForLog?.firstName),
+        hasDate: Boolean(bDataForLog?.date || bDataForLog?.birthDateISO),
+        hasTime: Boolean(bDataForLog?.time),
+        hasPlace: Boolean(bDataForLog?.place),
+      })
+      if (shouldUseApiBackbone) {
+        flowLog('info', '[ASTRO] calling Hexastra Swiss Ephemeris', { effectiveDomainForApi })
+      }
+    }
 
     let specializedResult = shouldUseApiBackbone
       ? await runSpecializedModule({
-          domainRoute,
+          domainRoute: effectiveDomainForApi,
           birthData: normalizeBirthData(userContext.birthData),
           practitionerUsage: normalizedPractitionerUsage,
           messages: limitedMessages,
         })
       : null
+
+    if (isAstroExact || isExactDataSubcategory) {
+      if (specializedResult?.raw && Object.keys(specializedResult.raw).length > 0) {
+        flowLog('info', '[ASTRO] exact data resolved', {
+          source: specializedResult.source,
+          rawKeys: Object.keys(specializedResult.raw),
+        })
+      } else {
+        flowLog('warn', '[ASTRO] exact data failed', {
+          hasSpecializedResult: Boolean(specializedResult),
+          hasRaw: Boolean(specializedResult?.raw),
+          source: specializedResult?.source ?? null,
+          shouldUseApiBackbone,
+        })
+      }
+    }
+
     if (shouldUseApiBackbone && !specializedResult) {
       const fallbackPublicSummary =
-        domainRoute === 'neurokua'
+        effectiveDomainForApi === 'neurokua'
           ? 'Module NeuroKua indisponible pour le moment. Je te partage une lecture générale basée sur tes données enregistrées.'
-          : domainRoute === 'gps_kua'
+          : effectiveDomainForApi === 'gps_kua'
             ? 'Module GPS indisponible. Je propose une orientation générale en attendant.'
             : 'Je poursuis avec une lecture générale.'
 
       specializedResult = {
-        source: toSpecializedSource(domainRoute),
+        source: toSpecializedSource(effectiveDomainForApi),
         publicSummary: fallbackPublicSummary,
         raw: null,
       }
-      flowLog('warn', 'fallback module used', { domainRoute, source: specializedResult.source })
+      flowLog('warn', 'fallback module used', { effectiveDomainForApi, source: specializedResult.source })
     }
     // ── Exact Data Guard ────────────────────────────────────────────────────
     // For subcategories that require deterministic calculated data (ascendant,
@@ -1920,15 +1986,21 @@ export async function runHexastraFlow(input: {
     flowLog('info', 'exact_data_audit', auditLog)
 
     if (exactDataNeeded && !exactDataResolved && input.requestType === 'chat') {
+      const birthDataComplete = missingBirthFields.length === 0 && presentBirthFields.length >= 3
       const refusalMessage = buildExactDataUnavailableResponse({
         language: userContext.language ?? fallbackLanguage,
         subcategory: detectedSubcategoryForGuard!,
         missingBirthFields,
+        birthDataComplete,
       })
       flowLog('warn', 'exact_data_guard_triggered', {
         subcategory: detectedSubcategoryForGuard,
         missingFields: missingBirthFields,
+        birthDataComplete,
         specializedSource: specializedResult?.source ?? null,
+        isAstroExact,
+        isExactDataSubcategory,
+        reason: birthDataComplete ? 'api_calculation_failed' : 'missing_birth_fields',
       })
       return {
         message: refusalMessage,

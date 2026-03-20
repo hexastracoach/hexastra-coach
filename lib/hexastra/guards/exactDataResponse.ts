@@ -58,13 +58,18 @@ function getSubcategoryLabel(subcategory: string, language: string): string {
 /**
  * Returns a clean, honest refusal message when exact data could not be resolved.
  * Never returns a fake interpretation.
+ *
+ * @param birthDataComplete - true when all required birth fields are present in the profile
+ *   but the calculation API was unreachable. In that case the message targets the engine,
+ *   not the user's data.
  */
 export function buildExactDataUnavailableResponse(params: {
   language: string
   subcategory: string
   missingBirthFields?: string[]
+  birthDataComplete?: boolean
 }): string {
-  const { language, subcategory, missingBirthFields = [] } = params
+  const { language, subcategory, missingBirthFields = [], birthDataComplete = false } = params
   const label = getSubcategoryLabel(subcategory, language)
 
   const hasMissingFields = missingBirthFields.length > 0
@@ -72,9 +77,13 @@ export function buildExactDataUnavailableResponse(params: {
   return tr(language, {
     fr: hasMissingFields
       ? `Pour calculer ton ${label} avec exactitude, il me manque des données de naissance essentielles :\n${missingBirthFields.map((f) => `- ${f}`).join('\n')}\n\nJe préfère ne pas improviser sur des données qui doivent être précises. Donne-moi ces informations et je te donne ton ${label} exact.`
-      : `Je n'ai pas pu récupérer les données exactes nécessaires pour ton ${label}.\n\nJe préfère ne pas improviser sur des informations qui doivent être calculées avec précision. Si le problème persiste, vérifie que tes données de naissance sont complètes et réessaie.`,
+      : birthDataComplete
+        ? `Je vois bien tes données de naissance dans ton profil — elles sont complètes.\n\nLe blocage ne vient pas de tes informations : le moteur de calcul astrologique n'a pas pu être contacté à cet instant.\n\nRéessaie dans quelques instants. Si le problème persiste, contacte le support.`
+        : `Je n'ai pas pu récupérer les données exactes nécessaires pour ton ${label}.\n\nJe préfère ne pas improviser sur des informations qui doivent être calculées avec précision. Si le problème persiste, vérifie que tes données de naissance sont complètes et réessaie.`,
     en: hasMissingFields
       ? `To calculate your ${label} accurately, I'm missing essential birth data:\n${missingBirthFields.map((f) => `- ${f}`).join('\n')}\n\nI won't guess on data that needs to be precise. Give me these details and I'll give you your exact ${label}.`
-      : `I was unable to retrieve the exact data needed for your ${label}.\n\nI prefer not to improvise on information that must be precisely calculated. If the issue persists, check that your birth data is complete and try again.`,
+      : birthDataComplete
+        ? `I can see your birth data is already saved in your profile — all required fields are present.\n\nThe issue is not your information: the astrological calculation engine could not be reached at this moment.\n\nPlease try again in a few moments. If the problem persists, contact support.`
+        : `I was unable to retrieve the exact data needed for your ${label}.\n\nI prefer not to improvise on information that must be precisely calculated. If the issue persists, check that your birth data is complete and try again.`,
   })
 }
