@@ -80,10 +80,115 @@ function requestDirective(input: BuildPromptInput): string {
   return 'Reponds selon le step de session: menu -> orienter avec souplesse ; clarification -> affiner ; decision -> trancher avec prudence ; sensitive_support -> simplifier ; analysis/deep_reading -> analyser et orienter.'
 }
 
+/**
+ * Detects requests for a comprehensive natal chart + transits reading.
+ * These requests should use the HexAstra 12-sphere structure instead of
+ * the generic 8-block synthesis.
+ */
+function detectNatal12SpheresRequest(message: string): boolean {
+  const lower = message.toLowerCase()
+  const hasNatal = /(th[eè]me (natal|astral)|carte (du ciel|natale)|birth chart|natal chart)/i.test(lower)
+  const hasTransits = /\btransit[s]?\b/i.test(lower)
+  const hasExplore = /\b(cartograph|12 sph[eè]res?|explor\w*)/i.test(lower)
+
+  // Natal + transits combined = always 12 spheres
+  if (hasNatal && hasTransits) return true
+  // Explicit exploration or cartography of natal = 12 spheres
+  if (hasNatal && hasExplore) return true
+
+  return false
+}
+
+/**
+ * Builds the 12-sphere HexAstra structure directive for natal + transits readings.
+ * Injectable in both the compact prompt and the full system prompt.
+ */
+function buildNatal12SpheresDirective(isFr: boolean): string {
+  if (!isFr) {
+    return `
+NATAL CHART + TRANSITS — HEXASTRA 12-SPHERE STRUCTURE (mandatory):
+
+Produce a complete INNER CARTOGRAPHY in 12 distinct spheres.
+Each sphere must contain: a clear observation, a key challenge, a useful orientation.
+
+Sphere headers ARE visible in the final response ("## Sphere N — Name").
+Each sphere: 2 to 4 fluid lines maximum.
+
+Complete structure (follow this order):
+[Opening — 1-2 personalized sentences, no header]
+## Sphere 1 — Identity / Core Impulse
+## Sphere 2 — Security / Grounding / Resources
+## Sphere 3 — Thinking / Language / Close Perception
+## Sphere 4 — Roots / Home / Inner Foundation
+## Sphere 5 — Expression / Desire / Creativity / Joy
+## Sphere 6 — Rhythm / Daily Routine / Adjustments / Work
+## Sphere 7 — Bond / Mirror / Relationship to Others
+## Sphere 8 — Transformation / Crisis / Intensity / Release
+## Sphere 9 — Vision / Expansion / Beliefs / Horizon
+## Sphere 10 — Vocation / Social Role / Visible Direction
+## Sphere 11 — Network / Contribution / Alliances / Collective Future
+## Sphere 12 — Withdrawal / Invisible / Inner Maturation / Spiritual
+## Final Synthesis
+[Key of Understanding + Key of Resolution — 2 final sentences, no header]
+
+RENDERING RULES:
+- Do not display associated planets in sphere headers — use them as internal guides only
+- If a datum is absent from the data block: note soberly without inventing
+- If birth time is unknown: silently omit houses and rising in spheres 1, 4, 7, 10
+- Integrate active transits into the spheres where they operate
+- Tone: inner cartography — grounded, concrete, not mystical, not technically exposed
+- Do not substitute a general interpretation for an absent calculated value
+`.trim()
+  }
+
+  return `
+LECTURE THÈME NATAL + TRANSITS — STRUCTURE HEXASTRA 12 SPHÈRES (obligatoire) :
+
+Produire une CARTOGRAPHIE INTÉRIEURE complète en 12 sphères distinctes et identifiables.
+Chaque sphère contient : un constat clair, un enjeu, une orientation utile.
+
+Les titres "## Sphère N — Nom" sont visibles dans la réponse finale.
+Chaque sphère : 2 à 4 lignes fluides maximum.
+
+Structure complète (respecter cet ordre) :
+[Ouverture — 1-2 phrases personnalisées, sans titre]
+## Sphère 1 — Identité / Impulsion centrale
+## Sphère 2 — Sécurité / Ancrage / Ressources
+## Sphère 3 — Pensée / Langage / Perception proche
+## Sphère 4 — Racines / Foyer / Fondation intérieure
+## Sphère 5 — Expression / Désir / Créativité / Joie
+## Sphère 6 — Rythme / Hygiène de vie / Ajustements / Travail quotidien
+## Sphère 7 — Lien / Miroir / Relation à l'autre
+## Sphère 8 — Transformation / Crise / Intensité / Lâcher-prise
+## Sphère 9 — Vision / Expansion / Croyances / Horizon
+## Sphère 10 — Vocation / Rôle social / Direction visible
+## Sphère 11 — Réseau / Contribution / Alliances / Futur collectif
+## Sphère 12 — Retrait / Invisible / Maturation intérieure / Spirituel
+## Synthèse finale
+[Clé de compréhension + Clé de résolution — 2 phrases finales, sans titre visible]
+
+RÈGLES DE RENDU :
+- Ne pas afficher les planètes associées dans les titres — elles servent de guide interne uniquement
+- Si une donnée est absente du bloc de données : noter sobrement sans inventer
+- Si l'heure de naissance est inconnue : omettre silencieusement les maisons et l'ascendant dans les sphères 1, 4, 7 et 10
+- Intégrer les transits actifs dans les sphères où ils opèrent
+- Ton : cartographie intérieure — incarné, concret, non mystique, non technique visible
+- Ne jamais substituer une interprétation générale à une valeur calculée absente
+`.trim()
+}
+
 function detailedReadingDirective(input: BuildPromptInput): string {
   const latestUserMessage = (input.messages?.[input.messages.length - 1]?.content ?? '').toLowerCase()
+  const isFr = (input.language?.slice(0, 2).toLowerCase() ?? 'fr') !== 'en'
+
+  // Natal + transits (with or without "détail" keyword): use the 12-sphere structure
+  if (detectNatal12SpheresRequest(latestUserMessage)) {
+    return buildNatal12SpheresDirective(isFr)
+  }
+
+  // Pure detailed natal (requires explicit "detail/complet" keyword)
   const asksDetailedNatal =
-    /(theme astral|thème astral|theme natal|thème natal|astrologique|astrologique|maisons|maison 1|carte du ciel)/i.test(
+    /(theme astral|thème astral|theme natal|thème natal|astrologique|maisons|maison 1|carte du ciel)/i.test(
       latestUserMessage
     ) &&
     /(detail|detaill|develop|approfond|complet)/i.test(latestUserMessage)
@@ -502,7 +607,13 @@ function buildCompactAstroExactPrompt(input: BuildPromptInput): string {
     .filter(Boolean)
     .join(' ')
 
-  const readingDirective = isFr
+  // Use 12-sphere structure when user asks for natal + transits combined exploration
+  const lastMsg = (input.messages?.[input.messages?.length - 1]?.content ?? '')
+  const isNatal12Spheres = detectNatal12SpheresRequest(lastMsg)
+
+  const readingDirective = isNatal12Spheres
+    ? buildNatal12SpheresDirective(isFr)
+    : isFr
     ? `
 LECTURE THÈME NATAL — STRUCTURE ATTENDUE (8 blocs maximum, visibles ou invisibles) :
 1. Ouverture brève personnalisée (1 phrase, nommer le prénom si connu)
