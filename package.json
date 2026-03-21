@@ -10,6 +10,7 @@
     "test:ks": "vitest run tests/ks",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test": "vitest run tests/ks",
     "list:vector-docs": "node ./scripts/list-vector-store-documents.mjs"
   },
   "dependencies": {
