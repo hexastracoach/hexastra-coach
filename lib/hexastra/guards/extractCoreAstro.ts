@@ -83,7 +83,7 @@ function normaliseSign(raw: unknown): string | null {
 }
 
 function extractDegree(obj: Record<string, unknown>): number | null {
-  const candidates = ['degree', 'degre', 'deg', 'longitude_in_sign', 'pos']
+  const candidates = ['degree', 'degre', 'deg', 'longitude_in_sign', 'pos', 'lon', 'longitude']
   for (const k of candidates) {
     const v = obj[k]
     if (typeof v === 'number' && !isNaN(v)) return Math.round(v * 10) / 10
@@ -127,8 +127,16 @@ function resolvePlacement(raw: Record<string, unknown>, keys: string[]): CoreAst
     // Object value — extract sign + degree
     if (typeof value === 'object' && !Array.isArray(value)) {
       const obj = value as Record<string, unknown>
+      // Covers snake_case, camelCase and French variants from various Railway response shapes
       const signRaw =
-        obj.sign ?? obj.sign_name ?? obj.signe ?? obj.name ?? obj.label ?? obj.zodiac_sign ?? null
+        obj.sign ??
+        obj.sign_name ?? obj.signName ??
+        obj.signe ??
+        obj.sign_fr ?? obj.signFr ?? obj.signFR ??
+        obj.zodiac_sign ?? obj.zodiacSign ??
+        obj.constellation ??
+        obj.name ?? obj.label ??
+        null
       const sign = normaliseSign(signRaw)
       if (sign) {
         return {
@@ -138,6 +146,12 @@ function resolvePlacement(raw: Record<string, unknown>, keys: string[]): CoreAst
           rawValue: value,
         }
       }
+      // Log the raw object structure when sign extraction fails — helps diagnose new API formats
+      console.warn('[ASTRO_CORE] resolvePlacement: object found but no sign extracted', {
+        key,
+        objectKeys: Object.keys(obj),
+        objectSample: JSON.stringify(obj).slice(0, 200),
+      })
     }
   }
 
@@ -227,6 +241,17 @@ export function extractCoreAstroPlacements(
     resolvedPath: path,
     sourceKeys: Object.keys(source).slice(0, 30),
   })
+
+  // Log raw structure of key bodies — critical for diagnosing new Railway response shapes
+  for (const [label, keys] of [['sun', SUN_KEYS], ['moon', MOON_KEYS], ['ascendant', RISING_KEYS]] as [string, string[]][]) {
+    const rawVal = keys.map(k => source[k]).find(v => v !== undefined && v !== null)
+    if (rawVal !== undefined && typeof rawVal === 'object' && !Array.isArray(rawVal)) {
+      console.log(`[ASTRO_CORE] raw ${label} object structure`, {
+        keys: Object.keys(rawVal as Record<string, unknown>),
+        sample: JSON.stringify(rawVal).slice(0, 300),
+      })
+    }
+  }
 
   const sun    = resolvePlacement(source, SUN_KEYS)
   const moon   = resolvePlacement(source, MOON_KEYS)

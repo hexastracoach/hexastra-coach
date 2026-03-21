@@ -3062,8 +3062,30 @@ export async function runHexastraFlow(input: {
       ? message
       : message
 
+    // Force flowState.step to 'analysis' when HD exact data is resolved with usable fields.
+    // computeFlowStep() may return 'clarification' because it runs before exactDataResolved
+    // is known — this override corrects the step at the final return point.
+    const hdExactAnalysisOverride =
+      !menuVisibleReturn &&
+      isHumanDesignExact &&
+      exactDataResolved &&
+      hdCompactCtx !== null &&
+      [hdCompactCtx.hdType, hdCompactCtx.hdProfile, hdCompactCtx.hdAuthority, hdCompactCtx.hdStrategy].some(Boolean)
+
+    const finalFlowStep = hdExactAnalysisOverride ? 'analysis' : flowStep
+
+    if (hdExactAnalysisOverride && flowStep !== 'analysis') {
+      flowLog('info', 'HD_EXACT_FLOW_STEP_OVERRIDE', {
+        from: flowStep,
+        to: 'analysis',
+        reason: 'isHumanDesignExact && exactDataResolved && hdCompactCtx has usable fields',
+        hdType: hdCompactCtx?.hdType,
+        hdProfile: hdCompactCtx?.hdProfile,
+      })
+    }
+
     flowLog('info', 'flow step final', {
-      step: menuVisibleReturn ? 'menu' : flowStep,
+      step: menuVisibleReturn ? 'menu' : finalFlowStep,
       finalMessageLength: finalMessage.length,
       menuVisible: menuVisibleReturn,
     })
@@ -3074,7 +3096,7 @@ export async function runHexastraFlow(input: {
         mode,
         plan,
         conversationId,
-        flowState: { step: menuVisibleReturn ? 'menu' : flowStep, completed: true },
+        flowState: { step: menuVisibleReturn ? 'menu' : finalFlowStep, completed: true },
         menu: { visible: menuVisibleReturn, items: menuItemsReturned },
         suggestions: menuVisibleReturn
           ? []
@@ -3087,7 +3109,7 @@ export async function runHexastraFlow(input: {
           selectedSubmenuKey: resolvedSelectedSubmenuKey,
           contextFrame: selectedContextFrame,
           clarificationQuestion: selectedClarificationQuestion,
-          sessionStep: menuVisibleReturn ? 'menu' : flowStep,
+          sessionStep: menuVisibleReturn ? 'menu' : finalFlowStep,
           emotionalState: sessionContext.emotionalState,
           timing: sessionContext.timing,
           journeyEnabled,

@@ -191,7 +191,15 @@ function extractStr(obj: Record<string, unknown>, ...keys: string[]): string | n
     if (typeof v === 'string' && v.trim()) return v.trim()
     if (v && typeof v === 'object' && !Array.isArray(v)) {
       const nested = v as Record<string, unknown>
-      const sign = nested.sign ?? nested.signe ?? nested.sign_name ?? nested.name
+      // All known sign key variants from Railway response shapes (snake_case + camelCase + French)
+      const sign =
+        nested.sign ??
+        nested.sign_name ?? nested.signName ??
+        nested.signe ??
+        nested.sign_fr ?? nested.signFr ?? nested.signFR ??
+        nested.zodiac_sign ?? nested.zodiacSign ??
+        nested.constellation ??
+        nested.name ?? nested.label
       if (typeof sign === 'string' && sign.trim()) return sign.trim()
     }
   }
