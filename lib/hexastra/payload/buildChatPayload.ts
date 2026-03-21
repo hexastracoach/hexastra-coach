@@ -57,6 +57,8 @@ export function buildChatPayload({
   readingPacket,
   knowledgePacket,
   isAstroExactCompact,
+  isHoroscopeRoute,
+  horoscopeVariant,
 }: {
   systemPrompt: string
   userContext: HexastraUserContext
@@ -68,6 +70,9 @@ export function buildChatPayload({
   knowledgePacket?: Record<string, unknown> | null
   /** When true: strip knowledge packets, reduce history to 2 messages, compact context */
   isAstroExactCompact?: boolean
+  /** When true: apply horoscope token budget (daily=2500, weekly=5000) */
+  isHoroscopeRoute?: boolean
+  horoscopeVariant?: 'daily' | 'weekly' | null
 }) {
   // ── Astro Exact Compact: stripped-down context ────────────────────────────
   // Birth data is already injected in the system prompt via exactDataBlock.
@@ -137,10 +142,13 @@ export function buildChatPayload({
 
   // ── Max output tokens ─────────────────────────────────────────────────────
   // Compact mode: cap at 900 to stay within timeout budget for free plan.
+  // Horoscope: 2500 for daily (15 blocks), 5000 for weekly (7 × 10 blocks).
   // Normal: 1300 for deep_reading/practitioner, 950 otherwise.
   const maxOutputTokens = isAstroExactCompact
     ? 900
-    : (flowStep === 'deep_reading' || userContext.plan === 'practitioner' ? 1300 : 950)
+    : isHoroscopeRoute
+      ? (horoscopeVariant === 'weekly' ? 5000 : 2500)
+      : (flowStep === 'deep_reading' || userContext.plan === 'practitioner' ? 1300 : 950)
 
   return {
     model: process.env.OPENAI_HEXASTRA_MODEL || 'gpt-4o',

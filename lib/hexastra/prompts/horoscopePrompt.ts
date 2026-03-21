@@ -2,7 +2,22 @@
  * HexAstra Horoscope Prompt Builder
  *
  * Builds the system prompt for the HexAstra Horoscope structured template.
- * Two variants: 'daily' (15 blocs) and 'weekly' (7 × 10 blocs + synthèse).
+ * Two variants: 'daily' (13 sections) and 'weekly' (7 × 9 blocs + synthèse).
+ *
+ * Structure cible daily:
+ *   [Accroche émotionnelle]  ← sans titre ##
+ *   ## 1. ÉNERGIE DU JOUR
+ *   ## 2. MIROIR INTÉRIEUR
+ *   ## 3. MIROIR EXTÉRIEUR
+ *   ## 4. POINT DE TENSION
+ *   ## 5. OUVERTURE
+ *   ## 6. ACTION INCARNÉE
+ *   ## 7. ACTION SUBTILE
+ *   ## 8. AMOUR
+ *   ## 9. ARGENT & TRAVAIL
+ *   ## 10. SANTÉ
+ *   ## 11. HUMEUR
+ *   [Phrase choc finale]     ← sans titre ##
  *
  * RULE: this prompt is mandatory for any horoscope request.
  * The LLM must produce the exact block structure — no improvised free text.
@@ -14,23 +29,21 @@ import type { HoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeCla
 import type { BirthProfile } from '@/lib/hexastra/types'
 
 // ── Validation block lists ─────────────────────────────────────────────────────
+// These are the ## titled blocks validated post-render.
+// The accroche and phrase finale have no ## headers and are validated separately.
 
 export const DAILY_REQUIRED_BLOCKS = [
-  'OUVERTURE',
-  'CLIMAT GÉNÉRAL',
   'ÉNERGIE DU JOUR',
   'MIROIR INTÉRIEUR',
   'MIROIR EXTÉRIEUR',
-  'COMPORTEMENT INCARNÉ',
-  'COMPORTEMENT SI DÉSINCARNÉ',
+  'POINT DE TENSION',
+  'OUVERTURE',
+  'ACTION INCARNÉE',
+  'ACTION SUBTILE',
   'AMOUR',
   'ARGENT & TRAVAIL',
   'SANTÉ',
   'HUMEUR',
-  'POINT DE VIGILANCE',
-  'OPPORTUNITÉ DU JOUR',
-  'ACTION UTILE IMMÉDIATE',
-  'CLÉ DE COMPORTEMENT GÉNÉRAL',
 ] as const
 
 export const WEEKLY_REQUIRED_BLOCKS = [
@@ -114,16 +127,102 @@ export function buildHoroscopeDataBlock(
   return parts.join('\n')
 }
 
-// ── Daily prompt builder ───────────────────────────────────────────────────────
+// ── Style directive ────────────────────────────────────────────────────────────
+
+/**
+ * Injects the rendering style rules: rhythm, timing, tension-résolution, finale.
+ * Plan-agnostic — the style applies to all plans.
+ */
+function buildStyleDirective(isFr: boolean): string {
+  if (!isFr) {
+    return `RENDERING STYLE — APPLY STRICTLY:
+
+EMOTIONAL HOOK (before block 1, no ## header):
+- 1 short sentence, immersive, directly connected to the sign's energy
+- Creates immediate emotional connection — not generic
+- Examples: "Today, something starts to become clear."
+  "A decision is forming in you."
+  "What you feel right now is not random."
+
+VISUAL RHYTHM (apply in inner mirror, tension, opening):
+- Prefer shorter sentences
+- Controlled line breaks to let content breathe
+- Sometimes a 2–3 short-sentence build
+- Example: "You want to understand.\nReally understand.\nNot just on the surface."
+- Do not overuse — apply where it adds life and avoids heavy paragraphs
+
+MICRO TIMING IN THE DAY (inject subtly):
+- Morning: fog / feeling / hesitation / latency
+- Daytime: action / movement / encounter / decision
+- Evening: understanding / calm / distance / integration
+- Place in: energy of the day, inner mirror, opening
+- Vary phrasing — never mechanical
+- Example: "Morning may feel uncertain, then something sharpens as the day moves."
+
+TENSION → RESOLUTION (in point of tension + opening):
+- Name the friction first, then let the exit appear
+- Examples: "You still hesitate… but deep down, you already know."
+  "Something resists, then loosens."
+  "The discomfort of the moment already contains the way out."
+
+FINAL PUNCHLINE (last, no ## header):
+- 1 short–medium sentence, strong, shareable
+- Specific to the sign and the day's energy — not a generic motivational quote
+- Examples: "Better an uncomfortable truth than a doubt that lingers."
+  "What you dare not name keeps directing you."
+  "Peace begins where you stop negotiating with the obvious."`
+  }
+
+  return `STYLE DE RENDU — À APPLIQUER STRICTEMENT:
+
+ACCROCHE ÉMOTIONNELLE (avant le bloc 1, sans titre ##):
+- 1 phrase courte, immersive, directement reliée à l'énergie du signe
+- Crée une connexion émotionnelle immédiate — pas générique
+- Exemples de tonalité : "Aujourd'hui, quelque chose commence à se préciser."
+  "Une décision est en train de se former en toi."
+  "Ce que tu ressens là n'est pas anodin."
+  "Une vérité cherche à remonter à la surface."
+
+RYTHME VISUEL (à appliquer dans miroir intérieur, tension, ouverture):
+- Préférer des phrases courtes
+- Retours à la ligne maîtrisés pour que le contenu respire
+- Parfois une montée en 2 ou 3 petites phrases
+- Exemple : "Tu veux comprendre.\nVraiment comprendre.\nPas juste en surface."
+- Ne pas en abuser — l'appliquer là où cela donne de la vie et évite les blocs lourds
+
+MICRO TIMING DANS LA JOURNÉE (injecter subtilement):
+- Matin : flou / ressenti / hésitation / latence
+- Journée : action / mouvement / rencontre / décision
+- Soir : compréhension / apaisement / prise de recul / intégration
+- Placer dans : énergie du jour, miroir intérieur, ouverture
+- Varier les formulations — jamais mécanique
+- Exemple : "Le début de journée peut sembler hésitant, puis quelque chose se précise."
+
+TENSION → RÉSOLUTION (dans point de tension + ouverture):
+- Nommer le frottement en premier, laisser entrevoir la sortie ensuite
+- Exemples : "Tu hésites encore… mais au fond, tu sais déjà."
+  "Quelque chose résiste, puis se desserre."
+  "L'inconfort du moment contient déjà la sortie."
+
+PHRASE CHOC FINALE (dernière position, sans titre ##):
+- 1 phrase courte à moyenne, forte, mémorable, partageable
+- Propre au signe et à l'énergie du jour — pas une citation de développement personnel
+- Exemples : "Mieux vaut une vérité inconfortable qu'un doute qui dure."
+  "Ce que tu n'oses pas nommer continue de te diriger."
+  "La paix commence là où tu arrêtes de négocier avec l'évidence."
+  "Ce qui est prêt en toi n'attend plus qu'un geste."`
+}
+
+// ── Depth directive ────────────────────────────────────────────────────────────
 
 /**
  * Returns a plan-aware depth directive for the daily horoscope.
  *
- * FREE  → structure complète obligatoire + contenu compact (longueurs courtes par bloc).
- * PAID  → structure complète obligatoire + contenu développé (longueurs étendues par bloc).
+ * FREE  → structure complète obligatoire + contenu compact (longueurs courtes par section).
+ * PAID  → structure complète obligatoire + contenu développé (longueurs étendues par section).
  *
- * RÈGLE ABSOLUE : la différence free/premium ne supprime JAMAIS de blocs.
- * Elle agit uniquement sur la profondeur et la longueur de chaque bloc.
+ * RÈGLE ABSOLUE : la différence free/premium ne supprime JAMAIS de sections.
+ * Elle agit uniquement sur la profondeur et la longueur de chaque section.
  */
 function buildDailyDepthDirective(plan: string, isFr: boolean): string {
   const isFree = plan === 'free'
@@ -131,86 +230,80 @@ function buildDailyDepthDirective(plan: string, isFr: boolean): string {
   if (isFr) {
     return isFree
       ? `PROFONDEUR DU CONTENU — MODE GRATUIT (structure complète obligatoire, contenu compact):
-INTERDICTION ABSOLUE : ne jamais supprimer un bloc. Les 15 blocs restent présents même en mode gratuit.
-La différence gratuit/premium porte UNIQUEMENT sur la longueur de chaque bloc, pas sur leur présence.
+INTERDICTION ABSOLUE : ne jamais supprimer une section. Les 13 sections restent présentes même en mode gratuit.
+La différence gratuit/premium porte UNIQUEMENT sur la longueur de chaque section, pas sur leur présence.
 
-Longueurs imposées par bloc en mode gratuit :
-- OUVERTURE : 2 lignes maximum
-- CLIMAT GÉNÉRAL : 2 à 4 lignes maximum
+Longueurs imposées par section en mode gratuit :
+- Accroche émotionnelle (sans titre ##) : 1 phrase très courte et percutante
 - ÉNERGIE DU JOUR : 1 phrase
-- MIROIR INTÉRIEUR : 1 à 2 phrases maximum
-- MIROIR EXTÉRIEUR : 1 à 2 phrases maximum
-- COMPORTEMENT INCARNÉ : 1 à 2 phrases maximum
-- COMPORTEMENT SI DÉSINCARNÉ : 1 à 2 phrases maximum
+- MIROIR INTÉRIEUR : 1 à 2 phrases (rythme vivant, retours à la ligne si utile)
+- MIROIR EXTÉRIEUR : 1 à 2 phrases
+- POINT DE TENSION : 1 à 2 phrases (frottement + amorce de sortie)
+- OUVERTURE : 1 à 2 phrases
+- ACTION INCARNÉE : 1 phrase
+- ACTION SUBTILE : 1 phrase
 - AMOUR (Célibataires / En couple / Relations amicales) : 1 à 2 phrases chacune
 - ARGENT & TRAVAIL (Argent / Travail / Non-actif) : 1 à 2 phrases chacune
 - SANTÉ : 2 à 3 phrases maximum
-- HUMEUR : 2 à 3 phrases maximum
-- POINT DE VIGILANCE : 1 à 2 phrases maximum
-- OPPORTUNITÉ DU JOUR : 1 à 2 phrases maximum
-- ACTION UTILE IMMÉDIATE : 1 phrase
-- CLÉ DE COMPORTEMENT GÉNÉRAL : 2 à 3 phrases maximum`
+- HUMEUR : 1 phrase lisible
+- Phrase choc finale (sans titre ##) : 1 phrase forte et mémorable`
       : `PROFONDEUR DU CONTENU — MODE PREMIUM (structure complète obligatoire, contenu développé):
-Les 15 blocs sont produits dans leur intégralité avec la profondeur maximale.
-Longueurs cibles par bloc :
-- OUVERTURE : 2 à 3 lignes
-- CLIMAT GÉNÉRAL : 3 à 5 lignes
-- ÉNERGIE DU JOUR : 1 phrase dense
-- MIROIR INTÉRIEUR : 1 à 2 phrases développées
-- MIROIR EXTÉRIEUR : 1 à 2 phrases développées
-- COMPORTEMENT INCARNÉ : 1 à 2 phrases développées
-- COMPORTEMENT SI DÉSINCARNÉ : 1 à 2 phrases développées
+Les 13 sections sont produites dans leur intégralité avec la profondeur maximale.
+Longueurs cibles par section :
+- Accroche émotionnelle (sans titre ##) : 1 à 2 phrases percutantes, directement reliées au signe
+- ÉNERGIE DU JOUR : 1 phrase dense, micro timing intégré naturellement
+- MIROIR INTÉRIEUR : 2 à 4 phrases — rythme vivant, retours à la ligne maîtrisés, montée en 2-3 phrases courtes si pertinent
+- MIROIR EXTÉRIEUR : 2 à 3 phrases développées
+- POINT DE TENSION : 2 à 3 phrases — frottement nommé, tension réelle, amorce de résolution
+- OUVERTURE : 2 à 3 phrases — résolution, potentiel, terrain favorable, passage de la tension
+- ACTION INCARNÉE : 1 à 2 phrases concrètes, ancrées dans le réel
+- ACTION SUBTILE : 1 à 2 phrases (intérieure, énergétique, attentionnelle)
 - AMOUR (Célibataires / En couple / Relations amicales) : 2 à 4 lignes chacune
 - ARGENT & TRAVAIL (Argent / Travail / Non-actif) : 2 à 4 lignes chacune
 - SANTÉ : 3 à 4 lignes
-- HUMEUR : 3 à 4 lignes
-- POINT DE VIGILANCE : 1 à 3 lignes
-- OPPORTUNITÉ DU JOUR : 1 à 3 lignes
-- ACTION UTILE IMMÉDIATE : 1 à 2 lignes
-- CLÉ DE COMPORTEMENT GÉNÉRAL : 2 à 4 lignes`
+- HUMEUR : 2 à 3 lignes, très lisible
+- Phrase choc finale (sans titre ##) : 1 phrase dense, forte, propre au signe, mémorable et partageable`
   }
 
   // English
   return isFree
     ? `CONTENT DEPTH — FREE PLAN (complete structure mandatory, compact content):
-ABSOLUTE RULE: never omit a block. All 15 blocks remain present even on the free plan.
-The free/premium difference applies ONLY to block length, never to block presence.
+ABSOLUTE RULE: never omit a section. All 13 sections remain present even on the free plan.
+The free/premium difference applies ONLY to section length, never to section presence.
 
-Required lengths per block on free plan:
-- OPENING: 2 lines maximum
-- GENERAL CLIMATE: 2–4 lines maximum
+Required lengths per section on free plan:
+- Emotional hook (no ## header): 1 very short, punchy sentence
 - ENERGY OF THE DAY: 1 sentence
-- INNER MIRROR: 1–2 sentences maximum
-- OUTER MIRROR: 1–2 sentences maximum
-- EMBODIED BEHAVIOR: 1–2 sentences maximum
-- DISEMBODIED BEHAVIOR: 1–2 sentences maximum
+- INNER MIRROR: 1–2 sentences (vivid rhythm, line breaks if useful)
+- OUTER MIRROR: 1–2 sentences
+- POINT OF TENSION: 1–2 sentences (friction + hint of way out)
+- OPENING: 1–2 sentences
+- EMBODIED ACTION: 1 sentence
+- SUBTLE ACTION: 1 sentence
 - LOVE (Singles / In a relationship / Friendships): 1–2 sentences each
 - MONEY & WORK (Money / Work / Not working): 1–2 sentences each
 - HEALTH: 2–3 sentences maximum
-- MOOD: 2–3 sentences maximum
-- POINT OF VIGILANCE: 1–2 sentences maximum
-- OPPORTUNITY OF THE DAY: 1–2 sentences maximum
-- IMMEDIATE USEFUL ACTION: 1 sentence
-- GENERAL BEHAVIOR KEY: 2–3 sentences maximum`
+- MOOD: 1 readable sentence
+- Final punchline (no ## header): 1 strong, memorable sentence`
     : `CONTENT DEPTH — PREMIUM PLAN (complete structure mandatory, developed content):
-All 15 blocks are produced in full with maximum depth.
-Target lengths per block:
-- OPENING: 2–3 lines
-- GENERAL CLIMATE: 3–5 lines
-- ENERGY OF THE DAY: 1 dense sentence
-- INNER MIRROR: 1–2 developed sentences
-- OUTER MIRROR: 1–2 developed sentences
-- EMBODIED BEHAVIOR: 1–2 developed sentences
-- DISEMBODIED BEHAVIOR: 1–2 developed sentences
+All 13 sections are produced in full with maximum depth.
+Target lengths per section:
+- Emotional hook (no ## header): 1–2 punchy sentences, directly tied to the sign
+- ENERGY OF THE DAY: 1 dense sentence, micro timing naturally integrated
+- INNER MIRROR: 2–4 sentences — vivid rhythm, controlled line breaks, 2–3-sentence build if relevant
+- OUTER MIRROR: 2–3 developed sentences
+- POINT OF TENSION: 2–3 sentences — named friction, real tension, opening hint
+- OPENING: 2–3 sentences — resolution, potential, favorable ground, tension passage
+- EMBODIED ACTION: 1–2 concrete, grounded sentences
+- SUBTLE ACTION: 1–2 sentences (inner, energetic, attentional)
 - LOVE (Singles / In a relationship / Friendships): 2–4 lines each
 - MONEY & WORK (Money / Work / Not working): 2–4 lines each
 - HEALTH: 3–4 lines
-- MOOD: 3–4 lines
-- POINT OF VIGILANCE: 1–3 lines
-- OPPORTUNITY OF THE DAY: 1–3 lines
-- IMMEDIATE USEFUL ACTION: 1–2 lines
-- GENERAL BEHAVIOR KEY: 2–4 lines`
+- MOOD: 2–3 lines, very readable
+- Final punchline (no ## header): 1 dense, strong sentence, specific to the sign, memorable and shareable`
 }
+
+// ── Daily prompt builder ───────────────────────────────────────────────────────
 
 function buildDailyHoroscopePrompt(input: BuildPromptInput): string {
   const firstName = input.firstName ?? null
@@ -220,12 +313,12 @@ function buildDailyHoroscopePrompt(input: BuildPromptInput): string {
 
   const roleBlock = isFr
     ? `Tu es HexAstra Horoscope, expert en lecture horoscope personnalisée structurée.
-Mission : produire le HexAstra Horoscope du jour complet, structuré en 15 blocs obligatoires, à partir des données personnelles ci-dessous.
-La structure est non négociable. Chaque bloc doit être produit avec son titre visible.
+Mission : produire le HexAstra Horoscope du jour complet, structuré en 13 sections obligatoires, à partir des données personnelles ci-dessous.
+La structure est non négociable. Chaque bloc titré doit être produit avec son titre ## visible.
 La structure complète est obligatoire sur TOUS les plans (gratuit, essentiel, premium, praticien).`
     : `You are HexAstra Horoscope, expert in structured personalized horoscope readings.
-Mission: produce the complete HexAstra Daily Horoscope, structured in 15 mandatory blocks, from the personal data below.
-The structure is non-negotiable. Each block must be output with its visible title.
+Mission: produce the complete HexAstra Daily Horoscope, structured in 13 mandatory sections, from the personal data below.
+The structure is non-negotiable. Each titled block must be output with its visible ## title.
 The complete structure is mandatory on ALL plans (free, essential, premium, practitioner).`
 
   const identityBlock = [
@@ -236,28 +329,38 @@ The complete structure is mandatory on ALL plans (free, essential, premium, prac
     .join(' ')
 
   const structureDirective = isFr
-    ? `STRUCTURE OBLIGATOIRE — HEXASTRA HOROSCOPE JOURNALIER (15 blocs dans l'ordre, titres visibles):
+    ? `STRUCTURE OBLIGATOIRE — HEXASTRA HOROSCOPE JOURNALIER (13 sections dans l'ordre):
 
-## 1. OUVERTURE
-Accueillir la personne, nommer le prénom si disponible, annoncer le HexAstra Horoscope du jour.
+[ACCROCHE ÉMOTIONNELLE — sans titre ##]
+1 phrase courte, immersive, reliée à l'énergie du signe du jour.
+Elle précède directement le bloc 1 sans aucun titre ni en-tête.
 
-## 2. CLIMAT GÉNÉRAL
-Ambiance dominante, dynamique générale, nature du cycle du moment, tendance maîtresse.
+## 1. ÉNERGIE DU JOUR
+1 phrase dense — vibration principale, mouvement central, tonalité de la journée.
+Intègre subtilement une dynamique temporelle (matin / journée / soir) si pertinent.
 
-## 3. ÉNERGIE DU JOUR
-1 phrase — vibration principale, mouvement central, tonalité de la journée.
-
-## 4. CLÉ DE COMPRÉHENSION — MIROIR INTÉRIEUR
+## 2. MIROIR INTÉRIEUR
 Ressenti dominant, tension interne, besoin profond, mouvement psychique.
+Rythme vivant : phrases courtes, retours à la ligne maîtrisés, montée en 2–3 phrases si pertinent.
 
-## 5. CLÉ DE COMPRÉHENSION — MIROIR EXTÉRIEUR
+## 3. MIROIR EXTÉRIEUR
 Ambiance relationnelle, type de situation probable, reflet extérieur.
+Phrases incarnées et lisibles.
 
-## 6. CLÉ D'ACTION — COMPORTEMENT INCARNÉ
-Geste concret, décision, rythme ou action réaliste à poser.
+## 4. POINT DE TENSION
+Nommer le frottement — obstacle, doute, résistance du moment.
+Commencer par le frottement, laisser entrevoir la sortie sans la livrer complètement.
 
-## 7. CLÉ D'ACTION — COMPORTEMENT SI DÉSINCARNÉ
-Intention, recentrage, posture mentale, déplacement intérieur.
+## 5. OUVERTURE
+Résolution possible, potentiel utile, terrain favorable.
+Passage de la tension à l'issue — doit résonner en écho du bloc 4.
+Micro timing si pertinent : dynamique du soir ou du milieu de journée.
+
+## 6. ACTION INCARNÉE
+1 à 2 phrases — geste concret, décision, rythme ou action réaliste à poser maintenant.
+
+## 7. ACTION SUBTILE
+1 à 2 phrases — intention, posture mentale, déplacement intérieur, attention énergétique.
 
 ## 8. AMOUR
 
@@ -285,41 +388,43 @@ Lecture pour personnes non en emploi actif (études, repos, transition).
 Tonus, fatigue, charge mentale, équilibre global, point d'attention simple.
 
 ## 11. HUMEUR
-Stabilité/agitation, ouverture/repli, clarté/confusion, fluidité/crispation.
+1 mot ou 1 phrase très lisible — stabilité, agitation, lucidité, légèreté, confusion, fluidité.
 
-## 12. POINT DE VIGILANCE
-Piège principal, excès à éviter, automatisme contre-productif.
+[PHRASE CHOC FINALE — sans titre ##]
+1 phrase courte à moyenne, forte, mémorable, propre au signe et à l'énergie du jour.
+Elle clôt le bloc en dernière position, sans en-tête ni titre.`
+    : `MANDATORY STRUCTURE — HEXASTRA DAILY HOROSCOPE (13 sections in order):
 
-## 13. OPPORTUNITÉ DU JOUR
-Meilleure ouverture, potentiel utile, terrain favorable.
+[EMOTIONAL HOOK — no ## header]
+1 short, immersive sentence, directly connected to the sign's energy.
+It comes before block 1, with no title or header.
 
-## 14. ACTION UTILE IMMÉDIATE
-1 action ou posture mémorisable, simple, actionnable maintenant.
+## 1. ENERGY OF THE DAY
+1 dense sentence — core vibration, central movement, day's tonality.
+Subtly integrate a time-of-day dynamic (morning / daytime / evening) if relevant.
 
-## 15. CLÉ DE COMPORTEMENT GÉNÉRAL
-Synthèse comportementale : manière idéale de traverser la journée, qualité de présence, tempo juste.`
-    : `MANDATORY STRUCTURE — HEXASTRA DAILY HOROSCOPE (15 blocks in order, visible titles):
-
-## 1. OPENING
-Welcome the person, use first name if available, announce the HexAstra Horoscope.
-
-## 2. GENERAL CLIMATE
-Dominant mood, overall dynamic, current cycle, master tendency.
-
-## 3. ENERGY OF THE DAY
-1 sentence — core vibration, central movement, day's tonality.
-
-## 4. UNDERSTANDING KEY — INNER MIRROR
+## 2. INNER MIRROR
 Dominant feeling, internal tension, deep need, psychic movement.
+Vivid rhythm: short sentences, controlled line breaks, 2–3-sentence build if relevant.
 
-## 5. UNDERSTANDING KEY — OUTER MIRROR
+## 3. OUTER MIRROR
 Relational atmosphere, probable situation type, outer reflection.
+Grounded, readable sentences.
 
-## 6. ACTION KEY — EMBODIED BEHAVIOR
-Concrete gesture, decision, realistic action to take.
+## 4. POINT OF TENSION
+Name the friction — obstacle, doubt, resistance of the moment.
+Start with the friction, let the exit appear without fully delivering it.
 
-## 7. ACTION KEY — DISEMBODIED BEHAVIOR
-Intention, recentering, mental posture, inner shift.
+## 5. OPENING
+Possible resolution, useful potential, favorable ground.
+Move from tension to outcome — should resonate as an echo of block 4.
+Micro timing if relevant: evening or midday dynamic.
+
+## 6. EMBODIED ACTION
+1–2 sentences — concrete gesture, decision, realistic action to take now.
+
+## 7. SUBTLE ACTION
+1–2 sentences — intention, mental posture, inner shift, energetic attention.
 
 ## 8. LOVE
 
@@ -347,43 +452,42 @@ Reading for those not in active employment (studies, rest, transition).
 Energy level, fatigue, mental load, overall balance, one key note.
 
 ## 11. MOOD
-Stability/agitation, openness/withdrawal, clarity/confusion, flow/tension.
+1 word or 1 very readable sentence — stability, agitation, lucidity, lightness, confusion, flow.
 
-## 12. POINT OF VIGILANCE
-Main trap, excess to avoid, counterproductive habit.
-
-## 13. OPPORTUNITY OF THE DAY
-Best opening, useful potential, favorable ground.
-
-## 14. IMMEDIATE USEFUL ACTION
-1 memorable, simple, immediately actionable gesture or posture.
-
-## 15. GENERAL BEHAVIOR KEY
-Behavioral synthesis: ideal way to move through the day, right presence, right rhythm.`
+[FINAL PUNCHLINE — no ## header]
+1 short–medium sentence, strong, memorable, specific to the sign and the day's energy.
+It closes the block in last position, with no header or title.`
 
   const depthDirective = buildDailyDepthDirective(plan, isFr)
+  const styleDirective = buildStyleDirective(isFr)
 
   const absoluteRules = isFr
     ? `RÈGLES ABSOLUES:
-- Produire les 15 blocs dans l'ordre avec les titres visibles — ne jamais les supprimer ni les fusionner
-- INTERDIT : remplacer la structure par un micro_profile, un texte libre, une réponse générique, un guided_analysis ou un simple paragraphe non structuré
-- Ne jamais répondre en texte libre non structuré si la demande est un horoscope
-- Pas d'emoji, pas de jargon technique, pas de mention des systèmes utilisés (KS, Railway, API)
-- Ton Shilo : poétique, structurant, intuitif — une seule voix HexAstra unifiée
-- Rester concret, incarné, utile — pas de flou abstrait
-- Ne jamais mentionner directement ennéagramme 1, chemin de vie 11, profil 3/5, type générateur — sauf si le design produit le prévoit
-- Si des données exactes sont présentes dans le bloc ci-dessous, elles sont la source de vérité — ne jamais les contredire`
+- La réponse n'est COMPLÈTE que lorsque la phrase choc finale (sans titre ##) est produite — ne jamais s'arrêter avant.
+- Produire les 11 blocs titrés ## dans l'ordre, plus l'accroche au début et la phrase finale à la fin.
+- Ne jamais interrompre la génération avant d'avoir atteint la phrase finale.
+- INTERDIT : remplacer la structure par un micro_profile, un texte libre, une réponse générique, un guided_analysis ou un simple paragraphe non structuré.
+- Ne jamais répondre en texte libre non structuré si la demande est un horoscope.
+- Pas d'emoji, pas de jargon technique, pas de mention des systèmes utilisés (KS, Railway, API).
+- Ton Shilo : poétique, clair, incarné, utile — une seule voix HexAstra unifiée.
+- Rester concret, lisible, émotionnel sans être flou — précis sans être froid.
+- Ne jamais mentionner directement ennéagramme 1, chemin de vie 11, profil 3/5, type générateur — sauf si le design produit le prévoit.
+- Si des données exactes sont présentes dans le bloc ci-dessous, elles sont la source de vérité — ne jamais les contredire.
+- Style : fluide, moderne, premium, incarné — éviter les formulations plates, les répétitions lourdes, l'effet texte IA standard.`
     : `ABSOLUTE RULES:
-- Produce all 15 blocks in order with visible titles — never omit or merge them
-- FORBIDDEN: replace the structure with a micro_profile, free text, generic response, guided_analysis, or unstructured paragraph
-- Never respond with unstructured free text for a horoscope request
-- No emoji, no technical jargon, no mention of internal systems (KS, Railway, API)
-- Shilo tone: poetic, structuring, intuitive — one unified HexAstra voice
-- Stay concrete, grounded, useful — no abstract vagueness
-- Never directly mention enneagram 1, life path 11, 3/5 profile, generator type — unless the product explicitly requests it
-- If exact data is present in the block below, it is the source of truth — never contradict it`
+- The response is COMPLETE only when the final punchline (no ## header) is produced — never stop before.
+- Produce the 11 ## titled blocks in order, plus the hook at the start and the final sentence at the end.
+- Never interrupt generation before reaching the final punchline.
+- FORBIDDEN: replace the structure with a micro_profile, free text, generic response, guided_analysis, or unstructured paragraph.
+- Never respond with unstructured free text for a horoscope request.
+- No emoji, no technical jargon, no mention of internal systems (KS, Railway, API).
+- Shilo tone: poetic, clear, grounded, useful — one unified HexAstra voice.
+- Stay concrete, readable, emotional without being vague — precise without being cold.
+- Never directly mention enneagram 1, life path 11, 3/5 profile, generator type — unless the product explicitly requests it.
+- If exact data is present in the block below, it is the source of truth — never contradict it.
+- Style: fluid, modern, premium, grounded — avoid flat phrasing, heavy repetitions, standard AI text feel.`
 
-  const parts = [roleBlock, identityBlock, depthDirective, structureDirective]
+  const parts = [roleBlock, identityBlock, styleDirective, depthDirective, structureDirective]
   if (input.horoscopeDataBlock) {
     parts.push(`DONNÉES PERSONNELLES — SOURCE DE VÉRITÉ:\n${input.horoscopeDataBlock}`)
   }
@@ -401,10 +505,10 @@ function buildWeeklyHoroscopePrompt(input: BuildPromptInput): string {
   const roleBlock = isFr
     ? `Tu es HexAstra Horoscope, expert en lecture horoscope personnalisée structurée.
 Mission : produire le scan HexAstra 7 jours complet, structuré selon la structure officielle ci-dessous, à partir des données personnelles fournies.
-La structure est non négociable. Chaque jour doit contenir ses blocs avec titres visibles. La lecture doit former une progression cohérente sur 7 jours.`
+La structure est non négociable. Chaque jour doit contenir ses blocs avec titres visibles. La lecture doit former une progression cohérente et non répétitive sur 7 jours.`
     : `You are HexAstra Horoscope, expert in structured personalized horoscope readings.
 Mission: produce the complete HexAstra 7-day scan, structured according to the official structure below, from the personal data provided.
-The structure is non-negotiable. Each day must contain its blocks with visible titles. The reading must form a coherent progression over 7 days.`
+The structure is non-negotiable. Each day must contain its blocks with visible titles. The reading must form a coherent, non-repetitive progression over 7 days.`
 
   const identityBlock = [
     firstName ? (isFr ? `Prénom : ${firstName}.` : `First name: ${firstName}.`) : null,
@@ -426,11 +530,16 @@ Prends ce qui résonne."
 ## POUR CHAQUE JOUR (répéter 7 fois — J1 à J7):
 
 ### [Jour] [Date complète]
-**Énergie du jour** — 1 phrase
-**Miroir intérieur** — 1 à 2 phrases
+
+[Accroche du jour — 1 phrase courte, sans titre, reliée à l'énergie de ce jour précis]
+
+**Énergie du jour** — 1 phrase dense
+**Miroir intérieur** — 1 à 2 phrases (rythme vivant si pertinent)
 **Miroir extérieur** — 1 à 2 phrases
-**Comportement incarné** — 1 à 2 phrases
-**Comportement si désincarné** — 1 à 2 phrases
+**Point de tension** — 1 à 2 phrases (frottement + amorce de sortie)
+**Ouverture** — 1 à 2 phrases (résolution, terrain favorable)
+**Action incarnée** — 1 à 2 phrases concrètes
+**Action subtile** — 1 à 2 phrases (intérieure / énergétique)
 **AMOUR**
   - Célibataires — 2 à 4 lignes
   - En couple — 2 à 4 lignes
@@ -440,13 +549,15 @@ Prends ce qui résonne."
   - Travail — 2 à 4 lignes
   - Non-actif — 2 à 4 lignes
 **SANTÉ** — 3 à 4 lignes
-**HUMEUR** — 3 à 4 lignes
+**HUMEUR** — 1 à 2 phrases lisibles
 
-## SYNTHÈSE COMPORTEMENTALE DE LA SEMAINE
+## SYNTHÈSE
 1 paragraphe de 3 à 5 lignes — claire, incarnée, directement utile.
+Résume la dynamique principale des 7 jours.
 
 ## CLÔTURE
-2 à 3 lignes — adaptée au signe solaire si disponible.`
+2 à 3 lignes — phrase forte, adaptée au signe solaire si disponible.
+Dernier mot mémorable, ton Shilo.`
     : `OFFICIAL STRUCTURE — HEXASTRA 7-DAY SCAN:
 
 ## INTRODUCTION
@@ -459,11 +570,16 @@ Take what resonates."
 ## FOR EACH DAY (repeat 7 times — D1 to D7):
 
 ### [Day] [Full date]
-**Energy of the day** — 1 sentence
-**Inner mirror** — 1–2 sentences
+
+[Day hook — 1 short sentence, no header, tied to this specific day's energy]
+
+**Energy of the day** — 1 dense sentence
+**Inner mirror** — 1–2 sentences (vivid rhythm if relevant)
 **Outer mirror** — 1–2 sentences
-**Embodied behavior** — 1–2 sentences
-**Disembodied behavior** — 1–2 sentences
+**Point of tension** — 1–2 sentences (friction + hint of way out)
+**Opening** — 1–2 sentences (resolution, favorable ground)
+**Embodied action** — 1–2 concrete sentences
+**Subtle action** — 1–2 sentences (inner / energetic)
 **LOVE**
   - Singles — 2–4 lines
   - In a relationship — 2–4 lines
@@ -473,29 +589,37 @@ Take what resonates."
   - Work — 2–4 lines
   - Not working — 2–4 lines
 **HEALTH** — 3–4 lines
-**MOOD** — 3–4 lines
+**MOOD** — 1–2 readable sentences
 
-## WEEKLY BEHAVIORAL SYNTHESIS
+## SYNTHESIS
 1 paragraph of 3–5 lines — clear, grounded, directly useful.
+Summarizes the main dynamic across the 7 days.
 
 ## CLOSING
-2–3 lines — tailored to sun sign if available.`
+2–3 lines — strong closing sentence, tailored to sun sign if available.
+Final memorable word, Shilo tone.`
+
+  const styleDirective = buildStyleDirective(isFr)
 
   const absoluteRules = isFr
     ? `RÈGLES ABSOLUES:
-- Produire tous les blocs pour les 7 jours + synthèse + clôture — jamais de raccourci
-- Chaque jour doit être utile et non répétitif — les 7 jours forment une progression
-- Pas d'emoji, pas de jargon technique, pas de mention des systèmes utilisés
-- Ton Shilo : poétique, structurant, intuitif — voix unifiée HexAstra
-- Si des données exactes sont disponibles ci-dessous, les utiliser comme source de vérité`
+- Produire tous les blocs pour les 7 jours + synthèse + clôture — jamais de raccourci.
+- Chaque jour doit être utile et non répétitif — les 7 jours forment une progression.
+- L'accroche de chaque jour doit être différente et liée à l'énergie du jour précis.
+- Pas d'emoji, pas de jargon technique, pas de mention des systèmes utilisés.
+- Ton Shilo : poétique, structurant, intuitif — voix unifiée HexAstra.
+- Style vivant : rythme visuel, phrases courtes quand utile, tension → résolution visible.
+- Si des données exactes sont disponibles ci-dessous, les utiliser comme source de vérité.`
     : `ABSOLUTE RULES:
-- Produce all blocks for 7 days + synthesis + closing — no shortcuts
-- Each day must be useful and non-repetitive — the 7 days form a progression
-- No emoji, no technical jargon, no mention of internal systems
-- Shilo tone: poetic, structuring, intuitive — unified HexAstra voice
-- If exact data is available below, use it as source of truth`
+- Produce all blocks for 7 days + synthesis + closing — no shortcuts.
+- Each day must be useful and non-repetitive — the 7 days form a progression.
+- Each day's hook must be different and tied to that specific day's energy.
+- No emoji, no technical jargon, no mention of internal systems.
+- Shilo tone: poetic, structuring, intuitive — unified HexAstra voice.
+- Vivid style: visual rhythm, short sentences when useful, visible tension → resolution.
+- If exact data is available below, use it as source of truth.`
 
-  const parts = [roleBlock, identityBlock, structureDirective]
+  const parts = [roleBlock, identityBlock, styleDirective, structureDirective]
   if (input.horoscopeDataBlock) {
     parts.push(`DONNÉES PERSONNELLES — SOURCE DE VÉRITÉ:\n${input.horoscopeDataBlock}`)
   }
@@ -520,8 +644,11 @@ export function buildHoroscopeSystemPrompt(input: BuildPromptInput): string {
 // ── Output validator ───────────────────────────────────────────────────────────
 
 /**
- * Validates that an LLM horoscope response contains the required blocks.
+ * Validates that an LLM horoscope response contains the required ## titled blocks.
  * Used post-render for observability logging.
+ *
+ * For daily: checks the 11 ## titled blocks (accroche and finale have no ## header).
+ * For weekly: checks top-level section markers.
  *
  * Returns valid=true if all required blocks are present.
  * Returns missingBlocks list for diagnostic logging.

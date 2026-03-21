@@ -10,6 +10,10 @@
 
 export type HoroscopeVariant = 'daily' | 'weekly'
 
+export type HoroscopeIntentResult =
+  | { matched: true; variant: HoroscopeVariant }
+  | { matched: false; variant: null }
+
 // ── Trigger patterns ───────────────────────────────────────────────────────────
 
 /** Patterns that signal a daily horoscope request */
@@ -59,6 +63,15 @@ export function isHoroscopeRequest(message: string): boolean {
     DAILY_TRIGGERS.some((p) => p.test(n) || p.test(message.toLowerCase())) ||
     WEEKLY_TRIGGERS.some((p) => p.test(n) || p.test(message.toLowerCase()))
   )
+}
+
+/**
+ * Single-call utility combining isHoroscopeRequest + detectHoroscopeVariant.
+ * Used for early-exit routing priority before general classification.
+ */
+export function detectHoroscopeIntent(message: string): HoroscopeIntentResult {
+  if (!isHoroscopeRequest(message)) return { matched: false, variant: null }
+  return { matched: true, variant: detectHoroscopeVariant(message) }
 }
 
 /**

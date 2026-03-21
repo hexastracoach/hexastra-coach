@@ -83,7 +83,7 @@ import {
 import { buildCompactHumanDesignContext } from '@/lib/humandesign/compactContext'
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
-import { isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
+import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
 import { selectResponseMode, buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
@@ -1389,6 +1389,20 @@ export async function runHexastraFlow(input: {
         latestUserMessage,
       })
 
+      // ── Horoscope priority detection — fires BEFORE general classification ───
+      // Must run early to prevent clarification/fallback_general routing.
+      const horoscopeIntent = detectHoroscopeIntent(latestUserMessage)
+      const isHoroscopeRoute = horoscopeIntent.matched
+      const horoscopeVariant = horoscopeIntent.matched ? horoscopeIntent.variant : null
+
+      if (isHoroscopeRoute) {
+        flowLog('info', 'HOROSCOPE_INTENT_MATCHED', {
+          variant: horoscopeVariant,
+          message: latestUserMessage.slice(0, 80),
+          action: 'priority_route — bypassing general classification fallback',
+        })
+      }
+
       // Pass conversation history so detectContext can detect astro follow-ups
       // (e.g. "non ce n'est pas ça" after an astro_exact reading)
       const semanticCtx = detectContext(latestUserMessage, limitedMessages)
@@ -1431,10 +1445,6 @@ export async function runHexastraFlow(input: {
           action: 'routing to HD exact pipeline — no vector search — API backbone forced',
         })
       }
-
-      // Horoscope route: structured 15-block (daily) or 7×10-block (weekly) template
-      const isHoroscopeRoute = isHoroscopeRequest(latestUserMessage)
-      const horoscopeVariant = isHoroscopeRoute ? detectHoroscopeVariant(latestUserMessage) : null
 
       if (isHoroscopeRoute) {
         flowLog('info', 'HOROSCOPE_ROUTE_SELECTED', {
@@ -1510,10 +1520,20 @@ export async function runHexastraFlow(input: {
         })
       }
 
-      const flowStep =
-        forceDirectReading && computedFlowStep !== 'sensitive_support'
+      const flowStep = isHoroscopeRoute
+        ? 'analysis'
+        : forceDirectReading && computedFlowStep !== 'sensitive_support'
           ? 'analysis'
           : computedFlowStep
+
+      if (isHoroscopeRoute) {
+        flowLog('info', 'HOROSCOPE_PRIORITY_ROUTE_APPLIED', {
+          computedFlowStep,
+          forcedFlowStep: 'analysis',
+          variant: horoscopeVariant,
+          action: 'computeFlowStep result overridden — clarification bypassed',
+        })
+      }
 
     const selectedMenu =
       selectedMenuKey && menuItems
@@ -1613,13 +1633,25 @@ export async function runHexastraFlow(input: {
     orchestrationTrace = trace
     flowLog('debug', 'orchestration trace', {
       branch: orchestrationDecision.branch,
-      route: orchestrationDecision.effectiveRoute,
+      route: isHoroscopeRoute ? 'horoscope_direct' : orchestrationDecision.effectiveRoute,
       renderTemplate: orchestrationExecution.renderTemplate,
       reasons: orchestrationDecision.reasonCodes,
-      routeChosenReason: orchestrationDecision.effectiveRoute === 'general' ? 'fallback_general' : 'explicit_match',
-      fallbackUsed: orchestrationDecision.effectiveRoute === 'general',
-      semanticContext: semanticCtx?.contextType ?? 'unknown',
+      routeChosenReason: isHoroscopeRoute
+        ? 'horoscope_direct'
+        : orchestrationDecision.effectiveRoute === 'general'
+          ? 'fallback_general'
+          : 'explicit_match',
+      fallbackUsed: !isHoroscopeRoute && orchestrationDecision.effectiveRoute === 'general',
+      semanticContext: isHoroscopeRoute ? 'horoscope' : (semanticCtx?.contextType ?? 'unknown'),
     })
+
+    if (isHoroscopeRoute && orchestrationDecision.effectiveRoute === 'general') {
+      flowLog('info', 'HOROSCOPE_FALLBACK_BYPASSED', {
+        bypassedRoute: orchestrationDecision.effectiveRoute,
+        forcedRoute: 'horoscope_direct',
+        variant: horoscopeVariant,
+      })
+    }
 
     const isBirthNeeded = !isBirthComplete(userContext.birthData)
     const needsPreciseBirthContext = requiresPreciseBirthContext(latestUserMessage)
@@ -1709,7 +1741,7 @@ export async function runHexastraFlow(input: {
       }
     }
 
-    if (contextualSelection?.kind === 'menu' && contextualSelection.immediateMessage) {
+    if (contextualSelection?.kind === 'menu' && contextualSelection.immediateMessage && !isHoroscopeRoute) {
       const message = contextualSelection.immediateMessage
       flowLog('info', 'flow step final', {
         step: 'clarification',
@@ -2011,24 +2043,30 @@ export async function runHexastraFlow(input: {
     // ── Skip vector retrieval based on universal vector policy ────────────────
     // Policy: exact fact/profile → skip; interpretation/guidance → enrich.
     // Legacy astro_exact / human_design_exact → always skip.
-    const skipVectorRetrieval = resolveVectorSkip(
+    // Horoscope → always skip (structured template, no vector enrichment needed).
+    const skipVectorRetrieval = isHoroscopeRoute || resolveVectorSkip(
       isAstroExact,
       isHumanDesignExact,
       universalClassif.requestKind,
       false, // exactDataResolved not yet known at this point — conservative skip
     )
     if (skipVectorRetrieval) {
-      const skipReason = isHumanDesignExact
-        ? 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_HUMAN_DESIGN'
-        : isAstroExact
-          ? 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_ASTRO'
-          : 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_QUERY'
+      const skipReason = isHoroscopeRoute
+        ? 'VECTOR_SEARCH_SKIPPED_FOR_HOROSCOPE'
+        : isHumanDesignExact
+          ? 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_HUMAN_DESIGN'
+          : isAstroExact
+            ? 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_ASTRO'
+            : 'VECTOR_SEARCH_SKIPPED_FOR_EXACT_QUERY'
       flowLog('info', skipReason, {
         semanticContextType: semanticCtx.contextType,
         requestKind: universalClassif.requestKind,
         isAstroExact,
         isHumanDesignExact,
-        reason: 'exact data from Railway is source of truth — vector search unnecessary',
+        isHoroscopeRoute,
+        reason: isHoroscopeRoute
+          ? 'horoscope uses structured template — no vector enrichment needed'
+          : 'exact data from Railway is source of truth — vector search unnecessary',
       })
     }
 
@@ -2683,6 +2721,8 @@ export async function runHexastraFlow(input: {
       readingPacket,
       knowledgePacket,
       isAstroExactCompact: isAstroExactCompact || isHumanDesignExactCompact,
+      isHoroscopeRoute: isHoroscopeRoute || undefined,
+      horoscopeVariant: horoscopeVariant ?? undefined,
     })
 
     if (isAstroExactCompact || isHumanDesignExactCompact) {
@@ -2713,13 +2753,11 @@ export async function runHexastraFlow(input: {
           : resolveOpenAiTimeoutMs(plan)
 
     // ── Max output tokens ─────────────────────────────────────────────────
-    // buildChatPayload already sets 900 for compact; keep previous free-plan cap for non-compact.
-    // Horoscope overrides: daily=1800 tokens, weekly=4500 tokens.
-    const effectiveMaxOutputTokens = isHoroscopeRoute
-      ? (horoscopeVariant === 'weekly' ? 4500 : 1800)
-      : !isCompactRoute && plan === 'free' && (isAstroExact || isHumanDesignExact || isExactDataSubcategory)
-        ? Math.min(payload.max_output_tokens ?? 950, 700)
-        : payload.max_output_tokens
+    // buildChatPayload already sets the right budget for horoscope (daily=2500, weekly=5000).
+    // Keep previous free-plan cap for astro/HD exact non-compact routes.
+    const effectiveMaxOutputTokens = !isHoroscopeRoute && !isCompactRoute && plan === 'free' && (isAstroExact || isHumanDesignExact || isExactDataSubcategory)
+      ? Math.min(payload.max_output_tokens ?? 950, 700)
+      : payload.max_output_tokens
 
     if (isCompactRoute) {
       flowLog('info', 'TIMEOUT_SAFE_MODE_ENABLED', {

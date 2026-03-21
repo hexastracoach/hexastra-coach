@@ -194,6 +194,62 @@ describe('buildHoroscopeDataBlock', () => {
   })
 })
 
+// ── DAILY_REQUIRED_BLOCKS — nouvelle structure ────────────────────────────────
+
+describe('DAILY_REQUIRED_BLOCKS — nouvelle structure de rendu', () => {
+  it('contient exactement 11 blocs titrés ##', () => {
+    expect(DAILY_REQUIRED_BLOCKS).toHaveLength(11)
+  })
+
+  it('contient ÉNERGIE DU JOUR', () => {
+    expect(DAILY_REQUIRED_BLOCKS).toContain('ÉNERGIE DU JOUR')
+  })
+
+  it('contient MIROIR INTÉRIEUR', () => {
+    expect(DAILY_REQUIRED_BLOCKS).toContain('MIROIR INTÉRIEUR')
+  })
+
+  it('contient MIROIR EXTÉRIEUR', () => {
+    expect(DAILY_REQUIRED_BLOCKS).toContain('MIROIR EXTÉRIEUR')
+  })
+
+  it('contient POINT DE TENSION', () => {
+    expect(DAILY_REQUIRED_BLOCKS).toContain('POINT DE TENSION')
+  })
+
+  it('contient OUVERTURE', () => {
+    expect(DAILY_REQUIRED_BLOCKS).toContain('OUVERTURE')
+  })
+
+  it('contient ACTION INCARNÉE', () => {
+    expect(DAILY_REQUIRED_BLOCKS).toContain('ACTION INCARNÉE')
+  })
+
+  it('contient ACTION SUBTILE', () => {
+    expect(DAILY_REQUIRED_BLOCKS).toContain('ACTION SUBTILE')
+  })
+
+  it('ne contient plus CLIMAT GÉNÉRAL (ancienne structure)', () => {
+    expect(DAILY_REQUIRED_BLOCKS).not.toContain('CLIMAT GÉNÉRAL')
+  })
+
+  it('ne contient plus COMPORTEMENT INCARNÉ (ancienne structure)', () => {
+    expect(DAILY_REQUIRED_BLOCKS).not.toContain('COMPORTEMENT INCARNÉ')
+  })
+
+  it('ne contient plus COMPORTEMENT SI DÉSINCARNÉ (ancienne structure)', () => {
+    expect(DAILY_REQUIRED_BLOCKS).not.toContain('COMPORTEMENT SI DÉSINCARNÉ')
+  })
+
+  it('ne contient plus POINT DE VIGILANCE (ancienne structure)', () => {
+    expect(DAILY_REQUIRED_BLOCKS).not.toContain('POINT DE VIGILANCE')
+  })
+
+  it('ne contient plus CLÉ DE COMPORTEMENT GÉNÉRAL (ancienne structure)', () => {
+    expect(DAILY_REQUIRED_BLOCKS).not.toContain('CLÉ DE COMPORTEMENT GÉNÉRAL')
+  })
+})
+
 // ── validateHoroscopeOutput — daily ──────────────────────────────────────────
 
 describe('validateHoroscopeOutput — daily', () => {
@@ -205,14 +261,14 @@ describe('validateHoroscopeOutput — daily', () => {
   })
 
   it('returns valid=false when blocks are missing', () => {
-    const partialOutput = '## OUVERTURE\nTexte ici.\n## CLIMAT GÉNÉRAL\nTexte.'
+    // Only 2 of the 11 required blocks — others are missing
+    const partialOutput = '## ÉNERGIE DU JOUR\nTexte ici.\n## MIROIR INTÉRIEUR\nTexte.'
     const result = validateHoroscopeOutput(partialOutput, 'daily')
     expect(result.valid).toBe(false)
     expect(result.missingBlocks.length).toBeGreaterThan(0)
   })
 
-  it('detects specific missing blocks', () => {
-    // Output without SANTÉ and HUMEUR
+  it('detects specific missing blocks — SANTÉ and HUMEUR', () => {
     const outputWithoutSome = DAILY_REQUIRED_BLOCKS
       .filter((b) => b !== 'SANTÉ' && b !== 'HUMEUR')
       .map((b) => `## ${b}\nContenu.`)
@@ -222,10 +278,44 @@ describe('validateHoroscopeOutput — daily', () => {
     expect(result.missingBlocks).toContain('HUMEUR')
   })
 
+  it('detects specific missing blocks — POINT DE TENSION and OUVERTURE', () => {
+    const outputWithoutSome = DAILY_REQUIRED_BLOCKS
+      .filter((b) => b !== 'POINT DE TENSION' && b !== 'OUVERTURE')
+      .map((b) => `## ${b}\nContenu.`)
+      .join('\n\n')
+    const result = validateHoroscopeOutput(outputWithoutSome, 'daily')
+    expect(result.missingBlocks).toContain('POINT DE TENSION')
+    expect(result.missingBlocks).toContain('OUVERTURE')
+  })
+
+  it('detects specific missing blocks — ACTION INCARNÉE and ACTION SUBTILE', () => {
+    const outputWithoutSome = DAILY_REQUIRED_BLOCKS
+      .filter((b) => b !== 'ACTION INCARNÉE' && b !== 'ACTION SUBTILE')
+      .map((b) => `## ${b}\nContenu.`)
+      .join('\n\n')
+    const result = validateHoroscopeOutput(outputWithoutSome, 'daily')
+    expect(result.missingBlocks).toContain('ACTION INCARNÉE')
+    expect(result.missingBlocks).toContain('ACTION SUBTILE')
+  })
+
   it('returns valid=false for empty string', () => {
     const result = validateHoroscopeOutput('', 'daily')
     expect(result.valid).toBe(false)
     expect(result.missingBlocks.length).toBeGreaterThan(0)
+  })
+
+  it('ÉNERGIE DU JOUR appears before MIROIR INTÉRIEUR in a valid output', () => {
+    const fullOutput = DAILY_REQUIRED_BLOCKS.map((b) => `## ${b}\nContenu du bloc.`).join('\n\n')
+    const energiePos = fullOutput.indexOf('ÉNERGIE DU JOUR')
+    const miroirPos = fullOutput.indexOf('MIROIR INTÉRIEUR')
+    expect(energiePos).toBeLessThan(miroirPos)
+  })
+
+  it('POINT DE TENSION appears before OUVERTURE in a valid output', () => {
+    const fullOutput = DAILY_REQUIRED_BLOCKS.map((b) => `## ${b}\nContenu du bloc.`).join('\n\n')
+    const tensionPos = fullOutput.indexOf('POINT DE TENSION')
+    const ouverturePos = fullOutput.indexOf('OUVERTURE')
+    expect(tensionPos).toBeLessThan(ouverturePos)
   })
 })
 
