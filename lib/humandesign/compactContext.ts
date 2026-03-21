@@ -50,6 +50,21 @@ function safeStr(v: unknown): string | null {
   return null
 }
 
+/**
+ * Extract a string from either a primitive or a nested object.
+ * Handles e.g. { type: { name: "Generator" } } or { type: "Generator" }
+ */
+function resolveHDValue(v: unknown): string | null {
+  if (typeof v === 'string' && v.trim()) return v.trim()
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    const obj = v as Record<string, unknown>
+    for (const k of ['name', 'label', 'value', 'text', 'title', 'fr', 'en', 'id']) {
+      if (typeof obj[k] === 'string' && (obj[k] as string).trim()) return (obj[k] as string).trim()
+    }
+  }
+  return null
+}
+
 function safeArr(v: unknown): string[] {
   if (!Array.isArray(v)) return []
   return v.filter((x) => typeof x === 'string' && x.trim()).map((x) => String(x).trim())
@@ -84,35 +99,50 @@ export function buildCompactHumanDesignContext(
   raw: Record<string, unknown>,
   maxChars = 1800,
 ): CompactHDContext {
-  // Merge root-level fields with the nested human_design / hd object
-  const hdRoot =
-    (raw.human_design && typeof raw.human_design === 'object' ? raw.human_design : null) ??
-    (raw.humanDesign && typeof raw.humanDesign === 'object' ? raw.humanDesign : null) ??
-    (raw.hd && typeof raw.hd === 'object' ? raw.hd : null) ??
-    {}
-
-  const merged: Record<string, unknown> = {
-    ...(hdRoot as Record<string, unknown>),
-    ...raw,
+  // Merge ALL HD source objects — Railway may split data across humanDesign (summary)
+  // and humanDesignFull (full chart). Later sources override earlier ones.
+  // Order: humanDesign (low priority) → humanDesignFull (high priority) → raw root (highest)
+  const hdAggregated: Record<string, unknown> = {}
+  for (const key of ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull']) {
+    const block = raw[key]
+    if (block && typeof block === 'object' && !Array.isArray(block)) {
+      Object.assign(hdAggregated, block as Record<string, unknown>)
+    }
   }
+  const merged: Record<string, unknown> = { ...hdAggregated, ...raw }
 
-  // ── Extract top-level HD fields ─────────────────────────────────────────
+  console.log('[HD_COMPACT] resolving sources', {
+    sourcesFound: ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull'].filter(k => !!raw[k]),
+    mergedKeyCount: Object.keys(hdAggregated).length,
+  })
+
+  // ── Extract top-level HD fields — resolveHDValue handles nested objects ──
   const hdType =
-    safeStr(merged.type_hd) ?? safeStr(merged.hd_type) ?? safeStr(merged.type)
+    resolveHDValue(merged.type_hd) ?? resolveHDValue(merged.hd_type) ?? resolveHDValue(merged.type) ??
+    resolveHDValue(merged.hdType) ?? resolveHDValue(merged.type_label) ?? resolveHDValue(merged.type_name)
   const hdProfile =
-    safeStr(merged.profil_hd) ?? safeStr(merged.profile) ?? safeStr(merged.profil)
+    resolveHDValue(merged.profil_hd) ?? resolveHDValue(merged.profile_hd) ?? resolveHDValue(merged.profile) ??
+    resolveHDValue(merged.profil) ?? resolveHDValue(merged.hdProfile) ?? resolveHDValue(merged.profileLine)
   const hdAuthority =
-    safeStr(merged.autorite_hd) ?? safeStr(merged.authority) ?? safeStr(merged.inner_authority)
+    resolveHDValue(merged.autorite_hd) ?? resolveHDValue(merged.authority) ??
+    resolveHDValue(merged.inner_authority) ?? resolveHDValue(merged.innerAuthority) ?? resolveHDValue(merged.hdAuthority)
   const hdStrategy =
-    safeStr(merged.strategie_hd) ?? safeStr(merged.strategy)
+    resolveHDValue(merged.strategie_hd) ?? resolveHDValue(merged.strategy) ?? resolveHDValue(merged.hdStrategy)
   const hdDefinition =
-    safeStr(merged.definition_hd) ?? safeStr(merged.definition)
+    resolveHDValue(merged.definition_hd) ?? resolveHDValue(merged.definition) ?? resolveHDValue(merged.hdDefinition)
   const hdIncarnationCross =
-    safeStr(merged.croix_incarnation) ?? safeStr(merged.incarnation_cross)
+    resolveHDValue(merged.croix_incarnation) ?? resolveHDValue(merged.incarnation_cross) ??
+    resolveHDValue(merged.incarnationCross)
   const hdSignature =
-    safeStr(merged.signature_hd) ?? safeStr(merged.signature)
+    resolveHDValue(merged.signature_hd) ?? resolveHDValue(merged.signature) ?? resolveHDValue(merged.hdSignature)
   const hdNotSelfTheme =
-    safeStr(merged.not_self_theme) ?? safeStr(merged.notSelfTheme) ?? safeStr(merged.not_self) ?? safeStr(merged.theme_non_soi)
+    resolveHDValue(merged.not_self_theme) ?? resolveHDValue(merged.notSelfTheme) ??
+    resolveHDValue(merged.not_self) ?? resolveHDValue(merged.theme_non_soi) ?? resolveHDValue(merged.hdNotSelfTheme)
+
+  console.log('[HD_COMPACT] extracted core fields', {
+    hdType, hdProfile, hdAuthority, hdStrategy,
+    extractedCount: [hdType, hdProfile, hdAuthority, hdStrategy, hdSignature, hdDefinition].filter(Boolean).length,
+  })
 
   // ── Centers ─────────────────────────────────────────────────────────────
   const hdDefinedCenters: string[] = (() => {
@@ -172,18 +202,24 @@ export function buildCompactHumanDesignContext(
   if (hdDefinedChannels.length) blockLines.push(`- CANAUX DÉFINIS: ${hdDefinedChannels.join(', ')}`)
   if (hdActivatedGates.length) blockLines.push(`- PORTES ACTIVES (top): ${hdActivatedGates.slice(0, 10).join(', ')}`)
 
-  // Also scan remaining HD_KEYS not yet covered
-  for (const [key, value] of Object.entries(raw)) {
-    if (EXCLUDE_KEYS.has(key) || !HD_KEYS.has(key)) continue
-    if (['type_hd', 'hd_type', 'type', 'profil_hd', 'profile', 'profil',
-         'autorite_hd', 'authority', 'inner_authority', 'strategie_hd', 'strategy',
-         'signature', 'signature_hd', 'not_self_theme', 'notSelfTheme', 'not_self', 'theme_non_soi',
-         'definition_hd', 'definition', 'croix_incarnation', 'incarnation_cross',
-         'centres_hd', 'centers', 'defined_centers', 'undefined_centers', 'open_centers',
-         'canaux_hd', 'channels', 'defined_channels',
-         'portes_hd', 'gates', 'activated_gates', 'portes_actives',
-         'human_design', 'humanDesign', 'hd',
-         'publicSummary', 'publicsummary', 'summary', 'synthese'].includes(key)) continue
+  // Also scan remaining HD_KEYS from merged (covers humanDesignFull fields not yet extracted)
+  const alreadyCovered = new Set([
+    'type_hd', 'hd_type', 'type', 'profil_hd', 'profile_hd', 'profile', 'profil', 'hdProfile', 'profileLine',
+    'autorite_hd', 'authority', 'inner_authority', 'innerAuthority', 'hdAuthority',
+    'strategie_hd', 'strategy', 'hdStrategy',
+    'signature', 'signature_hd', 'hdSignature',
+    'not_self_theme', 'notSelfTheme', 'not_self', 'theme_non_soi', 'hdNotSelfTheme',
+    'definition_hd', 'definition', 'hdDefinition',
+    'croix_incarnation', 'incarnation_cross', 'incarnationCross',
+    'centres_hd', 'centers', 'defined_centers', 'definedCenters', 'undefined_centers', 'open_centers',
+    'canaux_hd', 'channels', 'defined_channels', 'definedChannels',
+    'portes_hd', 'gates', 'activated_gates', 'activatedGates', 'portes_actives',
+    'human_design', 'humanDesign', 'humanDesignFull', 'hd', 'HD',
+    'publicSummary', 'publicsummary', 'summary', 'synthese',
+  ])
+  for (const [key, value] of Object.entries(merged)) {
+    if (EXCLUDE_KEYS.has(key) || alreadyCovered.has(key)) continue
+    if (!HD_KEYS.has(key) && !HD_KEYS.has(key.toLowerCase())) continue
     if (value === null || value === undefined) continue
     const formatted = typeof value === 'object' ? JSON.stringify(value).slice(0, 200) : String(value)
     const line = `- ${key.replace(/_/g, ' ').toUpperCase()}: ${formatted}`
@@ -201,6 +237,13 @@ export function buildCompactHumanDesignContext(
     }
   }
 
+  const compactDataBlock = blockLines.join('\n')
+  console.log('[HD_COMPACT] block built', {
+    blockChars: compactDataBlock.length,
+    linesCount: blockLines.length,
+    hdType, hdProfile, hdAuthority,
+  })
+
   return {
     hdType,
     hdProfile,
@@ -215,6 +258,6 @@ export function buildCompactHumanDesignContext(
     hdActivatedGates,
     hdDefinedChannels,
     hdSummarySeeds,
-    compactDataBlock: blockLines.join('\n'),
+    compactDataBlock,
   }
 }

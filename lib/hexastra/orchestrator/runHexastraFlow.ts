@@ -2159,21 +2159,22 @@ export async function runHexastraFlow(input: {
 
     if (isAstroExact || isExactDataSubcategory) {
       const bDataForLog = normalizeBirthData(userContext.birthData)
-      flowLog('info', '[ASTRO] entering astrology_exact resolver', {
+      const scienceLabel = (universalClassif.science ?? orchestrationExecution.detectedScience ?? 'exact').toUpperCase()
+      flowLog('info', `[${scienceLabel}] entering exact resolver`, {
         contextType: semanticCtx.contextType,
         subcategory: orchestrationExecution.detectedSubcategory,
         science: orchestrationExecution.detectedScience,
         effectiveDomainForApi,
         shouldUseApiBackbone,
       })
-      flowLog('info', '[ASTRO] stored birth data loaded', {
+      flowLog('info', `[${scienceLabel}] stored birth data loaded`, {
         hasFirstName: Boolean(bDataForLog?.firstName),
         hasDate: Boolean(bDataForLog?.date || bDataForLog?.birthDateISO),
         hasTime: Boolean(bDataForLog?.time),
         hasPlace: Boolean(bDataForLog?.place),
       })
       if (shouldUseApiBackbone) {
-        flowLog('info', '[ASTRO] calling Hexastra Swiss Ephemeris', { effectiveDomainForApi })
+        flowLog('info', `[${scienceLabel}] calling Hexastra API`, { effectiveDomainForApi })
       }
     }
 
@@ -2267,15 +2268,28 @@ export async function runHexastraFlow(input: {
       exactDataReliable: reliabilityResult.reliable,
       isPedagogical: universalClassif.requestKind === 'clarification',
     })
+    // Enneagram always uses interpretive_reading — prose, not structured output
+    const effectiveResponseMode =
+      universalClassif.science === 'enneagram' && responseMode === 'calculated_reading'
+        ? 'interpretive_reading'
+        : responseMode
+    if (effectiveResponseMode !== responseMode) {
+      flowLog('info', 'ENNEAGRAM_MODE_OVERRIDE', {
+        from: responseMode,
+        to: effectiveResponseMode,
+        science: universalClassif.science,
+      })
+    }
+
     flowLog('info', 'RESPONSE_MODE_SELECTED', {
-      responseMode,
+      responseMode: effectiveResponseMode,
       requestKind: universalClassif.requestKind,
       subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
       plan,
       exactDataResolved,
     })
 
-    const responseModeDirective = buildResponseModeDirective(responseMode)
+    const responseModeDirective = buildResponseModeDirective(effectiveResponseMode)
 
     // Anti-contradiction directive: inject when astro follow-up contradicts a value
     const antiContradictionActive = semanticCtx.contextType === 'astro_followup'
@@ -2839,9 +2853,9 @@ export async function runHexastraFlow(input: {
     }
 
     // Detect response mode mismatch (observability only)
-    if (detectResponseModeMismatch(rawMessage, responseMode, exactDataResolved)) {
+    if (detectResponseModeMismatch(rawMessage, effectiveResponseMode, exactDataResolved)) {
       flowLog('warn', 'RESPONSE_MODE_MISMATCH_DETECTED', {
-        expectedMode: responseMode,
+        expectedMode: effectiveResponseMode,
         requestKind: universalClassif.requestKind,
         responseExcerpt: rawMessage.slice(0, 120),
         hint: 'Response appears to be prose for a fact/list request. Check mode directive injection.',
@@ -2857,7 +2871,7 @@ export async function runHexastraFlow(input: {
         openAiTimeoutMs,
         isAstroExactCompact,
         isHumanDesignExactCompact,
-        responseMode,
+        responseMode: effectiveResponseMode,
         requestKind: universalClassif.requestKind,
       })
     } else {
@@ -2869,7 +2883,7 @@ export async function runHexastraFlow(input: {
         openAiTimeoutMs,
         isAstroExactCompact,
         isHumanDesignExactCompact,
-        responseMode,
+        responseMode: effectiveResponseMode,
       })
     }
 

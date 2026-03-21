@@ -92,11 +92,12 @@ describe('isReliableExactData — human_design', () => {
     expect(result.missingFields).toContain('type_hd')
   })
 
-  it('unreliable when profil_hd missing', () => {
+  it('still reliable when profil_hd missing (type is enough)', () => {
     const result = isReliableExactData('human_design', null, {
       type_hd: 'Générateur',
     })
-    expect(result.reliable).toBe(false)
+    // Profile is enrichment, not a reliability blocker — type alone is sufficient
+    expect(result.reliable).toBe(true)
     expect(result.missingFields).toContain('profil_hd')
   })
 
@@ -138,12 +139,13 @@ describe('isReliableExactData — numerology', () => {
     expect(result.missingFields).toContain('chemin_de_vie')
   })
 
-  it('detects missing annee_personnelle for that subcategory', () => {
+  it('detects missing annee_personnelle for that subcategory (but still reliable)', () => {
     const result = isReliableExactData('numerology', 'annee_personnelle', {
       chemin_de_vie: 5,
       // no annee_personnelle
     })
-    expect(result.reliable).toBe(false)
+    // Life path present → reliable; annee_personnelle absence is noted but not blocking
+    expect(result.reliable).toBe(true)
     expect(result.missingFields).toContain('annee_personnelle')
   })
 })

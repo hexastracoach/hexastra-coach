@@ -34,6 +34,21 @@ function safeStr(v: unknown): string | null {
   return null
 }
 
+/**
+ * Like safeStr, but also extracts a string from a nested object.
+ * Handles e.g. { type: { name: "Generator", label: "..." } } → "Generator"
+ */
+function safeStrDeep(v: unknown): string | null {
+  if (typeof v === 'string' && v.trim()) return v.trim()
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    const obj = v as Record<string, unknown>
+    for (const k of ['name', 'label', 'value', 'text', 'title', 'fr', 'en', 'id']) {
+      if (typeof obj[k] === 'string' && (obj[k] as string).trim()) return (obj[k] as string).trim()
+    }
+  }
+  return null
+}
+
 function mergeNested(raw: Record<string, unknown>, ...nestKeys: string[]): Record<string, unknown> {
   for (const key of nestKeys) {
     const block = raw[key]
@@ -52,6 +67,38 @@ function mergeNested(raw: Record<string, unknown>, ...nestKeys: string[]): Recor
     return { ...blockObj, ...raw }
   }
   return raw
+}
+
+/**
+ * Merge ALL known Human Design source objects from a raw /chart/fusion response.
+ * Railway may split data across humanDesign (summary) and humanDesignFull (chart).
+ * Later sources override earlier ones; raw root wins over everything.
+ */
+function mergeHDSources(raw: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = {}
+  // Order: humanDesign first (lower priority), humanDesignFull overrides, hd last
+  for (const key of ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull']) {
+    const block = raw[key]
+    if (block && typeof block === 'object' && !Array.isArray(block)) {
+      Object.assign(merged, block as Record<string, unknown>)
+    }
+  }
+  // Root-level raw overrides nested (e.g. explicit top-level type_hd field)
+  return { ...merged, ...raw }
+}
+
+/**
+ * Merge ALL known Numerology source objects from a raw /chart/fusion response.
+ */
+function mergeNumerologySources(raw: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = {}
+  for (const key of ['numerologie', 'numerology', 'numerologie_complete', 'numbers']) {
+    const block = raw[key]
+    if (block && typeof block === 'object' && !Array.isArray(block)) {
+      Object.assign(merged, block as Record<string, unknown>)
+    }
+  }
+  return { ...merged, ...raw }
 }
 
 // ── Per-science checkers ───────────────────────────────────────────────────────
@@ -112,32 +159,53 @@ function checkHDReliability(
   const missing: string[] = []
   const errors: string[] = []
 
-  const merged = mergeNested(raw, 'human_design', 'humanDesign', 'hd')
+  // Merge ALL HD sources: humanDesign + humanDesignFull + human_design + hd
+  // Railway splits summary (humanDesign) and full chart (humanDesignFull)
+  const merged = mergeHDSources(raw)
 
-  const typeOk = safeStr(merged.type_hd) ?? safeStr(merged.hd_type) ?? safeStr(merged.type)
-  const profileOk = safeStr(merged.profil_hd) ?? safeStr(merged.profile) ?? safeStr(merged.profil)
-  const authorityOk = safeStr(merged.autorite_hd) ?? safeStr(merged.authority) ?? safeStr(merged.inner_authority)
+  // safeStrDeep handles both string values and nested objects like { name: "Generator" }
+  const typeOk =
+    safeStrDeep(merged.type_hd) ?? safeStrDeep(merged.hd_type) ?? safeStrDeep(merged.type) ??
+    safeStrDeep(merged.hdType) ?? safeStrDeep(merged.type_label) ?? safeStrDeep(merged.type_name)
+
+  const profileOk =
+    safeStrDeep(merged.profil_hd) ?? safeStrDeep(merged.profile_hd) ?? safeStrDeep(merged.profile) ??
+    safeStrDeep(merged.profil) ?? safeStrDeep(merged.hdProfile) ?? safeStrDeep(merged.profileLine) ??
+    safeStrDeep(merged.profile_line) ?? safeStrDeep(merged.personality_line)
+
+  const authorityOk =
+    safeStrDeep(merged.autorite_hd) ?? safeStrDeep(merged.authority) ??
+    safeStrDeep(merged.inner_authority) ?? safeStrDeep(merged.innerAuthority) ??
+    safeStrDeep(merged.hdAuthority)
 
   if (!typeOk) missing.push('type_hd')
+  // Profile is secondary: mark missing for logging but not required for basic reliability
   if (!profileOk) missing.push('profil_hd')
 
   if (subcategory === 'autorite_hd' && !authorityOk) missing.push('autorite_hd')
 
   if (subcategory === 'centres_hd' || subcategory === 'human_design_exact') {
-    if (!hasValue(merged, 'centres_hd', 'centers', 'defined_centers')) missing.push('centres_hd')
+    if (!hasValue(merged, 'centres_hd', 'centers', 'defined_centers', 'definedCenters', 'centres_definis')) {
+      missing.push('centres_hd')
+    }
   }
 
   if (subcategory === 'portes_hd') {
-    if (!hasValue(merged, 'portes_hd', 'gates', 'activated_gates')) missing.push('portes_hd')
+    if (!hasValue(merged, 'portes_hd', 'gates', 'activated_gates', 'activatedGates', 'portes_actives')) {
+      missing.push('portes_hd')
+    }
   }
 
   if (subcategory === 'canaux_hd') {
-    if (!hasValue(merged, 'canaux_hd', 'channels', 'defined_channels')) missing.push('canaux_hd')
+    if (!hasValue(merged, 'canaux_hd', 'channels', 'defined_channels', 'definedChannels')) {
+      missing.push('canaux_hd')
+    }
   }
 
   const total = subcategory === 'human_design_exact' ? 5 : 2
   const completeness = Math.max(0, (total - missing.length) / total)
-  const reliable = !missing.includes('type_hd') && !missing.includes('profil_hd')
+  // Reliable when type is present — profile is enrichment, not a blocker
+  const reliable = Boolean(typeOk)
 
   return { reliable, missingFields: missing, errors, completeness }
 }
@@ -149,26 +217,45 @@ function checkNumerologyReliability(
   const missing: string[] = []
   const errors: string[] = []
 
-  const merged = mergeNested(raw, 'numerology', 'numerologie')
+  // Merge ALL numerology sources — Railway may use different key names
+  const merged = mergeNumerologySources(raw)
 
-  const lifePathOk = hasValue(merged, 'chemin_de_vie', 'life_path', 'lifePath', 'cheminVie')
+  const lifePathOk = hasValue(
+    merged,
+    'chemin_de_vie', 'life_path', 'lifePath', 'cheminVie', 'chemin_vie',
+    'lifePathNumber', 'life_path_number', 'lifepath', 'life_path_no',
+    'numero_chemin', 'cheminDeVie', 'path', 'nombre_chemin',
+  )
   if (!lifePathOk) missing.push('chemin_de_vie')
 
-  if (subcategory === 'expression' && !hasValue(merged, 'expression', 'expression_number')) {
-    missing.push('expression')
-  }
-  if (subcategory === 'ame' && !hasValue(merged, 'ame', 'soul', 'soul_number')) {
-    missing.push('ame')
-  }
-  if (subcategory === 'annee_personnelle' && !hasValue(merged, 'annee_personnelle', 'personal_year')) {
-    missing.push('annee_personnelle')
-  }
-  if (subcategory === 'mois_personnel' && !hasValue(merged, 'mois_personnel', 'personal_month')) {
-    missing.push('mois_personnel')
+  // Personal year is checked only when relevant subcategory — not required for basic reliability
+  if (subcategory === 'annee_personnelle') {
+    if (!hasValue(merged, 'annee_personnelle', 'personal_year', 'personalYear', 'personal_year_number', 'personalYearNumber', 'anneePersonnelle', 'year_number')) {
+      missing.push('annee_personnelle')
+    }
   }
 
-  const completeness = missing.length === 0 ? 1 : 0.5
-  const reliable = missing.length === 0
+  if (subcategory === 'expression') {
+    if (!hasValue(merged, 'expression', 'expression_number', 'expressionNumber', 'nombre_expression')) {
+      missing.push('expression')
+    }
+  }
+
+  if (subcategory === 'ame') {
+    if (!hasValue(merged, 'ame', 'soul', 'soul_number', 'soulUrge', 'soul_urge', 'soulUrgeNumber', 'nombre_ame')) {
+      missing.push('ame')
+    }
+  }
+
+  if (subcategory === 'mois_personnel') {
+    if (!hasValue(merged, 'mois_personnel', 'personal_month', 'personalMonth', 'personal_month_number')) {
+      missing.push('mois_personnel')
+    }
+  }
+
+  // Reliable when life path is present — sufficient for most numerology readings
+  const completeness = missing.includes('chemin_de_vie') ? 0 : Math.max(0.5, (1 - (missing.length - 0) / 5))
+  const reliable = lifePathOk
 
   return { reliable, missingFields: missing, errors, completeness }
 }

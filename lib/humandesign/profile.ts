@@ -95,7 +95,7 @@ export function extractHDProfileFromRaw(
   })
 
   // ── Strategy 1: Try known HD root objects ────────────────────────────────
-  const hdCandidateKeys = ['human_design', 'humanDesign', 'hd', 'HD']
+  const hdCandidateKeys = ['human_design', 'humanDesign', 'humanDesignFull', 'hd', 'HD']
   for (const hdKey of hdCandidateKeys) {
     const hdObj = safeObj(raw[hdKey])
     if (!hdObj) continue
