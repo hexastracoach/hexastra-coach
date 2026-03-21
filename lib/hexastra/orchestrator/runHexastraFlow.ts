@@ -83,6 +83,8 @@ import {
 import { buildCompactHumanDesignContext } from '@/lib/humandesign/compactContext'
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
+import { isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
+import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
 import { selectResponseMode, buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
 import { isReliableExactData } from '@/lib/exact-data/reliability'
@@ -1430,11 +1432,23 @@ export async function runHexastraFlow(input: {
         })
       }
 
+      // Horoscope route: structured 15-block (daily) or 7×10-block (weekly) template
+      const isHoroscopeRoute = isHoroscopeRequest(latestUserMessage)
+      const horoscopeVariant = isHoroscopeRoute ? detectHoroscopeVariant(latestUserMessage) : null
+
+      if (isHoroscopeRoute) {
+        flowLog('info', 'HOROSCOPE_ROUTE_SELECTED', {
+          variant: horoscopeVariant,
+          message: latestUserMessage.slice(0, 80),
+        })
+      }
+
       // Direct request detection: skip contextual framing when user already asked a complete question
-      // Combines: universal classification + semantic exact routes (astro_exact, human_design_exact)
+      // Combines: universal classification + semantic exact routes (astro_exact, human_design_exact, horoscope)
       const isDirectRequest =
         isAstroExact ||
         isHumanDesignExact ||
+        isHoroscopeRoute ||
         isActionableDirectRequest(latestUserMessage, universalClassif)
 
       if (isDirectRequest) {
@@ -1452,6 +1466,7 @@ export async function runHexastraFlow(input: {
       const blockMicroProfile =
         isAstroExact ||
         isHumanDesignExact ||
+        isHoroscopeRoute ||
         (semanticCtx.contextType !== 'profile' &&
           semanticCtx.contextType !== 'unknown' &&
           semanticCtx.confidence >= 0.8)
@@ -2603,6 +2618,15 @@ export async function runHexastraFlow(input: {
       .filter(Boolean)
       .join('\n\n') || null
 
+    const horoscopeDataBlock = isHoroscopeRoute
+      ? buildHoroscopeDataBlock(
+          userContext.firstName ?? userContext.name ?? null,
+          userContext.birthData ?? null,
+          specializedResult?.raw ?? null,
+          horoscopeVariant ?? 'daily',
+        )
+      : null
+
     const systemPrompt = buildSystemPrompt({
       plan,
       mode,
@@ -2640,6 +2664,9 @@ export async function runHexastraFlow(input: {
       responseModeDirective,
       antiHallucinationRules: exactDataNeeded ? ANTI_HALLUCINATION_RULES : undefined,
       antiContradictionDirective: antiContradictionActive ? ANTI_CONTRADICTION_DIRECTIVE : undefined,
+      isHoroscopeRoute: isHoroscopeRoute || undefined,
+      horoscopeVariant: horoscopeVariant ?? undefined,
+      horoscopeDataBlock: horoscopeDataBlock ?? undefined,
     })
 
     const messagesForLLM = limitedMessages.length
@@ -2675,17 +2702,22 @@ export async function runHexastraFlow(input: {
     // Compact route: use a tighter timeout budget since the payload is much smaller.
     // Non-compact astro_exact: bump free plan from 13s to 20s to accommodate the
     // larger exact data block that may still be present.
+    // Horoscope: daily=22s, weekly=28s (15-block or 70-block generation).
     const isCompactRoute = isAstroExactCompact || isHumanDesignExactCompact
-    const openAiTimeoutMs = isCompactRoute
-      ? Math.min(resolveOpenAiTimeoutMs(plan), 18000)    // compact: at most 18s (fast path)
-      : (isAstroExact || isHumanDesignExact)
-        ? Math.max(resolveOpenAiTimeoutMs(plan), 20000)  // non-compact exact: at least 20s
-        : resolveOpenAiTimeoutMs(plan)
+    const openAiTimeoutMs = isHoroscopeRoute
+      ? (horoscopeVariant === 'weekly' ? 28000 : 22000)
+      : isCompactRoute
+        ? Math.min(resolveOpenAiTimeoutMs(plan), 18000)    // compact: at most 18s (fast path)
+        : (isAstroExact || isHumanDesignExact)
+          ? Math.max(resolveOpenAiTimeoutMs(plan), 20000)  // non-compact exact: at least 20s
+          : resolveOpenAiTimeoutMs(plan)
 
     // ── Max output tokens ─────────────────────────────────────────────────
     // buildChatPayload already sets 900 for compact; keep previous free-plan cap for non-compact.
-    const effectiveMaxOutputTokens =
-      !isCompactRoute && plan === 'free' && (isAstroExact || isHumanDesignExact || isExactDataSubcategory)
+    // Horoscope overrides: daily=1800 tokens, weekly=4500 tokens.
+    const effectiveMaxOutputTokens = isHoroscopeRoute
+      ? (horoscopeVariant === 'weekly' ? 4500 : 1800)
+      : !isCompactRoute && plan === 'free' && (isAstroExact || isHumanDesignExact || isExactDataSubcategory)
         ? Math.min(payload.max_output_tokens ?? 950, 700)
         : payload.max_output_tokens
 
@@ -2713,6 +2745,17 @@ export async function runHexastraFlow(input: {
     const totalMs = Date.now() - flowStartMs
 
     // ── Post-render guards ────────────────────────────────────────────────────
+    // Horoscope output validation: check required blocks are present
+    if (isHoroscopeRoute && horoscopeVariant) {
+      const horoscopeValidation = validateHoroscopeOutput(rawMessage, horoscopeVariant)
+      flowLog(horoscopeValidation.valid ? 'info' : 'warn', 'HOROSCOPE_RENDER_SUCCESS', {
+        variant: horoscopeVariant,
+        valid: horoscopeValidation.valid,
+        missingBlocks: horoscopeValidation.missingBlocks,
+        responseChars: rawMessage.length,
+      })
+    }
+
     // Detect false plan limitation in the generated response (observability only)
     if (blockFalsePlanLimitation && containsFalsePlanLimitation(rawMessage)) {
       flowLog('warn', 'FALSE_PLAN_LIMITATION_DETECTED_IN_RESPONSE', {

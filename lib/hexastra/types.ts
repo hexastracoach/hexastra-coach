@@ -243,7 +243,7 @@ export type BuildPromptInput = {
   /** Mode d'analyse choisi par l'utilisateur au bootstrap */
   analysisMode?: 'science_by_science' | 'hexastra_fusion' | null
   /** Niveau de restitution praticien choisi au bootstrap */
-  renderMode?: 'simple' | 'approfondie' | 'praticien' | null
+  renderMode?: 'simple' | 'approfondie' | 'praticien' | 'hexastra_horoscope' | null
   /** Science sélectionnée dans le menu (clé du menu level 1) */
   selectedScience?: string | null
   /** Contexte praticien: self = perso, client = pour un client, duo = lecture croisée 2 personnes */
@@ -289,4 +289,17 @@ export type BuildPromptInput = {
    * Source: ANTI_CONTRADICTION_DIRECTIVE depuis hallucinationGuard.ts.
    */
   antiContradictionDirective?: string | null
+  /**
+   * Activates the HexAstra Horoscope structured template.
+   * When true, buildSystemPrompt returns buildHoroscopeSystemPrompt(input).
+   * Bypasses the generic KS system prompt entirely.
+   */
+  isHoroscopeRoute?: boolean
+  /** 'daily' (15 blocs) or 'weekly' (7 × 10 blocs + synthèse). Defaults to 'daily'. */
+  horoscopeVariant?: 'daily' | 'weekly' | null
+  /**
+   * Personalized data block for the horoscope (current date, sun sign, birth date, etc.).
+   * Built by buildHoroscopeDataBlock() from birthData + optional Railway raw data.
+   */
+  horoscopeDataBlock?: string | null
 }

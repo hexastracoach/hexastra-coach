@@ -2,6 +2,7 @@ import { PLAN_MODE_MAP } from '@/lib/hexastra/config/planModeMap'
 import { applySafetySuffix } from '@/lib/hexastra/guards/safety'
 import { buildEvolutionContext } from '@/lib/evolution/evolutionContextBuilder'
 import { buildInsightContext } from '@/lib/hexastra/memory/insightEngine'
+import { buildHoroscopeSystemPrompt } from '@/lib/hexastra/prompts/horoscopePrompt'
 import type { UserEvolutionProfile } from '@/types/evolution'
 import type { BuildPromptInput } from '@/lib/hexastra/types'
 
@@ -570,6 +571,13 @@ ABSOLUTE RULES:
 }
 
 export function buildSystemPrompt(input: BuildPromptInput): string {
+  // ── HexAstra Horoscope route ──────────────────────────────────────────────
+  // When isHoroscopeRoute=true: bypass the full KS prompt and use the
+  // structured horoscope template (daily 15-block or weekly 7×10-block).
+  if (input.isHoroscopeRoute) {
+    return buildHoroscopeSystemPrompt(input)
+  }
+
   // ── Astro Exact Compact route ─────────────────────────────────────────────
   // When exactDataResolved + astro_exact: use a short focused prompt (< 5000 chars)
   // instead of the full KS-heavy prompt. Avoids OpenAI timeout on free plan.
