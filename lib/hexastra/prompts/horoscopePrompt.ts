@@ -116,18 +116,117 @@ export function buildHoroscopeDataBlock(
 
 // ── Daily prompt builder ───────────────────────────────────────────────────────
 
+/**
+ * Returns a plan-aware depth directive for the daily horoscope.
+ *
+ * FREE  → structure complète obligatoire + contenu compact (longueurs courtes par bloc).
+ * PAID  → structure complète obligatoire + contenu développé (longueurs étendues par bloc).
+ *
+ * RÈGLE ABSOLUE : la différence free/premium ne supprime JAMAIS de blocs.
+ * Elle agit uniquement sur la profondeur et la longueur de chaque bloc.
+ */
+function buildDailyDepthDirective(plan: string, isFr: boolean): string {
+  const isFree = plan === 'free'
+
+  if (isFr) {
+    return isFree
+      ? `PROFONDEUR DU CONTENU — MODE GRATUIT (structure complète obligatoire, contenu compact):
+INTERDICTION ABSOLUE : ne jamais supprimer un bloc. Les 15 blocs restent présents même en mode gratuit.
+La différence gratuit/premium porte UNIQUEMENT sur la longueur de chaque bloc, pas sur leur présence.
+
+Longueurs imposées par bloc en mode gratuit :
+- OUVERTURE : 2 lignes maximum
+- CLIMAT GÉNÉRAL : 2 à 4 lignes maximum
+- ÉNERGIE DU JOUR : 1 phrase
+- MIROIR INTÉRIEUR : 1 à 2 phrases maximum
+- MIROIR EXTÉRIEUR : 1 à 2 phrases maximum
+- COMPORTEMENT INCARNÉ : 1 à 2 phrases maximum
+- COMPORTEMENT SI DÉSINCARNÉ : 1 à 2 phrases maximum
+- AMOUR (Célibataires / En couple / Relations amicales) : 1 à 2 phrases chacune
+- ARGENT & TRAVAIL (Argent / Travail / Non-actif) : 1 à 2 phrases chacune
+- SANTÉ : 2 à 3 phrases maximum
+- HUMEUR : 2 à 3 phrases maximum
+- POINT DE VIGILANCE : 1 à 2 phrases maximum
+- OPPORTUNITÉ DU JOUR : 1 à 2 phrases maximum
+- ACTION UTILE IMMÉDIATE : 1 phrase
+- CLÉ DE COMPORTEMENT GÉNÉRAL : 2 à 3 phrases maximum`
+      : `PROFONDEUR DU CONTENU — MODE PREMIUM (structure complète obligatoire, contenu développé):
+Les 15 blocs sont produits dans leur intégralité avec la profondeur maximale.
+Longueurs cibles par bloc :
+- OUVERTURE : 2 à 3 lignes
+- CLIMAT GÉNÉRAL : 3 à 5 lignes
+- ÉNERGIE DU JOUR : 1 phrase dense
+- MIROIR INTÉRIEUR : 1 à 2 phrases développées
+- MIROIR EXTÉRIEUR : 1 à 2 phrases développées
+- COMPORTEMENT INCARNÉ : 1 à 2 phrases développées
+- COMPORTEMENT SI DÉSINCARNÉ : 1 à 2 phrases développées
+- AMOUR (Célibataires / En couple / Relations amicales) : 2 à 4 lignes chacune
+- ARGENT & TRAVAIL (Argent / Travail / Non-actif) : 2 à 4 lignes chacune
+- SANTÉ : 3 à 4 lignes
+- HUMEUR : 3 à 4 lignes
+- POINT DE VIGILANCE : 1 à 3 lignes
+- OPPORTUNITÉ DU JOUR : 1 à 3 lignes
+- ACTION UTILE IMMÉDIATE : 1 à 2 lignes
+- CLÉ DE COMPORTEMENT GÉNÉRAL : 2 à 4 lignes`
+  }
+
+  // English
+  return isFree
+    ? `CONTENT DEPTH — FREE PLAN (complete structure mandatory, compact content):
+ABSOLUTE RULE: never omit a block. All 15 blocks remain present even on the free plan.
+The free/premium difference applies ONLY to block length, never to block presence.
+
+Required lengths per block on free plan:
+- OPENING: 2 lines maximum
+- GENERAL CLIMATE: 2–4 lines maximum
+- ENERGY OF THE DAY: 1 sentence
+- INNER MIRROR: 1–2 sentences maximum
+- OUTER MIRROR: 1–2 sentences maximum
+- EMBODIED BEHAVIOR: 1–2 sentences maximum
+- DISEMBODIED BEHAVIOR: 1–2 sentences maximum
+- LOVE (Singles / In a relationship / Friendships): 1–2 sentences each
+- MONEY & WORK (Money / Work / Not working): 1–2 sentences each
+- HEALTH: 2–3 sentences maximum
+- MOOD: 2–3 sentences maximum
+- POINT OF VIGILANCE: 1–2 sentences maximum
+- OPPORTUNITY OF THE DAY: 1–2 sentences maximum
+- IMMEDIATE USEFUL ACTION: 1 sentence
+- GENERAL BEHAVIOR KEY: 2–3 sentences maximum`
+    : `CONTENT DEPTH — PREMIUM PLAN (complete structure mandatory, developed content):
+All 15 blocks are produced in full with maximum depth.
+Target lengths per block:
+- OPENING: 2–3 lines
+- GENERAL CLIMATE: 3–5 lines
+- ENERGY OF THE DAY: 1 dense sentence
+- INNER MIRROR: 1–2 developed sentences
+- OUTER MIRROR: 1–2 developed sentences
+- EMBODIED BEHAVIOR: 1–2 developed sentences
+- DISEMBODIED BEHAVIOR: 1–2 developed sentences
+- LOVE (Singles / In a relationship / Friendships): 2–4 lines each
+- MONEY & WORK (Money / Work / Not working): 2–4 lines each
+- HEALTH: 3–4 lines
+- MOOD: 3–4 lines
+- POINT OF VIGILANCE: 1–3 lines
+- OPPORTUNITY OF THE DAY: 1–3 lines
+- IMMEDIATE USEFUL ACTION: 1–2 lines
+- GENERAL BEHAVIOR KEY: 2–4 lines`
+}
+
 function buildDailyHoroscopePrompt(input: BuildPromptInput): string {
   const firstName = input.firstName ?? null
   const lang = (input.language || 'fr').slice(0, 2).toLowerCase()
   const isFr = lang !== 'en'
+  const plan = input.plan ?? 'free'
 
   const roleBlock = isFr
     ? `Tu es HexAstra Horoscope, expert en lecture horoscope personnalisée structurée.
 Mission : produire le HexAstra Horoscope du jour complet, structuré en 15 blocs obligatoires, à partir des données personnelles ci-dessous.
-La structure est non négociable. Chaque bloc doit être produit avec son titre visible.`
+La structure est non négociable. Chaque bloc doit être produit avec son titre visible.
+La structure complète est obligatoire sur TOUS les plans (gratuit, essentiel, premium, praticien).`
     : `You are HexAstra Horoscope, expert in structured personalized horoscope readings.
 Mission: produce the complete HexAstra Daily Horoscope, structured in 15 mandatory blocks, from the personal data below.
-The structure is non-negotiable. Each block must be output with its visible title.`
+The structure is non-negotiable. Each block must be output with its visible title.
+The complete structure is mandatory on ALL plans (free, essential, premium, practitioner).`
 
   const identityBlock = [
     firstName ? (isFr ? `Prénom : ${firstName}.` : `First name: ${firstName}.`) : null,
@@ -140,131 +239,134 @@ The structure is non-negotiable. Each block must be output with its visible titl
     ? `STRUCTURE OBLIGATOIRE — HEXASTRA HOROSCOPE JOURNALIER (15 blocs dans l'ordre, titres visibles):
 
 ## 1. OUVERTURE
-2 à 3 lignes — accueillir la personne, nommer le prénom si disponible, annoncer le HexAstra Horoscope du jour.
+Accueillir la personne, nommer le prénom si disponible, annoncer le HexAstra Horoscope du jour.
 
 ## 2. CLIMAT GÉNÉRAL
-3 à 5 lignes — ambiance dominante, dynamique générale, nature du cycle du moment, tendance maîtresse.
+Ambiance dominante, dynamique générale, nature du cycle du moment, tendance maîtresse.
 
 ## 3. ÉNERGIE DU JOUR
 1 phrase — vibration principale, mouvement central, tonalité de la journée.
 
 ## 4. CLÉ DE COMPRÉHENSION — MIROIR INTÉRIEUR
-1 à 2 phrases — ressenti dominant, tension interne, besoin profond, mouvement psychique.
+Ressenti dominant, tension interne, besoin profond, mouvement psychique.
 
 ## 5. CLÉ DE COMPRÉHENSION — MIROIR EXTÉRIEUR
-1 à 2 phrases — ambiance relationnelle, type de situation probable, reflet extérieur.
+Ambiance relationnelle, type de situation probable, reflet extérieur.
 
 ## 6. CLÉ D'ACTION — COMPORTEMENT INCARNÉ
-1 à 2 phrases — geste concret, décision, rythme ou action réaliste à poser.
+Geste concret, décision, rythme ou action réaliste à poser.
 
 ## 7. CLÉ D'ACTION — COMPORTEMENT SI DÉSINCARNÉ
-1 à 2 phrases — intention, recentrage, posture mentale, déplacement intérieur.
+Intention, recentrage, posture mentale, déplacement intérieur.
 
 ## 8. AMOUR
 
 ### Célibataires
-2 à 4 lignes — lecture relationnelle concrète et incarnée.
+Lecture relationnelle concrète et incarnée.
 
 ### En couple
-2 à 4 lignes — lecture relationnelle concrète et incarnée.
+Lecture relationnelle concrète et incarnée.
 
 ### Relations amicales
-2 à 4 lignes — lecture relationnelle concrète et incarnée.
+Lecture relationnelle concrète et incarnée.
 
 ## 9. ARGENT & TRAVAIL
 
 ### Argent
-2 à 4 lignes — sécurité, décisions, élan pratique.
+Sécurité, décisions, élan pratique.
 
 ### Travail
-2 à 4 lignes — activité, focus, collaborations.
+Activité, focus, collaborations.
 
 ### Non-actif
-2 à 4 lignes — lecture pour personnes non en emploi actif (études, repos, transition).
+Lecture pour personnes non en emploi actif (études, repos, transition).
 
 ## 10. SANTÉ
-3 à 4 lignes — tonus, fatigue, charge mentale, équilibre global, point d'attention simple.
+Tonus, fatigue, charge mentale, équilibre global, point d'attention simple.
 
 ## 11. HUMEUR
-3 à 4 lignes — stabilité/agitation, ouverture/repli, clarté/confusion, fluidité/crispation.
+Stabilité/agitation, ouverture/repli, clarté/confusion, fluidité/crispation.
 
 ## 12. POINT DE VIGILANCE
-1 à 3 lignes — piège principal, excès à éviter, automatisme contre-productif.
+Piège principal, excès à éviter, automatisme contre-productif.
 
 ## 13. OPPORTUNITÉ DU JOUR
-1 à 3 lignes — meilleure ouverture, potentiel utile, terrain favorable.
+Meilleure ouverture, potentiel utile, terrain favorable.
 
 ## 14. ACTION UTILE IMMÉDIATE
-1 à 2 lignes — 1 action ou posture mémorisable, simple, actionnable maintenant.
+1 action ou posture mémorisable, simple, actionnable maintenant.
 
 ## 15. CLÉ DE COMPORTEMENT GÉNÉRAL
-2 à 4 lignes — synthèse comportementale : manière idéale de traverser la journée, qualité de présence, tempo juste.`
+Synthèse comportementale : manière idéale de traverser la journée, qualité de présence, tempo juste.`
     : `MANDATORY STRUCTURE — HEXASTRA DAILY HOROSCOPE (15 blocks in order, visible titles):
 
 ## 1. OPENING
-2–3 lines — welcome the person, use first name if available, announce the HexAstra Horoscope.
+Welcome the person, use first name if available, announce the HexAstra Horoscope.
 
 ## 2. GENERAL CLIMATE
-3–5 lines — dominant mood, overall dynamic, current cycle, master tendency.
+Dominant mood, overall dynamic, current cycle, master tendency.
 
 ## 3. ENERGY OF THE DAY
 1 sentence — core vibration, central movement, day's tonality.
 
 ## 4. UNDERSTANDING KEY — INNER MIRROR
-1–2 sentences — dominant feeling, internal tension, deep need, psychic movement.
+Dominant feeling, internal tension, deep need, psychic movement.
 
 ## 5. UNDERSTANDING KEY — OUTER MIRROR
-1–2 sentences — relational atmosphere, probable situation type, outer reflection.
+Relational atmosphere, probable situation type, outer reflection.
 
 ## 6. ACTION KEY — EMBODIED BEHAVIOR
-1–2 sentences — concrete gesture, decision, realistic action to take.
+Concrete gesture, decision, realistic action to take.
 
 ## 7. ACTION KEY — DISEMBODIED BEHAVIOR
-1–2 sentences — intention, recentering, mental posture, inner shift.
+Intention, recentering, mental posture, inner shift.
 
 ## 8. LOVE
 
 ### Singles
-2–4 lines — concrete, grounded relational reading.
+Concrete, grounded relational reading.
 
 ### In a relationship
-2–4 lines — concrete, grounded relational reading.
+Concrete, grounded relational reading.
 
 ### Friendships
-2–4 lines — concrete, grounded relational reading.
+Concrete, grounded relational reading.
 
 ## 9. MONEY & WORK
 
 ### Money
-2–4 lines — security, decisions, practical momentum.
+Security, decisions, practical momentum.
 
 ### Work
-2–4 lines — activity, focus, collaborations.
+Activity, focus, collaborations.
 
 ### Not working
-2–4 lines — reading for those not in active employment (studies, rest, transition).
+Reading for those not in active employment (studies, rest, transition).
 
 ## 10. HEALTH
-3–4 lines — energy level, fatigue, mental load, overall balance, one key note.
+Energy level, fatigue, mental load, overall balance, one key note.
 
 ## 11. MOOD
-3–4 lines — stability/agitation, openness/withdrawal, clarity/confusion, flow/tension.
+Stability/agitation, openness/withdrawal, clarity/confusion, flow/tension.
 
 ## 12. POINT OF VIGILANCE
-1–3 lines — main trap, excess to avoid, counterproductive habit.
+Main trap, excess to avoid, counterproductive habit.
 
 ## 13. OPPORTUNITY OF THE DAY
-1–3 lines — best opening, useful potential, favorable ground.
+Best opening, useful potential, favorable ground.
 
 ## 14. IMMEDIATE USEFUL ACTION
-1–2 lines — 1 memorable, simple, immediately actionable gesture or posture.
+1 memorable, simple, immediately actionable gesture or posture.
 
 ## 15. GENERAL BEHAVIOR KEY
-2–4 lines — behavioral synthesis: ideal way to move through the day, right presence, right rhythm.`
+Behavioral synthesis: ideal way to move through the day, right presence, right rhythm.`
+
+  const depthDirective = buildDailyDepthDirective(plan, isFr)
 
   const absoluteRules = isFr
     ? `RÈGLES ABSOLUES:
-- Produire les 15 blocs dans l'ordre avec les titres visibles — ne jamais les supprimer
+- Produire les 15 blocs dans l'ordre avec les titres visibles — ne jamais les supprimer ni les fusionner
+- INTERDIT : remplacer la structure par un micro_profile, un texte libre, une réponse générique, un guided_analysis ou un simple paragraphe non structuré
 - Ne jamais répondre en texte libre non structuré si la demande est un horoscope
 - Pas d'emoji, pas de jargon technique, pas de mention des systèmes utilisés (KS, Railway, API)
 - Ton Shilo : poétique, structurant, intuitif — une seule voix HexAstra unifiée
@@ -272,7 +374,8 @@ The structure is non-negotiable. Each block must be output with its visible titl
 - Ne jamais mentionner directement ennéagramme 1, chemin de vie 11, profil 3/5, type générateur — sauf si le design produit le prévoit
 - Si des données exactes sont présentes dans le bloc ci-dessous, elles sont la source de vérité — ne jamais les contredire`
     : `ABSOLUTE RULES:
-- Produce all 15 blocks in order with visible titles — never omit them
+- Produce all 15 blocks in order with visible titles — never omit or merge them
+- FORBIDDEN: replace the structure with a micro_profile, free text, generic response, guided_analysis, or unstructured paragraph
 - Never respond with unstructured free text for a horoscope request
 - No emoji, no technical jargon, no mention of internal systems (KS, Railway, API)
 - Shilo tone: poetic, structuring, intuitive — one unified HexAstra voice
@@ -280,7 +383,7 @@ The structure is non-negotiable. Each block must be output with its visible titl
 - Never directly mention enneagram 1, life path 11, 3/5 profile, generator type — unless the product explicitly requests it
 - If exact data is present in the block below, it is the source of truth — never contradict it`
 
-  const parts = [roleBlock, identityBlock, structureDirective]
+  const parts = [roleBlock, identityBlock, depthDirective, structureDirective]
   if (input.horoscopeDataBlock) {
     parts.push(`DONNÉES PERSONNELLES — SOURCE DE VÉRITÉ:\n${input.horoscopeDataBlock}`)
   }
