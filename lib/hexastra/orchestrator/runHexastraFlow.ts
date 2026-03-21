@@ -82,6 +82,7 @@ import {
 } from '@/lib/humandesign/profile'
 import { buildCompactHumanDesignContext } from '@/lib/humandesign/compactContext'
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
+import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { selectResponseMode, buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
 import { isReliableExactData } from '@/lib/exact-data/reliability'
@@ -1429,6 +1430,25 @@ export async function runHexastraFlow(input: {
         })
       }
 
+      // Direct request detection: skip contextual framing when user already asked a complete question
+      // Combines: universal classification + semantic exact routes (astro_exact, human_design_exact)
+      const isDirectRequest =
+        isAstroExact ||
+        isHumanDesignExact ||
+        isActionableDirectRequest(latestUserMessage, universalClassif)
+
+      if (isDirectRequest) {
+        flowLog('info', 'DIRECT_REQUEST_DETECTED', {
+          message: latestUserMessage.slice(0, 100),
+          reason: directRequestSkipReason(latestUserMessage, universalClassif),
+          isAstroExact,
+          isHumanDesignExact,
+          science: universalClassif.science,
+          requestKind: universalClassif.requestKind,
+          subcategory: universalClassif.subcategory,
+        })
+      }
+
       const blockMicroProfile =
         isAstroExact ||
         isHumanDesignExact ||
@@ -1707,7 +1727,22 @@ export async function runHexastraFlow(input: {
       }
     }
 
-    if (contextualSelection?.kind === 'open_parent' && selectedMenu) {
+    // Log when contextual framing is bypassed for a direct request
+    if (
+      isDirectRequest &&
+      (contextualSelection?.kind === 'open_parent' || contextualSelection?.kind === 'context')
+    ) {
+      flowLog('info', 'CONTEXT_FRAMING_SKIPPED', {
+        kind: contextualSelection.kind,
+        message: latestUserMessage.slice(0, 100),
+        science: universalClassif.science,
+        requestKind: universalClassif.requestKind,
+        subcategory: universalClassif.subcategory,
+        action: 'DIRECT_EXECUTION_SELECTED',
+      })
+    }
+
+    if (contextualSelection?.kind === 'open_parent' && selectedMenu && !isDirectRequest) {
       const followUpLine = (userContext.language ?? fallbackLanguage).toLowerCase().startsWith('en')
         ? 'You can now choose a sub-angle or ask your question directly in this frame.'
         : 'Tu peux maintenant choisir un sous-angle ou poser directement ta question dans ce cadre.'
@@ -1870,7 +1905,8 @@ export async function runHexastraFlow(input: {
 
     if (
       input.requestType === 'chat' &&
-      contextualSelection?.kind === 'context'
+      contextualSelection?.kind === 'context' &&
+      !isDirectRequest
     ) {
       const message = buildContextSelectionPrompt({
         language: userContext.language ?? fallbackLanguage,
@@ -1916,6 +1952,16 @@ export async function runHexastraFlow(input: {
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       }
+    }
+
+    if (isDirectRequest) {
+      flowLog('info', 'DIRECT_EXECUTION_SELECTED', {
+        message: latestUserMessage.slice(0, 100),
+        science: universalClassif.science,
+        requestKind: universalClassif.requestKind,
+        subcategory: universalClassif.subcategory,
+        framingKindBypassed: contextualSelection?.kind ?? 'none',
+      })
     }
 
     const domainRoute = resolveDomainRoute({
