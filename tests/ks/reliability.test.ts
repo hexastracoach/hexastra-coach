@@ -76,10 +76,20 @@ describe('isReliableExactData — astrology', () => {
 // ─── Human Design ─────────────────────────────────────────────────────────────
 
 describe('isReliableExactData — human_design', () => {
-  it('reliable when type_hd + profil_hd present', () => {
+  it('reliable when type_hd + authority present', () => {
+    // Reliability rule: type AND (authority OR strategy)
     const result = isReliableExactData('human_design', null, {
       type_hd: 'Projecteur',
       profil_hd: '3/5',
+      authority: 'Émotionnelle',
+    })
+    expect(result.reliable).toBe(true)
+  })
+
+  it('reliable when type_hd + strategy present (no authority)', () => {
+    const result = isReliableExactData('human_design', null, {
+      type_hd: 'Générateur Manifestant',
+      strategy: 'Répondre et informer',
     })
     expect(result.reliable).toBe(true)
   })
@@ -87,34 +97,46 @@ describe('isReliableExactData — human_design', () => {
   it('unreliable when type_hd missing', () => {
     const result = isReliableExactData('human_design', null, {
       profil_hd: '2/4',
+      authority: 'Splénique',
     })
     expect(result.reliable).toBe(false)
     expect(result.missingFields).toContain('type_hd')
   })
 
-  it('still reliable when profil_hd missing (type is enough)', () => {
+  it('unreliable when type present but neither authority nor strategy', () => {
     const result = isReliableExactData('human_design', null, {
       type_hd: 'Générateur',
+      // no authority, no strategy
     })
-    // Profile is enrichment, not a reliability blocker — type alone is sufficient
-    expect(result.reliable).toBe(true)
+    expect(result.reliable).toBe(false)
+    expect(result.missingFields).toContain('autorite_ou_strategie')
+  })
+
+  it('still marks profil_hd missing when absent (enrichment field)', () => {
+    const result = isReliableExactData('human_design', null, {
+      type_hd: 'Générateur',
+      authority: 'Sacrale',
+    })
     expect(result.missingFields).toContain('profil_hd')
+    expect(result.reliable).toBe(true)
   })
 
   it('detects missing centres for centres_hd subcategory', () => {
     const result = isReliableExactData('human_design', 'centres_hd', {
       type_hd: 'Manifesteur',
       profil_hd: '1/3',
+      authority: 'Émotionnelle',
       // no centres
     })
     expect(result.missingFields).toContain('centres_hd')
   })
 
-  it('handles nested human_design block', () => {
+  it('handles nested human_design block with authority', () => {
     const result = isReliableExactData('human_design', null, {
       human_design: {
         type_hd: 'Réflecteur',
         profil_hd: '6/2',
+        authority: 'Lunaire',
       },
     })
     expect(result.reliable).toBe(true)

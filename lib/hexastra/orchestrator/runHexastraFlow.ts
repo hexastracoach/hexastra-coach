@@ -81,7 +81,7 @@ import {
   asksForHDProfile,
   isReliableHumanDesignProfile,
 } from '@/lib/humandesign/profile'
-import { buildCompactHumanDesignContext } from '@/lib/humandesign/compactContext'
+import { buildCompactHumanDesignContext, type CompactHDContext } from '@/lib/humandesign/compactContext'
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
@@ -2190,18 +2190,20 @@ export async function runHexastraFlow(input: {
     astroEndMs = Date.now()
 
     if (isAstroExact || isExactDataSubcategory) {
+      const exactScienceLabel = (universalClassif.science ?? 'exact').toUpperCase()
       const rawKeyCount = specializedResult?.raw ? Object.keys(specializedResult.raw).length : 0
       const rawTotalChars = specializedResult?.raw ? JSON.stringify(specializedResult.raw).length : 0
       if (specializedResult?.raw && rawKeyCount > 0) {
-        flowLog('info', '[ASTRO] exact data resolved', {
+        flowLog('info', `[EXACT] exact data resolved`, {
+          science: exactScienceLabel,
           source: specializedResult.source,
-          rawKeys: Object.keys(specializedResult.raw),
           rawKeyCount,
           rawTotalChars,
           astroMs: astroEndMs - astroStartMs,
         })
       } else {
-        flowLog('warn', '[ASTRO] exact data failed', {
+        flowLog('warn', `[EXACT] exact data failed`, {
+          science: exactScienceLabel,
           hasSpecializedResult: Boolean(specializedResult),
           hasRaw: Boolean(specializedResult?.raw),
           source: specializedResult?.source ?? null,
@@ -2249,8 +2251,56 @@ export async function runHexastraFlow(input: {
       exactDataResolved,
     })
 
+    // ── Pre-build HD compact context for early reliability override ──────────
+    // Built here (before selectResponseMode) so that field presence can be used
+    // as a secondary reliability signal. The isHumanDesignExactCompact block
+    // below will log the full context; this just provides the data early.
+    let hdCompactCtx: CompactHDContext | null = null
+    if (isHumanDesignExact && exactDataResolved && specializedResult?.raw) {
+      hdCompactCtx = buildCompactHumanDesignContext(specializedResult.raw)
+    }
+
+    // ── Effective reliability — belt-and-suspenders ───────────────────────────
+    // If the reliability check missed some aliases but the compact context resolved
+    // key fields (type + authority OR strategy), treat the data as exploitable.
+    // This prevents clarification loops when Railway returns valid data.
+    let effectiveReliable = reliabilityResult.reliable
+    if (!effectiveReliable && exactDataResolved) {
+      // HD: compact context is authoritative proof that data is usable
+      if (hdCompactCtx) {
+        const hdCoreCount = [hdCompactCtx.hdType, hdCompactCtx.hdAuthority, hdCompactCtx.hdStrategy].filter(Boolean).length
+        if (hdCoreCount >= 2) {
+          effectiveReliable = true
+          flowLog('info', 'EXACT_RELIABILITY_OVERRIDE', {
+            science: universalClassif.science,
+            reason: 'compact context resolved enough core HD fields',
+            hdType: hdCompactCtx.hdType,
+            hdAuthority: hdCompactCtx.hdAuthority,
+            hdStrategy: hdCompactCtx.hdStrategy,
+            hdCoreCount,
+          })
+        }
+      }
+      // Numerology: life path present in merged sources → override
+      if (universalClassif.science === 'numerology' && specializedResult?.raw) {
+        const numeRaw = specializedResult.raw as Record<string, unknown>
+        const numeBlock = (numeRaw.numerology ?? numeRaw.numerologie ?? numeRaw.numbers ?? {}) as Record<string, unknown>
+        const merged = { ...numeBlock, ...numeRaw }
+        const hasLifePath = [
+          'chemin_de_vie', 'life_path', 'lifePath', 'cheminVie', 'lifePathNumber',
+        ].some(k => merged[k] !== undefined && merged[k] !== null && merged[k] !== '')
+        if (hasLifePath) {
+          effectiveReliable = true
+          flowLog('info', 'EXACT_RELIABILITY_OVERRIDE', {
+            science: 'numerology',
+            reason: 'life path present in raw numerology data',
+          })
+        }
+      }
+    }
+
     // False plan limitation guard: if data is resolved and reliable, block plan-restriction messages
-    const blockFalsePlanLimitation = shouldBlockFalsePlanLimitation(exactDataResolved, reliabilityResult.reliable)
+    const blockFalsePlanLimitation = shouldBlockFalsePlanLimitation(exactDataResolved, effectiveReliable)
     if (blockFalsePlanLimitation) {
       flowLog('info', 'FALSE_PLAN_LIMITATION_BLOCKED', {
         reason: 'exact data is resolved and reliable — any plan limitation message would be a false negative',
@@ -2259,13 +2309,13 @@ export async function runHexastraFlow(input: {
       })
     }
 
-    // Response mode selection — passes reliability + pedagogical signal
+    // Response mode selection — passes effective reliability (post compact-context override)
     const responseMode = selectResponseMode({
       requestKind: universalClassif.requestKind,
       subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
       plan,
       exactDataResolved,
-      exactDataReliable: reliabilityResult.reliable,
+      exactDataReliable: effectiveReliable,
       isPedagogical: universalClassif.requestKind === 'clarification',
     })
     // Enneagram always uses interpretive_reading — prose, not structured output
@@ -2612,8 +2662,7 @@ export async function runHexastraFlow(input: {
         action: 'HD compact context — no vector knowledge — reduced history',
       })
 
-      if (specializedResult?.raw) {
-        const hdCompactCtx = buildCompactHumanDesignContext(specializedResult.raw)
+      if (hdCompactCtx) {
         flowLog('info', 'HUMAN_DESIGN_COMPACT_CONTEXT_BUILT', {
           hdType: hdCompactCtx.hdType,
           hdProfile: hdCompactCtx.hdProfile,

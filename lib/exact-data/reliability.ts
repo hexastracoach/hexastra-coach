@@ -8,6 +8,7 @@
  */
 
 import type { Science } from '@/lib/hexastra/orchestration/universalClassification'
+import { resolveAstroSource } from '@/lib/hexastra/guards/extractCoreAstro'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -110,26 +111,24 @@ function checkAstroReliability(
   const missing: string[] = []
   const errors: string[] = []
 
-  // Look for nested tropical/astrology block first — also handles tropical.planets sub-key
-  const astro = mergeNested(raw, 'tropical', 'astrology', 'natal')
+  // Use the canonical astro resolver — handles tropical.planets / tropical / flat root
+  const { source: astro, path: astroPath } = resolveAstroSource(raw)
 
-  // Check capitalized variants (Railway may use 'Sun', 'Moon', 'Ascendant')
-  const sunOk = hasValue(astro, 'sun', 'Sun', 'signe_solaire', 'sun_sign', 'soleil')
+  const sunOk  = hasValue(astro, 'sun', 'Sun', 'signe_solaire', 'sun_sign', 'soleil')
   const moonOk = hasValue(astro, 'moon', 'Moon', 'signe_lunaire', 'moon_sign', 'lune')
-  const ascOk = hasValue(astro, 'ascendant', 'Ascendant', 'rising', 'Rising', 'rising_sign', 'asc')
+  const ascOk  = hasValue(astro, 'ascendant', 'Ascendant', 'rising', 'Rising', 'rising_sign', 'asc')
 
-  if (!sunOk) missing.push('sun')
+  if (!sunOk)  missing.push('sun')
   if (!moonOk) missing.push('moon')
-  if (!ascOk) missing.push('ascendant')
+  if (!ascOk)  missing.push('ascendant')
 
   if (subcategory === 'theme_natal' || subcategory === 'planetes') {
-    // Check both lowercase and capitalized variants for each planet
     const planetChecks: [string, string[]][] = [
       ['mercury', ['mercury', 'Mercury', 'mercure', 'mercury_sign']],
       ['venus',   ['venus',   'Venus',   'Vénus',   'venus_sign']],
       ['mars',    ['mars',    'Mars',    'mars_sign']],
       ['jupiter', ['jupiter', 'Jupiter', 'jupiter_sign']],
-      ['saturn',  ['saturn',  'Saturn',  'saturne',  'Saturne', 'saturn_sign']],
+      ['saturn',  ['saturn',  'Saturn',  'saturne', 'Saturne', 'saturn_sign']],
     ]
     for (const [label, keys] of planetChecks) {
       if (!hasValue(astro, ...keys)) missing.push(label)
@@ -146,8 +145,16 @@ function checkAstroReliability(
 
   const total = subcategory === 'theme_natal' ? 8 : 3
   const completeness = Math.max(0, (total - missing.length) / total)
-  // Reliable if we have sun + moon (ascendant can be absent when time is unknown)
   const reliable = !missing.includes('sun') && !missing.includes('moon')
+
+  console.log('[ASTRO_RELIABILITY]', {
+    astroPath,
+    sourceKeys: Object.keys(astro).slice(0, 15),
+    sunOk, moonOk, ascOk,
+    missingFields: missing,
+    completeness,
+    reliable,
+  })
 
   return { reliable, missingFields: missing, errors, completeness }
 }
@@ -178,34 +185,54 @@ function checkHDReliability(
     safeStrDeep(merged.inner_authority) ?? safeStrDeep(merged.innerAuthority) ??
     safeStrDeep(merged.hdAuthority)
 
+  const strategyOk =
+    safeStrDeep(merged.strategie_hd) ?? safeStrDeep(merged.strategy) ??
+    safeStrDeep(merged.hdStrategy)
+
   if (!typeOk) missing.push('type_hd')
-  // Profile is secondary: mark missing for logging but not required for basic reliability
+  // Profile is enrichment: noted if absent but never blocks reliability
   if (!profileOk) missing.push('profil_hd')
+  if (!authorityOk && !strategyOk) missing.push('autorite_ou_strategie')
 
   if (subcategory === 'autorite_hd' && !authorityOk) missing.push('autorite_hd')
 
   if (subcategory === 'centres_hd' || subcategory === 'human_design_exact') {
-    if (!hasValue(merged, 'centres_hd', 'centers', 'defined_centers', 'definedCenters', 'centres_definis')) {
+    if (!hasValue(merged,
+      'centres_hd', 'centers', 'defined_centers', 'definedCenters',
+      'openCenters', 'centres_definis',
+    )) {
       missing.push('centres_hd')
     }
   }
 
   if (subcategory === 'portes_hd') {
-    if (!hasValue(merged, 'portes_hd', 'gates', 'activated_gates', 'activatedGates', 'portes_actives')) {
+    if (!hasValue(merged,
+      'portes_hd', 'gates', 'activated_gates', 'activatedGates', 'portes_actives',
+    )) {
       missing.push('portes_hd')
     }
   }
 
   if (subcategory === 'canaux_hd') {
-    if (!hasValue(merged, 'canaux_hd', 'channels', 'defined_channels', 'definedChannels')) {
+    if (!hasValue(merged,
+      'canaux_hd', 'channels', 'defined_channels', 'definedChannels',
+    )) {
       missing.push('canaux_hd')
     }
   }
 
-  const total = subcategory === 'human_design_exact' ? 5 : 2
+  const total = subcategory === 'human_design_exact' ? 5 : 3
   const completeness = Math.max(0, (total - missing.length) / total)
-  // Reliable when type is present — profile is enrichment, not a blocker
-  const reliable = Boolean(typeOk)
+  // Reliable when type + (authority OR strategy) — ensures data is usable for a real HD reading
+  const reliable = Boolean(typeOk) && (Boolean(authorityOk) || Boolean(strategyOk))
+
+  console.log('[HD_RELIABILITY]', {
+    sourcesFound: ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull'].filter(k => !!raw[k]),
+    typeOk, profileOk, authorityOk, strategyOk,
+    missingFields: missing,
+    completeness,
+    reliable,
+  })
 
   return { reliable, missingFields: missing, errors, completeness }
 }
@@ -256,6 +283,13 @@ function checkNumerologyReliability(
   // Reliable when life path is present — sufficient for most numerology readings
   const completeness = missing.includes('chemin_de_vie') ? 0 : Math.max(0.5, (1 - (missing.length - 0) / 5))
   const reliable = lifePathOk
+
+  console.log('[NUMEROLOGY_RELIABILITY]', {
+    lifePathOk,
+    missingFields: missing,
+    completeness,
+    reliable,
+  })
 
   return { reliable, missingFields: missing, errors, completeness }
 }

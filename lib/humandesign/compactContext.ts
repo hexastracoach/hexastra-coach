@@ -67,7 +67,11 @@ function resolveHDValue(v: unknown): string | null {
 
 function safeArr(v: unknown): string[] {
   if (!Array.isArray(v)) return []
-  return v.filter((x) => typeof x === 'string' && x.trim()).map((x) => String(x).trim())
+  // Accept both string arrays ("Gate 1") and number arrays (1) — convert numbers to strings
+  return v
+    .filter((x) => (typeof x === 'string' && x.trim()) || typeof x === 'number')
+    .map((x) => String(x).trim())
+    .filter(Boolean)
 }
 
 export type CompactHDContext = {
@@ -111,8 +115,12 @@ export function buildCompactHumanDesignContext(
   }
   const merged: Record<string, unknown> = { ...hdAggregated, ...raw }
 
+  const sourcesFound = ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull'].filter(k => !!raw[k])
+  // Identify which source took precedence (last found = highest priority after Object.assign loop)
+  const primarySource = sourcesFound.slice().reverse().find(k => !!raw[k]) ?? 'root'
   console.log('[HD_COMPACT] resolving sources', {
-    sourcesFound: ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull'].filter(k => !!raw[k]),
+    sourcesFound,
+    primarySource,
     mergedKeyCount: Object.keys(hdAggregated).length,
   })
 
@@ -146,7 +154,8 @@ export function buildCompactHumanDesignContext(
 
   // ── Centers ─────────────────────────────────────────────────────────────
   const hdDefinedCenters: string[] = (() => {
-    const raw_centers = merged.centres_hd ?? merged.centers ?? merged.defined_centers
+    const raw_centers =
+      merged.centres_hd ?? merged.centers ?? merged.defined_centers ?? merged.definedCenters
     if (Array.isArray(raw_centers)) return safeArr(raw_centers)
     if (raw_centers && typeof raw_centers === 'object') {
       // Object format: { sacral: true, head: false, ... }
@@ -158,9 +167,9 @@ export function buildCompactHumanDesignContext(
   })().slice(0, 9)
 
   const hdOpenCenters: string[] = (() => {
-    const raw_open = merged.open_centers ?? merged.undefined_centers
+    const raw_open = merged.open_centers ?? merged.openCenters ?? merged.undefined_centers
     if (Array.isArray(raw_open)) return safeArr(raw_open).slice(0, 9)
-    const raw_centers = merged.centres_hd ?? merged.centers
+    const raw_centers = merged.centres_hd ?? merged.centers ?? merged.definedCenters
     if (raw_centers && typeof raw_centers === 'object' && !Array.isArray(raw_centers)) {
       return Object.entries(raw_centers as Record<string, unknown>)
         .filter(([, v]) => v === false || v === 'open' || v === 'undefined')
@@ -171,13 +180,16 @@ export function buildCompactHumanDesignContext(
 
   // ── Gates ────────────────────────────────────────────────────────────────
   const hdActivatedGates: string[] = (() => {
-    const raw_gates = merged.portes_hd ?? merged.gates ?? merged.activated_gates ?? merged.portes_actives
+    const raw_gates =
+      merged.portes_hd ?? merged.gates ?? merged.activated_gates ??
+      merged.activatedGates ?? merged.portes_actives
     return safeArr(raw_gates).slice(0, 26)
   })()
 
   // ── Channels ─────────────────────────────────────────────────────────────
   const hdDefinedChannels: string[] = (() => {
-    const raw_channels = merged.canaux_hd ?? merged.channels ?? merged.defined_channels
+    const raw_channels =
+      merged.canaux_hd ?? merged.channels ?? merged.defined_channels ?? merged.definedChannels
     return safeArr(raw_channels).slice(0, 10)
   })()
 
@@ -239,9 +251,12 @@ export function buildCompactHumanDesignContext(
 
   const compactDataBlock = blockLines.join('\n')
   console.log('[HD_COMPACT] block built', {
+    primarySource,
     blockChars: compactDataBlock.length,
     linesCount: blockLines.length,
-    hdType, hdProfile, hdAuthority,
+    hdType, hdProfile, hdAuthority, hdStrategy,
+    hdDefinedCentersCount: hdDefinedCenters.length,
+    hdActivatedGatesCount: hdActivatedGates.length,
   })
 
   return {
