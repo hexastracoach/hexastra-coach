@@ -36,9 +36,20 @@ function safeStr(v: unknown): string | null {
 
 function mergeNested(raw: Record<string, unknown>, ...nestKeys: string[]): Record<string, unknown> {
   for (const key of nestKeys) {
-    if (raw[key] && typeof raw[key] === 'object' && !Array.isArray(raw[key])) {
-      return { ...(raw[key] as Record<string, unknown>), ...raw }
+    const block = raw[key]
+    if (!block || typeof block !== 'object' || Array.isArray(block)) continue
+    const blockObj = block as Record<string, unknown>
+
+    // Handle two-level nesting: e.g. raw.tropical.planets.sun
+    // Railway /chart/fusion may nest planets under a "planets" sub-key
+    const planetsBlock = blockObj.planets ?? blockObj.Planets
+    if (planetsBlock && typeof planetsBlock === 'object' && !Array.isArray(planetsBlock)) {
+      // planets spread first (lower priority), blockObj overrides (ascendant, houses at tropical root win)
+      return { ...(planetsBlock as Record<string, unknown>), ...blockObj, ...raw }
     }
+
+    // Standard one-level nesting: raw.tropical.sun
+    return { ...blockObj, ...raw }
   }
   return raw
 }
@@ -52,20 +63,29 @@ function checkAstroReliability(
   const missing: string[] = []
   const errors: string[] = []
 
-  // Look for nested tropical/astrology block first
+  // Look for nested tropical/astrology block first — also handles tropical.planets sub-key
   const astro = mergeNested(raw, 'tropical', 'astrology', 'natal')
 
-  const sunOk = hasValue(astro, 'sun', 'signe_solaire', 'sun_sign', 'soleil')
-  const moonOk = hasValue(astro, 'moon', 'signe_lunaire', 'moon_sign', 'lune')
-  const ascOk = hasValue(astro, 'ascendant', 'rising', 'rising_sign', 'asc')
+  // Check capitalized variants (Railway may use 'Sun', 'Moon', 'Ascendant')
+  const sunOk = hasValue(astro, 'sun', 'Sun', 'signe_solaire', 'sun_sign', 'soleil')
+  const moonOk = hasValue(astro, 'moon', 'Moon', 'signe_lunaire', 'moon_sign', 'lune')
+  const ascOk = hasValue(astro, 'ascendant', 'Ascendant', 'rising', 'Rising', 'rising_sign', 'asc')
 
   if (!sunOk) missing.push('sun')
   if (!moonOk) missing.push('moon')
   if (!ascOk) missing.push('ascendant')
 
   if (subcategory === 'theme_natal' || subcategory === 'planetes') {
-    for (const p of ['mercury', 'venus', 'mars', 'jupiter', 'saturn']) {
-      if (!hasValue(astro, p, `${p}_sign`, `${p}e`)) missing.push(p)
+    // Check both lowercase and capitalized variants for each planet
+    const planetChecks: [string, string[]][] = [
+      ['mercury', ['mercury', 'Mercury', 'mercure', 'mercury_sign']],
+      ['venus',   ['venus',   'Venus',   'Vénus',   'venus_sign']],
+      ['mars',    ['mars',    'Mars',    'mars_sign']],
+      ['jupiter', ['jupiter', 'Jupiter', 'jupiter_sign']],
+      ['saturn',  ['saturn',  'Saturn',  'saturne',  'Saturne', 'saturn_sign']],
+    ]
+    for (const [label, keys] of planetChecks) {
+      if (!hasValue(astro, ...keys)) missing.push(label)
     }
   }
 

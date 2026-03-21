@@ -73,6 +73,7 @@ import {
   extractCoreAstroPlacements,
   formatCoreAstroBlock,
   asksForCorePlacements,
+  buildLocalAstroFallback,
 } from '@/lib/hexastra/guards/extractCoreAstro'
 import {
   extractHDProfileFromRaw,
@@ -2756,10 +2757,15 @@ export async function runHexastraFlow(input: {
 
     // ── Max output tokens ─────────────────────────────────────────────────
     // buildChatPayload already sets the right budget for horoscope (daily=2500, weekly=5000).
-    // Keep previous free-plan cap for astro/HD exact non-compact routes.
-    const effectiveMaxOutputTokens = !isHoroscopeRoute && !isCompactRoute && plan === 'free' && (isAstroExact || isHumanDesignExact || isExactDataSubcategory)
-      ? Math.min(payload.max_output_tokens ?? 950, 700)
-      : payload.max_output_tokens
+    // Compact + free plan: cap at 550 tokens (fast, cheap — planets list + brief reading).
+    // Non-compact exact + free plan: cap at 700 tokens (larger data block needs more output).
+    const effectiveMaxOutputTokens = isHoroscopeRoute
+      ? payload.max_output_tokens
+      : isCompactRoute && plan === 'free'
+        ? Math.min(payload.max_output_tokens ?? 950, 550)
+        : (!isCompactRoute && plan === 'free' && (isAstroExact || isHumanDesignExact || isExactDataSubcategory))
+          ? Math.min(payload.max_output_tokens ?? 950, 700)
+          : payload.max_output_tokens
 
     if (isCompactRoute) {
       flowLog('info', 'TIMEOUT_SAFE_MODE_ENABLED', {
@@ -2771,13 +2777,38 @@ export async function runHexastraFlow(input: {
       })
     }
 
-    const rawMessage = await callOpenAIResponse({
-      ...payload,
-      max_output_tokens: effectiveMaxOutputTokens,
-      input: payload.input as { role: 'system' | 'user' | 'assistant'; content: string }[],
-      timeoutMs: openAiTimeoutMs,
-    })
-    openAiEndMs = Date.now()
+    // ── OpenAI call with astro-exact local fallback on timeout ───────────
+    // If Railway already returned reliable data but OpenAI times out, we never
+    // show a generic error. Instead we return the calculated values directly.
+    let rawMessage: string
+    try {
+      rawMessage = await callOpenAIResponse({
+        ...payload,
+        max_output_tokens: effectiveMaxOutputTokens,
+        input: payload.input as { role: 'system' | 'user' | 'assistant'; content: string }[],
+        timeoutMs: openAiTimeoutMs,
+      })
+      openAiEndMs = Date.now()
+    } catch (openAiErr) {
+      openAiEndMs = Date.now()
+      const isTimeout = openAiErr instanceof Error && openAiErr.message.includes('timed out')
+      if (isTimeout && isAstroExactCompact && exactDataResolved && specializedResult?.raw) {
+        flowLog('warn', 'ASTRO_EXACT_LOCAL_FALLBACK_ACTIVATED', {
+          openAiMs: openAiEndMs - (openAiStartMs ?? openAiEndMs),
+          plan,
+          isAstroExactCompact,
+          reason: 'OpenAI timeout — Railway data available — serving local deterministic fallback',
+          hint: 'User sees calculated values + retry invitation instead of error',
+        })
+        rawMessage = buildLocalAstroFallback(
+          specializedResult.raw,
+          userContext.language ?? fallbackLanguage,
+          userContext.firstName ?? userContext.name ?? null,
+        )
+      } else {
+        throw openAiErr
+      }
+    }
 
     const contextMs = astroStartMs ? astroStartMs - flowStartMs : Date.now() - flowStartMs
     const astroMs = (astroStartMs && astroEndMs) ? astroEndMs - astroStartMs : 0

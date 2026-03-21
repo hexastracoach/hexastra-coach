@@ -7,6 +7,8 @@
  * Rule: Calculation first, interpretation after. Never hallucinate.
  */
 
+import { resolveAstroSource } from './extractCoreAstro'
+
 /** All subcategory keys where deterministic API data is mandatory */
 export const EXACT_DATA_REQUIRED_SUBCATEGORIES = new Set<string>([
   // ── Astrology ───────────────────────────────────────────────────────────
@@ -231,6 +233,11 @@ function extractList(obj: Record<string, unknown>, ...keys: string[]): string[] 
  * Used for the `astro_exact_compact` rendering path to dramatically reduce
  * the OpenAI payload size — ignores HD, numerology, Kua fields entirely.
  *
+ * Handles all Railway /chart/fusion nested structures:
+ * - raw.tropical.sun (planets at tropical root)
+ * - raw.tropical.planets.sun (planets under nested "planets" key)
+ * - raw.tropical.Sun (capitalized keys)
+ *
  * @param raw    Raw /chart/fusion response object
  * @param maxChars  Max chars for the compact data block (default 2000)
  */
@@ -238,23 +245,50 @@ export function buildCompactNatalReadingContext(
   raw: Record<string, unknown>,
   maxChars = 2000,
 ): CompactNatalContext {
-  // ── Extract core positions ─────────────────────────────────────────────
-  const sunSign    = extractStr(raw, 'sun', 'soleil', 'Sun')
-  const sunDegree  = extractNum(raw, 'sun', 'soleil', 'Sun')
-  const moonSign   = extractStr(raw, 'moon', 'lune', 'Moon')
-  const moonDegree = extractNum(raw, 'moon', 'lune', 'Moon')
-  const risingSign = extractStr(raw, 'ascendant', 'rising', 'asc', 'Ascendant', 'ascending_sign', 'rising_sign')
-  const risingDegree = extractNum(raw, 'ascendant', 'rising', 'asc')
+  // ── Resolve astro source — handles tropical, tropical.planets, capitalized keys
+  const { source: astro, path: astroPath } = resolveAstroSource(raw)
 
-  // ── Extract structural data ───────────────────────────────────────────
-  const dominantSigns    = extractList(raw, 'dominant_signs', 'signes_dominants', 'dominant_sign')
-  const dominantElements = extractList(raw, 'dominant_elements', 'elements_dominants', 'dominant_element')
-  const dominantModalities = extractList(raw, 'dominant_modalities', 'modalites_dominantes', 'dominant_modality')
-  const stelliums        = extractList(raw, 'stelliums', 'stellium')
-  const chartShape       = extractStr(raw, 'chart_shape', 'forme_theme', 'chart_pattern') ?? null
+  const fieldsInSource = Object.keys(astro).length
+  console.log('[COMPACT_NATAL] resolved astro source', {
+    astroPath,
+    fieldsInSource,
+    sampleKeys: Object.keys(astro).slice(0, 15),
+  })
+
+  // ── Extract core positions ─────────────────────────────────────────────
+  const sunSign    = extractStr(astro, 'sun', 'Sun', 'soleil', 'Soleil')
+  const sunDegree  = extractNum(astro, 'sun', 'Sun', 'soleil')
+  const moonSign   = extractStr(astro, 'moon', 'Moon', 'lune', 'Lune')
+  const moonDegree = extractNum(astro, 'moon', 'Moon', 'lune')
+  const risingSign = extractStr(astro, 'ascendant', 'Ascendant', 'rising', 'Rising', 'asc', 'ascending_sign', 'rising_sign')
+  const risingDegree = extractNum(astro, 'ascendant', 'Ascendant', 'rising', 'asc')
+  const mercurySign = extractStr(astro, 'mercury', 'Mercury', 'mercure', 'Mercure')
+  const venusSign   = extractStr(astro, 'venus', 'Venus', 'Vénus')
+  const marsSign    = extractStr(astro, 'mars', 'Mars')
+  const jupiterSign = extractStr(astro, 'jupiter', 'Jupiter')
+  const saturnSign  = extractStr(astro, 'saturn', 'Saturn', 'saturne', 'Saturne')
+
+  console.log('[COMPACT_NATAL] extracted core placements', {
+    astroPath,
+    sunSign, moonSign, risingSign, mercurySign, venusSign, marsSign, jupiterSign, saturnSign,
+    extractedCount: [sunSign, moonSign, risingSign, mercurySign, venusSign, marsSign, jupiterSign, saturnSign].filter(Boolean).length,
+  })
+
+  // ── Extract structural data — check both astro source and raw root ─────
+  const dominantSigns    = extractList(astro, 'dominant_signs', 'signes_dominants', 'dominant_sign')
+    .concat(extractList(raw, 'dominant_signs', 'signes_dominants', 'dominant_sign')).slice(0, 5)
+  const dominantElements = extractList(astro, 'dominant_elements', 'elements_dominants', 'dominant_element')
+    .concat(extractList(raw, 'dominant_elements', 'elements_dominants')).slice(0, 4)
+  const dominantModalities = extractList(astro, 'dominant_modalities', 'modalites_dominantes', 'dominant_modality')
+    .concat(extractList(raw, 'dominant_modalities', 'modalites_dominantes')).slice(0, 3)
+  const stelliums = extractList(astro, 'stelliums', 'stellium')
+    .concat(extractList(raw, 'stelliums', 'stellium')).slice(0, 3)
+  const chartShape = extractStr(astro, 'chart_shape', 'forme_theme', 'chart_pattern')
+    ?? extractStr(raw, 'chart_shape', 'forme_theme', 'chart_pattern') ?? null
 
   // ── Extract key aspects (cap at 5) ────────────────────────────────────
-  const aspectsRaw = raw.aspects ?? raw.aspects_principaux ?? raw.major_aspects
+  const aspectsRaw = astro.aspects ?? astro.aspects_principaux ?? astro.major_aspects
+    ?? raw.aspects ?? raw.aspects_principaux ?? raw.major_aspects
   const keyAspects: string[] = []
   if (Array.isArray(aspectsRaw)) {
     aspectsRaw.slice(0, 5).forEach((a) => {
@@ -264,7 +298,8 @@ export function buildCompactNatalReadingContext(
   }
 
   // ── Extract dominant houses (cap at 3) ────────────────────────────────
-  const housesRaw = raw.houses ?? raw.maisons ?? raw.house_cusps
+  const housesRaw = astro.houses ?? astro.maisons ?? astro.house_cusps
+    ?? raw.houses ?? raw.maisons ?? raw.house_cusps
   const dominantHouses: string[] = []
   if (Array.isArray(housesRaw)) {
     housesRaw.slice(0, 3).forEach((h) => {
@@ -273,31 +308,56 @@ export function buildCompactNatalReadingContext(
     })
   }
 
-  // ── Extract summary seeds ─────────────────────────────────────────────
+  // ── Extract summary seeds (from raw root — Railway puts them there) ───
   const natalSummarySeeds: string[] = []
   for (const k of ['publicSummary', 'publicsummary', 'summary', 'synthese', 'reading', 'interpretation', 'bilan']) {
-    const v = raw[k]
+    const v = raw[k] ?? astro[k]
     if (typeof v === 'string' && v.trim()) {
       natalSummarySeeds.push(v.slice(0, 300))
       break
     }
   }
 
-  // ── Build compact data block (astro-only, capped) ─────────────────────
-  const astroOnlyEntries = Object.entries(raw).filter(([k]) =>
+  // ── Build compact data block — prioritise resolved planets ────────────
+  // We build the block from the resolved astro source (not raw root) so that
+  // sun/moon/ascendant values appear first, readable, and are not buried in
+  // a deeply nested JSON dump.
+  const blockLines = ['DONNÉES THÈME NATAL (source de vérité — citer exactement):']
+
+  // Inject resolved planet values explicitly at the top
+  if (sunSign)     blockLines.push(`- SOLEIL: ${sunSign}${sunDegree !== null ? ` (${sunDegree}°)` : ''}`)
+  if (moonSign)    blockLines.push(`- LUNE: ${moonSign}${moonDegree !== null ? ` (${moonDegree}°)` : ''}`)
+  if (risingSign)  blockLines.push(`- ASCENDANT: ${risingSign}${risingDegree !== null ? ` (${risingDegree}°)` : ''}`)
+  if (mercurySign) blockLines.push(`- MERCURE: ${mercurySign}`)
+  if (venusSign)   blockLines.push(`- VÉNUS: ${venusSign}`)
+  if (marsSign)    blockLines.push(`- MARS: ${marsSign}`)
+  if (jupiterSign) blockLines.push(`- JUPITER: ${jupiterSign}`)
+  if (saturnSign)  blockLines.push(`- SATURNE: ${saturnSign}`)
+  if (keyAspects.length > 0) blockLines.push(`- ASPECTS CLÉS: ${keyAspects.join(' | ')}`)
+  if (dominantSigns.length > 0) blockLines.push(`- SIGNES DOMINANTS: ${dominantSigns.join(', ')}`)
+  if (dominantElements.length > 0) blockLines.push(`- ÉLÉMENTS: ${dominantElements.join(', ')}`)
+  if (natalSummarySeeds.length > 0) blockLines.push(`- SYNTHÈSE: ${natalSummarySeeds[0]}`)
+
+  // Add remaining raw astro-only fields up to the cap
+  const astroOnlyEntries = Object.entries(astro).filter(([k]) =>
     NATAL_ASTRO_KEYS.has(k) || NATAL_ASTRO_KEYS.has(k.toLowerCase()),
   )
-
-  const blockLines = ['DONNÉES THÈME NATAL (source de vérité — citer exactement):']
   for (const [key, value] of astroOnlyEntries) {
-    const formattedKey = key.replace(/_/g, ' ').toUpperCase()
-    const raw_str = typeof value === 'object' ? JSON.stringify(value).slice(0, 200) : String(value)
-    blockLines.push(`- ${formattedKey}: ${raw_str}`)
     if (blockLines.join('\n').length >= maxChars) {
       blockLines.push(`…[données supplémentaires disponibles — non affichées pour limiter le contexte]`)
       break
     }
+    const formattedKey = key.replace(/_/g, ' ').toUpperCase()
+    const raw_str = typeof value === 'object' ? JSON.stringify(value).slice(0, 200) : String(value)
+    blockLines.push(`- ${formattedKey}: ${raw_str}`)
   }
+
+  const compactDataBlock = blockLines.join('\n')
+  console.log('[COMPACT_NATAL] block built', {
+    blockChars: compactDataBlock.length,
+    linesCount: blockLines.length,
+    astroPath,
+  })
 
   return {
     sunSign, sunDegree,
@@ -307,7 +367,7 @@ export function buildCompactNatalReadingContext(
     stelliums, keyAspects, dominantHouses,
     chartShape,
     natalSummarySeeds,
-    compactDataBlock: blockLines.join('\n'),
+    compactDataBlock,
   }
 }
 

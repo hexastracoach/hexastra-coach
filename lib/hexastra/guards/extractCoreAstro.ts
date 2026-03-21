@@ -33,12 +33,17 @@ export type CoreAstroPlacements = {
 
 // ── Known key variants for each body ─────────────────────────────────────────
 // Order matters: first match wins
-const SUN_KEYS   = ['sun', 'soleil', 'Sun', 'Soleil', 'SUN', 'sol']
-const MOON_KEYS  = ['moon', 'lune', 'Moon', 'Lune', 'MOON', 'luna']
-const RISING_KEYS = [
+const SUN_KEYS     = ['sun', 'soleil', 'Sun', 'Soleil', 'SUN', 'sol']
+const MOON_KEYS    = ['moon', 'lune', 'Moon', 'Lune', 'MOON', 'luna']
+const RISING_KEYS  = [
   'ascendant', 'rising', 'asc', 'Ascendant', 'Rising', 'ASC',
   'ascendant_sign', 'rising_sign', 'maison_1', 'house_1_sign',
 ]
+const MERCURY_KEYS = ['mercury', 'mercure', 'Mercury', 'Mercure', 'MERCURY']
+const VENUS_KEYS   = ['venus', 'venus_planet', 'Venus', 'Vénus', 'VENUS']
+const MARS_KEYS    = ['mars', 'Mars', 'MARS']
+const JUPITER_KEYS = ['jupiter', 'Jupiter', 'JUPITER']
+const SATURN_KEYS  = ['saturn', 'saturne', 'Saturn', 'Saturne', 'SATURN']
 
 // Sign normalisation map — handles API responses in English or French
 const SIGN_NORMALISATION: Record<string, string> = {
@@ -154,6 +159,49 @@ function resolvePlacement(raw: Record<string, unknown>, keys: string[]): CoreAst
   return null
 }
 
+// ── Astro source resolver ─────────────────────────────────────────────────────
+
+/**
+ * Resolve the canonical astrology data source from a /chart/fusion raw response.
+ *
+ * Railway returns planets nested under `raw.tropical` (and optionally under
+ * `raw.tropical.planets`). This function normalises all known structures into
+ * a single flat object where `sun`, `moon`, `ascendant`, etc. are top-level keys.
+ *
+ * Merge priority (highest wins):
+ *   tropical root keys (ascendant, houses, aspects…) > tropical.planets > root
+ */
+export function resolveAstroSource(raw: Record<string, unknown>): {
+  source: Record<string, unknown>
+  /** Dot-path string showing where data was found — useful for logging */
+  path: string
+} {
+  const TOP_KEYS = ['tropical', 'astrology', 'natal', 'chart'] as const
+
+  for (const topKey of TOP_KEYS) {
+    const block = raw[topKey]
+    if (!block || typeof block !== 'object' || Array.isArray(block)) continue
+    const blockObj = block as Record<string, unknown>
+
+    // Check for nested "planets" sub-object (e.g. tropical.planets.sun)
+    const planetsBlock = blockObj.planets ?? blockObj.Planets
+    if (planetsBlock && typeof planetsBlock === 'object' && !Array.isArray(planetsBlock)) {
+      // planets spread first (lower priority), blockObj overrides
+      // → ascendant/houses/aspects from tropical root win
+      return {
+        source: { ...(planetsBlock as Record<string, unknown>), ...blockObj },
+        path: `${topKey}+${topKey}.planets`,
+      }
+    }
+
+    // Planets are at block root level (e.g. tropical.sun or tropical.Sun)
+    return { source: blockObj, path: topKey }
+  }
+
+  // No nested astro block found — use root as last resort
+  return { source: raw, path: 'root' }
+}
+
 /**
  * Extract Sun, Moon and Rising sign from /chart/fusion raw data.
  * Returns a structured, deterministic result — never guesses.
@@ -172,13 +220,17 @@ export function extractCoreAstroPlacements(
     return { sun: null, moon: null, rising: null, allResolved: false, missing: ['sun', 'moon', 'rising'] }
   }
 
+  const { source, path } = resolveAstroSource(raw)
+
   console.log('[ASTRO_CORE] extracting core placements', {
-    availableKeys: Object.keys(raw).slice(0, 20),
+    rootKeys: Object.keys(raw).slice(0, 20),
+    resolvedPath: path,
+    sourceKeys: Object.keys(source).slice(0, 30),
   })
 
-  const sun   = resolvePlacement(raw, SUN_KEYS)
-  const moon  = resolvePlacement(raw, MOON_KEYS)
-  const rising = resolvePlacement(raw, RISING_KEYS)
+  const sun    = resolvePlacement(source, SUN_KEYS)
+  const moon   = resolvePlacement(source, MOON_KEYS)
+  const rising = resolvePlacement(source, RISING_KEYS)
 
   if (!sun)    missing.push('sun')
   if (!moon)   missing.push('moon')
@@ -187,22 +239,95 @@ export function extractCoreAstroPlacements(
   const allResolved = missing.length === 0
 
   console.log('[ASTRO_CORE] extracted', {
+    path,
     sun:    sun    ? { sign: sun.sign,    degree: sun.degree }    : null,
     moon:   moon   ? { sign: moon.sign,   degree: moon.degree }   : null,
     rising: rising ? { sign: rising.sign, degree: rising.degree } : null,
     allResolved,
     missing,
+    fieldsExtracted: 3 - missing.length,
   })
 
   if (missing.length > 0) {
     console.warn('[ASTRO_CORE] missing field(s)', {
       missing,
-      availableKeys: Object.keys(raw).slice(0, 40),
-      hint: 'Check /chart/fusion response structure',
+      resolvedPath: path,
+      sourceKeys: Object.keys(source).slice(0, 40),
+      hint: 'Check /chart/fusion response — expected nested under tropical or tropical.planets',
     })
   }
 
   return { sun, moon, rising, allResolved, missing }
+}
+
+// ── Local fallback builder ────────────────────────────────────────────────────
+
+/**
+ * Build a local fallback response when OpenAI times out but Railway data is available.
+ * Presents raw calculated facts without LLM interpretation — never invents.
+ * The user is invited to retry for the full reading.
+ */
+export function buildLocalAstroFallback(
+  raw: Record<string, unknown>,
+  language: string,
+  firstName: string | null,
+): string {
+  const isFr = !language.startsWith('en')
+  const { source, path } = resolveAstroSource(raw)
+
+  const sun     = resolvePlacement(source, SUN_KEYS)
+  const moon    = resolvePlacement(source, MOON_KEYS)
+  const rising  = resolvePlacement(source, RISING_KEYS)
+  const mercury = resolvePlacement(source, MERCURY_KEYS)
+  const venus   = resolvePlacement(source, VENUS_KEYS)
+  const mars    = resolvePlacement(source, MARS_KEYS)
+
+  const foundFields = [sun, moon, rising, mercury, venus, mars].filter(Boolean).length
+
+  console.log('[LOCAL_ASTRO_FALLBACK] building local fallback', {
+    path,
+    foundFields,
+    hasSun: Boolean(sun),
+    hasMoon: Boolean(moon),
+    hasRising: Boolean(rising),
+  })
+
+  const name = firstName ? `, ${firstName}` : ''
+
+  // No fields at all — graceful degradation
+  if (foundFields === 0) {
+    return isFr
+      ? "Tes données ont bien été calculées. La lecture complète sera disponible dans un instant — renvoie ton message."
+      : "Your data has been calculated. The full reading will be available shortly — please resend your message."
+  }
+
+  const lines: string[] = []
+
+  if (isFr) {
+    lines.push(`Voici tes placements calculés${name} :`)
+    lines.push('')
+    if (sun?.sign)     lines.push(`**Soleil** en ${sun.sign}${sun.degree !== null ? ` (${sun.degree}°)` : ''}`)
+    if (moon?.sign)    lines.push(`**Lune** en ${moon.sign}${moon.degree !== null ? ` (${moon.degree}°)` : ''}`)
+    if (rising?.sign)  lines.push(`**Ascendant** ${rising.sign}${rising.degree !== null ? ` (${rising.degree}°)` : ''}`)
+    if (mercury?.sign) lines.push(`Mercure en ${mercury.sign}`)
+    if (venus?.sign)   lines.push(`Vénus en ${venus.sign}`)
+    if (mars?.sign)    lines.push(`Mars en ${mars.sign}`)
+    lines.push('')
+    lines.push('_Lecture complète momentanément indisponible — renvoie ton message pour obtenir l\'analyse complète._')
+  } else {
+    lines.push(`Here are your calculated placements${name}:`)
+    lines.push('')
+    if (sun?.sign)     lines.push(`**Sun** in ${sun.sign}${sun.degree !== null ? ` (${sun.degree}°)` : ''}`)
+    if (moon?.sign)    lines.push(`**Moon** in ${moon.sign}${moon.degree !== null ? ` (${moon.degree}°)` : ''}`)
+    if (rising?.sign)  lines.push(`**Rising** ${rising.sign}${rising.degree !== null ? ` (${rising.degree}°)` : ''}`)
+    if (mercury?.sign) lines.push(`Mercury in ${mercury.sign}`)
+    if (venus?.sign)   lines.push(`Venus in ${venus.sign}`)
+    if (mars?.sign)    lines.push(`Mars in ${mars.sign}`)
+    lines.push('')
+    lines.push('_Full reading temporarily unavailable — resend your message for the complete analysis._')
+  }
+
+  return lines.join('\n')
 }
 
 /**
