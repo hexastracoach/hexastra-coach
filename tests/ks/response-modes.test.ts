@@ -1,45 +1,82 @@
 /**
  * Tests — Response Modes
  *
- * Validates selectResponseMode() for all combinations:
- * - compact_timeout_safe when timeout risk or free+exact
- * - exact_list for list subcategories
- * - exact_card for card subcategories
- * - interpretive_reading for synthesis/interpretation/guidance
- * - Fallback behavior
+ * Validates selectResponseMode() for all 4 modes:
+ * - calculated_reading     when data resolved + reliable + exact request
+ * - interpretive_reading   when data resolved but unreliable, or synthesis request
+ * - guided_exploration     when no exact data, or guidance, or free plan constrained
+ * - pedagogical_explanation when clarification/conceptual question
  */
 import { describe, it, expect } from 'vitest'
 import { selectResponseMode, buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
 
-// ─── compact_timeout_safe ────────────────────────────────────────────────────
+// ─── pedagogical_explanation ─────────────────────────────────────────────────
 
-describe('selectResponseMode — compact_timeout_safe', () => {
-  it('forces compact on timeout risk', () => {
+describe('selectResponseMode — pedagogical_explanation', () => {
+  it('returns pedagogical_explanation for clarification requestKind', () => {
+    expect(selectResponseMode({
+      requestKind: 'clarification',
+      subcategory: null,
+      plan: 'premium',
+    })).toBe('pedagogical_explanation')
+  })
+
+  it('returns pedagogical_explanation when isPedagogical=true regardless of requestKind', () => {
+    expect(selectResponseMode({
+      requestKind: 'exact_fact',
+      subcategory: 'ascendant',
+      plan: 'essential',
+      isPedagogical: true,
+    })).toBe('pedagogical_explanation')
+  })
+})
+
+// ─── guided_exploration (compact) ────────────────────────────────────────────
+
+describe('selectResponseMode — guided_exploration', () => {
+  it('returns guided_exploration on timeout risk', () => {
     expect(selectResponseMode({
       requestKind: 'exact_fact',
       subcategory: 'planetes',
       plan: 'premium',
       isTimeoutRisk: true,
-    })).toBe('compact_timeout_safe')
+    })).toBe('guided_exploration')
   })
 
-  it('forces compact for free plan + exact_fact', () => {
+  it('returns guided_exploration for free plan + exact_fact', () => {
     expect(selectResponseMode({
       requestKind: 'exact_fact',
       subcategory: 'ascendant',
       plan: 'free',
-    })).toBe('compact_timeout_safe')
+    })).toBe('guided_exploration')
   })
 
-  it('forces compact for free plan + exact_profile', () => {
+  it('returns guided_exploration for free plan + exact_profile', () => {
     expect(selectResponseMode({
       requestKind: 'exact_profile',
       subcategory: null,
       plan: 'free',
-    })).toBe('compact_timeout_safe')
+    })).toBe('guided_exploration')
   })
 
-  it('does NOT force compact for free plan + interpretation', () => {
+  it('returns guided_exploration when exact_fact but data not resolved', () => {
+    expect(selectResponseMode({
+      requestKind: 'exact_fact',
+      subcategory: 'ascendant',
+      plan: 'premium',
+      exactDataResolved: false,
+    })).toBe('guided_exploration')
+  })
+
+  it('returns guided_exploration for guidance requestKind', () => {
+    expect(selectResponseMode({
+      requestKind: 'guidance',
+      subcategory: null,
+      plan: 'free',
+    })).toBe('guided_exploration')
+  })
+
+  it('does NOT return guided_exploration for free plan + interpretation', () => {
     expect(selectResponseMode({
       requestKind: 'interpretation',
       subcategory: 'ascendant',
@@ -48,83 +85,56 @@ describe('selectResponseMode — compact_timeout_safe', () => {
   })
 })
 
-// ─── exact_list ───────────────────────────────────────────────────────────────
+// ─── calculated_reading ───────────────────────────────────────────────────────
 
-describe('selectResponseMode — exact_list', () => {
-  it('returns exact_list for planetes subcategory', () => {
+describe('selectResponseMode — calculated_reading', () => {
+  it('returns calculated_reading for exact_fact + data resolved + reliable', () => {
     expect(selectResponseMode({
       requestKind: 'exact_fact',
       subcategory: 'planetes',
       plan: 'premium',
-    })).toBe('exact_list')
+      exactDataResolved: true,
+      exactDataReliable: true,
+    })).toBe('calculated_reading')
   })
 
-  it('returns exact_list for maisons subcategory', () => {
-    expect(selectResponseMode({
-      requestKind: 'exact_fact',
-      subcategory: 'maisons',
-      plan: 'essential',
-    })).toBe('exact_list')
-  })
-
-  it('returns exact_list for centres_hd subcategory', () => {
-    expect(selectResponseMode({
-      requestKind: 'exact_fact',
-      subcategory: 'centres_hd',
-      plan: 'essential',
-    })).toBe('exact_list')
-  })
-
-  it('returns exact_list for portes_hd subcategory', () => {
-    expect(selectResponseMode({
-      requestKind: 'exact_fact',
-      subcategory: 'portes_hd',
-      plan: 'premium',
-    })).toBe('exact_list')
-  })
-
-  it('falls back to exact_list when no subcategory matches', () => {
-    expect(selectResponseMode({
-      requestKind: 'exact_fact',
-      subcategory: null,
-      plan: 'premium',
-    })).toBe('exact_list')
-  })
-})
-
-// ─── exact_card ───────────────────────────────────────────────────────────────
-
-describe('selectResponseMode — exact_card', () => {
-  it('returns exact_card for ascendant subcategory', () => {
+  it('returns calculated_reading for exact_fact + data resolved (reliable not specified = true)', () => {
     expect(selectResponseMode({
       requestKind: 'exact_fact',
       subcategory: 'ascendant',
       plan: 'essential',
-    })).toBe('exact_card')
+      exactDataResolved: true,
+    })).toBe('calculated_reading')
   })
 
-  it('returns exact_card for type_hd subcategory', () => {
-    expect(selectResponseMode({
-      requestKind: 'exact_fact',
-      subcategory: 'type_hd',
-      plan: 'premium',
-    })).toBe('exact_card')
-  })
-
-  it('returns exact_card for chemin_de_vie subcategory', () => {
-    expect(selectResponseMode({
-      requestKind: 'exact_fact',
-      subcategory: 'chemin_de_vie',
-      plan: 'essential',
-    })).toBe('exact_card')
-  })
-
-  it('returns exact_card for exact_profile requestKind', () => {
+  it('returns calculated_reading for exact_profile + data resolved + reliable', () => {
     expect(selectResponseMode({
       requestKind: 'exact_profile',
       subcategory: null,
       plan: 'premium',
-    })).toBe('exact_card')
+      exactDataResolved: true,
+      exactDataReliable: true,
+    })).toBe('calculated_reading')
+  })
+
+  it('returns calculated_reading for type_hd subcategory with resolved reliable data', () => {
+    expect(selectResponseMode({
+      requestKind: 'exact_fact',
+      subcategory: 'type_hd',
+      plan: 'premium',
+      exactDataResolved: true,
+      exactDataReliable: true,
+    })).toBe('calculated_reading')
+  })
+
+  it('returns calculated_reading for chemin_de_vie subcategory with resolved reliable data', () => {
+    expect(selectResponseMode({
+      requestKind: 'exact_fact',
+      subcategory: 'chemin_de_vie',
+      plan: 'essential',
+      exactDataResolved: true,
+      exactDataReliable: true,
+    })).toBe('calculated_reading')
   })
 })
 
@@ -147,14 +157,6 @@ describe('selectResponseMode — interpretive_reading', () => {
     })).toBe('interpretive_reading')
   })
 
-  it('returns interpretive_reading for guidance', () => {
-    expect(selectResponseMode({
-      requestKind: 'guidance',
-      subcategory: null,
-      plan: 'free',
-    })).toBe('interpretive_reading')
-  })
-
   it('returns interpretive_reading for mixed', () => {
     expect(selectResponseMode({
       requestKind: 'mixed',
@@ -163,53 +165,65 @@ describe('selectResponseMode — interpretive_reading', () => {
     })).toBe('interpretive_reading')
   })
 
-  it('returns interpretive_reading for clarification', () => {
+  it('returns interpretive_reading when exact_fact + data resolved but NOT reliable', () => {
     expect(selectResponseMode({
-      requestKind: 'clarification',
-      subcategory: null,
+      requestKind: 'exact_fact',
+      subcategory: 'ascendant',
       plan: 'premium',
+      exactDataResolved: true,
+      exactDataReliable: false,
     })).toBe('interpretive_reading')
   })
 })
 
-// ─── Fallback ─────────────────────────────────────────────────────────────────
+// ─── Fallback behavior ────────────────────────────────────────────────────────
 
 describe('selectResponseMode — fallback', () => {
-  it('returns exact_card when data resolved + unknown kind', () => {
+  it('returns calculated_reading when data resolved + unknown kind', () => {
     expect(selectResponseMode({
       requestKind: 'unknown',
       subcategory: null,
       plan: 'premium',
       exactDataResolved: true,
-    })).toBe('exact_card')
+      exactDataReliable: true,
+    })).toBe('calculated_reading')
   })
 
-  it('returns interpretive_reading when data not resolved + unknown kind', () => {
+  it('returns guided_exploration when data not resolved + unknown kind', () => {
     expect(selectResponseMode({
       requestKind: 'unknown',
       subcategory: null,
       plan: 'premium',
       exactDataResolved: false,
-    })).toBe('interpretive_reading')
+    })).toBe('guided_exploration')
   })
 })
 
 // ─── buildResponseModeDirective ───────────────────────────────────────────────
 
 describe('buildResponseModeDirective', () => {
-  it('exact_list directive mentions LISTE FACTUELLE', () => {
-    expect(buildResponseModeDirective('exact_list')).toContain('LISTE FACTUELLE')
-  })
-
-  it('exact_card directive mentions CARTE FACTUELLE', () => {
-    expect(buildResponseModeDirective('exact_card')).toContain('CARTE FACTUELLE')
+  it('calculated_reading directive mentions LECTURE CALCULÉE', () => {
+    expect(buildResponseModeDirective('calculated_reading')).toContain('LECTURE CALCULÉE')
   })
 
   it('interpretive_reading directive mentions LECTURE INTERPRÉTATIVE', () => {
     expect(buildResponseModeDirective('interpretive_reading')).toContain('LECTURE INTERPRÉTATIVE')
   })
 
-  it('compact_timeout_safe directive mentions COMPACT', () => {
-    expect(buildResponseModeDirective('compact_timeout_safe')).toContain('COMPACT')
+  it('guided_exploration directive mentions EXPLORATION GUIDÉE', () => {
+    expect(buildResponseModeDirective('guided_exploration')).toContain('EXPLORATION GUIDÉE')
+  })
+
+  it('pedagogical_explanation directive mentions EXPLICATION PÉDAGOGIQUE', () => {
+    expect(buildResponseModeDirective('pedagogical_explanation')).toContain('EXPLICATION PÉDAGOGIQUE')
+  })
+
+  it('calculated_reading directive forbids inventing values', () => {
+    const directive = buildResponseModeDirective('calculated_reading')
+    expect(directive.toLowerCase()).toContain("n'invente")
+  })
+
+  it('guided_exploration directive stays concise (mentions 4-8 lignes)', () => {
+    expect(buildResponseModeDirective('guided_exploration')).toContain('4-8 lignes')
   })
 })

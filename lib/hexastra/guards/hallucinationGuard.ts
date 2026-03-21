@@ -97,7 +97,7 @@ export function detectResponseModeMismatch(
 ): boolean {
   if (!exactDataResolved || !responseText || responseText.length < 30) return false
 
-  if (expectedMode === 'exact_list' || expectedMode === 'exact_card') {
+  if (expectedMode === 'calculated_reading') {
     // A factual response should contain structured values, not only prose.
     // Heuristic: look for structured markers (colon-separated, bullets, numbers, degree symbols)
     const hasStructuredValue = /[A-Z][a-zà-ÿ]+ ?\:.*\S|●|•|\d+\/\d+|\d+°|[A-Z]{3,}/.test(responseText)

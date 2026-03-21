@@ -96,18 +96,45 @@ const FUSION_SUBCATS = new Set([
   'etat_emotionnel', 'lecture_generale',
 ])
 
+// ── Explicit science override from last message ────────────────────────────────
+
+/**
+ * Patterns that signal the user explicitly named a specific science in their message.
+ * Used to override the 'science' domain route default (which falls back to astrology)
+ * when no subcategory was detected. Only applied when subcategory is null.
+ */
+const EXPLICIT_SCIENCE_PATTERNS: Array<{ pattern: RegExp; science: Science }> = [
+  { pattern: /\b(numerolog|numérolog|chemin de vie|nombre expression|nombre de vie|numéro de vie)/i, science: 'numerology' },
+  { pattern: /\b(human design|design humain|bodygraph|mon hd\b|portes? hd|centres? hd|canaux hd)/i, science: 'human_design' },
+  { pattern: /\b(enneagramme|ennéagramme|ennéa\b|mon ennea|mon type [1-9]\b)/i, science: 'enneagram' },
+  { pattern: /\b(kua\b|feng.?shui|gps kua|neurokua|nombre kua|direction kua)/i, science: 'kua' },
+  { pattern: /\b(fusion\b|multi.?science|hexastra fusion|toutes les sciences)/i, science: 'fusion' },
+]
+
+/**
+ * Returns the science explicitly named in the message, or null if none detected.
+ * Only called when subcategory detection returned null (to avoid conflicts).
+ */
+function resolveExplicitScienceOverride(message: string): Science | null {
+  for (const { pattern, science } of EXPLICIT_SCIENCE_PATTERNS) {
+    if (pattern.test(message)) return science
+  }
+  return null
+}
+
 // ── Science resolver ───────────────────────────────────────────────────────────
 
 function resolveScience(
   domainRoute: DomainRoute,
   semanticContext: SemanticContextType,
   subcategory: string | null,
+  explicitOverride: Science | null = null,
 ): Science {
   // Semantic context overrides everything for exact routes
   if (semanticContext === 'astro_exact' || semanticContext === 'astro_followup') return 'astrology'
   if (semanticContext === 'human_design_exact') return 'human_design'
 
-  // Subcategory-based resolution (most precise)
+  // Subcategory-based resolution (most precise — from current message)
   if (subcategory) {
     if (ASTRO_SUBCATS.has(subcategory)) return 'astrology'
     if (HD_SUBCATS.has(subcategory)) return 'human_design'
@@ -118,18 +145,18 @@ function resolveScience(
     if (FUSION_SUBCATS.has(subcategory)) return 'fusion'
   }
 
-  // Domain route fallback
+  // Domain route fallback — with explicit override for ambiguous routes ('science', default)
   switch (domainRoute) {
-    case 'fusion':      return 'fusion'
-    case 'science':     return 'astrology' // science without subcategory defaults to astrology
-    case 'gps_kua':     return 'kua'
-    case 'neurokua':    return 'fusion'
-    case 'timing':      return 'timing'
-    case 'career':      return 'fusion'
-    case 'relationship':return 'fusion'
-    case 'decision':    return 'fusion'
-    case 'wellbeing':   return 'fusion'
-    default:            return 'general'
+    case 'fusion':       return 'fusion'
+    case 'science':      return explicitOverride ?? 'astrology' // explicit name wins over default astrology
+    case 'gps_kua':      return 'kua'
+    case 'neurokua':     return 'fusion'
+    case 'timing':       return 'timing'
+    case 'career':       return 'fusion'
+    case 'relationship': return 'fusion'
+    case 'decision':     return 'fusion'
+    case 'wellbeing':    return 'fusion'
+    default:             return explicitOverride ?? 'general' // also apply override on generic route
   }
 }
 
@@ -148,7 +175,9 @@ export function classifyMessage(message: string, history?: ChatMessage[]): Class
   const subcategory = subcatResult?.subcategory ?? null
 
   const requestKind = classifyRequestKind(message, subcategory)
-  const science = resolveScience(domainRoute, semanticCtx.contextType, subcategory)
+  // Only compute explicit override when subcategory is null — avoids conflicts with precise detection
+  const explicitScienceOverride = subcategory ? null : resolveExplicitScienceOverride(message)
+  const science = resolveScience(domainRoute, semanticCtx.contextType, subcategory, explicitScienceOverride)
 
   // needsExactData: either requestKind signals it, or semantic context does
   const needsExactData =

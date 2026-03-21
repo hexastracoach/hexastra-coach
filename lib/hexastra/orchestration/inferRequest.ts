@@ -7,6 +7,27 @@ function includesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text))
 }
 
+/**
+ * Text phrases that signal the user wants context/framing only,
+ * without triggering a full reading or Railway call.
+ * Example: "n'ouvre pas encore de lecture", "juste voir les options"
+ */
+const FRAME_ONLY_PATTERNS: RegExp[] = [
+  /n[''']ouvre pas encore/i,
+  /pas encore de lecture/i,
+  /juste (pour )?voir les options/i,
+  /montre.?moi (le|les) (cadre|options|menu)/i,
+  /voir d[''']abord les options/i,
+  /quelles sont (les|mes) options/i,
+  /pas encore de r[ée]ponse/i,
+  /juste (pour )?voir le cadre/i,
+  /avant de poser ma question/i,
+]
+
+function isTextFrameOnly(text: string): boolean {
+  return FRAME_ONLY_PATTERNS.some((p) => p.test(text))
+}
+
 function inferUrgency(text: string): InferenceResult['urgencyLevel'] {
   if (includesAny(text, [/\burgent\b/, /\bmaintenant\b/, /\bimmediat/i, /\bcrise\b/])) return 'high'
   if (includesAny(text, [/\brapidement\b/, /\bcette semaine\b/, /\bbientot\b/])) return 'medium'
@@ -118,6 +139,7 @@ export function inferRequest(params: {
       normalized.uiAction === 'select_submenu_item' ||
       isShortChoice ||
       isCompositeChoice ||
+      isTextFrameOnly(normalized.normalizedUserMessage) ||
       normalized.normalizedUserMessage === (menuContract?.id ?? '').toLowerCase())
 
   const clarificationNeeded =

@@ -2257,12 +2257,14 @@ export async function runHexastraFlow(input: {
       })
     }
 
-    // Response mode selection
+    // Response mode selection — passes reliability + pedagogical signal
     const responseMode = selectResponseMode({
       requestKind: universalClassif.requestKind,
       subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
       plan,
       exactDataResolved,
+      exactDataReliable: reliabilityResult.reliable,
+      isPedagogical: universalClassif.requestKind === 'clarification',
     })
     flowLog('info', 'RESPONSE_MODE_SELECTED', {
       responseMode,
