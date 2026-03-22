@@ -80,7 +80,14 @@ function safeObj(value: unknown): Record<string, unknown> | null {
 
 /**
  * Extract HD Profile lines from a /chart/fusion raw response.
- * Tries multiple known field conventions — first match wins.
+ *
+ * PRIORITY ORDER (règle métier — ne pas modifier sans validation):
+ *   1. personality_line + design_line (lignes brutes plates)
+ *   2. personality_sun.line + design_sun.line (lignes soleil imbriquées)
+ *   3. profile / profil string (fallback — source la moins fiable)
+ *
+ * Si les lignes brutes contredisent le champ profile, les lignes gagnent
+ * et un warning HD_PROFILE_CONFLICT_DETECTED est émis.
  */
 export function extractHDProfileFromRaw(
   raw: Record<string, unknown> | null | undefined,
@@ -94,13 +101,128 @@ export function extractHDProfileFromRaw(
     topLevelKeys: Object.keys(raw).slice(0, 20),
   })
 
-  // ── Strategy 1: Try known HD root objects ────────────────────────────────
   const hdCandidateKeys = ['human_design', 'humanDesign', 'humanDesignFull', 'hd', 'HD']
+
+  // ── Audit: collecter toutes les sources connues avant de décider ──────────
+  const hdHumanDesign = safeObj(raw['humanDesign'])
+  const hdHumanDesignFull = safeObj(raw['humanDesignFull'])
+  const auditFirstHD = (() => {
+    for (const k of hdCandidateKeys) {
+      const o = safeObj(raw[k])
+      if (o) return o
+    }
+    return null
+  })()
+  const auditFirstSun = auditFirstHD
+    ? safeObj(auditFirstHD.personality_sun ?? auditFirstHD.personalitySun)
+    : null
+  const auditFirstDesignSun = auditFirstHD
+    ? safeObj(auditFirstHD.design_sun ?? auditFirstHD.designSun)
+    : null
+
+  const auditLog = {
+    'humanDesign.profile': hdHumanDesign?.['profile'] ?? hdHumanDesign?.['profil'],
+    'humanDesignFull.profile': hdHumanDesignFull?.['profile'] ?? hdHumanDesignFull?.['profil'],
+    personality_line:
+      auditFirstHD?.personality_line ??
+      auditFirstHD?.personalityLine ??
+      raw.personality_line ??
+      raw.personalityLine,
+    design_line:
+      auditFirstHD?.design_line ??
+      auditFirstHD?.designLine ??
+      raw.design_line ??
+      raw.designLine,
+    'personality_sun.line': auditFirstSun?.line,
+    'design_sun.line': auditFirstDesignSun?.line,
+  }
+
+  console.log('[HD_PROFILE_AUDIT]', auditLog)
+
+  // ── Helper: détecter un conflit entre lignes brutes et profile string ─────
+  function detectConflict(
+    computedProfile: string,
+    sourceLines: string,
+    profileStringRaw: unknown,
+    sourceString: string,
+  ): void {
+    const parsed = parseProfileString(profileStringRaw)
+    if (!parsed) return
+    const profileStringValue = `${parsed.personalityLine}/${parsed.designLine}`
+    if (profileStringValue !== computedProfile) {
+      console.warn('[HD_PROFILE_CONFLICT_DETECTED]', {
+        winner: computedProfile,
+        source_winner: sourceLines,
+        loser: profileStringValue,
+        source_loser: sourceString,
+        reason: 'Raw lines take priority over profile string — règle métier critique',
+        audit: auditLog,
+      })
+    }
+  }
+
+  // ── Stratégie 1 (priorité max): personality_line + design_line plats ──────
   for (const hdKey of hdCandidateKeys) {
     const hdObj = safeObj(raw[hdKey])
     if (!hdObj) continue
 
-    // 1a. Pre-computed profile string in HD object
+    const pLine = toLine(hdObj.personality_line ?? hdObj.personalityLine ?? hdObj.personality_sun_line)
+    const dLine = toLine(hdObj.design_line ?? hdObj.designLine ?? hdObj.design_sun_line)
+    if (pLine && dLine) {
+      const profile = `${pLine}/${dLine}`
+      const source = `${hdKey}.personality_line+design_line`
+      for (const profileKey of ['profile', 'profil', 'profile_hd', 'profil_hd']) {
+        if (hdObj[profileKey] !== undefined) {
+          detectConflict(profile, source, hdObj[profileKey], `${hdKey}.${profileKey}`)
+        }
+      }
+      const result = { personalityLine: pLine, designLine: dLine, profile, calculated: true, source }
+      console.log('[HD_PROFILE_EXTRACT] found via HD flat lines [priority 1]', result)
+      return result
+    }
+  }
+
+  // Root-level flat lines (priorité 1 aussi, si aucun objet HD trouvé)
+  const rootPLine = toLine(raw.personality_line ?? raw.personalityLine)
+  const rootDLine = toLine(raw.design_line ?? raw.designLine)
+  if (rootPLine && rootDLine) {
+    const profile = `${rootPLine}/${rootDLine}`
+    const source = 'root.personality_line+design_line'
+    const result = { personalityLine: rootPLine, designLine: rootDLine, profile, calculated: true, source }
+    console.log('[HD_PROFILE_EXTRACT] found via root flat lines [priority 1]', result)
+    return result
+  }
+
+  // ── Stratégie 2: personality_sun.line + design_sun.line imbriqués ─────────
+  for (const hdKey of hdCandidateKeys) {
+    const hdObj = safeObj(raw[hdKey])
+    if (!hdObj) continue
+
+    const personalitySun = safeObj(hdObj.personality_sun ?? hdObj.personalitySun)
+    const designSun = safeObj(hdObj.design_sun ?? hdObj.designSun)
+    if (personalitySun && designSun) {
+      const pSunLine = toLine(personalitySun.line)
+      const dSunLine = toLine(designSun.line)
+      if (pSunLine && dSunLine) {
+        const profile = `${pSunLine}/${dSunLine}`
+        const source = `${hdKey}.personality_sun.line+design_sun.line`
+        for (const profileKey of ['profile', 'profil', 'profile_hd', 'profil_hd']) {
+          if (hdObj[profileKey] !== undefined) {
+            detectConflict(profile, source, hdObj[profileKey], `${hdKey}.${profileKey}`)
+          }
+        }
+        const result = { personalityLine: pSunLine, designLine: dSunLine, profile, calculated: true, source }
+        console.log('[HD_PROFILE_EXTRACT] found via HD sun lines [priority 2]', result)
+        return result
+      }
+    }
+  }
+
+  // ── Stratégie 3 (fallback): profile string dans objet HD ─────────────────
+  for (const hdKey of hdCandidateKeys) {
+    const hdObj = safeObj(raw[hdKey])
+    if (!hdObj) continue
+
     for (const profileKey of ['profile', 'profil', 'profile_hd', 'profil_hd']) {
       const parsed = parseProfileString(hdObj[profileKey])
       if (parsed) {
@@ -111,47 +233,13 @@ export function extractHDProfileFromRaw(
           source: `${hdKey}.${profileKey}`,
           rawValue: hdObj[profileKey],
         }
-        console.log('[HD_PROFILE_EXTRACT] found via HD object profile string', result)
-        return result
-      }
-    }
-
-    // 1b. Flat personality_line + design_line in HD object
-    const pLine = toLine(hdObj.personality_line ?? hdObj.personalityLine ?? hdObj.personality_sun_line)
-    const dLine = toLine(hdObj.design_line ?? hdObj.designLine ?? hdObj.design_sun_line)
-    if (pLine && dLine) {
-      const result = {
-        personalityLine: pLine,
-        designLine: dLine,
-        profile: `${pLine}/${dLine}`,
-        calculated: true,
-        source: `${hdKey}.personality_line+design_line`,
-      }
-      console.log('[HD_PROFILE_EXTRACT] found via HD flat lines', result)
-      return result
-    }
-
-    // 1c. Nested personality_sun.line + design_sun.line
-    const personalitySun = safeObj(hdObj.personality_sun ?? hdObj.personalitySun)
-    const designSun = safeObj(hdObj.design_sun ?? hdObj.designSun)
-    if (personalitySun && designSun) {
-      const pSunLine = toLine(personalitySun.line)
-      const dSunLine = toLine(designSun.line)
-      if (pSunLine && dSunLine) {
-        const result = {
-          personalityLine: pSunLine,
-          designLine: dSunLine,
-          profile: `${pSunLine}/${dSunLine}`,
-          calculated: true,
-          source: `${hdKey}.personality_sun.line+design_sun.line`,
-        }
-        console.log('[HD_PROFILE_EXTRACT] found via HD sun lines', result)
+        console.log('[HD_PROFILE_EXTRACT] found via HD object profile string [priority 3 — fallback]', result)
         return result
       }
     }
   }
 
-  // ── Strategy 2: Root-level profile string ────────────────────────────────
+  // ── Stratégie 3 (fallback): profile string au niveau racine ──────────────
   for (const profileKey of ['profil_hd', 'profile_hd', 'hd_profile', 'hd_profil']) {
     const parsed = parseProfileString(raw[profileKey])
     if (parsed) {
@@ -162,28 +250,13 @@ export function extractHDProfileFromRaw(
         source: profileKey,
         rawValue: raw[profileKey],
       }
-      console.log('[HD_PROFILE_EXTRACT] found via root profile string', result)
+      console.log('[HD_PROFILE_EXTRACT] found via root profile string [priority 3 — fallback]', result)
       return result
     }
   }
 
-  // ── Strategy 3: Root-level flat lines ───────────────────────────────────
-  const rootPLine = toLine(raw.personality_line ?? raw.personalityLine)
-  const rootDLine = toLine(raw.design_line ?? raw.designLine)
-  if (rootPLine && rootDLine) {
-    const result = {
-      personalityLine: rootPLine,
-      designLine: rootDLine,
-      profile: `${rootPLine}/${rootDLine}`,
-      calculated: true,
-      source: 'root.personality_line+design_line',
-    }
-    console.log('[HD_PROFILE_EXTRACT] found via root flat lines', result)
-    return result
-  }
-
-  // ── Strategy 4: Nested gates — Personality Gate 1 line + Design Gate 1 line ─
-  // Some APIs expose full gate lists rather than extracted lines
+  // ── Stratégie 4: gates imbriqués — Personality Gate 1 + Design Gate 1 ────
+  // Certaines APIs exposent les listes de gates plutôt que les lignes extraites
   const hdRoot = safeObj(raw.human_design)
   const gatesObj = safeObj(raw.gates ?? hdRoot?.gates)
   if (gatesObj) {
@@ -206,7 +279,7 @@ export function extractHDProfileFromRaw(
           calculated: true,
           source: 'gates.personality_1.line+design_1.line',
         }
-        console.log('[HD_PROFILE_EXTRACT] found via gate lines', result)
+        console.log('[HD_PROFILE_EXTRACT] found via gate lines [priority 4]', result)
         return result
       }
     }
@@ -215,6 +288,7 @@ export function extractHDProfileFromRaw(
   console.warn('[HD_PROFILE_EXTRACT] could not extract HD profile from raw data', {
     availableKeys: Object.keys(raw).slice(0, 30),
     hint: 'Check /chart/fusion response structure for HD profile fields',
+    audit: auditLog,
   })
 
   return {
