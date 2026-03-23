@@ -447,6 +447,20 @@ Ce format est reserve a l usage praticien uniquement. Ne jamais l utiliser sur d
   return parts.join('\n')
 }
 
+function exactScienceIsolationDirective(input: BuildPromptInput): string {
+  if (input.analysisMode === 'hexastra_fusion') return ''
+
+  const science = input.selectedScience ?? input.selectedMenuLabel ?? null
+
+  if (!science) return ''
+  if (!input.requiresExactData && !input.selectedScience) return ''
+
+  return `Science ciblee: ${science}.
+- Rester strictement dans cette science pour cette reponse.
+- Interdiction d'ajouter une fusion implicite avec astrologie, Human Design, numerologie, enneagramme ou Kua si l'utilisateur ne les a pas demandes explicitement.
+- Si seules certaines donnees de cette science sont disponibles, repondre a partir d'elles et nommer sobrement ce qui manque.`
+}
+
 function practitionerContextDirective(input: BuildPromptInput): string {
   if (input.plan !== 'practitioner') return ''
 
@@ -781,6 +795,7 @@ ${stepDirective(input)}
 ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}
 ${analysisModeDirective(input)}
+${exactScienceIsolationDirective(input)}
 ${practitionerContextDirective(input)}
 ${hdProfileDirective(input)}
 ${input.antiHallucinationRules ? input.antiHallucinationRules : ''}

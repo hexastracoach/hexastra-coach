@@ -45,6 +45,7 @@ export type SubcategoryDetectionResult = {
 
 /** Minimum confidence for a match to be included in results */
 const MIN_CONFIDENCE = 0.15
+const ENTRY_BY_KEY = new Map(SUBCATEGORY_ENTRIES.map((entry) => [entry.key, entry]))
 
 function scoreEntry(entry: SubcategoryEntry, text: string): number {
   let patternHits = 0
@@ -58,6 +59,27 @@ function scoreEntry(entry: SubcategoryEntry, text: string): number {
 function entryConfidence(entry: SubcategoryEntry, score: number): number {
   const maxPossibleScore = entry.weight * entry.patterns.length
   return Math.min(score / maxPossibleScore, 1)
+}
+
+function addSyntheticMatch(
+  key: string,
+  candidates: Array<{ key: string; science: SubcategoryScience; score: number }>,
+  matchMap: Map<string, SubcategoryMatch>,
+) {
+  if (matchMap.has(key)) return
+
+  const entry = ENTRY_BY_KEY.get(key)
+  if (!entry) return
+
+  const score = entry.weight
+  candidates.push({ key: entry.key, science: entry.science, score })
+  matchMap.set(entry.key, {
+    science: entry.science,
+    subcategory: entry.key,
+    responseType: entry.responseType,
+    confidence: entryConfidence(entry, score),
+    score,
+  })
 }
 
 const EMPTY_RESULT: SubcategoryDetectionResult = {
@@ -85,6 +107,23 @@ export function detectSubcategory(text: string): SubcategoryDetectionResult {
 
   const candidates: Array<{ key: string; science: SubcategoryScience; score: number }> = []
   const matchMap = new Map<string, SubcategoryMatch>()
+  const normalized = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+  const mentionsHumanDesign = /\b(human design|design humain|hd)\b/.test(normalized)
+  if (mentionsHumanDesign && /\b(strategie|strategy)\b/.test(normalized)) {
+    addSyntheticMatch('strategie_hd', candidates, matchMap)
+  }
+
+  const mentionsEnneagram = /\b(enneagramme|enneagram|ennea)\b/.test(normalized)
+  if (mentionsEnneagram && /\bprofil\b/.test(normalized)) {
+    addSyntheticMatch('type_enn', candidates, matchMap)
+  }
+  if (mentionsEnneagram && /\baile\b/.test(normalized)) {
+    addSyntheticMatch('aile_enn', candidates, matchMap)
+  }
 
   for (const entry of SUBCATEGORY_ENTRIES) {
     const score = scoreEntry(entry, text)

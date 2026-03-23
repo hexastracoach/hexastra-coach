@@ -1,20 +1,15 @@
-/**
- * User Evolution Store — localStorage persistence for UserEvolutionProfile.
- *
- * No external dependency (no Zustand). Follows the same localStorage pattern
- * as the rest of the project (micro-readings, birth data, etc.).
- * Safe to call on the server (returns null / no-ops when window is undefined).
- */
-
 import type { UserEvolutionProfile } from '@/types/evolution'
+import { readScopedStorage, removeScopedStorage, writeScopedStorage } from '@/lib/chat/scopedLocalStorage'
 
 const STORAGE_KEY = 'hexastra.evolution.v1'
 
-export function loadEvolutionProfile(): UserEvolutionProfile | null {
+export function loadEvolutionProfile(scopeKey?: string | null): UserEvolutionProfile | null {
   if (typeof window === 'undefined') return null
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = readScopedStorage(window.localStorage, STORAGE_KEY, scopeKey)
     if (!raw) return null
+
     const parsed = JSON.parse(raw)
     return parsed && typeof parsed === 'object' ? (parsed as UserEvolutionProfile) : null
   } catch {
@@ -22,37 +17,37 @@ export function loadEvolutionProfile(): UserEvolutionProfile | null {
   }
 }
 
-export function saveEvolutionProfile(profile: UserEvolutionProfile): void {
+export function saveEvolutionProfile(profile: UserEvolutionProfile, scopeKey?: string | null): void {
   if (typeof window === 'undefined') return
+
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile))
+    writeScopedStorage(window.localStorage, STORAGE_KEY, JSON.stringify(profile), scopeKey)
   } catch {
-    // localStorage full or blocked — fail silently
+    // noop
   }
 }
 
-export function clearEvolutionProfile(): void {
+export function clearEvolutionProfile(scopeKey?: string | null): void {
   if (typeof window === 'undefined') return
+
   try {
-    localStorage.removeItem(STORAGE_KEY)
+    removeScopedStorage(window.localStorage, STORAGE_KEY, scopeKey)
   } catch {
-    // fail silently
+    // noop
   }
 }
 
-/**
- * Shallow-merge a partial update into the current profile and persist it.
- * Returns the merged profile.
- */
 export function mergeAndSaveEvolutionProfile(
   current: UserEvolutionProfile | null,
   updates: Partial<UserEvolutionProfile>,
+  scopeKey?: string | null,
 ): UserEvolutionProfile {
   const merged: UserEvolutionProfile = {
     ...(current ?? {}),
     ...updates,
     updatedAt: new Date().toISOString(),
   }
-  saveEvolutionProfile(merged)
+
+  saveEvolutionProfile(merged, scopeKey)
   return merged
 }

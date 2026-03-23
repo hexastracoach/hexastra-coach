@@ -29,6 +29,43 @@ function isColumnMissingError(message: string): boolean {
   return COLUMN_MISSING_PATTERNS.some((p) => lower.includes(p))
 }
 
+export async function GET() {
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user?.id) {
+      return NextResponse.json({ ok: false, reason: 'unauthenticated' }, { status: 401 })
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select(
+        'first_name, birth_date, birth_time, birth_time_known, birth_location, birth_country_code, birth_lat, birth_lng, gender',
+      )
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[BIRTH_DATA] profile fetch failed', {
+        userId: user.id,
+        error: error.message,
+      })
+      return NextResponse.json({ ok: false, reason: 'db_error', detail: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      ok: true,
+      profile: data ?? null,
+    })
+  } catch (err) {
+    console.error('[BIRTH_DATA] unexpected error in GET /api/profile/birth', err)
+    return NextResponse.json({ ok: false, reason: 'internal_error' }, { status: 500 })
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()

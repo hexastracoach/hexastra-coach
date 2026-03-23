@@ -72,6 +72,11 @@ import {
   loadEvolutionProfile,
   saveEvolutionProfile,
 } from '@/lib/stores/userEvolutionStore'
+import {
+  readScopedStorage,
+  removeScopedStorage,
+  writeScopedStorage,
+} from '@/lib/chat/scopedLocalStorage'
 import type { UserEvolutionProfile } from '@/types/evolution'
 import { useChatLanguage, useTranslation } from '@/lib/i18n/useTranslation'
 import {
@@ -131,6 +136,7 @@ function IconMenu() {
 
 const API_TIMEOUT_MS = 30000
 const CONVERSATION_STORAGE_KEY = 'hexastra_conversation_id'
+const USER_MEMORY_STORAGE_KEY = 'hexastra.userMemory'
 const CACHE_LIMIT = 50
 const DUPLICATE_MESSAGE_WINDOW_MS = 1200
 
@@ -334,6 +340,76 @@ function mergeBirthData(data: Partial<BirthData>): BirthData {
   }
 }
 
+function applyBirthDataState(
+  next: Partial<BirthData> | null | undefined,
+  setState: (value: BirthData) => void,
+  ref: MutableRefObject<BirthData>,
+) {
+  const normalized = mergeBirthData(next ?? {})
+  ref.current = normalized
+  setState(normalized)
+}
+
+function splitBirthLocation(value: unknown) {
+  if (typeof value !== 'string') {
+    return { birthCity: '', birthCountryName: '' }
+  }
+
+  const segments = value
+    .split(',')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  if (segments.length === 0) {
+    return { birthCity: '', birthCountryName: '' }
+  }
+
+  if (segments.length === 1) {
+    return { birthCity: segments[0], birthCountryName: '' }
+  }
+
+  return {
+    birthCity: segments.slice(0, -1).join(', '),
+    birthCountryName: segments[segments.length - 1],
+  }
+}
+
+function birthDataFromProfile(profile: Record<string, unknown> | null | undefined): BirthData | null {
+  if (!profile || typeof profile !== 'object') return null
+
+  const { birthCity, birthCountryName } = splitBirthLocation(profile.birth_location)
+  const birthLat =
+    typeof profile.birth_lat === 'number'
+      ? String(profile.birth_lat)
+      : typeof profile.birth_lat === 'string'
+        ? profile.birth_lat
+        : ''
+  const birthLng =
+    typeof profile.birth_lng === 'number'
+      ? String(profile.birth_lng)
+      : typeof profile.birth_lng === 'string'
+        ? profile.birth_lng
+        : ''
+
+  const normalized = mergeBirthData({
+    firstName: typeof profile.first_name === 'string' ? profile.first_name : '',
+    birthDate: typeof profile.birth_date === 'string' ? profile.birth_date : '',
+    birthTime: typeof profile.birth_time === 'string' ? profile.birth_time : '',
+    birthTimeKnown:
+      typeof profile.birth_time_known === 'boolean'
+        ? profile.birth_time_known
+        : Boolean(profile.birth_time),
+    birthCity,
+    birthLat,
+    birthLng,
+    birthCountryCode: typeof profile.birth_country_code === 'string' ? profile.birth_country_code : '',
+    birthCountryName,
+    gender: typeof profile.gender === 'string' ? profile.gender : '',
+  })
+
+  return isBirthDataComplete(normalized) ? normalized : null
+}
+
 export default function ChatPageClient() {
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -367,6 +443,8 @@ export default function ChatPageClient() {
   const [showLeft, setShowLeft] = useState(false)
   const [viewportWidth, setViewportWidth] = useState(1600)
   const [userEmail, setUserEmail] = useState('')
+  const [authUserId, setAuthUserId] = useState<string | null>(null)
+  const [storageScopeReady, setStorageScopeReady] = useState(false)
 
   const [birthData, setBirthData] = useState<BirthData>(EMPTY_BIRTH_DATA)
   const [partnerBirthData, setPartnerBirthData] = useState<BirthData>(EMPTY_BIRTH_DATA)
@@ -404,6 +482,7 @@ export default function ChatPageClient() {
   const partnerBirthDataRef = useRef<BirthData>(EMPTY_BIRTH_DATA)
   const journeyHydratedRef = useRef(false)
   const mode = planLoaded ? getEntitlements(userPlan).chatMode : 'essentiel'
+  const storageScope = authUserId
 
   const step = computeBootstrapStep({
     planLoaded,
@@ -595,7 +674,7 @@ export default function ChatPageClient() {
 
     if (responsePolicy.evolutionProfile) {
       setEvolutionProfile(responsePolicy.evolutionProfile as UserEvolutionProfile)
-      saveEvolutionProfile(responsePolicy.evolutionProfile as UserEvolutionProfile)
+      saveEvolutionProfile(responsePolicy.evolutionProfile as UserEvolutionProfile, storageScope)
     }
 
     if (responsePolicy.userMemoryUpdate) {
@@ -603,7 +682,12 @@ export default function ChatPageClient() {
         const update = responsePolicy.userMemoryUpdate as Partial<UserMemory>
         setUserMemory((prev) => {
           const merged = { ...prev, ...update }
-          localStorage.setItem('hexastra.userMemory', JSON.stringify(merged))
+          writeScopedStorage(
+            window.localStorage,
+            USER_MEMORY_STORAGE_KEY,
+            JSON.stringify(merged),
+            storageScope,
+          )
           return merged
         })
       } catch {}
@@ -638,7 +722,7 @@ export default function ChatPageClient() {
     }
 
     return responsePolicy.reply
-  }, [userPlan])
+  }, [storageScope, userPlan])
 
   const postChatPayload = useCallback(
     async (payload: unknown): Promise<HexastraApiResponse> => {
@@ -832,11 +916,13 @@ export default function ChatPageClient() {
       .then(({ data, error }) => {
         if (!mounted) return
 
+        setAuthUserId(data?.user?.id ?? null)
         if (data?.user?.email) setUserEmail(data.user.email)
 
         const plan = (data?.user?.user_metadata?.plan as PlanKey) ?? 'free'
         setUserPlan(plan)
         setPlanLoaded(true)
+        setStorageScopeReady(true)
 
         if (error) {
           console.warn('[ChatPageClient] getUser error, fallback to free plan', error)
@@ -844,14 +930,16 @@ export default function ChatPageClient() {
 
         setEvolutionProfile((prev) => {
           const updated = { ...(prev ?? {}), plan }
-          saveEvolutionProfile(updated)
+          saveEvolutionProfile(updated, data?.user?.id ?? null)
           return updated
         })
       })
       .catch((err) => {
         if (!mounted) return
         console.error('[ChatPageClient] getUser failed', err)
+        setAuthUserId(null)
         setPlanLoaded(true)
+        setStorageScopeReady(true)
       })
 
     return () => {
@@ -882,20 +970,25 @@ export default function ChatPageClient() {
   }, [])
 
   useEffect(() => {
+    if (!storageScopeReady) return
     try {
-      const stored = localStorage.getItem(CONVERSATION_STORAGE_KEY)
-      if (stored) {
-        setConversationId(stored)
-      }
-    } catch {}
-  }, [])
+      const stored = readScopedStorage(window.localStorage, CONVERSATION_STORAGE_KEY, storageScope)
+      setConversationId(stored && stored.trim() ? stored : null)
+    } catch {
+      setConversationId(null)
+    }
+  }, [storageScopeReady, storageScope])
 
   useEffect(() => {
-    if (!conversationId) return
+    if (!storageScopeReady) return
     try {
-      localStorage.setItem(CONVERSATION_STORAGE_KEY, conversationId)
+      if (conversationId) {
+        writeScopedStorage(window.localStorage, CONVERSATION_STORAGE_KEY, conversationId, storageScope)
+      } else {
+        removeScopedStorage(window.localStorage, CONVERSATION_STORAGE_KEY, storageScope)
+      }
     } catch {}
-  }, [conversationId])
+  }, [conversationId, storageScopeReady, storageScope])
 
   // Reload conversation history from Supabase after a page refresh
   useEffect(() => {
@@ -915,66 +1008,112 @@ export default function ChatPageClient() {
   }, [conversationId])
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEYS.birthData)
-      if (stored) {
-        const parsed = JSON.parse(stored) as BirthData
-        if (parsed && typeof parsed === 'object') {
-          const normalized = mergeBirthData(parsed)
-          birthDataRef.current = normalized
-          setBirthData(normalized)
+    if (!storageScopeReady) return
+    let cancelled = false
+
+    const hydrateBirthData = async () => {
+      try {
+        const stored = readScopedStorage(window.localStorage, STORAGE_KEYS.birthData, storageScope)
+        if (stored) {
+          const parsed = JSON.parse(stored) as Partial<BirthData>
+          if (parsed && typeof parsed === 'object') {
+            applyBirthDataState(parsed, setBirthData, birthDataRef)
+            return
+          }
         }
+      } catch {}
+
+      if (storageScope) {
+        try {
+          const response = await fetch('/api/profile/birth', {
+            method: 'GET',
+            cache: 'no-store',
+          })
+          const payload = (await safeJson(response)) as { profile?: Record<string, unknown> | null } | null
+          const profileBirthData = response.ok ? birthDataFromProfile(payload?.profile ?? null) : null
+
+          if (!cancelled && profileBirthData) {
+            applyBirthDataState(profileBirthData, setBirthData, birthDataRef)
+            writeScopedStorage(
+              window.localStorage,
+              STORAGE_KEYS.birthData,
+              JSON.stringify(profileBirthData),
+              storageScope,
+            )
+            return
+          }
+        } catch {}
       }
-    } catch {}
-  }, [])
+
+      if (!cancelled) {
+        applyBirthDataState(null, setBirthData, birthDataRef)
+      }
+    }
+
+    void hydrateBirthData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [storageScopeReady, storageScope])
 
   useEffect(() => {
+    if (!storageScopeReady) return
     try {
-      const stored = localStorage.getItem('hexastra.userMemory')
-      if (stored) {
-        const parsed = JSON.parse(stored) as UserMemory
-        if (parsed && typeof parsed === 'object') setUserMemory(parsed)
+      const stored = readScopedStorage(window.localStorage, USER_MEMORY_STORAGE_KEY, storageScope)
+      if (!stored) {
+        setUserMemory(EMPTY_USER_MEMORY)
+        return
       }
-    } catch {}
-  }, [])
+
+      const parsed = JSON.parse(stored) as UserMemory
+      setUserMemory(parsed && typeof parsed === 'object' ? parsed : EMPTY_USER_MEMORY)
+    } catch {
+      setUserMemory(EMPTY_USER_MEMORY)
+    }
+  }, [storageScopeReady, storageScope])
 
   useEffect(() => {
+    if (!storageScopeReady) return
     try {
-      const stored = localStorage.getItem(STORAGE_KEYS.partnerBirthData)
-      if (stored) {
-        const parsed = JSON.parse(stored) as BirthData
-        if (parsed && typeof parsed === 'object') {
-          const normalized = mergeBirthData(parsed)
-          partnerBirthDataRef.current = normalized
-          setPartnerBirthData(normalized)
-        }
+      const stored = readScopedStorage(window.localStorage, STORAGE_KEYS.partnerBirthData, storageScope)
+      if (!stored) {
+        applyBirthDataState(null, setPartnerBirthData, partnerBirthDataRef)
+        return
+      }
+
+      const parsed = JSON.parse(stored) as Partial<BirthData>
+      if (parsed && typeof parsed === 'object') {
+        applyBirthDataState(parsed, setPartnerBirthData, partnerBirthDataRef)
+        return
       }
     } catch {}
-  }, [])
+
+    applyBirthDataState(null, setPartnerBirthData, partnerBirthDataRef)
+  }, [storageScopeReady, storageScope])
 
   useEffect(() => {
-    setMicroReadings(loadMicroReadings())
-  }, [])
+    if (!storageScopeReady) return
+    setMicroReadings(loadMicroReadings(storageScope))
+  }, [storageScopeReady, storageScope])
 
   useEffect(() => {
-    const storedCompleted = loadBirthAutoIntroCompleted()
+    if (!storageScopeReady) return
+
+    const storedCompleted = loadBirthAutoIntroCompleted(storageScope)
     if (storedCompleted) {
       setBirthAutoIntroCompleted(true)
       return
     }
 
-    try {
-      const storedBirthData = localStorage.getItem(STORAGE_KEYS.birthData)
-      if (!storedBirthData) return
-      const parsed = JSON.parse(storedBirthData) as BirthData
-      if (parsed && typeof parsed === 'object' && isBirthDataComplete(mergeBirthData(parsed))) {
-        setBirthAutoIntroCompleted(true)
-        markBirthAutoIntroCompleted()
-      }
-    } catch {
-      // noop
+    if (isBirthDataComplete(birthData)) {
+      setBirthAutoIntroCompleted(true)
+      markBirthAutoIntroCompleted(storageScope)
+      return
     }
-  }, [])
+
+    setBirthAutoIntroCompleted(false)
+  }, [birthData, storageScopeReady, storageScope])
 
   useEffect(() => {
     try {
@@ -999,29 +1138,35 @@ export default function ChatPageClient() {
   }, [])
 
   useEffect(() => {
-    const profile = loadEvolutionProfile()
-    if (profile) setEvolutionProfile(profile)
-  }, [])
+    if (!storageScopeReady) return
+    const profile = loadEvolutionProfile(storageScope)
+    setEvolutionProfile(profile)
+  }, [storageScopeReady, storageScope])
 
   useEffect(() => {
+    if (!storageScopeReady) return
     try {
-      const storedReadings = localStorage.getItem(STORAGE_KEYS.readings)
-      const storedProjects = localStorage.getItem(STORAGE_KEYS.projects)
+      const storedReadings = readScopedStorage(window.localStorage, STORAGE_KEYS.readings, storageScope)
+      const storedProjects = readScopedStorage(window.localStorage, STORAGE_KEYS.projects, storageScope)
 
       if (storedReadings) {
         const parsed = JSON.parse(storedReadings)
         if (Array.isArray(parsed)) setReadings(parsed.filter(isValidReading))
+      } else {
+        setReadings([])
       }
 
       if (storedProjects) {
         const parsed = JSON.parse(storedProjects)
         if (Array.isArray(parsed)) setProjects(parsed.filter(isValidProject))
+      } else {
+        setProjects([])
       }
     } catch {
       setReadings([])
       setProjects([])
     }
-  }, [])
+  }, [storageScopeReady, storageScope])
 
   useEffect(() => {
     const query = searchParams.get('q')
@@ -1093,10 +1238,10 @@ export default function ChatPageClient() {
       if (autoBirthIntroPending) {
         setAutoBirthIntroPending(false)
         setBirthAutoIntroCompleted(true)
-        markBirthAutoIntroCompleted()
+        markBirthAutoIntroCompleted(storageScope)
       }
     }
-  }, [autoBirthIntroPending, step])
+  }, [autoBirthIntroPending, step, storageScope])
 
   useEffect(() => {
     return () => {
@@ -1111,18 +1256,23 @@ export default function ChatPageClient() {
     birthDataRef.current = normalized
     setBirthData(normalized)
     try {
-      localStorage.setItem(STORAGE_KEYS.birthData, JSON.stringify(normalized))
+      writeScopedStorage(window.localStorage, STORAGE_KEYS.birthData, JSON.stringify(normalized), storageScope)
     } catch {}
-  }, [])
+  }, [storageScope])
 
   const handlePartnerBirthDataChange = useCallback((next: BirthData) => {
     const normalized = mergeBirthData(next)
     partnerBirthDataRef.current = normalized
     setPartnerBirthData(normalized)
     try {
-      localStorage.setItem(STORAGE_KEYS.partnerBirthData, JSON.stringify(normalized))
+      writeScopedStorage(
+        window.localStorage,
+        STORAGE_KEYS.partnerBirthData,
+        JSON.stringify(normalized),
+        storageScope,
+      )
     } catch {}
-  }, [])
+  }, [storageScope])
 
   const appendBirthDataSavedMessage = useCallback((content: string) => {
     setMessages((prev) => {
@@ -1165,7 +1315,7 @@ export default function ChatPageClient() {
       if (normalized.firstName) {
         setEvolutionProfile((prev) => {
           const updated = { ...(prev ?? {}), firstName: normalized.firstName }
-          saveEvolutionProfile(updated)
+          saveEvolutionProfile(updated, storageScope)
           return updated
         })
       }
@@ -1199,7 +1349,7 @@ export default function ChatPageClient() {
       if (parts.length && shouldResumeAfterBirthSave) {
         setBirthAutoIntroCompleted(true)
         setAutoBirthIntroPending(false)
-        markBirthAutoIntroCompleted()
+        markBirthAutoIntroCompleted(storageScope)
         void sendStructuredAction({
           message: `Mes données de naissance sont maintenant enregistrées (${parts.join(', ')}). Reprends ma demande précédente et fais la lecture demandée : ${pendingReadingRequest}`,
           displayMessage: 'Mes données de naissance sont enregistrées. Reprends ma demande précédente.',
@@ -1210,7 +1360,7 @@ export default function ChatPageClient() {
       }
 
       if (shouldRunInitialAutoReading) {
-        setMicroReadings(resetMicroReadings())
+        setMicroReadings(resetMicroReadings(storageScope))
         microTriggerRef.current = null
         forceMicroBootstrapRef.current = true
         setAutoBirthIntroPending(true)
@@ -1220,7 +1370,7 @@ export default function ChatPageClient() {
       if (parts.length || partnerParts.length) {
         forceMicroBootstrapRef.current = false
         setAutoBirthIntroPending(false)
-        appendBirthDataSavedMessage(
+      appendBirthDataSavedMessage(
           partnerParts.length > 0
             ? 'Les données de naissance sont enregistrées. HexAstra pourra les utiliser pour tes prochaines lectures, pour toi comme pour un proche.'
             : 'Tes données de naissance sont enregistrées. HexAstra pourra les utiliser pour tes prochaines lectures.'
@@ -1236,6 +1386,7 @@ export default function ChatPageClient() {
       pendingReadingRequest,
       sendStructuredAction,
       shouldResumeAfterBirthSave,
+      storageScope,
     ]
   )
 
@@ -1262,13 +1413,13 @@ export default function ChatPageClient() {
 
   const persistReadings = useCallback((next: Reading[]) => {
     setReadings(next)
-    localStorage.setItem(STORAGE_KEYS.readings, JSON.stringify(next))
-  }, [])
+    writeScopedStorage(window.localStorage, STORAGE_KEYS.readings, JSON.stringify(next), storageScope)
+  }, [storageScope])
 
   const persistProjects = useCallback((next: Project[]) => {
     setProjects(next)
-    localStorage.setItem(STORAGE_KEYS.projects, JSON.stringify(next))
-  }, [])
+    writeScopedStorage(window.localStorage, STORAGE_KEYS.projects, JSON.stringify(next), storageScope)
+  }, [storageScope])
 
   const saveReading = useCallback(
     (conversation: Msg[]) => {
@@ -1367,9 +1518,9 @@ export default function ChatPageClient() {
       setMicroReadings((prev) => {
         let next: MicroReadings
 
-        if (requestType === 'micro_profile') next = markProfileDone(prev, birthData)
-        else if (requestType === 'micro_year') next = markYearDone(prev)
-        else next = markMonthDone(prev)
+        if (requestType === 'micro_profile') next = markProfileDone(prev, birthData, storageScope)
+        else if (requestType === 'micro_year') next = markYearDone(prev, storageScope)
+        else next = markMonthDone(prev, storageScope)
 
         microTriggerRef.current = null
         return next
@@ -1418,7 +1569,9 @@ export default function ChatPageClient() {
       const memorySignals = detectMemorySignals(baseContent)
       setUserMemory((prev) => {
         const next = updateUserMemory(prev, memorySignals)
-        try { localStorage.setItem('hexastra.userMemory', JSON.stringify(next)) } catch {}
+        try {
+          writeScopedStorage(window.localStorage, USER_MEMORY_STORAGE_KEY, JSON.stringify(next), storageScope)
+        } catch {}
         return next
       })
 
@@ -1682,6 +1835,7 @@ export default function ChatPageClient() {
       menuItems,
       activeClarificationQuestion,
       activeContextFrame,
+      storageScope,
     ]
   )
 
@@ -1700,9 +1854,9 @@ export default function ChatPageClient() {
     microTriggerRef.current = null
     lastMessageRef.current = null
     try {
-      localStorage.removeItem(CONVERSATION_STORAGE_KEY)
+      removeScopedStorage(window.localStorage, CONVERSATION_STORAGE_KEY, storageScope)
     } catch {}
-  }, [chatLanguage])
+  }, [chatLanguage, storageScope])
 
   const handleCreateProject = useCallback(
     (name: string) => {
@@ -1954,16 +2108,3 @@ export default function ChatPageClient() {
     </div>
   )
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

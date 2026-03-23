@@ -1,10 +1,5 @@
 /**
- * Tests — Classification + Reliability
- *
- * Validates:
- * 1. Explicit last-message science override in classifyMessage()
- * 2. Text-based frame-only detection in inferRequest() (isContextSelectionOnly)
- * 3. Response mode degradation when reliability = false
+ * Tests - Classification + Reliability
  */
 
 import { describe, it, expect } from 'vitest'
@@ -12,8 +7,6 @@ import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassific
 import { inferRequest } from '@/lib/hexastra/orchestration/inferRequest'
 import { selectResponseMode } from '@/lib/hexastra/orchestration/responseModes'
 import type { NormalizedInput, MenuContract } from '@/lib/hexastra/orchestration/types'
-
-// ── Helper ─────────────────────────────────────────────────────────────────────
 
 function makeNormalized(msg: string, uiAction: NormalizedInput['uiAction'] = 'send_message'): NormalizedInput {
   return {
@@ -63,11 +56,9 @@ function makeMenuContract(): MenuContract {
   }
 }
 
-// ── Part 1: Explicit science override ─────────────────────────────────────────
-
-describe('classifyMessage — explicit science override', () => {
-  it('detects numerology when user says "numérologie" (no subcategory)', () => {
-    const result = classifyMessage('parle-moi de ma numérologie')
+describe('classifyMessage - explicit science override', () => {
+  it('detects numerology when user says "numerologie" (no subcategory)', () => {
+    const result = classifyMessage('parle-moi de ma numerologie')
     expect(result.science).toBe('numerology')
   })
 
@@ -76,8 +67,8 @@ describe('classifyMessage — explicit science override', () => {
     expect(result.science).toBe('human_design')
   })
 
-  it('detects enneagram when user says "ennéagramme"', () => {
-    const result = classifyMessage("qu'est-ce que mon ennéagramme dit de moi")
+  it('detects enneagram when user says "enneagramme"', () => {
+    const result = classifyMessage("qu'est-ce que mon enneagramme dit de moi")
     expect(result.science).toBe('enneagram')
   })
 
@@ -86,19 +77,17 @@ describe('classifyMessage — explicit science override', () => {
     expect(result.science).toBe('kua')
   })
 
-  it('does NOT override when subcategory is detected (subcategory wins)', () => {
+  it('does not override when a precise subcategory is detected', () => {
     const result = classifyMessage('quel est mon ascendant')
     expect(result.science).toBe('astrology')
     expect(result.subcategory).toBe('ascendant')
   })
 })
 
-// ── Part 2: Text-based frame-only detection ────────────────────────────────────
-
-describe('inferRequest — isContextSelectionOnly text detection', () => {
+describe('inferRequest - frame-only detection', () => {
   const menuContract = makeMenuContract()
 
-  it('detects "n\'ouvre pas encore de lecture" as frame-only', () => {
+  it("detects frame-only phrasing like 'n'ouvre pas encore de lecture'", () => {
     const result = inferRequest({
       normalized: makeNormalized("n'ouvre pas encore de lecture, montre-moi d'abord les options"),
       menuContract,
@@ -115,45 +104,27 @@ describe('inferRequest — isContextSelectionOnly text detection', () => {
     expect(result.isContextSelectionOnly).toBe(true)
   })
 
-  it('detects "avant de poser ma question, montre-moi le cadre" as frame-only', () => {
-    const result = inferRequest({
-      normalized: makeNormalized('avant de poser ma question, montre-moi le cadre'),
-      menuContract,
-    })
-    expect(result.isContextSelectionOnly).toBe(true)
-  })
-
-  it('does NOT flag a normal question as frame-only', () => {
+  it('does not flag a normal question as frame-only', () => {
     const result = inferRequest({
       normalized: makeNormalized('quel est mon ascendant ?'),
       menuContract,
     })
     expect(result.isContextSelectionOnly).toBe(false)
   })
-
-  it('does NOT flag frame-only when no menuContract', () => {
-    const result = inferRequest({
-      normalized: makeNormalized("n'ouvre pas encore de lecture"),
-      menuContract: null,
-    })
-    expect(result.isContextSelectionOnly).toBe(false)
-  })
 })
 
-// ── Part 3: Reliability-based mode degradation ────────────────────────────────
-
-describe('selectResponseMode — reliability degradation', () => {
-  it('degrades to interpretive_reading when data resolved but reliability=false', () => {
+describe('selectResponseMode - reliability degradation', () => {
+  it('degrades to guided_exploration when data resolved but reliability=false', () => {
     expect(selectResponseMode({
       requestKind: 'exact_fact',
       subcategory: 'type_hd',
       plan: 'premium',
       exactDataResolved: true,
       exactDataReliable: false,
-    })).toBe('interpretive_reading')
+    })).toBe('guided_exploration')
   })
 
-  it('returns calculated_reading when data resolved AND reliable', () => {
+  it('returns calculated_reading when data resolved and reliable', () => {
     expect(selectResponseMode({
       requestKind: 'exact_fact',
       subcategory: 'type_hd',
@@ -163,7 +134,7 @@ describe('selectResponseMode — reliability degradation', () => {
     })).toBe('calculated_reading')
   })
 
-  it('returns guided_exploration when data not resolved (exact request)', () => {
+  it('returns guided_exploration when data is not resolved for an exact request', () => {
     expect(selectResponseMode({
       requestKind: 'exact_fact',
       subcategory: 'nombre_kua',

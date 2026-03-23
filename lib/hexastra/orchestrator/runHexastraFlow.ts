@@ -169,6 +169,25 @@ function tr(language: string, variants: Partial<Record<string, string>>, fallbac
   return variants[code] ?? variants[fallback] ?? ''
 }
 
+function toPromptScienceLabel(science: string | null | undefined): string | null {
+  switch (science) {
+    case 'astrology':
+      return 'Astrologie'
+    case 'human_design':
+      return 'Human Design'
+    case 'numerology':
+      return 'Numerologie'
+    case 'enneagram':
+      return 'Enneagramme'
+    case 'kua':
+      return 'Kua'
+    case 'hexastra_fusion':
+      return 'Fusion Hexastra'
+    default:
+      return null
+  }
+}
+
 function requiresPreciseBirthContext(message: string): boolean {
   const normalized = (message || '')
     .toLowerCase()
@@ -2234,7 +2253,7 @@ export async function runHexastraFlow(input: {
     // could not resolve the exact data. Never let the LLM hallucinate.
     const detectedSubcategoryForGuard = orchestrationExecution.detectedSubcategory
     const exactDataNeeded = requiresExactData(detectedSubcategoryForGuard)
-    const exactDataResolved = hasResolvedExactData(specializedResult)
+    const rawExactDataResolved = hasResolvedExactData(specializedResult)
 
     // Universal reliability check — validates field completeness per science
     const reliabilityResult = isReliableExactData(
@@ -2242,6 +2261,7 @@ export async function runHexastraFlow(input: {
       universalClassif.subcategory ?? detectedSubcategoryForGuard,
       specializedResult?.raw ?? null,
     )
+    let exactDataResolved = rawExactDataResolved && reliabilityResult.completeness > 0
     flowLog(reliabilityResult.reliable ? 'info' : 'warn', 'EXACT_DATA_RELIABLE', {
       science: universalClassif.science,
       subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
@@ -2256,8 +2276,31 @@ export async function runHexastraFlow(input: {
     // as a secondary reliability signal. The isHumanDesignExactCompact block
     // below will log the full context; this just provides the data early.
     let hdCompactCtx: CompactHDContext | null = null
-    if (isHumanDesignExact && exactDataResolved && specializedResult?.raw) {
+    if (isHumanDesignExact && rawExactDataResolved && specializedResult?.raw) {
       hdCompactCtx = buildCompactHumanDesignContext(specializedResult.raw)
+    }
+
+    if (!exactDataResolved && hdCompactCtx) {
+      const hasUsableHdData =
+        [
+          hdCompactCtx.hdType,
+          hdCompactCtx.hdProfile,
+          hdCompactCtx.hdAuthority,
+          hdCompactCtx.hdStrategy,
+          hdCompactCtx.hdDefinition,
+          hdCompactCtx.hdIncarnationCross,
+        ].some(Boolean) ||
+        hdCompactCtx.hdDefinedCenters.length > 0 ||
+        hdCompactCtx.hdActivatedGates.length > 0 ||
+        hdCompactCtx.hdDefinedChannels.length > 0
+
+      if (hasUsableHdData) {
+        exactDataResolved = true
+        flowLog('info', 'EXACT_DATA_RESOLUTION_OVERRIDE', {
+          science: 'human_design',
+          reason: 'compact HD context resolved usable science-specific fields',
+        })
+      }
     }
 
     // ── Effective reliability — belt-and-suspenders ───────────────────────────
@@ -2589,9 +2632,16 @@ export async function runHexastraFlow(input: {
     // Build exact data block — capped at 4000 chars to avoid prompt explosion.
     // A full /chart/fusion response can be 50k–150k chars; we only need key fields.
     const exactDataMaxChars = plan === 'practitioner' ? 6000 : plan === 'premium' ? 5000 : 4000
+    const astroCompactCtx =
+      isAstroExact && exactDataResolved && specializedResult?.raw
+        ? buildCompactNatalReadingContext(specializedResult.raw, exactDataMaxChars)
+        : null
     const rawExactDataBlock =
       exactDataNeeded && exactDataResolved && specializedResult?.raw
-        ? formatExactDataBlockCapped(specializedResult.raw, exactDataMaxChars)
+        ? astroCompactCtx?.compactDataBlock ??
+          (isHumanDesignExact && hdCompactCtx
+            ? hdCompactCtx.compactDataBlock
+            : formatExactDataBlockCapped(specializedResult.raw, exactDataMaxChars))
         : null
 
     // ── Deterministic core placements block (Bug 3) ──────────────────────────
@@ -2635,7 +2685,8 @@ export async function runHexastraFlow(input: {
       })
 
       if (specializedResult?.raw) {
-        const compactCtx = buildCompactNatalReadingContext(specializedResult.raw)
+        const compactCtx =
+          astroCompactCtx ?? buildCompactNatalReadingContext(specializedResult.raw)
         flowLog('info', 'ASTRO_COMPACT_CONTEXT_BUILT', {
           sunSign: compactCtx.sunSign,
           moonSign: compactCtx.moonSign,
@@ -2761,6 +2812,10 @@ export async function runHexastraFlow(input: {
       messages: limitedMessages,
       analysisMode: input.analysisMode ?? null,
       renderMode: input.renderMode ?? null,
+      selectedScience:
+        selectedParentScience?.label ??
+        (selectedMenuKey?.startsWith('science_') ? selectedMenuLabel : null) ??
+        toPromptScienceLabel(universalClassif.science),
       exactDataBlock: exactDataBlockForPrompt,
       requiresExactData: exactDataNeeded,
       hdProfileBlock,

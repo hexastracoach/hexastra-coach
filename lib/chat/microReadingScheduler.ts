@@ -1,12 +1,22 @@
 import type { BirthData } from '@/app/chat/_lib/chat'
 import type { MicroReadings } from './bootstrapTypes'
 import { BIRTH_AUTO_INTRO_STORAGE_KEY, MICRO_READINGS_STORAGE_KEY } from './bootstrapTypes'
-import { birthDataProfileKey, currentYearKey, currentMonthKey } from './bootstrapMachine'
+import { birthDataProfileKey, currentMonthKey, currentYearKey } from './bootstrapMachine'
+import { readScopedStorage, writeScopedStorage } from './scopedLocalStorage'
 
-export function loadMicroReadings(): MicroReadings {
+const EMPTY_MICRO_READINGS: MicroReadings = {
+  profileKey: null,
+  yearKey: null,
+  monthKey: null,
+}
+
+export function loadMicroReadings(scopeKey?: string | null): MicroReadings {
+  if (typeof window === 'undefined') return EMPTY_MICRO_READINGS
+
   try {
-    const raw = localStorage.getItem(MICRO_READINGS_STORAGE_KEY)
-    if (!raw) return { profileKey: null, yearKey: null, monthKey: null }
+    const raw = readScopedStorage(window.localStorage, MICRO_READINGS_STORAGE_KEY, scopeKey)
+    if (!raw) return EMPTY_MICRO_READINGS
+
     const parsed = JSON.parse(raw) as Partial<MicroReadings>
     return {
       profileKey: parsed.profileKey ?? null,
@@ -14,66 +24,69 @@ export function loadMicroReadings(): MicroReadings {
       monthKey: parsed.monthKey ?? null,
     }
   } catch {
-    return { profileKey: null, yearKey: null, monthKey: null }
+    return EMPTY_MICRO_READINGS
   }
 }
 
-function persist(mr: MicroReadings): void {
+function persist(readings: MicroReadings, scopeKey?: string | null): void {
+  if (typeof window === 'undefined') return
+
   try {
-    localStorage.setItem(MICRO_READINGS_STORAGE_KEY, JSON.stringify(mr))
-  } catch { /* noop */ }
+    writeScopedStorage(window.localStorage, MICRO_READINGS_STORAGE_KEY, JSON.stringify(readings), scopeKey)
+  } catch {
+    // noop
+  }
 }
 
-/** Call after the micro-profile response is received */
-export function markProfileDone(mr: MicroReadings, bd: BirthData): MicroReadings {
-  const next: MicroReadings = { ...mr, profileKey: birthDataProfileKey(bd) }
-  persist(next)
+export function markProfileDone(
+  readings: MicroReadings,
+  birthData: BirthData,
+  scopeKey?: string | null,
+): MicroReadings {
+  const next: MicroReadings = { ...readings, profileKey: birthDataProfileKey(birthData) }
+  persist(next, scopeKey)
   return next
 }
 
-/** Call after the micro-année response is received */
-export function markYearDone(mr: MicroReadings): MicroReadings {
-  const next: MicroReadings = { ...mr, yearKey: currentYearKey() }
-  persist(next)
+export function markYearDone(readings: MicroReadings, scopeKey?: string | null): MicroReadings {
+  const next: MicroReadings = { ...readings, yearKey: currentYearKey() }
+  persist(next, scopeKey)
   return next
 }
 
-/** Call after the micro-mois response is received */
-export function markMonthDone(mr: MicroReadings): MicroReadings {
-  const next: MicroReadings = { ...mr, monthKey: currentMonthKey() }
-  persist(next)
+export function markMonthDone(readings: MicroReadings, scopeKey?: string | null): MicroReadings {
+  const next: MicroReadings = { ...readings, monthKey: currentMonthKey() }
+  persist(next, scopeKey)
   return next
 }
 
-/**
- * Call when birth data changes significantly (different person, etc.)
- * Clears profile key so it's regenerated. Year/month keys remain
- * valid if data is still from the same year/month.
- */
-export function invalidateProfile(mr: MicroReadings): MicroReadings {
-  const next: MicroReadings = { ...mr, profileKey: null }
-  persist(next)
+export function invalidateProfile(readings: MicroReadings, scopeKey?: string | null): MicroReadings {
+  const next: MicroReadings = { ...readings, profileKey: null }
+  persist(next, scopeKey)
   return next
 }
 
-/** Full reset — use when user explicitly clears data */
-export function resetMicroReadings(): MicroReadings {
-  const empty: MicroReadings = { profileKey: null, yearKey: null, monthKey: null }
-  persist(empty)
-  return empty
+export function resetMicroReadings(scopeKey?: string | null): MicroReadings {
+  const next = { ...EMPTY_MICRO_READINGS }
+  persist(next, scopeKey)
+  return next
 }
 
-export function loadBirthAutoIntroCompleted(): boolean {
+export function loadBirthAutoIntroCompleted(scopeKey?: string | null): boolean {
+  if (typeof window === 'undefined') return false
+
   try {
-    return localStorage.getItem(BIRTH_AUTO_INTRO_STORAGE_KEY) === '1'
+    return readScopedStorage(window.localStorage, BIRTH_AUTO_INTRO_STORAGE_KEY, scopeKey) === '1'
   } catch {
     return false
   }
 }
 
-export function markBirthAutoIntroCompleted(): void {
+export function markBirthAutoIntroCompleted(scopeKey?: string | null): void {
+  if (typeof window === 'undefined') return
+
   try {
-    localStorage.setItem(BIRTH_AUTO_INTRO_STORAGE_KEY, '1')
+    writeScopedStorage(window.localStorage, BIRTH_AUTO_INTRO_STORAGE_KEY, '1', scopeKey)
   } catch {
     // noop
   }

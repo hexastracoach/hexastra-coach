@@ -130,7 +130,7 @@ const EXACT_SUBCATS = new Set([
   'mois_personnel', 'jour_personnel', 'personnalite_num',
   'type_hd', 'profil_hd', 'autorite_hd', 'strategie_hd',
   'centres_hd', 'portes_hd', 'canaux_hd', 'croix_incarnation', 'definition_hd',
-  'nombre_kua', 'direction_kua', 'type_enn',
+  'nombre_kua', 'direction_kua', 'type_enn', 'aile_enn',
 ])
 
 const SYNTHESIS_SUBCATS = new Set([
