@@ -30,7 +30,7 @@ export type ResponseModeInput = {
 /**
  * Priority:
  * 1. Pedagogical / clarification -> pedagogical_explanation
- * 2. Timeout risk or free+exact  -> guided_exploration
+ * 2. Timeout risk -> guided_exploration
  * 3. exact_fact/profile + data resolved + reliable -> calculated_reading
  * 4. exact_fact/profile + data resolved + not reliable -> guided_exploration
  * 5. exact_fact/profile + no data -> guided_exploration
@@ -39,16 +39,13 @@ export type ResponseModeInput = {
  * 8. Fallback: resolved+reliable -> calculated_reading, else guided_exploration
  */
 export function selectResponseMode(input: ResponseModeInput): ResponseMode {
-  const { requestKind, plan, isTimeoutRisk, exactDataResolved, exactDataReliable, isPedagogical } = input
+  const { requestKind, isTimeoutRisk, exactDataResolved, exactDataReliable, isPedagogical } = input
 
   if (isPedagogical || requestKind === 'clarification') {
     return 'pedagogical_explanation'
   }
 
-  if (
-    isTimeoutRisk ||
-    (plan === 'free' && (requestKind === 'exact_fact' || requestKind === 'exact_profile'))
-  ) {
+  if (isTimeoutRisk) {
     return 'guided_exploration'
   }
 

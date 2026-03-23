@@ -46,6 +46,15 @@ const RAW_ASTRO_ONLY: Record<string, unknown> = {
   chemin_de_vie: 3,
 }
 
+const RAW_HD_WITH_GLOBAL_SUMMARY_LEAK: Record<string, unknown> = {
+  publicSummary: 'Type Human Design : trine. Profil 5/1.',
+  humanDesignFull: {
+    type_hd: 'Projecteur',
+    strategie_hd: "Attendre l'invitation",
+    autorite_hd: 'Splénique',
+  },
+}
+
 // ─── classifyQuery ────────────────────────────────────────────────────────────
 
 describe('classifyQuery — Human Design detection', () => {
@@ -260,6 +269,14 @@ describe('buildCompactHumanDesignContext — HD-only extraction', () => {
 
   it('TC35 — filtre une publicSummary qui fuit un profil non vérifié', () => {
     const ctx = buildCompactHumanDesignContext(RAW_HD_FULL)
+    expect(ctx.hdSummarySeeds).toHaveLength(0)
+  })
+
+  it('TC36 — ignore une synthèse globale racine qui fuit des valeurs non fiables', () => {
+    const ctx = buildCompactHumanDesignContext(RAW_HD_WITH_GLOBAL_SUMMARY_LEAK)
+    expect(ctx.compactDataBlock).toContain('Projecteur')
+    expect(ctx.compactDataBlock).not.toContain('trine')
+    expect(ctx.compactDataBlock).not.toContain('5/1')
     expect(ctx.hdSummarySeeds).toHaveLength(0)
   })
 })

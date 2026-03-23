@@ -15,23 +15,33 @@ import { extractHDProfileFromRaw, isReliableHumanDesignProfile } from '@/lib/hum
 const HD_KEYS = new Set([
   // Type / Profile / Authority
   'type_hd', 'hd_type', 'type', 'profil_hd', 'profile', 'profil',
+  'profile_hd', 'hdType', 'hdProfile',
   'autorite_hd', 'authority', 'inner_authority',
+  'innerAuthority', 'hdAuthority',
   'strategie_hd', 'strategy',
+  'hdStrategy',
   // Signature / Not-self theme
   'signature', 'signature_hd',
+  'hdSignature',
   'not_self_theme', 'notSelfTheme', 'not_self', 'theme_non_soi',
+  'hdNotSelfTheme',
   // Centers
   'centres_hd', 'centers', 'defined_centers', 'undefined_centers', 'open_centers',
+  'definedCenters', 'openCenters',
   'centre_sacral', 'centre_gorge', 'centre_tete', 'centre_ajna',
   'centre_plexus', 'centre_ego', 'centre_g', 'centre_racine',
   // Gates / Channels
   'portes_hd', 'gates', 'activated_gates', 'portes_actives',
+  'activatedGates',
   'canaux_hd', 'channels', 'defined_channels',
+  'definedChannels',
   // Incarnation Cross / Definition
   'croix_incarnation', 'incarnation_cross',
+  'incarnationCross',
   'definition_hd', 'definition',
+  'hdDefinition',
   // Top-level HD object
-  'human_design', 'humanDesign', 'hd',
+  'human_design', 'humanDesign', 'humanDesignFull', 'hd',
   // Summary
   'publicSummary', 'publicsummary', 'summary', 'synthese',
 ])
@@ -51,6 +61,9 @@ function safeStr(v: unknown): string | null {
   if (typeof v === 'string' && v.trim()) return v.trim()
   return null
 }
+
+const HD_SOURCE_KEYS = new Set(['human_design', 'humanDesign', 'humanDesignFull', 'hd', 'HD'])
+const ROOT_SUMMARY_KEYS = new Set(['publicSummary', 'publicsummary', 'summary', 'synthese'])
 
 /**
  * Extract a string from either a primitive or a nested object.
@@ -150,7 +163,13 @@ export function buildCompactHumanDesignContext(
       Object.assign(hdAggregated, block as Record<string, unknown>)
     }
   }
-  const merged: Record<string, unknown> = { ...hdAggregated, ...raw }
+  const rootHdOnly = Object.fromEntries(
+    Object.entries(raw).filter(([key]) => {
+      if (HD_SOURCE_KEYS.has(key) || ROOT_SUMMARY_KEYS.has(key) || EXCLUDE_KEYS.has(key)) return false
+      return HD_KEYS.has(key) || HD_KEYS.has(key.toLowerCase())
+    }),
+  )
+  const merged: Record<string, unknown> = { ...hdAggregated, ...rootHdOnly }
 
   const sourcesFound = ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull'].filter(k => !!raw[k])
   // Identify which source took precedence (last found = highest priority after Object.assign loop)
@@ -241,7 +260,11 @@ export function buildCompactHumanDesignContext(
 
   // ── Summary seeds ─────────────────────────────────────────────────────────
   const hdSummarySeeds: string[] = (() => {
-    const s = safeStr(merged.publicSummary) ?? safeStr(merged.publicsummary) ?? safeStr(merged.summary) ?? safeStr(merged.synthese)
+    const s =
+      safeStr(hdAggregated.publicSummary) ??
+      safeStr(hdAggregated.publicsummary) ??
+      safeStr(hdAggregated.summary) ??
+      safeStr(hdAggregated.synthese)
     if (!hdProfile && containsProfilePattern(s)) return []
     return s ? [s] : []
   })()

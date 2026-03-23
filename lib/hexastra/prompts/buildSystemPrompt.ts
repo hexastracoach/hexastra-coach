@@ -523,6 +523,8 @@ RÈGLES STRICTES SUR CES DONNÉES:
 - Ne jamais citer une valeur différente pour les champs listés ci-dessus.
 - L'interprétation doit partir de ces données, pas les ignorer.
 - Si une donnée semble incohérente, la citer telle quelle et noter l'observation, ne jamais substituer.
+- Si un champ demandé n'apparaît pas dans ce bloc, écrire explicitement qu'il est non disponible au lieu de l'inférer.
+- Interdiction absolue de déduire une valeur d'une autre science, d'une synthèse globale ou d'une analogie symbolique.
 `.trim())
   }
 

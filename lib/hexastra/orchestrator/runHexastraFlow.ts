@@ -72,7 +72,10 @@ import {
   buildExactDataAuditLog,
   buildCompactNatalReadingContext,
 } from '@/lib/hexastra/guards/exactDataGuard'
-import { buildExactDataUnavailableResponse } from '@/lib/hexastra/guards/exactDataResponse'
+import {
+  buildExactDataUnavailableResponse,
+  buildIncompleteExactDataResponse,
+} from '@/lib/hexastra/guards/exactDataResponse'
 import {
   extractCoreAstroPlacements,
   formatCoreAstroBlock,
@@ -93,6 +96,7 @@ import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra
 import { selectResponseMode, buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
 import { isReliableExactData } from '@/lib/exact-data/reliability'
+import { buildCompactExactScienceBlock } from '@/lib/exact-data/compactBlocks'
 import {
   shouldBlockFalsePlanLimitation,
   containsFalsePlanLimitation,
@@ -2372,6 +2376,48 @@ export async function runHexastraFlow(input: {
       }
     }
 
+    const isStrictExactRequestKind =
+      universalClassif.requestKind === 'exact_fact' || universalClassif.requestKind === 'exact_profile'
+
+    if (
+      exactDataNeeded &&
+      exactDataResolved &&
+      !effectiveReliable &&
+      isStrictExactRequestKind &&
+      input.requestType === 'chat'
+    ) {
+      const partialMessage = buildIncompleteExactDataResponse({
+        language: userContext.language ?? fallbackLanguage,
+        subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory ?? 'donnée exacte',
+        missingExactFields: reliabilityResult.missingFields,
+      })
+      flowLog('warn', 'exact_data_partial_guard_triggered', {
+        subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory,
+        requestKind: universalClassif.requestKind,
+        missingFields: reliabilityResult.missingFields,
+        reliabilityReliable: reliabilityResult.reliable,
+        exactDataResolved,
+        science: universalClassif.science,
+      })
+      return {
+        message: partialMessage,
+        reply: partialMessage,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: 'analysis', completed: false },
+        menu: { visible: false, items: [] },
+        metadata: {
+          contextType: normalizedContextType,
+          practitionerUsage: userContext.practitionerUsage ?? null,
+          shouldPersistMemory: false,
+          journeyEnabled,
+          orchestrationTrace,
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      }
+    }
+
     // False plan limitation guard: if data is resolved and reliable, block plan-restriction messages
     const blockFalsePlanLimitation = shouldBlockFalsePlanLimitation(exactDataResolved, effectiveReliable)
     if (blockFalsePlanLimitation) {
@@ -2666,12 +2712,21 @@ export async function runHexastraFlow(input: {
       isAstroExact && exactDataResolved && specializedResult?.raw
         ? buildCompactNatalReadingContext(specializedResult.raw, exactDataMaxChars)
         : null
+    const scienceCompactBlock =
+      exactDataNeeded && exactDataResolved && specializedResult?.raw
+        ? buildCompactExactScienceBlock({
+            science: universalClassif.science,
+            raw: specializedResult.raw,
+            requestedSubcategories: detectedSubcategoriesForReliability,
+            maxChars: Math.min(exactDataMaxChars, 1800),
+          })
+        : null
     const rawExactDataBlock =
       exactDataNeeded && exactDataResolved && specializedResult?.raw
         ? astroCompactCtx?.compactDataBlock ??
           (isHumanDesignExact && hdCompactCtx
             ? hdCompactCtx.compactDataBlock
-            : formatExactDataBlockCapped(specializedResult.raw, exactDataMaxChars))
+            : scienceCompactBlock ?? formatExactDataBlockCapped(specializedResult.raw, exactDataMaxChars))
         : null
 
     // ── Deterministic core placements block (Bug 3) ──────────────────────────

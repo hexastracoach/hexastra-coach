@@ -33,19 +33,21 @@ describe('selectResponseMode - guided_exploration', () => {
     })).toBe('guided_exploration')
   })
 
-  it('returns guided_exploration for free plan + exact_fact', () => {
+  it('returns guided_exploration for free plan + exact_fact when data is not resolved', () => {
     expect(selectResponseMode({
       requestKind: 'exact_fact',
       subcategory: 'ascendant',
       plan: 'free',
+      exactDataResolved: false,
     })).toBe('guided_exploration')
   })
 
-  it('returns guided_exploration for free plan + exact_profile', () => {
+  it('returns guided_exploration for free plan + exact_profile when data is not resolved', () => {
     expect(selectResponseMode({
       requestKind: 'exact_profile',
       subcategory: null,
       plan: 'free',
+      exactDataResolved: false,
     })).toBe('guided_exploration')
   })
 
@@ -102,6 +104,26 @@ describe('selectResponseMode - calculated_reading', () => {
       requestKind: 'exact_profile',
       subcategory: null,
       plan: 'premium',
+      exactDataResolved: true,
+      exactDataReliable: true,
+    })).toBe('calculated_reading')
+  })
+
+  it('returns calculated_reading for free exact_fact when data is resolved and reliable', () => {
+    expect(selectResponseMode({
+      requestKind: 'exact_fact',
+      subcategory: 'ascendant',
+      plan: 'free',
+      exactDataResolved: true,
+      exactDataReliable: true,
+    })).toBe('calculated_reading')
+  })
+
+  it('returns calculated_reading for free exact_profile when data is resolved and reliable', () => {
+    expect(selectResponseMode({
+      requestKind: 'exact_profile',
+      subcategory: 'type_hd',
+      plan: 'free',
       exactDataResolved: true,
       exactDataReliable: true,
     })).toBe('calculated_reading')

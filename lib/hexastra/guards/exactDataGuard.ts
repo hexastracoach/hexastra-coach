@@ -165,6 +165,7 @@ const NATAL_ASTRO_KEYS = new Set([
   'soleil', 'lune', 'ascendant_sign', 'rising_sign',
   'houses', 'maisons', 'house_cusps',
   'aspects', 'aspects_principaux', 'major_aspects',
+  'transits', 'current_transits', 'transits_actifs',
   'dominant_signs', 'dominant_elements', 'dominant_modalities',
   'stelliums', 'chart_shape',
   'publicSummary', 'publicsummary', 'summary', 'synthese', 'reading',
@@ -357,6 +358,30 @@ export function buildCompactNatalReadingContext(
     })
   }
 
+  const transitsRaw =
+    astro.transits ?? astro.current_transits ?? astro.transits_actifs ??
+    raw.transits ?? raw.current_transits ?? raw.transits_actifs
+  const activeTransits: string[] = []
+  if (Array.isArray(transitsRaw)) {
+    transitsRaw.slice(0, 5).forEach((t) => {
+      if (typeof t === 'string') activeTransits.push(t)
+      else if (typeof t === 'object' && t) activeTransits.push(JSON.stringify(t).slice(0, 120))
+    })
+  } else if (typeof transitsRaw === 'string' && transitsRaw.trim()) {
+    activeTransits.push(transitsRaw.trim())
+  } else if (transitsRaw && typeof transitsRaw === 'object') {
+    Object.entries(transitsRaw as Record<string, unknown>)
+      .slice(0, 5)
+      .forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '') return
+        const formatted =
+          typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+            ? String(value)
+            : JSON.stringify(value).slice(0, 90)
+        activeTransits.push(`${key}: ${formatted}`)
+      })
+  }
+
   // ── Extract dominant houses (cap at 3) ────────────────────────────────
   const housesRaw = astro.houses ?? astro.maisons ?? astro.house_cusps
     ?? raw.houses ?? raw.maisons ?? raw.house_cusps
@@ -394,6 +419,7 @@ export function buildCompactNatalReadingContext(
   if (jupiterSign) blockLines.push(`- JUPITER: ${jupiterSign}`)
   if (saturnSign)  blockLines.push(`- SATURNE: ${saturnSign}`)
   if (keyAspects.length > 0) blockLines.push(`- ASPECTS CLÉS: ${keyAspects.join(' | ')}`)
+  if (activeTransits.length > 0) blockLines.push(`- TRANSITS ACTIFS: ${activeTransits.join(' | ')}`)
   if (dominantSigns.length > 0) blockLines.push(`- SIGNES DOMINANTS: ${dominantSigns.join(', ')}`)
   if (dominantElements.length > 0) blockLines.push(`- ÉLÉMENTS: ${dominantElements.join(', ')}`)
   if (natalSummarySeeds.length > 0) blockLines.push(`- SYNTHÈSE: ${natalSummarySeeds[0]}`)

@@ -18,6 +18,7 @@ const SUBCATEGORY_LABELS: Record<string, { fr: string; en: string }> = {
   ascendant:          { fr: 'ascendant', en: 'rising sign' },
   theme_natal:        { fr: 'thème natal', en: 'birth chart' },
   maisons:            { fr: 'maisons astrologiques', en: 'astrological houses' },
+  houses:             { fr: 'maisons astrologiques', en: 'astrological houses' },
   signe_lunaire:      { fr: 'signe lunaire', en: 'moon sign' },
   planetes:           { fr: 'positions planétaires', en: 'planetary positions' },
   transits:           { fr: 'transits', en: 'transits' },
@@ -46,6 +47,14 @@ const SUBCATEGORY_LABELS: Record<string, { fr: string; en: string }> = {
   orientation_habitat: { fr: 'orientation habitat', en: 'home orientation' },
   orientation_bureau:  { fr: 'orientation bureau', en: 'desk orientation' },
   direction_sommeil:   { fr: 'direction de sommeil', en: 'sleeping direction' },
+  sun:                { fr: 'Soleil', en: 'Sun' },
+  moon:               { fr: 'Lune', en: 'Moon' },
+  mercury:            { fr: 'Mercure', en: 'Mercury' },
+  venus:              { fr: 'Vénus', en: 'Venus' },
+  mars:               { fr: 'Mars', en: 'Mars' },
+  jupiter:            { fr: 'Jupiter', en: 'Jupiter' },
+  saturn:             { fr: 'Saturne', en: 'Saturn' },
+  autorite_ou_strategie: { fr: 'autorité ou stratégie Human Design', en: 'Human Design authority or strategy' },
 }
 
 function getSubcategoryLabel(subcategory: string, language: string): string {
@@ -85,5 +94,30 @@ export function buildExactDataUnavailableResponse(params: {
       : birthDataComplete
         ? `I can see your birth data is already saved in your profile — all required fields are present.\n\nThe issue is not your information: the astrological calculation engine could not be reached at this moment.\n\nPlease try again in a few moments. If the problem persists, contact support.`
         : `I was unable to retrieve the exact data needed for your ${label}.\n\nI prefer not to improvise on information that must be precisely calculated. If the issue persists, check that your birth data is complete and try again.`,
+  })
+}
+
+export function buildIncompleteExactDataResponse(params: {
+  language: string
+  subcategory: string
+  missingExactFields: string[]
+}): string {
+  const { language, subcategory, missingExactFields } = params
+  const label = getSubcategoryLabel(subcategory, language)
+  const missingLabels = missingExactFields.length
+    ? missingExactFields.map((field) => `- ${getSubcategoryLabel(field, language)}`).join('\n')
+    : language.startsWith('en')
+      ? '- required exact calculated fields'
+      : '- des champs calculés indispensables'
+
+  return tr(language, {
+    fr:
+      `Je ne peux pas confirmer ton ${label} avec fiabilité à partir des données calculées actuellement disponibles.\n\n` +
+      `La source renvoie un bloc partiel, et il manque encore :\n${missingLabels}\n\n` +
+      `Je préfère ne rien compléter par déduction ou par analogie avec d'autres sciences.`,
+    en:
+      `I can't confirm your ${label} reliably from the calculated data currently available.\n\n` +
+      `The source returned only partial data, and it is still missing:\n${missingLabels}\n\n` +
+      `I prefer not to fill the gaps by deduction or by borrowing from other sciences.`,
   })
 }
