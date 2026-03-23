@@ -29,7 +29,7 @@ export async function POST() {
   }
 
   const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' })
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
 
   const {
     data: { user },

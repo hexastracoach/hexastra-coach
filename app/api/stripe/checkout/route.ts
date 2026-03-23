@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       return badRequest('Prix invalide ou non configuré')
     }
 
-    const supabase = createSupabaseServer()
+    const supabase = await createSupabaseServer()
 
     // Try cookie-based auth first
     const {

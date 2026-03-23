@@ -4,7 +4,7 @@ import { badRequest, internalError, ok, unauthorized } from '@/lib/utils/apiResp
 
 export async function DELETE() {
   try {
-    const supabase = createSupabaseServer()
+    const supabase = await createSupabaseServer()
     const {
       data: { user },
       error,

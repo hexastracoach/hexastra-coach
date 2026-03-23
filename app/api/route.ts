@@ -16,7 +16,7 @@ export async function GET(
   const { fileId } = await params
   if (!fileId) return badRequest('fileId manquant')
 
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return unauthorized()
 
@@ -26,7 +26,7 @@ export async function GET(
 
   if (fileError || !fileRef) return internalError('Fichier introuvable')
 
-  const serviceClient = createSupabaseServer()
+  const serviceClient = await createSupabaseServer()
   const { data: signedUrl, error: signedError } = await (serviceClient as any).storage
     .from(fileRef.bucket)
     .createSignedUrl(fileRef.storage_path, 60)

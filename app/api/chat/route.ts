@@ -70,6 +70,20 @@ function normalizeText(value: string): string {
 const DEFAULT_FALLBACK_MESSAGE = 'Je suis là. Dis-moi ce dont tu as besoin.'
 const DEFAULT_EMPTY_MENU = { visible: false, items: [] }
 
+function serializeUnknownError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    }
+  }
+
+  return {
+    message: String(error),
+  }
+}
+
 function withTrace(payload: ChatResponsePayload, trace?: OrchestrationTrace | null): ChatResponsePayload {
   if (!trace) return payload
   return {
@@ -619,7 +633,7 @@ function detectLanguageFromText(text: string): SupportedLanguage | null {
 
 async function resolveEffectivePlan(_req: NextRequest): Promise<{ plan: PlanKey; userId: string | null }> {
   try {
-    const supabase = createSupabaseServer()
+    const supabase = await createSupabaseServer()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -705,12 +719,16 @@ export async function POST(req: NextRequest) {
   const log = (level: 'info' | 'debug' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) => {
     logger[level](`[api/chat][${requestId}] ${msg}`, meta)
   }
+  let failureStage = 'request_received'
+  let failureContext: Record<string, unknown> = {}
 
   log('info', 'POST hit')
 
   try {
+    failureStage = 'validate_env'
     validateEnv(REQUIRED_ENV)
 
+    failureStage = 'parse_body'
     const body = await req.json().catch(() => null)
     log('debug', 'body parsed', { hasBody: Boolean(body) })
 
@@ -738,6 +756,20 @@ export async function POST(req: NextRequest) {
       typeof (body as Record<string, unknown>).conversationId === 'string'
         ? ((body as Record<string, unknown>).conversationId as string)
         : null
+    const bodyRecord = body as Record<string, unknown>
+    const requestedSelectedMenuKey =
+      typeof bodyRecord.selectedMenuKey === 'string' ? (bodyRecord.selectedMenuKey as string) : null
+    const requestedSelectedSubmenuKey =
+      typeof bodyRecord.selectedSubmenuKey === 'string' ? (bodyRecord.selectedSubmenuKey as string) : null
+
+    failureContext = {
+      requestType,
+      conversationId: requestedConversationId,
+      selectedMenuKey: requestedSelectedMenuKey,
+      selectedSubmenuKey: requestedSelectedSubmenuKey,
+      messagesCount: sanitizedMessages.length,
+      lastUserMessagePreview: lastUserMessage.slice(0, 240),
+    }
 
     log('info', 'request summary', {
       requestType,
@@ -755,7 +787,6 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).journeyEnabled as boolean)
         : false
 
-    const bodyRecord = body as Record<string, unknown>
     const normalizedBirthData = normalizeBirthData(bodyRecord.birthData)
     const normalizedPractitionerUsage = normalizePractitionerUsage(bodyRecord.practitionerUsage)
     const requestedAnalysisMode =
@@ -778,11 +809,6 @@ export async function POST(req: NextRequest) {
       typeof bodyRecord.conversationId === 'string'
         ? (bodyRecord.conversationId as string)
         : null
-    const requestedSelectedMenuKey =
-      typeof bodyRecord.selectedMenuKey === 'string' ? (bodyRecord.selectedMenuKey as string) : null
-    const requestedSelectedSubmenuKey =
-      typeof bodyRecord.selectedSubmenuKey === 'string' ? (bodyRecord.selectedSubmenuKey as string) : null
-
     const intentLocal = detectIntentLocal(
       lastUserMessage,
       sanitizedMessages,
@@ -806,6 +832,7 @@ export async function POST(req: NextRequest) {
       renderMode: requestedRenderMode,
     }
 
+    failureStage = 'pre_quota_orchestration'
     const preQuotaEvaluation = evaluateOrchestration({
       normalized: buildNormalizedInput({
         requestType,
@@ -987,6 +1014,7 @@ export async function POST(req: NextRequest) {
 
     log('debug', 'quota', quota as any)
 
+    failureStage = 'post_quota_orchestration'
     const postQuotaEvaluation = evaluateOrchestration({
       normalized: buildNormalizedInput({
         requestType,
@@ -1022,6 +1050,12 @@ export async function POST(req: NextRequest) {
       execution: postQuotaExecution,
       trace: postQuotaTrace,
     } = postQuotaEvaluation
+
+    log('info', 'orchestration post-quota', {
+      branch: postQuotaDecision.branch,
+      route: postQuotaDecision.effectiveRoute,
+      reasons: postQuotaDecision.reasonCodes,
+    })
 
     const postQuotaHandler = ({
       quota: async () => {
@@ -1104,6 +1138,7 @@ export async function POST(req: NextRequest) {
       },
       analysis: async () => {
         log('info', 'branch chosen', { branch: 'analysis' })
+        failureStage = 'analysis_run_flow'
         const response = await runHexastraFlow({
           ...sharedFlowInput,
           requestType,
@@ -1223,8 +1258,22 @@ export async function POST(req: NextRequest) {
       if (postQuotaResponse) return postQuotaResponse
     }
   } catch (error) {
-    log('error', 'fatal error', { error })
-    captureError(error, { path: '/api/chat' })
+    const serializedError = serializeUnknownError(error)
+    log('error', 'fatal error', {
+      stage: failureStage,
+      ...failureContext,
+      errorName: serializedError.name ?? null,
+      errorMessage: serializedError.message,
+      errorStack: serializedError.stack ?? null,
+    })
+    captureError(error, {
+      path: '/api/chat',
+      requestId,
+      extra: {
+        stage: failureStage,
+        ...failureContext,
+      },
+    })
     const safeErrorResponse = buildSafeErrorResponse()
     log('info', 'response normalized', {
       branch: 'safe_error',

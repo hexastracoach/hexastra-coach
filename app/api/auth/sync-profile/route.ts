@@ -4,7 +4,7 @@ import { logger } from '@/lib/utils/logger'
 import { ok, unauthorized, internalError } from '@/lib/utils/apiResponse'
 
 export async function POST() {
-  const supabase = createSupabaseServer()
+  const supabase = await createSupabaseServer()
 
   const {
     data: { user },
