@@ -8,7 +8,7 @@
  */
 
 import type { Science } from '@/lib/hexastra/orchestration/universalClassification'
-import { resolveAstroSource } from '@/lib/hexastra/guards/extractCoreAstro'
+import { resolveStrictAstroContext } from '@/lib/hexastra/guards/extractCoreAstro'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -215,31 +215,37 @@ function checkAstroReliability(
   const errors: string[] = []
 
   // Use the canonical astro resolver — handles tropical.planets / tropical / flat root
-  const { source: astro, path: astroPath } = resolveAstroSource(raw)
+  const strictAstro = resolveStrictAstroContext(raw)
+  const astro = strictAstro.source
+  const astroPath = strictAstro.path
 
-  const sunOk  = hasValue(astro, 'sun', 'Sun', 'signe_solaire', 'sun_sign', 'soleil')
-  const moonOk = hasValue(astro, 'moon', 'Moon', 'signe_lunaire', 'moon_sign', 'lune')
-  const ascOk  = hasValue(astro, 'ascendant', 'Ascendant', 'rising', 'Rising', 'rising_sign', 'asc')
+  const sunOk = Boolean(strictAstro.placements.sun.placement?.sign)
+  const moonOk = Boolean(strictAstro.placements.moon.placement?.sign)
+  const ascOk = Boolean(strictAstro.placements.ascendant.placement?.sign)
 
   if (!sunOk)  missing.push('sun')
   if (!moonOk) missing.push('moon')
   if (!ascOk)  missing.push('ascendant')
 
   if (subcategory === 'theme_natal' || subcategory === 'planetes') {
-    const planetChecks: [string, string[]][] = [
-      ['mercury', ['mercury', 'Mercury', 'mercure', 'mercury_sign']],
+    const planetChecks: Array<[string, boolean | string[]]> = [
+      ['mercury', Boolean(strictAstro.placements.mercury.placement?.sign)],
       ['venus',   ['venus',   'Venus',   'Vénus',   'venus_sign']],
-      ['mars',    ['mars',    'Mars',    'mars_sign']],
-      ['jupiter', ['jupiter', 'Jupiter', 'jupiter_sign']],
-      ['saturn',  ['saturn',  'Saturn',  'saturne', 'Saturne', 'saturn_sign']],
+      ['mars', Boolean(strictAstro.placements.mars.placement?.sign)],
+      ['jupiter', Boolean(strictAstro.placements.jupiter.placement?.sign)],
+      ['saturn', Boolean(strictAstro.placements.saturn.placement?.sign)],
     ]
-    for (const [label, keys] of planetChecks) {
-      if (!hasValue(astro, ...keys)) missing.push(label)
+    const normalizedPlanetChecks: Array<[string, boolean]> = planetChecks.map(([label, value]) => {
+      if (label === 'venus') return [label, Boolean(strictAstro.placements.venus.placement?.sign)]
+      return [label, Boolean(value)]
+    })
+    for (const [label, isPresent] of normalizedPlanetChecks) {
+      if (!isPresent) missing.push(label)
     }
   }
 
   if (subcategory === 'maisons') {
-    if (!hasValue(astro, 'houses', 'maisons', 'house_1', 'maison_1')) missing.push('houses')
+    if (!hasValue(astro, 'houses', 'maisons', 'house_cusps', 'house_1', 'maison_1')) missing.push('houses')
   }
 
   if (subcategory === 'aspects') {
@@ -277,6 +283,7 @@ function checkAstroReliability(
 
   console.log('[ASTRO_RELIABILITY]', {
     astroPath,
+    usesTropical: strictAstro.usesTropical,
     sourceKeys: Object.keys(astro).slice(0, 15),
     sunOk, moonOk, ascOk,
     missingFields: missing,

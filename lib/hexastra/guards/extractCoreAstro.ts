@@ -279,6 +279,271 @@ export function resolveAstroSource(raw: Record<string, unknown>): {
   return { source: raw, path: 'root' }
 }
 
+export type StrictAstroPlacementKey =
+  | 'sun'
+  | 'moon'
+  | 'ascendant'
+  | 'mercury'
+  | 'venus'
+  | 'mars'
+  | 'jupiter'
+  | 'saturn'
+
+export type StrictAstroPlacementResult = {
+  key: StrictAstroPlacementKey
+  placement: CoreAstroPlacement | null
+  sourcePath: string | null
+}
+
+export type StrictAstroContext = {
+  source: Record<string, unknown>
+  path: string
+  usesTropical: boolean
+  placements: Record<StrictAstroPlacementKey, StrictAstroPlacementResult>
+  missingFields: StrictAstroPlacementKey[]
+}
+
+export function normalizeAstroSign(raw: unknown): string | null {
+  return normaliseSign(raw)
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function placementFromValue(value: unknown): CoreAstroPlacement | null {
+  if (value === undefined || value === null) return null
+
+  if (typeof value === 'string') {
+    const sign = normaliseSign(value)
+    return sign ? { sign, degree: null, rawValue: value } : null
+  }
+
+  const obj = asRecord(value)
+  if (!obj) return null
+
+  const sign = extractSign(obj)
+  if (!sign) return null
+
+  return {
+    sign,
+    degree: extractDegree(obj),
+    retrograde: extractRetrograde(obj),
+    rawValue: value,
+  }
+}
+
+function capitalizeKey(value: string): string {
+  return value ? `${value[0].toUpperCase()}${value.slice(1)}` : value
+}
+
+function resolveStrictSource(raw: Record<string, unknown>): {
+  source: Record<string, unknown>
+  path: string
+  usesTropical: boolean
+  tropicalBlock: Record<string, unknown> | null
+} {
+  const tropical = asRecord(raw.tropical)
+  if (tropical) {
+    const planetsBlock = asRecord(tropical.planets ?? tropical.Planets)
+    return {
+      source: planetsBlock ? { ...planetsBlock, ...tropical } : tropical,
+      path: planetsBlock ? 'tropical+tropical.planets' : 'tropical',
+      usesTropical: true,
+      tropicalBlock: tropical,
+    }
+  }
+
+  const { source, path } = resolveAstroSource(raw)
+  return {
+    source,
+    path,
+    usesTropical: false,
+    tropicalBlock: null,
+  }
+}
+
+function resolvePlacementFromBlock(params: {
+  baseBlock: Record<string, unknown>
+  basePath: string
+  canonicalKey: string
+  keys: string[]
+}): StrictAstroPlacementResult {
+  const { baseBlock, basePath, canonicalKey, keys } = params
+  const planetsBlock = asRecord(baseBlock.planets ?? baseBlock.Planets)
+
+  for (const key of keys) {
+    const direct = placementFromValue(baseBlock[key])
+    if (direct) {
+      return {
+        key: canonicalKey as StrictAstroPlacementKey,
+        placement: direct,
+        sourcePath: `${basePath}.${key}`,
+      }
+    }
+  }
+
+  for (const key of keys) {
+    const nested = planetsBlock ? placementFromValue(planetsBlock[key]) : null
+    if (nested) {
+      return {
+        key: canonicalKey as StrictAstroPlacementKey,
+        placement: nested,
+        sourcePath: `${basePath}.planets.${key}`,
+      }
+    }
+  }
+
+  const flatDirect = extractFlatPlacement(baseBlock, canonicalKey)
+  if (flatDirect) {
+    return {
+      key: canonicalKey as StrictAstroPlacementKey,
+      placement: flatDirect,
+      sourcePath: `${basePath}.${canonicalKey}_sign`,
+    }
+  }
+
+  const flatNested = planetsBlock ? extractFlatPlacement(planetsBlock, canonicalKey) : null
+  if (flatNested) {
+    return {
+      key: canonicalKey as StrictAstroPlacementKey,
+      placement: flatNested,
+      sourcePath: `${basePath}.planets.${canonicalKey}_sign`,
+    }
+  }
+
+  return {
+    key: canonicalKey as StrictAstroPlacementKey,
+    placement: null,
+    sourcePath: null,
+  }
+}
+
+function resolveHouseOneCandidate(
+  value: unknown,
+  sourcePath: string,
+): { placement: CoreAstroPlacement; sourcePath: string } | null {
+  if (Array.isArray(value)) {
+    const houseOne = value.find((item, index) => {
+      if (index === 0) return true
+      const record = asRecord(item)
+      const houseNumber = record?.number ?? record?.house ?? record?.index ?? record?.id
+      return houseNumber === 1 || houseNumber === '1'
+    })
+
+    if (!houseOne) return null
+
+    const placement = placementFromValue(houseOne)
+    return placement ? { placement, sourcePath: `${sourcePath}[1]` } : null
+  }
+
+  const obj = asRecord(value)
+  if (!obj) return null
+
+  const directKeys = ['1', 'house_1', 'house1', 'maison_1', 'maison1', 'cusp_1', 'cusp1']
+  for (const key of directKeys) {
+    const placement = placementFromValue(obj[key])
+    if (placement) return { placement, sourcePath: `${sourcePath}.${key}` }
+  }
+
+  return null
+}
+
+function resolveAscendantFromBlock(params: {
+  baseBlock: Record<string, unknown>
+  basePath: string
+}): StrictAstroPlacementResult {
+  const { baseBlock, basePath } = params
+  const planetsBlock = asRecord(baseBlock.planets ?? baseBlock.Planets)
+  const anglesBlock = asRecord(baseBlock.angles)
+  const housesBlock = baseBlock.houses ?? baseBlock.maisons
+  const cuspsBlock = baseBlock.house_cusps ?? baseBlock.houseCusps ?? baseBlock.cusps
+
+  const orderedCandidates: Array<{ sourcePath: string; value: unknown }> = [
+    { sourcePath: `${basePath}.ascendant`, value: baseBlock.ascendant },
+    { sourcePath: `${basePath}.Ascendant`, value: baseBlock.Ascendant },
+    { sourcePath: `${basePath}.planets.ascendant`, value: planetsBlock?.ascendant },
+    { sourcePath: `${basePath}.planets.Ascendant`, value: planetsBlock?.Ascendant },
+    { sourcePath: `${basePath}.angles.ascendant`, value: anglesBlock?.ascendant },
+    { sourcePath: `${basePath}.angles.asc`, value: anglesBlock?.asc },
+  ]
+
+  for (const candidate of orderedCandidates) {
+    const placement = placementFromValue(candidate.value)
+    if (placement) {
+      return {
+        key: 'ascendant',
+        placement,
+        sourcePath: candidate.sourcePath,
+      }
+    }
+  }
+
+  const housesAscendant = asRecord(housesBlock)?.ascendant
+  const housesAscPlacement = placementFromValue(housesAscendant)
+  if (housesAscPlacement) {
+    return {
+      key: 'ascendant',
+      placement: housesAscPlacement,
+      sourcePath: `${basePath}.houses.ascendant`,
+    }
+  }
+
+  const houseOne = resolveHouseOneCandidate(housesBlock, `${basePath}.houses`)
+  if (houseOne) {
+    return {
+      key: 'ascendant',
+      placement: houseOne.placement,
+      sourcePath: houseOne.sourcePath,
+    }
+  }
+
+  const cuspOne = resolveHouseOneCandidate(cuspsBlock, `${basePath}.house_cusps`)
+  if (cuspOne) {
+    return {
+      key: 'ascendant',
+      placement: cuspOne.placement,
+      sourcePath: cuspOne.sourcePath,
+    }
+  }
+
+  return {
+    key: 'ascendant',
+    placement: null,
+    sourcePath: null,
+  }
+}
+
+export function resolveStrictAstroContext(raw: Record<string, unknown>): StrictAstroContext {
+  const strictSource = resolveStrictSource(raw)
+  const baseBlock = strictSource.tropicalBlock ?? strictSource.source
+  const basePath = strictSource.usesTropical ? 'tropical' : strictSource.path
+
+  const placements: StrictAstroContext['placements'] = {
+    sun: resolvePlacementFromBlock({ baseBlock, basePath, canonicalKey: 'sun', keys: SUN_KEYS }),
+    moon: resolvePlacementFromBlock({ baseBlock, basePath, canonicalKey: 'moon', keys: MOON_KEYS }),
+    ascendant: resolveAscendantFromBlock({ baseBlock, basePath }),
+    mercury: resolvePlacementFromBlock({ baseBlock, basePath, canonicalKey: 'mercury', keys: MERCURY_KEYS }),
+    venus: resolvePlacementFromBlock({ baseBlock, basePath, canonicalKey: 'venus', keys: VENUS_KEYS }),
+    mars: resolvePlacementFromBlock({ baseBlock, basePath, canonicalKey: 'mars', keys: MARS_KEYS }),
+    jupiter: resolvePlacementFromBlock({ baseBlock, basePath, canonicalKey: 'jupiter', keys: JUPITER_KEYS }),
+    saturn: resolvePlacementFromBlock({ baseBlock, basePath, canonicalKey: 'saturn', keys: SATURN_KEYS }),
+  }
+
+  const missingFields = (Object.entries(placements) as [StrictAstroPlacementKey, StrictAstroPlacementResult][])
+    .filter(([, result]) => !result.placement?.sign)
+    .map(([key]) => key)
+
+  return {
+    source: strictSource.source,
+    path: strictSource.path,
+    usesTropical: strictSource.usesTropical,
+    placements,
+    missingFields,
+  }
+}
+
 /**
  * Extract Sun, Moon and Rising sign from /chart/fusion raw data.
  * Returns a structured, deterministic result — never guesses.
@@ -297,11 +562,13 @@ export function extractCoreAstroPlacements(
     return { sun: null, moon: null, rising: null, allResolved: false, missing: ['sun', 'moon', 'rising'] }
   }
 
-  const { source, path } = resolveAstroSource(raw)
+  const strictAstro = resolveStrictAstroContext(raw)
+  const { source, path, placements } = strictAstro
 
   console.log('[ASTRO_CORE] extracting core placements', {
     rootKeys: Object.keys(raw).slice(0, 20),
     resolvedPath: path,
+    usesTropical: strictAstro.usesTropical,
     sourceKeys: Object.keys(source).slice(0, 30),
   })
 
@@ -316,9 +583,9 @@ export function extractCoreAstroPlacements(
     }
   }
 
-  const sun    = resolvePlacement(source, SUN_KEYS)
-  const moon   = resolvePlacement(source, MOON_KEYS)
-  const rising = resolvePlacement(source, RISING_KEYS)
+  const sun = placements.sun.placement
+  const moon = placements.moon.placement
+  const rising = placements.ascendant.placement
 
   if (!sun)    missing.push('sun')
   if (!moon)   missing.push('moon')
@@ -341,6 +608,11 @@ export function extractCoreAstroPlacements(
       missing,
       resolvedPath: path,
       sourceKeys: Object.keys(source).slice(0, 40),
+      fieldSources: {
+        sun: placements.sun.sourcePath,
+        moon: placements.moon.sourcePath,
+        ascendant: placements.ascendant.sourcePath,
+      },
       hint: 'Check /chart/fusion response — expected nested under tropical or tropical.planets',
     })
   }
@@ -361,23 +633,32 @@ export function buildLocalAstroFallback(
   firstName: string | null,
 ): string {
   const isFr = !language.startsWith('en')
-  const { source, path } = resolveAstroSource(raw)
-
-  const sun     = resolvePlacement(source, SUN_KEYS)
-  const moon    = resolvePlacement(source, MOON_KEYS)
-  const rising  = resolvePlacement(source, RISING_KEYS)
-  const mercury = resolvePlacement(source, MERCURY_KEYS)
-  const venus   = resolvePlacement(source, VENUS_KEYS)
-  const mars    = resolvePlacement(source, MARS_KEYS)
+  const strictAstro = resolveStrictAstroContext(raw)
+  const { path, placements } = strictAstro
+  const sun = placements.sun.placement
+  const moon = placements.moon.placement
+  const rising = placements.ascendant.placement
+  const mercury = placements.mercury.placement
+  const venus = placements.venus.placement
+  const mars = placements.mars.placement
 
   const foundFields = [sun, moon, rising, mercury, venus, mars].filter(Boolean).length
 
   console.log('[LOCAL_ASTRO_FALLBACK] building local fallback', {
     path,
+    usesTropical: strictAstro.usesTropical,
     foundFields,
     hasSun: Boolean(sun),
     hasMoon: Boolean(moon),
     hasRising: Boolean(rising),
+    fieldSources: {
+      sun: placements.sun.sourcePath,
+      moon: placements.moon.sourcePath,
+      ascendant: placements.ascendant.sourcePath,
+      mercury: placements.mercury.sourcePath,
+      venus: placements.venus.sourcePath,
+      mars: placements.mars.sourcePath,
+    },
   })
 
   const name = firstName ? `, ${firstName}` : ''
@@ -392,27 +673,29 @@ export function buildLocalAstroFallback(
   const lines: string[] = []
 
   if (isFr) {
-    lines.push(`Voici tes placements calculés${name} :`)
+    lines.push(`Voici les placements exacts validés${name} :`)
     lines.push('')
-    if (sun?.sign)     lines.push(`**Soleil** en ${sun.sign}${sun.degree !== null ? ` (${sun.degree}°)` : ''}`)
-    if (moon?.sign)    lines.push(`**Lune** en ${moon.sign}${moon.degree !== null ? ` (${moon.degree}°)` : ''}`)
-    if (rising?.sign)  lines.push(`**Ascendant** ${rising.sign}${rising.degree !== null ? ` (${rising.degree}°)` : ''}`)
-    if (mercury?.sign) lines.push(`Mercure en ${mercury.sign}`)
-    if (venus?.sign)   lines.push(`Vénus en ${venus.sign}`)
-    if (mars?.sign)    lines.push(`Mars en ${mars.sign}`)
+    lines.push(`- Soleil: ${sun?.sign ? `${sun.sign}${sun.degree !== null ? ` (${sun.degree}°)` : ''}` : 'indisponible'}`)
+    lines.push(`- Lune: ${moon?.sign ? `${moon.sign}${moon.degree !== null ? ` (${moon.degree}°)` : ''}` : 'indisponible'}`)
+    lines.push(`- Ascendant: ${rising?.sign ? `${rising.sign}${rising.degree !== null ? ` (${rising.degree}°)` : ''}` : 'indisponible'}`)
+    lines.push(`- Mercure: ${mercury?.sign ?? 'indisponible'}`)
+    lines.push(`- Vénus: ${venus?.sign ?? 'indisponible'}`)
+    lines.push(`- Mars: ${mars?.sign ?? 'indisponible'}`)
     lines.push('')
-    lines.push('_Lecture complète momentanément indisponible — renvoie ton message pour obtenir l\'analyse complète._')
+    lines.push('_Lecture complète momentanément indisponible. Je n’ajoute aucune valeur absente de la source tropicale exacte._')
+    lines.push('_renvoie ton message pour obtenir l’analyse complète._')
   } else {
-    lines.push(`Here are your calculated placements${name}:`)
+    lines.push(`Here are your validated exact placements${name}:`)
     lines.push('')
-    if (sun?.sign)     lines.push(`**Sun** in ${sun.sign}${sun.degree !== null ? ` (${sun.degree}°)` : ''}`)
-    if (moon?.sign)    lines.push(`**Moon** in ${moon.sign}${moon.degree !== null ? ` (${moon.degree}°)` : ''}`)
-    if (rising?.sign)  lines.push(`**Rising** ${rising.sign}${rising.degree !== null ? ` (${rising.degree}°)` : ''}`)
-    if (mercury?.sign) lines.push(`Mercury in ${mercury.sign}`)
-    if (venus?.sign)   lines.push(`Venus in ${venus.sign}`)
-    if (mars?.sign)    lines.push(`Mars in ${mars.sign}`)
+    lines.push(`- Sun: ${sun?.sign ? `${sun.sign}${sun.degree !== null ? ` (${sun.degree}°)` : ''}` : 'unavailable'}`)
+    lines.push(`- Moon: ${moon?.sign ? `${moon.sign}${moon.degree !== null ? ` (${moon.degree}°)` : ''}` : 'unavailable'}`)
+    lines.push(`- Rising: ${rising?.sign ? `${rising.sign}${rising.degree !== null ? ` (${rising.degree}°)` : ''}` : 'unavailable'}`)
+    lines.push(`- Mercury: ${mercury?.sign ?? 'unavailable'}`)
+    lines.push(`- Venus: ${venus?.sign ?? 'unavailable'}`)
+    lines.push(`- Mars: ${mars?.sign ?? 'unavailable'}`)
     lines.push('')
-    lines.push('_Full reading temporarily unavailable — resend your message for the complete analysis._')
+    lines.push('_Full reading temporarily unavailable. I am not adding any value that is absent from the exact tropical source._')
+    lines.push('_Resend your message for the complete analysis._')
   }
 
   return lines.join('\n')

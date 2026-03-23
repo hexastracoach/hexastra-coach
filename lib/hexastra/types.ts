@@ -99,6 +99,8 @@ export type HexastraApiResponse = {
   flowState: HexastraFlowState
   conversationId: string
   type?: string
+  usedLocalFallback?: boolean
+  fallbackType?: string | null
   menu?: {
     visible: boolean
     items: HexastraMenuItem[]
@@ -153,6 +155,8 @@ export type HexastraApiResponse = {
     contextFrame?: string | null
     clarificationQuestion?: string | null
     orchestrationTrace?: OrchestrationTrace
+    usedLocalFallback?: boolean
+    fallbackType?: string | null
   }
   updatedEvolutionProfile?: Record<string, unknown> | null
 }

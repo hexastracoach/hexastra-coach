@@ -47,6 +47,8 @@ type ChatResponsePayload = Record<string, unknown> & {
   flowState?: Record<string, unknown>
   menu?: Record<string, unknown>
   metadata?: Record<string, unknown>
+  usedLocalFallback?: boolean
+  fallbackType?: string | null
 }
 const SUPPORTED_LANGUAGES = ['fr', 'en', 'es', 'pt', 'de', 'it'] as const
 type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number]
@@ -250,16 +252,28 @@ function buildConsistentResponse(
   }
 }
 
-function getNormalizationDiagnostics(payload: ChatResponsePayload) {
+export function getNormalizationDiagnostics(payload: ChatResponsePayload) {
   const message = typeof payload.message === 'string' ? payload.message.trim() : ''
   const reply = typeof payload.reply === 'string' ? payload.reply.trim() : ''
   const content = typeof payload.content === 'string' ? payload.content.trim() : ''
   const from = message ? 'message' : reply ? 'reply' : content ? 'content' : 'fallback'
   const finalText = message || reply || content || DEFAULT_FALLBACK_MESSAGE
+  const metadata = payload.metadata && typeof payload.metadata === 'object'
+    ? (payload.metadata as Record<string, unknown>)
+    : {}
+  const explicitUsedLocalFallback =
+    payload.usedLocalFallback === true || metadata.usedLocalFallback === true
+  const explicitFallbackType =
+    typeof payload.fallbackType === 'string'
+      ? payload.fallbackType
+      : typeof metadata.fallbackType === 'string'
+        ? (metadata.fallbackType as string)
+        : null
 
   return {
     from,
-    usedLocalFallback: from === 'fallback',
+    usedLocalFallback: explicitUsedLocalFallback || from === 'fallback',
+    fallbackType: explicitFallbackType,
     finalTextLength: finalText.length,
   }
 }

@@ -66,7 +66,7 @@ describe('buildCompactExactScienceBlock', () => {
 })
 
 describe('buildCompactNatalReadingContext', () => {
-  it('keeps active transits in the compact astro block', () => {
+  it('keeps the compact astro block limited to validated natal fields', () => {
     const ctx = buildCompactNatalReadingContext({
       tropical: {
         planets: {
@@ -74,11 +74,10 @@ describe('buildCompactNatalReadingContext', () => {
           moon: { sign: 'Cancer', degree: 22.1 },
         },
         ascendant: { sign: 'Lion', degree: 3.8 },
+        transits: ['Saturne trigone Soleil', 'Jupiter sextile Lune'],
       },
-      transits: ['Saturne trigone Soleil', 'Jupiter sextile Lune'],
     })
 
-    expect(ctx.compactDataBlock).toContain('TRANSITS ACTIFS')
-    expect(ctx.compactDataBlock).toContain('Saturne trigone Soleil')
+    expect(ctx.compactDataBlock).not.toContain('TRANSITS ACTIFS')
   })
 })

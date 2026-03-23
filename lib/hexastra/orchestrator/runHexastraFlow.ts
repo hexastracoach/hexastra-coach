@@ -71,6 +71,8 @@ import {
   formatExactDataBlockCapped,
   buildExactDataAuditLog,
   buildCompactNatalReadingContext,
+  buildValidatedAstroExactFallback,
+  validateAstroExactRender,
 } from '@/lib/hexastra/guards/exactDataGuard'
 import {
   buildExactDataUnavailableResponse,
@@ -80,7 +82,6 @@ import {
   extractCoreAstroPlacements,
   formatCoreAstroBlock,
   asksForCorePlacements,
-  buildLocalAstroFallback,
 } from '@/lib/hexastra/guards/extractCoreAstro'
 import {
   extractHDProfileFromRaw,
@@ -1254,6 +1255,39 @@ function normalizeBirthData(birth: BirthProfile | null): BirthProfile | null {
   return norm
 }
 
+export function resolveAstroFollowupRoutingState(params: {
+  semanticContextType: string
+  currentRoute: DomainRoute
+  science: string | null | undefined
+}): {
+  branch: 'analysis' | null
+  route: DomainRoute
+  science: string | null
+  isAstroExact: boolean
+  shouldUseApiBackbone: boolean
+  effectiveDomainForApi: DomainRoute
+} {
+  if (params.semanticContextType === 'astro_followup') {
+    return {
+      branch: 'analysis',
+      route: 'science',
+      science: 'astrology',
+      isAstroExact: true,
+      shouldUseApiBackbone: true,
+      effectiveDomainForApi: 'science',
+    }
+  }
+
+  return {
+    branch: null,
+    route: params.currentRoute,
+    science: params.science ?? null,
+    isAstroExact: false,
+    shouldUseApiBackbone: false,
+    effectiveDomainForApi: params.currentRoute,
+  }
+}
+
 export async function runHexastraFlow(input: {
   plan?: PlanKey
   responseDepth?: ResponseDepth
@@ -2056,12 +2090,18 @@ export async function runHexastraFlow(input: {
       })
     }
 
-    const domainRoute = resolveDomainRoute({
+    const initialDomainRoute = resolveDomainRoute({
       latestUserMessage,
       selectedMenuDomainRoute: latestDomainRoute,
       sessionDomainRoute: userContext.session?.domainRoute ?? null,
       contextType: normalizedContextType,
     })
+    const astroFollowupRouting = resolveAstroFollowupRoutingState({
+      semanticContextType: semanticCtx.contextType,
+      currentRoute: initialDomainRoute,
+      science: universalClassif.science,
+    })
+    const domainRoute = astroFollowupRouting.route
 
     const retrievalQuery = [
       latestUserMessage,
@@ -2161,20 +2201,25 @@ export async function runHexastraFlow(input: {
     const effectiveExecutionContract = selectionExecutionContract ?? freeformContract
 
     // Exact subcategory from orchestration — used to force API call regardless of domain
-    const isExactDataSubcategory = requiresExactData(orchestrationExecution.detectedSubcategory)
+    const isExactDataSubcategory =
+      astroFollowupRouting.shouldUseApiBackbone ||
+      requiresExactData(orchestrationExecution.detectedSubcategory)
 
     // Effective domain for API: prefer orchestration route over legacy 'general' fallback.
     // When orchestration detected 'science' or 'fusion' but legacy classifyQuery returned 'general'
     // (e.g. accent mismatch, unlisted pattern), use the orchestration result.
     const effectiveDomainForApi: DomainRoute =
-      orchestrationExecution.route !== 'general'
-        ? orchestrationExecution.route
-        : domainRoute
+      semanticCtx.contextType === 'astro_followup'
+        ? astroFollowupRouting.effectiveDomainForApi
+        : orchestrationExecution.route !== 'general'
+          ? orchestrationExecution.route
+          : domainRoute
 
     const domainConfigForApi = getKsDomainConfig(effectiveDomainForApi)
 
     // Force API call for astro/HD exact requests and any subcategory requiring deterministic data
     const shouldUseApiBackbone =
+      astroFollowupRouting.shouldUseApiBackbone ||
       isAstroExact ||
       isHumanDesignExact ||
       isExactDataSubcategory ||
@@ -2183,6 +2228,7 @@ export async function runHexastraFlow(input: {
 
     flowLog('debug', 'api_backbone_resolution', {
       legacyDomainRoute: domainRoute,
+      lockedRoute: astroFollowupRouting.route,
       orchestrationRoute: orchestrationExecution.route,
       effectiveDomainForApi,
       isAstroExact,
@@ -2285,7 +2331,9 @@ export async function runHexastraFlow(input: {
           : detectedSubcategoryForGuard
             ? [detectedSubcategoryForGuard]
             : []
-    const exactDataNeeded = requiresExactData(detectedSubcategoryForGuard)
+    const exactDataNeeded =
+      semanticCtx.contextType === 'astro_followup' ||
+      requiresExactData(detectedSubcategoryForGuard)
     const rawExactDataResolved = hasResolvedExactData(specializedResult)
 
     // Universal reliability check — validates field completeness per science
@@ -2439,9 +2487,11 @@ export async function runHexastraFlow(input: {
     })
     // Enneagram always uses interpretive_reading — prose, not structured output
     const effectiveResponseMode =
-      universalClassif.science === 'enneagram' && responseMode === 'calculated_reading'
-        ? 'interpretive_reading'
-        : responseMode
+      semanticCtx.contextType === 'astro_followup' && exactDataResolved
+        ? 'calculated_reading'
+        : universalClassif.science === 'enneagram' && responseMode === 'calculated_reading'
+          ? 'interpretive_reading'
+          : responseMode
     if (effectiveResponseMode !== responseMode) {
       flowLog('info', 'ENNEAGRAM_MODE_OVERRIDE', {
         from: responseMode,
@@ -2712,6 +2762,67 @@ export async function runHexastraFlow(input: {
       isAstroExact && exactDataResolved && specializedResult?.raw
         ? buildCompactNatalReadingContext(specializedResult.raw, exactDataMaxChars)
         : null
+    const birthDataForAstroExact = normalizeBirthData(userContext.birthData)
+    const astroBirthDate =
+      birthDataForAstroExact?.date?.trim() ||
+      birthDataForAstroExact?.birthDateISO?.slice(0, 10) ||
+      null
+
+    const shouldRequireSunSignForAstroExact =
+      isAstroExact &&
+      exactDataResolved &&
+      (
+        semanticCtx.contextType === 'astro_followup' ||
+        detectedSubcategoryForGuard === 'theme_natal' ||
+        detectedSubcategoryForGuard === 'planetes' ||
+        asksForCorePlacements(latestUserMessage)
+      )
+
+    if (shouldRequireSunSignForAstroExact && astroCompactCtx && !astroCompactCtx.sunSign) {
+      const partialMessage = buildIncompleteExactDataResponse({
+        language: userContext.language ?? fallbackLanguage,
+        subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory ?? 'theme_natal',
+        missingExactFields: ['sun'],
+      })
+      flowLog('error', 'ASTRO_SUN_SIGN_MISSING_GUARD', {
+        semanticContextType: semanticCtx.contextType,
+        subcategory: detectedSubcategoryForGuard,
+        astroBirthDate,
+        astroPathMissingFields: astroCompactCtx.missingFields,
+      })
+      return {
+        message: partialMessage,
+        reply: partialMessage,
+        mode,
+        plan,
+        conversationId,
+        flowState: { step: 'analysis', completed: false },
+        menu: { visible: false, items: [] },
+        usedLocalFallback: false,
+        fallbackType: null,
+        metadata: {
+          contextType: normalizedContextType,
+          practitionerUsage: userContext.practitionerUsage ?? null,
+          shouldPersistMemory: false,
+          journeyEnabled,
+          orchestrationTrace,
+          usedLocalFallback: false,
+          fallbackType: null,
+        },
+        updatedEvolutionProfile: input.evolutionProfile ?? null,
+      }
+    }
+
+    if (astroCompactCtx && astroBirthDate === '1990-01-24' && astroCompactCtx.sunSign !== 'Verseau') {
+      flowLog('error', 'ASTRO_SUN_SIGN_DEBUG_ALERT', {
+        zodiacMode: 'tropical',
+        expectedSunSign: 'Verseau',
+        extractedSunSign: astroCompactCtx.sunSign,
+        astroBirthDate,
+        birthTime: birthDataForAstroExact?.time ?? null,
+        birthPlace: birthDataForAstroExact?.place ?? null,
+      })
+    }
     const scienceCompactBlock =
       exactDataNeeded && exactDataResolved && specializedResult?.raw
         ? buildCompactExactScienceBlock({
@@ -2738,7 +2849,10 @@ export async function runHexastraFlow(input: {
       isAstroExact &&
       exactDataResolved &&
       specializedResult?.raw &&
-      asksForCorePlacements(latestUserMessage)
+      (
+        asksForCorePlacements(latestUserMessage) ||
+        semanticCtx.contextType === 'astro_followup'
+      )
     ) {
       const corePlacements = extractCoreAstroPlacements(specializedResult.raw)
       if (corePlacements.sun || corePlacements.moon || corePlacements.rising) {
@@ -2983,6 +3097,8 @@ export async function runHexastraFlow(input: {
     // ── OpenAI call with astro-exact local fallback on timeout ───────────
     // If Railway already returned reliable data but OpenAI times out, we never
     // show a generic error. Instead we return the calculated values directly.
+    let usedLocalFallback = false
+    let fallbackType: string | null = null
     let rawMessage: string
     try {
       rawMessage = await callOpenAIResponse({
@@ -3003,13 +3119,37 @@ export async function runHexastraFlow(input: {
           reason: 'OpenAI timeout — Railway data available — serving local deterministic fallback',
           hint: 'User sees calculated values + retry invitation instead of error',
         })
-        rawMessage = buildLocalAstroFallback(
-          specializedResult.raw,
+        usedLocalFallback = true
+        fallbackType = 'astro_exact_local'
+        rawMessage = astroCompactCtx
+          ? buildValidatedAstroExactFallback(
+              astroCompactCtx,
+              userContext.language ?? fallbackLanguage,
+              userContext.firstName ?? userContext.name ?? null,
+            )
+          : buildValidatedAstroExactFallback(
+              buildCompactNatalReadingContext(specializedResult.raw, exactDataMaxChars),
+              userContext.language ?? fallbackLanguage,
+              userContext.firstName ?? userContext.name ?? null,
+            )
+      } else {
+        throw openAiErr
+      }
+    }
+
+    if (isAstroExactCompact && astroCompactCtx) {
+      const renderValidation = validateAstroExactRender(rawMessage, astroCompactCtx)
+      if (!renderValidation.valid) {
+        flowLog('warn', 'ASTRO_EXACT_RENDER_GUARDRAIL_TRIGGERED', {
+          violations: renderValidation.violations,
+          semanticContextType: semanticCtx.contextType,
+          fallbackType,
+        })
+        rawMessage = buildValidatedAstroExactFallback(
+          astroCompactCtx,
           userContext.language ?? fallbackLanguage,
           userContext.firstName ?? userContext.name ?? null,
         )
-      } else {
-        throw openAiErr
       }
     }
 
@@ -3084,6 +3224,8 @@ export async function runHexastraFlow(input: {
       plan,
       isAstroExact,
       isAstroExactCompact,
+      usedLocalFallback,
+      fallbackType,
       effectiveMaxOutputTokens,
       exactDataBlockChars: exactDataBlockForPrompt?.length ?? 0,
     })
@@ -3236,6 +3378,8 @@ export async function runHexastraFlow(input: {
         mode,
         plan,
         conversationId,
+        usedLocalFallback,
+        fallbackType,
         flowState: { step: menuVisibleReturn ? 'menu' : finalFlowStep, completed: true },
         menu: { visible: menuVisibleReturn, items: menuItemsReturned },
         suggestions: menuVisibleReturn
@@ -3262,6 +3406,8 @@ export async function runHexastraFlow(input: {
           },
           readingSummary: normalizedReadingSummary,
           orchestrationTrace,
+          usedLocalFallback,
+          fallbackType,
         },
         updatedEvolutionProfile: input.evolutionProfile ?? null,
       } as HexastraApiResponse;
