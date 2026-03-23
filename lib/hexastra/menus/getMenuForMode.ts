@@ -127,6 +127,140 @@ const freeMenu: HexastraMenuItem[] = scienceMenu.filter(
   (item) => item.key !== 'science_fusion',
 )
 
+const LEGACY_TO_CURRENT_MENU_KEY: Record<string, string> = {
+  science_astrolex: 'science_astrologie',
+  science_porteum: 'science_human_design',
+  science_triangle: 'science_numerologie',
+  science_enneagram: 'science_enneagramme',
+}
+
+const CURRENT_TO_LEGACY_MENU_KEY: Record<string, string> = Object.fromEntries(
+  Object.entries(LEGACY_TO_CURRENT_MENU_KEY).map(([legacyKey, currentKey]) => [currentKey, legacyKey])
+)
+
+const CURRENT_TO_KS_SELECTION_KEY: Record<string, string> = {
+  science_astrologie: 'science_astrolex',
+  astro_signes: 'science_astrolex',
+  astro_ascendant: 'science_astrolex',
+  astro_maisons: 'science_astrolex_houses',
+  astro_planetes: 'science_astrolex_planetarium',
+  astro_aspects: 'science_astrolex_aspects',
+  astro_transits: 'science_astrolex_transits',
+  astro_compatibilite: 'science_astrolex_synastry',
+  astro_theme_natal: 'science_astrolex_synthesis',
+  astro_vocation: 'science_astrolex_synthesis',
+  astro_amour: 'science_astrolex_synastry',
+  astro_travail: 'science_astrolex_synthesis',
+  astro_cycles: 'science_astrolex_transits',
+  science_numerologie: 'science_triangle',
+  num_chemin_vie: 'science_triangle_vibration',
+  num_annee_perso: 'science_triangle_year',
+  num_nom_prenom: 'science_triangle_synthesis',
+  num_compatibilite: 'science_triangle_synthesis',
+  num_cycles: 'science_triangle_transition',
+  num_vocation: 'science_triangle_vibration',
+  num_decision: 'science_triangle_opportunity',
+  science_human_design: 'science_porteum',
+  hd_type: 'science_porteum',
+  hd_strategie: 'science_porteum_authority',
+  hd_autorite: 'science_porteum_authority',
+  hd_profil: 'science_porteum_profile',
+  hd_centres: 'science_porteum_centers',
+  hd_portes: 'science_porteum_gates',
+  hd_canaux: 'science_porteum_channels',
+  hd_croix: 'science_porteum_synthesis',
+  hd_compatibilite: 'science_porteum_synthesis',
+  hd_transits: 'science_porteum_synthesis',
+  science_enneagramme: 'science_enneagram',
+  enn_type: 'science_enneagram_type',
+  enn_aile: 'science_enneagram_type',
+  enn_centre: 'science_enneagram_synthesis',
+  enn_instinct: 'science_enneagram_defense',
+  enn_niveau: 'science_enneagram_resources',
+  enn_relations: 'science_enneagram_synthesis',
+  enn_travail: 'science_enneagram_synthesis',
+  enn_evolution: 'science_enneagram_resources',
+  science_kua: 'science_kua',
+  kua_nombre: 'science_kua_orientation',
+  kua_directions: 'science_kua_orientation',
+  kua_habitat: 'science_kua_space',
+  kua_bureau: 'science_kua_environment',
+  kua_sommeil: 'science_kua_environment',
+  kua_gps_global: 'science_kua_synthesis',
+  science_fusion: 'science_fusion',
+  fusion_generale: 'science_fusion',
+  fusion_ultra_precise: 'science_fusion',
+  fusion_compatibilite: 'science_fusion',
+  fusion_decision: 'science_fusion',
+  fusion_timing: 'science_fusion',
+  fusion_praticien: 'science_fusion',
+  fusion_synthese_croisee: 'science_fusion',
+}
+
+const LEGACY_SCIENCE_FALLBACK_ITEMS: Record<string, HexastraMenuItem> = {
+  science_neurokua: {
+    key: 'science_neurokua',
+    label: 'NeuroKua',
+    description: 'Equilibre interne, axe correctif et regulation sensorielle.',
+    contextType: 'energy',
+    domainRoute: 'neurokua',
+    promptHint: 'Lecture NeuroKua centree sur la regulation, la surcharge et le bon ajustement du moment.',
+  },
+}
+
+function cloneMenuItem(item: HexastraMenuItem, overrideKey?: string): HexastraMenuItem {
+  return {
+    ...item,
+    key: overrideKey ?? item.key,
+    submenu: item.submenu?.map((child) => ({ ...child })),
+  }
+}
+
+function buildLegacyScienceMenu(items: HexastraMenuItem[]): HexastraMenuItem {
+  const orderedLegacyKeys = [
+    'science_astrolex',
+    'science_porteum',
+    'science_enneagram',
+    'science_kua',
+    'science_neurokua',
+    'science_triangle',
+  ]
+
+  const submenu = orderedLegacyKeys
+    .map((legacyKey) => {
+      const currentKey = LEGACY_TO_CURRENT_MENU_KEY[legacyKey]
+      if (currentKey) {
+        const currentItem = items.find((item) => item.key === currentKey)
+        if (currentItem) {
+          return cloneMenuItem(currentItem, legacyKey)
+        }
+      }
+      const fallbackItem = LEGACY_SCIENCE_FALLBACK_ITEMS[legacyKey]
+      return fallbackItem ? cloneMenuItem(fallbackItem) : null
+    })
+    .filter((item): item is HexastraMenuItem => Boolean(item))
+
+  return {
+    key: 'science',
+    label: 'Analyse par science',
+    description: 'Choisis une science pour eclairer la situation.',
+    contextType: 'science',
+    domainRoute: 'science',
+    promptHint: 'Choisir la science la plus utile avant de lancer la lecture.',
+    submenu,
+  }
+}
+
+export function resolveCurrentMenuKey(key?: string | null): string | null {
+  if (!key) return null
+  return LEGACY_TO_CURRENT_MENU_KEY[key] ?? key
+}
+
+export function resolveKsSelectionKeyFromMenuKey(key?: string | null): string | null {
+  if (!key) return null
+  return CURRENT_TO_KS_SELECTION_KEY[key] ?? CURRENT_TO_LEGACY_MENU_KEY[key] ?? key
+}
+
 export function getMenuForMode(mode: HexastraMode, plan?: string): HexastraMenuItem[] {
   if (plan === 'free') return freeMenu
   return scienceMenu
@@ -134,10 +268,19 @@ export function getMenuForMode(mode: HexastraMode, plan?: string): HexastraMenuI
 
 export function findMenuItem(items: HexastraMenuItem[], key?: string | null): HexastraMenuItem | null {
   if (!key || !Array.isArray(items)) return null
+  if (key === 'science') return buildLegacyScienceMenu(items)
+
+  const normalizedKey = resolveCurrentMenuKey(key)
+  if (!normalizedKey) return null
+
   for (const item of items) {
-    if (item.key === key) return item
-    const sub = item.submenu?.find((child) => child.key === key)
-    if (sub) return sub
+    if (item.key === normalizedKey) return normalizedKey === key ? item : cloneMenuItem(item, key)
+    const sub = item.submenu?.find((child) => child.key === normalizedKey)
+    if (sub) return normalizedKey === key ? sub : cloneMenuItem(sub, key)
   }
+
+  const fallbackItem = LEGACY_SCIENCE_FALLBACK_ITEMS[key]
+  if (fallbackItem) return cloneMenuItem(fallbackItem)
+
   return null
 }

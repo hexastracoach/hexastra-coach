@@ -89,6 +89,22 @@ describe('client send policy', () => {
     expect(decision.reply).toContain('Que veux-tu explorer')
   })
 
+  it('does not treat a numeric reply as a menu choice when a modern submenu is already active', () => {
+    const decision = resolveClientSendPolicy({
+      message: '1',
+      plan: 'premium',
+      usedMessages: 0,
+      menuItems: MENU_ITEMS,
+      selectedMenuKey: 'science_human_design',
+      selectedSubmenuKey: 'hd_portes',
+      activeClarificationQuestion: 'Que veux-tu explorer dans tes portes ?',
+      activeContextFrame: 'Contexte Human Design - Portes',
+    })
+
+    expect(decision.kind).not.toBe('open_parent')
+    expect(decision.kind).not.toBe('select_context')
+  })
+
   it('keeps the free daily quota gate on the client for immediate feedback', () => {
     const decision = resolveClientSendPolicy({
       message: 'Analyse ma situation actuelle',

@@ -109,7 +109,7 @@ export default function MenuDock({
   }
 
   return (
-    <section className="hx-menu-dock hx-menu-dock-compact" aria-label="Choix d’exploration">
+    <section className="hx-menu-dock hx-menu-dock-compact" aria-label="Choix d'exploration">
       <div className="hx-menu-dock-inline-head">
         <div className="hx-menu-dock-inline-title-wrap">
           <span className="hx-menu-dock-inline-icon">
@@ -171,10 +171,7 @@ export default function MenuDock({
               </div>
 
               {hasSubmenu && isOpen ? (
-                <div
-                  id={`submenu-${item.key}`}
-                  className="hx-menu-dock-inline-submenu"
-                >
+                <div id={`submenu-${item.key}`} className="hx-menu-dock-inline-submenu">
                   <div className="hx-menu-dock-submenu-head">
                     <span className="hx-menu-dock-submenu-kicker">Sous-menus</span>
                     <span className="hx-menu-dock-submenu-title">{item.label}</span>
@@ -190,9 +187,7 @@ export default function MenuDock({
                       }}
                     >
                       <span className="hx-menu-dock-inline-subbutton-kicker">Sous-angle</span>
-                      <span className="hx-menu-dock-inline-subbutton-title">
-                        {sub.label}
-                      </span>
+                      <span className="hx-menu-dock-inline-subbutton-title">{sub.label}</span>
                       {sub.description ? (
                         <small className="hx-menu-dock-inline-subbutton-desc">
                           {sub.description}

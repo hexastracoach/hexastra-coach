@@ -9,7 +9,11 @@ import { buildSessionContext } from '@/lib/hexastra/context/buildSessionContext'
 import { buildChatPayload } from '@/lib/hexastra/payload/buildChatPayload'
 import { compressKnowledgeContext } from '@/lib/contextCompressor'
 import { getAdaptiveRetrievalConfig } from '@/lib/retrievalPolicy'
-import { getMenuForMode, findMenuItem } from '@/lib/hexastra/menus/getMenuForMode'
+import {
+  getMenuForMode,
+  findMenuItem,
+  resolveKsSelectionKeyFromMenuKey,
+} from '@/lib/hexastra/menus/getMenuForMode'
 import {
   persistConversationMessage,
   writeSessionState,
@@ -114,6 +118,11 @@ const OPENAI_TIMEOUT_BY_PLAN: Record<string, number> = {
 function resolveOpenAiTimeoutMs(plan: string): number {
   return OPENAI_TIMEOUT_BY_PLAN[plan] ?? OPENAI_TIMEOUT_BY_PLAN.free
 }
+
+function getCompatibleSelectionExecutionContract(key?: string | null) {
+  return getKsSelectionExecutionContract(resolveKsSelectionKeyFromMenuKey(key))
+}
+
 const flowLog = (
   level: 'info' | 'debug' | 'warn' | 'error',
   msg: string,
@@ -529,8 +538,10 @@ function resolveContextualSelection(params: {
     }
   }
 
-  const selectedScienceKey = selectedSubmenuKey?.startsWith('science_')
-    ? getScienceSubanalysisDefinition(selectedSubmenuKey)?.parentScienceKey ?? selectedSubmenuKey
+  const resolvedSelectedSubmenuKey = resolveKsSelectionKeyFromMenuKey(selectedSubmenuKey)
+  const selectedScienceKey = resolvedSelectedSubmenuKey?.startsWith('science_')
+    ? getScienceSubanalysisDefinition(resolvedSelectedSubmenuKey)?.parentScienceKey ??
+      resolvedSelectedSubmenuKey
     : null
 
   const directSubscienceSelection = resolveScienceSubanalysisSelection(selectedScienceKey, message)
@@ -856,9 +867,9 @@ function resolveRetrievalProfile(params: {
   latestUserMessage?: string | null
 }) {
   const selectionConfig =
-    getKsSelectionExecutionContract(params.selectionKey ?? null) ??
-    getKsSelectionExecutionContract(params.selectedSubmenu?.key ?? null) ??
-    getKsSelectionExecutionContract(params.selectedMenu?.key ?? null)
+    getCompatibleSelectionExecutionContract(params.selectionKey ?? null) ??
+    getCompatibleSelectionExecutionContract(params.selectedSubmenu?.key ?? null) ??
+    getCompatibleSelectionExecutionContract(params.selectedMenu?.key ?? null)
   const freeformConfig = getKsFreeformExecutionContract(params.latestUserMessage ?? null)
 
   if (selectionConfig || freeformConfig) return 'selection_specialized'
@@ -915,9 +926,9 @@ function buildKsNarrativeBrief(params: {
 }) {
   const domainConfig = getKsDomainConfig(params.domainRoute)
   const selectionConfig =
-    getKsSelectionExecutionContract(params.selectionKey ?? null) ??
-    getKsSelectionExecutionContract(params.selectedSubmenu?.key ?? null) ??
-    getKsSelectionExecutionContract(params.selectedMenu?.key ?? null)
+    getCompatibleSelectionExecutionContract(params.selectionKey ?? null) ??
+    getCompatibleSelectionExecutionContract(params.selectedSubmenu?.key ?? null) ??
+    getCompatibleSelectionExecutionContract(params.selectedMenu?.key ?? null)
   const freeformConfig = getKsFreeformExecutionContract(params.latestUserMessage ?? null)
   const effectiveSelectionConfig = selectionConfig ?? freeformConfig
   const focus =
@@ -1574,8 +1585,10 @@ export async function runHexastraFlow(input: {
         : null
 
     const selectionExecutionContractPreview =
-      getKsSelectionExecutionContract(selectedSubmenuKey ?? selectedMenuKey ?? null)
-    const selectedSubscienceDefinition = getScienceSubanalysisDefinition(selectedSubmenuKey)
+      getCompatibleSelectionExecutionContract(selectedSubmenuKey ?? selectedMenuKey ?? null)
+    const selectedSubscienceDefinition = getScienceSubanalysisDefinition(
+      resolveKsSelectionKeyFromMenuKey(selectedSubmenuKey)
+    )
     const selectedParentScience =
       selectedMenu?.key === 'science' && selectedSubscienceDefinition?.parentScienceKey
         ? findMenuItem(selectedMenu.submenu ?? [], selectedSubscienceDefinition.parentScienceKey)
@@ -2138,8 +2151,8 @@ export async function runHexastraFlow(input: {
     const menuInstruction = retrievalPlan?.menu?.instruction ?? null
     const selectionExecutionContract =
       selectionExecutionContractPreview ??
-      getKsSelectionExecutionContract(selectedSubmenu?.key ?? null) ??
-      getKsSelectionExecutionContract(selectedMenuKey ?? null)
+      getCompatibleSelectionExecutionContract(selectedSubmenu?.key ?? null) ??
+      getCompatibleSelectionExecutionContract(selectedMenuKey ?? null)
     const freeformContract = getKsFreeformExecutionContract(latestUserMessage)
     const effectiveExecutionContract = selectionExecutionContract ?? freeformContract
 

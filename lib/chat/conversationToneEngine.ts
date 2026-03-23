@@ -1,4 +1,4 @@
-﻿/**
+/**
  * HexAstra conversation tone stabilizer.
  * Ensures every reply stays SHILO: calme, humain, clair, lucide, accessible.
  */
@@ -15,9 +15,12 @@ function normalizeWhitespace(text: string): string {
 
 function softenSystemicPhrases(text: string): string {
   return text
-    .replace(/(choisis|selectionne)\s+(une|la)\s+(cat[Ã©e]gorie|option)/gi, 'On peut avancer ensemble sans passer par un menu.')
-    .replace(/utilise\s+le\s+menu/gi, 'Dis-moi simplement ce qui compte pour toi, je mâ€™adapte.')
-    .replace(/voici\s+(les\s+)?options?\s*:/gi, 'VoilÃ  quelques pistes que je peux explorer avec toi :')
+    .replace(
+      /(choisis|selectionne)\s+(une|la)\s+(categorie|catégorie|option)/gi,
+      'On peut avancer ensemble sans passer par un menu.'
+    )
+    .replace(/utilise\s+le\s+menu/gi, "Dis-moi simplement ce qui compte pour toi, je m'adapte.")
+    .replace(/voici\s+(les\s+)?options?\s*:/gi, 'Voila quelques pistes que je peux explorer avec toi :')
 }
 
 function prependRecognition(text: string, intent?: string): string {
@@ -45,5 +48,3 @@ export function ensureHexAstraTone(text: string, ctx: ToneContext = {}): string 
   }
   return t
 }
-
-

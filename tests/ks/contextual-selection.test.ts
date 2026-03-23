@@ -25,31 +25,31 @@ describe('contextual selection helpers', () => {
     expect(actualQuestion).toBeNull()
   })
 
-  it('understands a typed science path with arrows down to the subscience', () => {
+  it('understands a typed science path with arrows down to the current submenu', () => {
     const match = findLooseMenuSelection({
       items: getMenuForMode('libre'),
-      message: 'Analyse par science -> Human Design -> Portes',
+      message: 'Human Design -> Portes actives',
       selectedMenuKey: null,
-    })
-
-    expect(match?.kind).toBe('subscience')
-    if (match?.kind === 'subscience') {
-      expect(match.science.key).toBe('science_porteum')
-      expect(match.option.key).toBe('science_porteum_gates')
-    }
-  })
-
-  it('understands a loose submenu selection inside an already active theme', () => {
-    const match = findLooseMenuSelection({
-      items: getMenuForMode('libre'),
-      message: 'relation compliquee',
-      selectedMenuKey: 'relations',
     })
 
     expect(match?.kind).toBe('submenu')
     if (match?.kind === 'submenu') {
-      expect(match.parent.key).toBe('relations')
-      expect(match.item.key).toBe('complex_relation')
+      expect(match.parent.key).toBe('science_human_design')
+      expect(match.item.key).toBe('hd_portes')
+    }
+  })
+
+  it('understands a loose submenu selection inside an already active science', () => {
+    const match = findLooseMenuSelection({
+      items: getMenuForMode('libre'),
+      message: 'portes actives',
+      selectedMenuKey: 'science_human_design',
+    })
+
+    expect(match?.kind).toBe('submenu')
+    if (match?.kind === 'submenu') {
+      expect(match.parent.key).toBe('science_human_design')
+      expect(match.item.key).toBe('hd_portes')
     }
   })
 

@@ -12,14 +12,14 @@ describe('orchestration policy layer', () => {
   it('requires clarification when a submenu is selected without a real question', () => {
     const menuContract = resolveMenuContract({
       plan: 'premium',
-      selectedMenuKey: 'science',
-      selectedSubmenuKey: 'science_porteum',
+      selectedMenuKey: 'science_human_design',
+      selectedSubmenuKey: 'hd_portes',
     })
 
     const normalized = buildNormalizedInput({
       requestType: 'chat',
-      selectedMenuKey: 'science',
-      selectedSubmenuKey: 'science_porteum',
+      selectedMenuKey: 'science_human_design',
+      selectedSubmenuKey: 'hd_portes',
       userMessage: '3',
       plan: 'premium',
       quotaState: 'ok',
@@ -52,14 +52,14 @@ describe('orchestration policy layer', () => {
   it('routes a real Human Design gates question to analysis', () => {
     const menuContract = resolveMenuContract({
       plan: 'premium',
-      selectedMenuKey: 'science',
-      selectedSubmenuKey: 'science_porteum',
+      selectedMenuKey: 'science_human_design',
+      selectedSubmenuKey: 'hd_portes',
     })
 
     const normalized = buildNormalizedInput({
       requestType: 'chat',
-      selectedMenuKey: 'science',
-      selectedSubmenuKey: 'science_porteum',
+      selectedMenuKey: 'science_human_design',
+      selectedSubmenuKey: 'hd_portes',
       userMessage: 'Quelles sont mes portes en HD ?',
       plan: 'premium',
       quotaState: 'ok',
@@ -166,8 +166,8 @@ describe('orchestration policy layer', () => {
   it('builds a shared orchestration bundle with a single evaluation entry point', () => {
     const normalized = buildNormalizedInput({
       requestType: 'chat',
-      selectedMenuKey: 'science',
-      selectedSubmenuKey: 'science_porteum',
+      selectedMenuKey: 'science_human_design',
+      selectedSubmenuKey: 'hd_portes',
       userMessage: 'Quelles sont mes portes en HD ?',
       plan: 'premium',
       quotaState: 'ok',
@@ -192,7 +192,7 @@ describe('orchestration policy layer', () => {
       legacyIntent: 'analysis',
     })
 
-    expect(evaluation.menuContract?.id).toBe('science_porteum')
+    expect(evaluation.menuContract?.id).toBe('hd_portes')
     expect(evaluation.policy.branch).toBe('analysis')
     expect(evaluation.execution.renderTemplate).toBe('guided_analysis')
     expect(evaluation.trace.policy.branch).toBe('analysis')

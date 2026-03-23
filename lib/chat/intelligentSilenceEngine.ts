@@ -1,4 +1,4 @@
-﻿type Energy = 'stress' | 'lost' | 'fatigue' | 'curious' | 'neutral'
+type Energy = 'stress' | 'lost' | 'fatigue' | 'curious' | 'neutral'
 
 type SilenceCtx = {
   intent?: string
@@ -12,16 +12,16 @@ const SHORT_UTTERANCES = [
   /^hey\b/i,
   /^coucou\b/i,
   /^merci\b/i,
-  /^(ok|oui|non|d'accord|je vois|intÃ©ressant)\b/i,
-  /^Ã§a va\b/i,
+  /^(ok|oui|non|d'accord|je vois|interessant|intéressant)\b/i,
+  /^(ca va|ça va)\b/i,
 ]
 
 const MINIMAL_SHAPES = {
   A: 'Salut. Je suis là.\nComment tu te sens maintenant ?',
-  B: 'Je vois.\nQu’est-ce qui demande à être clarifié ici ?',
-  C: 'D’accord.\nOn peut regarder ça simplement.',
+  B: "Je vois.\nQu'est-ce qui demande à être clarifié ici ?",
+  C: "D'accord.\nOn peut regarder ça simplement.",
   D: 'Merci.\nJe te suis.',
-  E: 'Je comprends.\nOù est-ce que ça bloque le plus ?',
+  E: 'Je comprends.\nOu est-ce que ça bloque le plus ?',
 }
 
 function pickShape(intent?: string, energy?: Energy): string {
@@ -37,8 +37,8 @@ function detectEnergy(msg?: string): Energy {
   if (!msg) return 'neutral'
   const t = msg.toLowerCase()
   if (/stress|tendu|angoiss|peur|pression/.test(t)) return 'stress'
-  if (/fatigu|Ã©puis|vidÃ©|lassÃ©|marre/.test(t)) return 'fatigue'
-  if (/perdu|flou|ne sais pas|hÃ©site|doute/.test(t)) return 'lost'
+  if (/fatigu|epuis|épuis|vide|vidé|lasse|lassé|marre/.test(t)) return 'fatigue'
+  if (/perdu|flou|ne sais pas|hesite|hésite|doute/.test(t)) return 'lost'
   if (/curieux|pourquoi|comment|envie de comprendre/.test(t)) return 'curious'
   return 'neutral'
 }
@@ -54,7 +54,6 @@ function detectOverexplaining(lines: string[]): boolean {
   if (lines.length > 5) return true
   const questions = lines.filter((l) => l.includes('?')).length
   if (questions > 1) return true
-  // repeated starters
   const starters = lines.map((l) => l.split(' ').slice(0, 3).join(' ').toLowerCase())
   const unique = new Set(starters)
   return unique.size < starters.length
@@ -68,7 +67,6 @@ function trimRedundancies(lines: string[]): string[] {
     if (!k) continue
     if (seen.has(k)) continue
     seen.add(k)
-    // skip filler phrases
     if (/merci pour (ce|ta)/i.test(l) && res.some((r) => /merci/i.test(r))) continue
     res.push(l)
   }
@@ -86,7 +84,6 @@ export function applyIntelligentSilence(reply: string, ctx: SilenceCtx = {}): st
   if (!reply) return reply
   const energy = detectEnergy(ctx.userMessage)
 
-  // For analyses/readings, only light trimming of redundancies
   if (ctx.isReading) {
     const lines = trimRedundancies(reply.split(/\r?\n/).map((l) => l.trim()).filter(Boolean))
     return lines.join('\n')
@@ -98,7 +95,5 @@ export function applyIntelligentSilence(reply: string, ctx: SilenceCtx = {}): st
     return lines.slice(0, 5).join('\n')
   }
 
-  // Compress to a minimal, calm shape
   return pickShape(ctx.intent, energy)
 }
-

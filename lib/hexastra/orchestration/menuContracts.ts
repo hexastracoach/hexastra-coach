@@ -1,18 +1,32 @@
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import { getKsSelectionExecutionContract } from '@/lib/hexastra/ks/ksRegistry'
-import { findMenuItem, getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
+import {
+  findMenuItem,
+  getMenuForMode,
+  resolveKsSelectionKeyFromMenuKey,
+} from '@/lib/hexastra/menus/getMenuForMode'
 import type { DomainRoute } from '@/lib/hexastra/types'
 import type { PlanKey } from '@/types/subscription'
 import type { DepthRequested, MenuContract, MenuDataRequirement } from './types'
 
 function inferRole(key: string): string {
-  if (key === 'science' || key.startsWith('science_')) return 'science'
+  if (
+    key === 'science' ||
+    key.startsWith('science_') ||
+    /^(astro|hd|num|enn|kua|fusion)_/.test(key)
+  ) {
+    return 'science'
+  }
   if (key.startsWith('pract_')) return 'practitioner'
   return 'theme'
 }
 
 function inferDataRequirement(route: DomainRoute, key: string): MenuDataRequirement {
-  if (/theme|natal|astral|astrolex|porteum|human|numerologie|triangle|neurokua|kua|timing/i.test(key)) {
+  if (
+    /theme|natal|astral|astrolex|porteum|human|numerologie|triangle|neurokua|kua|timing|astro_|hd_|num_|enn_|fusion_/i.test(
+      key
+    )
+  ) {
     return 'birth_basic'
   }
   if (route === 'fusion' || route === 'science' || route === 'timing' || route === 'neurokua' || route === 'gps_kua') {
@@ -22,7 +36,13 @@ function inferDataRequirement(route: DomainRoute, key: string): MenuDataRequirem
 }
 
 function inferMaxDepth(key: string): DepthRequested {
-  if (key.startsWith('science_') || key.startsWith('pract_')) return 'deep'
+  if (
+    key.startsWith('science_') ||
+    key.startsWith('pract_') ||
+    /^(astro|hd|num|enn|kua|fusion)_/.test(key)
+  ) {
+    return 'deep'
+  }
   return 'guided'
 }
 
@@ -38,12 +58,15 @@ export function resolveMenuContract(params: {
     selectedMenu && params.selectedSubmenuKey
       ? findMenuItem(selectedMenu.submenu ?? [], params.selectedSubmenuKey)
       : null
+  const executionKey =
+    resolveKsSelectionKeyFromMenuKey(params.selectedSubmenuKey) ??
+    resolveKsSelectionKeyFromMenuKey(params.selectedMenuKey)
 
   const active = selectedSubmenu ?? selectedMenu
   if (!active) return null
 
   const executionContract =
-    getKsSelectionExecutionContract(selectedSubmenu?.key ?? selectedMenu?.key ?? null)
+    getKsSelectionExecutionContract(executionKey)
 
   const route = active.domainRoute ?? selectedMenu?.domainRoute ?? 'general'
   const key = active.key

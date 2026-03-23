@@ -13,7 +13,11 @@ export type ClientSendPolicyDecision =
   | { kind: 'open_menu' }
   | { kind: 'open_parent'; selection: ResolvedMenuSelection }
   | { kind: 'select_context'; selection: ResolvedMenuSelection }
-  | { kind: 'local_reply'; reply: string; premiumLock?: { targetPlan: string; ctaLabel: string; text: string } }
+  | {
+      kind: 'local_reply'
+      reply: string
+      premiumLock?: { targetPlan: string; ctaLabel: string; text: string }
+    }
   | { kind: 'api' }
 
 function normalizeText(value: string) {
@@ -97,7 +101,7 @@ function buildFreeQuotaReply() {
   return {
     reply: `Tu as atteint la limite de ton accès découverte pour le moment.
 
-Ton espace gratuit se réouvrira automatiquement dans 24h.
+Ton espace gratuit se rouvrira automatiquement dans 24h.
 Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
     premiumLock: {
       targetPlan: 'essential',
@@ -134,11 +138,9 @@ export function resolveClientSendPolicy(params: {
   }
 
   const numericChoice = parseNumericMenuChoice(message)
-  const hasActiveScienceSubanalysis = Boolean(
-    selectedSubmenuKey && selectedSubmenuKey.startsWith('science_')
-  )
+  const hasActiveSubanalysisContext = Boolean(selectedSubmenuKey)
 
-  if (numericChoice && menuItems.length > 0 && !hasActiveScienceSubanalysis) {
+  if (numericChoice && menuItems.length > 0 && !hasActiveSubanalysisContext) {
     const selection = resolveNumericMenuSelection(menuItems, numericChoice, selectedMenuKey)
     if (selection?.openParentOnly) {
       return { kind: 'open_parent', selection }

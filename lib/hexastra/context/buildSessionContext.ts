@@ -1,5 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { ContextType, DomainRoute, EmotionalState, PrecisionLevel, SessionStateRecord, TimingIntensity } from '@/lib/hexastra/types'
+import type {
+  ContextType,
+  DomainRoute,
+  EmotionalState,
+  PrecisionLevel,
+  SessionStateRecord,
+  TimingIntensity,
+} from '@/lib/hexastra/types'
 import { readSessionState } from '@/lib/hexastra/memory/sessionMemory'
 import { detectDominantPotential } from '@/lib/hexastra/detection/detectDominantPotential'
 import { detectLifePhase } from '@/lib/hexastra/detection/detectLifePhase'
@@ -27,9 +34,19 @@ export type HexastraSessionContext = {
 
 function inferDomainRoute(message: string, contextType: ContextType): DomainRoute {
   const t = message.toLowerCase()
-  if (/(neurokua|kua|feng|direction|orientation|boussole|équilibre énergétique|equilibre energetique)/i.test(t)) return 'gps_kua'
-  if (/(fatigue|surcharge|stress|recharge|énergie|energie|etat du jour|état du jour)/i.test(t)) return 'neurokua'
-  if (/(fusion|lecture générale|lecture complete|lecture complète|hexastra complète|hexastra complete)/i.test(t)) return 'fusion'
+
+  if (/(fatigue|surcharge|stress|recharge|energie|etat du jour|état du jour|neurokua)/i.test(t)) {
+    return 'neurokua'
+  }
+
+  if (/\b(kua|feng|direction|orientation|boussole)\b|equilibre energetique|équilibre énergétique/i.test(t)) {
+    return 'gps_kua'
+  }
+
+  if (/(fusion|lecture generale|lecture complete|lecture complète|hexastra complete|hexastra complète)/i.test(t)) {
+    return 'fusion'
+  }
+
   if (contextType === 'career') return 'career'
   if (contextType === 'relationship') return 'relationship'
   if (contextType === 'decision') return 'decision'
@@ -62,12 +79,16 @@ export async function buildSessionContext({
   const theme = state?.current_theme ?? (resolvedContext === 'general' ? null : resolvedContext)
   const mode = practitioner ? 'praticien' : 'libre'
   const selected = findMenuItem(getMenuForMode(mode), selectedSubmenuKey ?? selectedMenuKey ?? null)
-  const domainRoute = selected?.domainRoute ?? state?.current_domain_route ?? inferDomainRoute(message, resolvedContext)
+  const domainRoute =
+    selected?.domainRoute ?? state?.current_domain_route ?? inferDomainRoute(message, resolvedContext)
   const activeModule =
-    domainRoute === 'gps_kua' ? 'KS.HexAstra.GPS.V1' :
-    domainRoute === 'neurokua' ? 'KS.NeuroKua.System.V1' :
-    domainRoute === 'fusion' ? 'KS.FUSION.V13' :
-    null
+    domainRoute === 'gps_kua'
+      ? 'KS.HexAstra.GPS.V1'
+      : domainRoute === 'neurokua'
+        ? 'KS.NeuroKua.System.V1'
+        : domainRoute === 'fusion'
+          ? 'KS.FUSION.V13'
+          : null
 
   return {
     state,

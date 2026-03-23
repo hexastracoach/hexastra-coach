@@ -612,8 +612,8 @@ export default function ChatPageClient() {
   const pushJourneyMessage = useCallback(
     (enabled: boolean) => {
       const content = enabled
-        ? `Ton parcours HexAstra est activÃ©.\nJe pourrai garder le fil de ton exploration, repÃ©rer les Ã©tapes dÃ©jÃ  traversÃ©es et te proposer plus facilement la prochaine Ã©tape utile.`
-        : `Le parcours HexAstra est dÃ©sactivÃ©.\nJe continue Ã  rÃ©pondre normalement, sans suivre explicitement un chemin Ã©tape par Ã©tape.`
+        ? `Ton parcours HexAstra est activé.\nJe pourrai garder le fil de ton exploration, repérer les étapes déjà traversées et te proposer plus facilement la prochaine étape utile.`
+        : `Le parcours HexAstra est désactivé.\nJe continue à répondre normalement, sans suivre explicitement un chemin étape par étape.`
       setMessages((prev) => [
         ...prev,
         {
@@ -1543,7 +1543,7 @@ export default function ChatPageClient() {
   const handleSend = useCallback(
     async (provided?: string) => {
       const baseContent = (provided ?? input).trim()
-      const attachNote = attachedFile ? `\n\n[PiÃ¨ce jointe : ${attachedFile.name}]` : ''
+      const attachNote = attachedFile ? `\n\n[Pièce jointe : ${attachedFile.name}]` : ''
       const currentBirthData = birthDataRef.current
       const currentPartnerBirthData = partnerBirthDataRef.current
       const content = baseContent + attachNote
@@ -1951,10 +1951,10 @@ export default function ChatPageClient() {
 
       {paymentSuccess && (
         <div className="hx-payment-success-banner" role="status">
-          <span>âœ¦</span>
-          <span>Paiement confirmÃ© â€” votre abonnement est activÃ©.</span>
+          <span>*</span>
+          <span>Paiement confirmé, votre abonnement est activé.</span>
           <button type="button" onClick={() => setPaymentSuccess(false)} aria-label="Fermer">
-            âœ•
+            ×
           </button>
         </div>
       )}

@@ -67,8 +67,13 @@ describe('render style controls', () => {
   })
 
   it('keeps maslow as a background support and not a public menu science', () => {
-    const libreScienceMenu = getMenuForMode('libre').find((item) => item.key === 'science')
-    const practitionerScienceMenu = getMenuForMode('praticien').find((item) => item.key === 'science')
+    const libreMenu = getMenuForMode('libre')
+    const practitionerMenu = getMenuForMode('praticien')
+    const libreKeys = libreMenu.flatMap((item) => [item.key, ...(item.submenu?.map((child) => child.key) ?? [])])
+    const practitionerKeys = practitionerMenu.flatMap((item) => [
+      item.key,
+      ...(item.submenu?.map((child) => child.key) ?? []),
+    ])
     const prompt = buildSystemPrompt({
       plan: 'free',
       mode: 'libre',
@@ -81,8 +86,8 @@ describe('render style controls', () => {
       messages: [{ role: 'user', content: 'fais moi une lecture generale' }],
     })
 
-    expect(libreScienceMenu?.submenu?.some((item) => item.key === 'science_maslow')).toBe(false)
-    expect(practitionerScienceMenu?.submenu?.some((item) => item.key === 'science_maslow')).toBe(false)
+    expect(libreKeys).not.toContain('science_maslow')
+    expect(practitionerKeys).not.toContain('science_maslow')
     expect(prompt).toContain("La Pyramide de Maslow peut servir de grille d'appui interne")
     expect(prompt).toContain('elle ne doit pas etre proposee spontanement comme science publique')
   })
