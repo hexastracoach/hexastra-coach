@@ -22,10 +22,36 @@ export type ReliabilityResult = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+function hasMeaningfulValue(
+  value: unknown,
+  seen = new Set<object>(),
+  depth = 0,
+): boolean {
+  if (value === null || value === undefined || value === '' || value === false) return false
+  if (typeof value === 'string') return value.trim().length > 0
+  if (typeof value === 'number') return Number.isFinite(value)
+  if (typeof value === 'boolean') return value
+  if (depth >= 6) return true
+
+  if (Array.isArray(value)) {
+    return value.some((item) => hasMeaningfulValue(item, seen, depth + 1))
+  }
+
+  if (value && typeof value === 'object') {
+    if (seen.has(value as object)) return false
+    seen.add(value as object)
+    return Object.values(value as Record<string, unknown>).some((item) =>
+      hasMeaningfulValue(item, seen, depth + 1),
+    )
+  }
+
+  return true
+}
+
 function hasValue(obj: Record<string, unknown>, ...keys: string[]): boolean {
   for (const key of keys) {
     const v = obj[key]
-    if (v !== null && v !== undefined && v !== '' && v !== false) return true
+    if (hasMeaningfulValue(v)) return true
   }
   return false
 }
@@ -93,13 +119,90 @@ function mergeHDSources(raw: Record<string, unknown>): Record<string, unknown> {
  */
 function mergeNumerologySources(raw: Record<string, unknown>): Record<string, unknown> {
   const merged: Record<string, unknown> = {}
-  for (const key of ['numerologie', 'numerology', 'numerologie_complete', 'numbers']) {
+  for (const key of [
+    'numerologie',
+    'numerology',
+    'numerologie_complete',
+    'numerologieComplete',
+    'numerology_complete',
+    'numerologyComplete',
+    'numerologyFull',
+    'numbers',
+  ]) {
     const block = raw[key]
     if (block && typeof block === 'object' && !Array.isArray(block)) {
       Object.assign(merged, block as Record<string, unknown>)
     }
   }
   return { ...merged, ...raw }
+}
+
+function findPresentAliasDeep(
+  value: unknown,
+  aliases: readonly string[],
+  seen = new Set<object>(),
+  depth = 0,
+): string | null {
+  if (!value || typeof value !== 'object') return null
+  if (seen.has(value as object)) return null
+  if (depth >= 6) return null
+
+  seen.add(value as object)
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findPresentAliasDeep(item, aliases, seen, depth + 1)
+      if (found) return found
+    }
+    return null
+  }
+
+  const obj = value as Record<string, unknown>
+  for (const [key, nested] of Object.entries(obj)) {
+    if (aliases.includes(key) && hasMeaningfulValue(nested)) return key
+    const found = findPresentAliasDeep(nested, aliases, seen, depth + 1)
+    if (found) return found
+  }
+
+  return null
+}
+
+function getObjectCandidate(raw: Record<string, unknown>, key: string): Record<string, unknown> | null {
+  const value = raw[key]
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return null
+}
+
+function findPresentAliasInSources(
+  raw: Record<string, unknown>,
+  aliases: readonly string[],
+  sourceKeys: readonly string[],
+): string | null {
+  for (const alias of aliases) {
+    if (hasValue(raw, alias)) return alias
+  }
+
+  for (const key of sourceKeys) {
+    const block = getObjectCandidate(raw, key)
+    if (!block) continue
+
+    for (const alias of aliases) {
+      if (hasValue(block, alias)) return alias
+    }
+
+    const nestedAlias = findPresentAliasDeep(block, aliases)
+    if (nestedAlias) return nestedAlias
+  }
+
+  return null
+}
+
+function normalizeSubcategories(subcategory: string | string[] | null | undefined): string[] {
+  if (Array.isArray(subcategory)) return subcategory.filter(Boolean)
+  if (typeof subcategory === 'string' && subcategory.trim()) return [subcategory]
+  return []
 }
 
 // ── Per-science checkers ───────────────────────────────────────────────────────
@@ -239,53 +342,72 @@ function checkHDReliability(
 
 function checkNumerologyReliability(
   raw: Record<string, unknown>,
-  subcategory: string | null,
+  subcategory: string | string[] | null,
 ): ReliabilityResult {
   const missing: string[] = []
   const errors: string[] = []
 
-  // Merge ALL numerology sources — Railway may use different key names
   const merged = mergeNumerologySources(raw)
+  const numerologySourceKeys = [
+    'numerologie',
+    'numerology',
+    'numerologie_complete',
+    'numerologieComplete',
+    'numerology_complete',
+    'numerologyComplete',
+    'numerologyFull',
+    'numbers',
+  ] as const
 
-  const lifePathOk = hasValue(
-    merged,
-    'chemin_de_vie', 'life_path', 'lifePath', 'cheminVie', 'chemin_vie',
-    'lifePathNumber', 'life_path_number', 'lifepath', 'life_path_no',
-    'numero_chemin', 'cheminDeVie', 'path', 'nombre_chemin',
-  )
-  if (!lifePathOk) missing.push('chemin_de_vie')
+  const aliasGroups = {
+    chemin_de_vie: [
+      'chemin_de_vie', 'life_path', 'lifePath', 'cheminVie', 'chemin_vie',
+      'lifePathNumber', 'life_path_number', 'lifepath', 'life_path_no',
+      'numero_chemin', 'cheminDeVie', 'nombre_chemin',
+    ],
+    annee_personnelle: [
+      'annee_personnelle', 'personal_year', 'personalYear', 'personal_year_number',
+      'personalYearNumber', 'anneePersonnelle', 'year_number',
+    ],
+    expression: [
+      'expression', 'expression_number', 'expressionNumber', 'nombre_expression',
+    ],
+    ame: [
+      'ame', 'soul', 'soul_number', 'soulUrge', 'soul_urge', 'soulUrgeNumber', 'nombre_ame',
+    ],
+    mois_personnel: [
+      'mois_personnel', 'personal_month', 'personalMonth', 'personal_month_number', 'personalMonthNumber',
+    ],
+    jour_personnel: [
+      'jour_personnel', 'personal_day', 'personalDay', 'personal_day_number', 'personalDayNumber',
+    ],
+    personnalite_num: [
+      'personnalite_num', 'personality_number', 'personalityNumber', 'nombre_personnalite',
+    ],
+  } as const
 
-  // Personal year is checked only when relevant subcategory — not required for basic reliability
-  if (subcategory === 'annee_personnelle') {
-    if (!hasValue(merged, 'annee_personnelle', 'personal_year', 'personalYear', 'personal_year_number', 'personalYearNumber', 'anneePersonnelle', 'year_number')) {
-      missing.push('annee_personnelle')
-    }
+  const subcategories = normalizeSubcategories(subcategory)
+  const requestedKeys = subcategories.filter((key): key is keyof typeof aliasGroups => key in aliasGroups)
+  const requiredKeys = requestedKeys.length > 0 ? requestedKeys : ['chemin_de_vie']
+
+  const matchedAliases = Object.fromEntries(
+    Object.entries(aliasGroups).map(([field, aliases]) => [
+      field,
+      findPresentAliasInSources(merged, aliases, numerologySourceKeys),
+    ]),
+  ) as Record<keyof typeof aliasGroups, string | null>
+
+  for (const key of requiredKeys) {
+    if (!matchedAliases[key]) missing.push(key)
   }
 
-  if (subcategory === 'expression') {
-    if (!hasValue(merged, 'expression', 'expression_number', 'expressionNumber', 'nombre_expression')) {
-      missing.push('expression')
-    }
-  }
-
-  if (subcategory === 'ame') {
-    if (!hasValue(merged, 'ame', 'soul', 'soul_number', 'soulUrge', 'soul_urge', 'soulUrgeNumber', 'nombre_ame')) {
-      missing.push('ame')
-    }
-  }
-
-  if (subcategory === 'mois_personnel') {
-    if (!hasValue(merged, 'mois_personnel', 'personal_month', 'personalMonth', 'personal_month_number')) {
-      missing.push('mois_personnel')
-    }
-  }
-
-  // Reliable when life path is present — sufficient for most numerology readings
-  const completeness = missing.includes('chemin_de_vie') ? 0 : Math.max(0.5, (1 - (missing.length - 0) / 5))
-  const reliable = lifePathOk
+  const foundCount = requiredKeys.length - missing.length
+  const completeness = requiredKeys.length > 0 ? foundCount / requiredKeys.length : 0
+  const reliable = missing.length === 0
 
   console.log('[NUMEROLOGY_RELIABILITY]', {
-    lifePathOk,
+    requestedFields: requiredKeys,
+    matchedAliases,
     missingFields: missing,
     completeness,
     reliable,
@@ -337,7 +459,7 @@ function checkEnneagramReliability(raw: Record<string, unknown>): ReliabilityRes
  */
 export function isReliableExactData(
   science: Science,
-  subcategory: string | null,
+  subcategory: string | string[] | null,
   raw: Record<string, unknown> | null | undefined,
 ): ReliabilityResult {
   if (!raw || typeof raw !== 'object') {
@@ -351,9 +473,9 @@ export function isReliableExactData(
 
   switch (science) {
     case 'astrology':
-      return checkAstroReliability(raw, subcategory)
+      return checkAstroReliability(raw, normalizeSubcategories(subcategory)[0] ?? null)
     case 'human_design':
-      return checkHDReliability(raw, subcategory)
+      return checkHDReliability(raw, normalizeSubcategories(subcategory)[0] ?? null)
     case 'numerology':
       return checkNumerologyReliability(raw, subcategory)
     case 'kua':

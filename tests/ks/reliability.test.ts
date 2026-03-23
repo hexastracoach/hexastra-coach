@@ -161,14 +161,42 @@ describe('isReliableExactData — numerology', () => {
     expect(result.missingFields).toContain('chemin_de_vie')
   })
 
-  it('detects missing annee_personnelle for that subcategory (but still reliable)', () => {
+  it('requires annee_personnelle when that subcategory is requested', () => {
     const result = isReliableExactData('numerology', 'annee_personnelle', {
       chemin_de_vie: 5,
       // no annee_personnelle
     })
-    // Life path present → reliable; annee_personnelle absence is noted but not blocking
-    expect(result.reliable).toBe(true)
+    expect(result.reliable).toBe(false)
     expect(result.missingFields).toContain('annee_personnelle')
+  })
+
+  it('accepts nested numerology fields from /chart/fusion blocks', () => {
+    const result = isReliableExactData('numerology', ['annee_personnelle', 'chemin_de_vie'], {
+      numerology: {
+        core: {
+          lifePathNumber: 8,
+        },
+        yearly: {
+          personalYearNumber: 3,
+        },
+      },
+    })
+    expect(result.reliable).toBe(true)
+    expect(result.completeness).toBe(1)
+    expect(result.missingFields).toHaveLength(0)
+  })
+
+  it('fails a multi numerology request when one requested field is missing', () => {
+    const result = isReliableExactData('numerology', ['annee_personnelle', 'chemin_de_vie'], {
+      numerology: {
+        yearly: {
+          personalYearNumber: 4,
+        },
+      },
+    })
+    expect(result.reliable).toBe(false)
+    expect(result.missingFields).toContain('chemin_de_vie')
+    expect(result.missingFields).not.toContain('annee_personnelle')
   })
 })
 

@@ -2252,19 +2252,28 @@ export async function runHexastraFlow(input: {
     // houses, HD type, Kua number, etc.), block the LLM response if the API
     // could not resolve the exact data. Never let the LLM hallucinate.
     const detectedSubcategoryForGuard = orchestrationExecution.detectedSubcategory
+    const detectedSubcategoriesForReliability =
+      orchestrationExecution.detectedSubcategories.length > 0
+        ? orchestrationExecution.detectedSubcategories
+        : universalClassif.subcategory
+          ? [universalClassif.subcategory]
+          : detectedSubcategoryForGuard
+            ? [detectedSubcategoryForGuard]
+            : []
     const exactDataNeeded = requiresExactData(detectedSubcategoryForGuard)
     const rawExactDataResolved = hasResolvedExactData(specializedResult)
 
     // Universal reliability check — validates field completeness per science
     const reliabilityResult = isReliableExactData(
       universalClassif.science,
-      universalClassif.subcategory ?? detectedSubcategoryForGuard,
+      detectedSubcategoriesForReliability,
       specializedResult?.raw ?? null,
     )
     let exactDataResolved = rawExactDataResolved && reliabilityResult.completeness > 0
     flowLog(reliabilityResult.reliable ? 'info' : 'warn', 'EXACT_DATA_RELIABLE', {
       science: universalClassif.science,
       subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
+      requestedSubcategories: detectedSubcategoriesForReliability,
       reliable: reliabilityResult.reliable,
       completeness: reliabilityResult.completeness,
       missingFields: reliabilityResult.missingFields,
