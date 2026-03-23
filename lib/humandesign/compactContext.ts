@@ -9,6 +9,8 @@
  * but filtered for Human Design fields exclusively.
  */
 
+import { extractHDProfileFromRaw, isReliableHumanDesignProfile } from '@/lib/humandesign/profile'
+
 // ── HD-only keys to include ───────────────────────────────────────────────────
 const HD_KEYS = new Set([
   // Type / Profile / Authority
@@ -65,6 +67,36 @@ function resolveHDValue(v: unknown): string | null {
   return null
 }
 
+function resolveHDValueDeep(
+  value: unknown,
+  aliases: readonly string[],
+  seen = new Set<object>(),
+): string | null {
+  if (!value || typeof value !== 'object') return null
+  if (seen.has(value as object)) return null
+  seen.add(value as object)
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = resolveHDValueDeep(item, aliases, seen)
+      if (found) return found
+    }
+    return null
+  }
+
+  const obj = value as Record<string, unknown>
+  for (const [key, nested] of Object.entries(obj)) {
+    if (aliases.includes(key)) {
+      const direct = resolveHDValue(nested)
+      if (direct) return direct
+    }
+    const found = resolveHDValueDeep(nested, aliases, seen)
+    if (found) return found
+  }
+
+  return null
+}
+
 function safeArr(v: unknown): string[] {
   if (!Array.isArray(v)) return []
   // Accept both string arrays ("Gate 1") and number arrays (1) — convert numbers to strings
@@ -72,6 +104,11 @@ function safeArr(v: unknown): string[] {
     .filter((x) => (typeof x === 'string' && x.trim()) || typeof x === 'number')
     .map((x) => String(x).trim())
     .filter(Boolean)
+}
+
+function containsProfilePattern(value: string | null | undefined): boolean {
+  if (!value) return false
+  return /\b(?:profil|profile)\b[^\n]{0,30}\b[1-6]\/[1-6]\b|\b[1-6]\/[1-6]\b/i.test(value)
 }
 
 export type CompactHDContext = {
@@ -127,25 +164,34 @@ export function buildCompactHumanDesignContext(
   // ── Extract top-level HD fields — resolveHDValue handles nested objects ──
   const hdType =
     resolveHDValue(merged.type_hd) ?? resolveHDValue(merged.hd_type) ?? resolveHDValue(merged.type) ??
-    resolveHDValue(merged.hdType) ?? resolveHDValue(merged.type_label) ?? resolveHDValue(merged.type_name)
+    resolveHDValue(merged.hdType) ?? resolveHDValue(merged.type_label) ?? resolveHDValue(merged.type_name) ??
+    resolveHDValueDeep(merged, ['type_hd', 'hd_type', 'type', 'hdType', 'type_label', 'type_name'])
+  const deterministicProfile = extractHDProfileFromRaw(raw)
   const hdProfile =
-    resolveHDValue(merged.profil_hd) ?? resolveHDValue(merged.profile_hd) ?? resolveHDValue(merged.profile) ??
-    resolveHDValue(merged.profil) ?? resolveHDValue(merged.hdProfile) ?? resolveHDValue(merged.profileLine)
+    isReliableHumanDesignProfile(deterministicProfile)
+      ? deterministicProfile.profile
+      : null
   const hdAuthority =
     resolveHDValue(merged.autorite_hd) ?? resolveHDValue(merged.authority) ??
-    resolveHDValue(merged.inner_authority) ?? resolveHDValue(merged.innerAuthority) ?? resolveHDValue(merged.hdAuthority)
+    resolveHDValue(merged.inner_authority) ?? resolveHDValue(merged.innerAuthority) ?? resolveHDValue(merged.hdAuthority) ??
+    resolveHDValueDeep(merged, ['autorite_hd', 'authority', 'inner_authority', 'innerAuthority', 'hdAuthority'])
   const hdStrategy =
-    resolveHDValue(merged.strategie_hd) ?? resolveHDValue(merged.strategy) ?? resolveHDValue(merged.hdStrategy)
+    resolveHDValue(merged.strategie_hd) ?? resolveHDValue(merged.strategy) ?? resolveHDValue(merged.hdStrategy) ??
+    resolveHDValueDeep(merged, ['strategie_hd', 'strategy', 'hdStrategy'])
   const hdDefinition =
-    resolveHDValue(merged.definition_hd) ?? resolveHDValue(merged.definition) ?? resolveHDValue(merged.hdDefinition)
+    resolveHDValue(merged.definition_hd) ?? resolveHDValue(merged.definition) ?? resolveHDValue(merged.hdDefinition) ??
+    resolveHDValueDeep(merged, ['definition_hd', 'definition', 'hdDefinition'])
   const hdIncarnationCross =
     resolveHDValue(merged.croix_incarnation) ?? resolveHDValue(merged.incarnation_cross) ??
-    resolveHDValue(merged.incarnationCross)
+    resolveHDValue(merged.incarnationCross) ??
+    resolveHDValueDeep(merged, ['croix_incarnation', 'incarnation_cross', 'incarnationCross'])
   const hdSignature =
-    resolveHDValue(merged.signature_hd) ?? resolveHDValue(merged.signature) ?? resolveHDValue(merged.hdSignature)
+    resolveHDValue(merged.signature_hd) ?? resolveHDValue(merged.signature) ?? resolveHDValue(merged.hdSignature) ??
+    resolveHDValueDeep(merged, ['signature_hd', 'signature', 'hdSignature'])
   const hdNotSelfTheme =
     resolveHDValue(merged.not_self_theme) ?? resolveHDValue(merged.notSelfTheme) ??
-    resolveHDValue(merged.not_self) ?? resolveHDValue(merged.theme_non_soi) ?? resolveHDValue(merged.hdNotSelfTheme)
+    resolveHDValue(merged.not_self) ?? resolveHDValue(merged.theme_non_soi) ?? resolveHDValue(merged.hdNotSelfTheme) ??
+    resolveHDValueDeep(merged, ['not_self_theme', 'notSelfTheme', 'not_self', 'theme_non_soi', 'hdNotSelfTheme'])
 
   console.log('[HD_COMPACT] extracted core fields', {
     hdType, hdProfile, hdAuthority, hdStrategy,
@@ -196,6 +242,7 @@ export function buildCompactHumanDesignContext(
   // ── Summary seeds ─────────────────────────────────────────────────────────
   const hdSummarySeeds: string[] = (() => {
     const s = safeStr(merged.publicSummary) ?? safeStr(merged.publicsummary) ?? safeStr(merged.summary) ?? safeStr(merged.synthese)
+    if (!hdProfile && containsProfilePattern(s)) return []
     return s ? [s] : []
   })()
 

@@ -45,4 +45,22 @@ describe('User phrasing regressions', () => {
       classifyMessage('Je veux explorer mon profil ennéagramme et mon aile.')
     )).toBe(true)
   })
+
+  it('routes fatigue phrasing to an inner-state HexAstra reading instead of generic conversation', () => {
+    const result = detectSubcategory('Pourquoi je suis fatigué ?')
+    const found = result.matches.map((entry) => entry.subcategory)
+    const classification = classifyMessage('Pourquoi je suis fatigué ?')
+
+    expect(found).toContain('etat_emotionnel')
+    expect(classification.science).toBe('fusion')
+    expect(classification.domainRoute).toBe('neurokua')
+  })
+
+  it('treats "mes aspects du moment" as a current transit reading, not a static natal aspect request', () => {
+    const result = detectSubcategory('Mes aspects du moment')
+    const found = result.matches.map((entry) => entry.subcategory)
+
+    expect(found[0]).toBe('transits')
+    expect(found).toContain('aspects')
+  })
 })

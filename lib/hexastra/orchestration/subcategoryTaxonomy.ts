@@ -39,6 +39,7 @@ export const SUBCATEGORY_ENTRIES: SubcategoryEntry[] = [
     patterns: [
       /\b(transit[s]?|en transit|transits du (jour|moment|mois)|actuels? transit[s]?)\b/i,
       /\b(planetary transit|current transit|transit today|mes transits)\b/i,
+      /\b(aspects? du (jour|moment)|mes aspects? du moment|current aspects?)\b/i,
     ],
   },
   {
@@ -519,6 +520,7 @@ export const SUBCATEGORY_ENTRIES: SubcategoryEntry[] = [
     weight: 4,
     patterns: [
       /\b(je (me sens|suis|vis|ressens)|je (bloque|n.avance pas|tourne en rond)|je (suis|me sens) (perdu|perdue|bloqu[eé]|perturb[eé]|confus[e]?|d[eé]pass[eé]|d[eé]bord[eé]|submerg[eé]))\b/i,
+      /\b(pourquoi je (suis|me sens) (fatigu[eé]|[eé]puis[eé]|vid[eé]|stress[eé])|je (suis|me sens) (fatigu[eé]|[eé]puis[eé]|vid[eé]|stress[eé])|fatigue (int[eé]rieure|persistante|r[eé]p[eé]t[eé]e)?|besoin de recharge|je manque d.[eé]lan)\b/i,
     ],
   },
   {

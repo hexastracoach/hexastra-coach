@@ -246,9 +246,34 @@ function checkAstroReliability(
     if (!hasValue(astro, 'aspects', 'major_aspects')) missing.push('aspects')
   }
 
-  const total = subcategory === 'theme_natal' ? 8 : 3
-  const completeness = Math.max(0, (total - missing.length) / total)
-  const reliable = !missing.includes('sun') && !missing.includes('moon')
+  let expectedFields: string[]
+  switch (subcategory) {
+    case 'ascendant':
+      expectedFields = ['ascendant']
+      break
+    case 'signe_lunaire':
+      expectedFields = ['moon']
+      break
+    case 'maisons':
+      expectedFields = ['houses']
+      break
+    case 'aspects':
+      expectedFields = ['aspects']
+      break
+    case 'planetes':
+      expectedFields = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn']
+      break
+    case 'theme_natal':
+      expectedFields = ['sun', 'moon', 'mercury', 'venus', 'mars', 'jupiter', 'saturn', 'ascendant']
+      break
+    default:
+      expectedFields = ['sun', 'moon']
+      break
+  }
+
+  const expectedMissing = expectedFields.filter((field) => missing.includes(field))
+  const completeness = Math.max(0, (expectedFields.length - expectedMissing.length) / expectedFields.length)
+  const reliable = expectedMissing.length === 0
 
   console.log('[ASTRO_RELIABILITY]', {
     astroPath,
@@ -272,23 +297,43 @@ function checkHDReliability(
   // Merge ALL HD sources: humanDesign + humanDesignFull + human_design + hd
   // Railway splits summary (humanDesign) and full chart (humanDesignFull)
   const merged = mergeHDSources(raw)
+  const hdSourceKeys = ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull'] as const
 
-  // safeStrDeep handles both string values and nested objects like { name: "Generator" }
   const typeOk =
+    findPresentAliasInSources(
+      merged,
+      ['type_hd', 'hd_type', 'type', 'hdType', 'type_label', 'type_name'],
+      hdSourceKeys,
+    ) ??
     safeStrDeep(merged.type_hd) ?? safeStrDeep(merged.hd_type) ?? safeStrDeep(merged.type) ??
     safeStrDeep(merged.hdType) ?? safeStrDeep(merged.type_label) ?? safeStrDeep(merged.type_name)
 
   const profileOk =
+    findPresentAliasInSources(
+      merged,
+      ['profil_hd', 'profile_hd', 'profile', 'profil', 'hdProfile', 'profileLine', 'profile_line', 'personality_line'],
+      hdSourceKeys,
+    ) ??
     safeStrDeep(merged.profil_hd) ?? safeStrDeep(merged.profile_hd) ?? safeStrDeep(merged.profile) ??
     safeStrDeep(merged.profil) ?? safeStrDeep(merged.hdProfile) ?? safeStrDeep(merged.profileLine) ??
     safeStrDeep(merged.profile_line) ?? safeStrDeep(merged.personality_line)
 
   const authorityOk =
+    findPresentAliasInSources(
+      merged,
+      ['autorite_hd', 'authority', 'inner_authority', 'innerAuthority', 'hdAuthority'],
+      hdSourceKeys,
+    ) ??
     safeStrDeep(merged.autorite_hd) ?? safeStrDeep(merged.authority) ??
     safeStrDeep(merged.inner_authority) ?? safeStrDeep(merged.innerAuthority) ??
     safeStrDeep(merged.hdAuthority)
 
   const strategyOk =
+    findPresentAliasInSources(
+      merged,
+      ['strategie_hd', 'strategy', 'hdStrategy'],
+      hdSourceKeys,
+    ) ??
     safeStrDeep(merged.strategie_hd) ?? safeStrDeep(merged.strategy) ??
     safeStrDeep(merged.hdStrategy)
 
@@ -432,19 +477,29 @@ function checkKuaReliability(raw: Record<string, unknown>): ReliabilityResult {
   }
 }
 
-function checkEnneagramReliability(raw: Record<string, unknown>): ReliabilityResult {
+function checkEnneagramReliability(
+  raw: Record<string, unknown>,
+  subcategory: string | string[] | null,
+): ReliabilityResult {
   const missing: string[] = []
   const merged = mergeNested(raw, 'enneagram', 'enneagramme')
+  const subcategories = normalizeSubcategories(subcategory)
+  const requestedWing = subcategories.includes('aile_enn')
 
-  if (!hasValue(merged, 'type_enn', 'type', 'enneagram_type')) {
-    missing.push('type_enn')
-  }
+  const typeOk = hasValue(merged, 'type_enn', 'type', 'enneagram_type')
+  const wingOk = hasValue(merged, 'aile_enn', 'wing', 'enneagram_wing', 'aile')
+
+  if (!typeOk) missing.push('type_enn')
+  if (requestedWing && !wingOk) missing.push('aile_enn')
+
+  const expectedFields = requestedWing ? 2 : 1
+  const completeness = Math.max(0, (expectedFields - missing.length) / expectedFields)
 
   return {
     reliable: missing.length === 0,
     missingFields: missing,
     errors: [],
-    completeness: missing.length === 0 ? 1 : 0,
+    completeness,
   }
 }
 
@@ -481,7 +536,7 @@ export function isReliableExactData(
     case 'kua':
       return checkKuaReliability(raw)
     case 'enneagram':
-      return checkEnneagramReliability(raw)
+      return checkEnneagramReliability(raw, subcategory)
     default:
       // For fusion / general / unknown — we can't validate field by field
       // Treat as unreliable unless raw has substantial content

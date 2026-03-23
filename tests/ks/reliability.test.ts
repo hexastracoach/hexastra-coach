@@ -63,6 +63,30 @@ describe('isReliableExactData — astrology', () => {
     expect(result.reliable).toBe(true)
   })
 
+  it('requires the ascendant itself for ascendant-specific requests', () => {
+    const result = isReliableExactData('astrology', 'ascendant', {
+      tropical: {
+        sun: { sign: 'Sagittaire', degree: 14.2 },
+        moon: { sign: 'Verseau', degree: 2.4 },
+      },
+    })
+    expect(result.reliable).toBe(false)
+    expect(result.completeness).toBe(0)
+    expect(result.missingFields).toContain('ascendant')
+  })
+
+  it('accepts longitude-only tropical data when the ascendant object is present', () => {
+    const result = isReliableExactData('astrology', 'ascendant', {
+      tropical: {
+        sun: { lon: 280.038993374667 },
+        moon: { lon: 155.9921878541953 },
+        ascendant: { lon: 205.3 },
+      },
+    })
+    expect(result.reliable).toBe(true)
+    expect(result.missingFields).not.toContain('ascendant')
+  })
+
   it('detects missing houses for maisons subcategory', () => {
     const result = isReliableExactData('astrology', 'maisons', {
       sun: 'Lion',
@@ -236,6 +260,16 @@ describe('isReliableExactData — enneagram', () => {
     })
     expect(result.reliable).toBe(false)
     expect(result.missingFields).toContain('type_enn')
+  })
+
+  it('requires wing data when aile_enn is explicitly requested', () => {
+    const result = isReliableExactData('enneagram', ['type_enn', 'aile_enn'], {
+      enneagram: {
+        type_enn: 8,
+      },
+    })
+    expect(result.reliable).toBe(false)
+    expect(result.missingFields).toContain('aile_enn')
   })
 })
 

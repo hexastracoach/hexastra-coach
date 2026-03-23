@@ -174,7 +174,7 @@ describe('buildCompactHumanDesignContext — HD-only extraction', () => {
   it('TC24 — extrait type/profil/autorité correctement', () => {
     const ctx = buildCompactHumanDesignContext(RAW_HD_FULL)
     expect(ctx.hdType).toBe('Projecteur')
-    expect(ctx.hdProfile).toBe('3/5')
+    expect(ctx.hdProfile).toBeNull()
     expect(ctx.hdAuthority).toBe('Autorité Splénique')
   })
 
@@ -216,7 +216,7 @@ describe('buildCompactHumanDesignContext — HD-only extraction', () => {
     const ctx = buildCompactHumanDesignContext(RAW_HD_FULL)
     expect(ctx.compactDataBlock).toContain('DONNÉES HUMAN DESIGN')
     expect(ctx.compactDataBlock).toContain('Projecteur')
-    expect(ctx.compactDataBlock).toContain('3/5')
+    expect(ctx.compactDataBlock).not.toContain('3/5')
   })
 
   it('TC32 — respecte la limite maxChars', () => {
@@ -227,9 +227,28 @@ describe('buildCompactHumanDesignContext — HD-only extraction', () => {
   it('TC33 — fonctionne avec données minimales', () => {
     const ctx = buildCompactHumanDesignContext(RAW_HD_MINIMAL)
     expect(ctx.hdType).toBe('Générateur')
-    expect(ctx.hdProfile).toBe('2/4')
+    expect(ctx.hdProfile).toBeNull()
     expect(ctx.hdDefinedCenters).toHaveLength(0)
     expect(ctx.hdActivatedGates).toHaveLength(0)
+  })
+
+  it('TC33b — préfère le profil calculé depuis les activations à un champ profile trompeur', () => {
+    const ctx = buildCompactHumanDesignContext({
+      humanDesignFull: {
+        profile: '5/1',
+        activations: {
+          conscious: {
+            sun: { line: 3 },
+          },
+          unconscious: {
+            earth: { line: 5 },
+          },
+        },
+      },
+    })
+    expect(ctx.hdProfile).toBe('3/5')
+    expect(ctx.compactDataBlock).toContain('3/5')
+    expect(ctx.compactDataBlock).not.toContain('5/1')
   })
 
   it('TC34 — retourne null pour type/profil si données absentes', () => {
@@ -239,9 +258,8 @@ describe('buildCompactHumanDesignContext — HD-only extraction', () => {
     expect(ctx.hdAuthority).toBeNull()
   })
 
-  it('TC35 — extrait publicSummary comme hdSummarySeeds', () => {
+  it('TC35 — filtre une publicSummary qui fuit un profil non vérifié', () => {
     const ctx = buildCompactHumanDesignContext(RAW_HD_FULL)
-    expect(ctx.hdSummarySeeds.length).toBeGreaterThan(0)
-    expect(ctx.hdSummarySeeds[0]).toContain('hérétique')
+    expect(ctx.hdSummarySeeds).toHaveLength(0)
   })
 })

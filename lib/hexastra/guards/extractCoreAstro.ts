@@ -75,6 +75,21 @@ const SIGN_NORMALISATION: Record<string, string> = {
   'pisces': 'Poissons',
 }
 
+const ZODIAC_SIGNS_FR = [
+  'Bélier',
+  'Taureau',
+  'Gémeaux',
+  'Cancer',
+  'Lion',
+  'Vierge',
+  'Balance',
+  'Scorpion',
+  'Sagittaire',
+  'Capricorne',
+  'Verseau',
+  'Poissons',
+] as const
+
 function normaliseSign(raw: unknown): string | null {
   if (!raw) return null
   if (typeof raw !== 'string') return null
@@ -82,16 +97,83 @@ function normaliseSign(raw: unknown): string | null {
   return SIGN_NORMALISATION[lower] ?? (raw.trim() || null)
 }
 
-function extractDegree(obj: Record<string, unknown>): number | null {
-  const candidates = ['degree', 'degre', 'deg', 'longitude_in_sign', 'pos', 'lon', 'longitude']
-  for (const k of candidates) {
-    const v = obj[k]
-    if (typeof v === 'number' && !isNaN(v)) return Math.round(v * 10) / 10
-    if (typeof v === 'string') {
-      const parsed = parseFloat(v)
-      if (!isNaN(parsed)) return Math.round(parsed * 10) / 10
-    }
+function parseFiniteNumber(raw: unknown): number | null {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  if (typeof raw === 'string') {
+    const parsed = parseFloat(raw)
+    if (Number.isFinite(parsed)) return parsed
   }
+  return null
+}
+
+function normalizeLongitude(raw: unknown): number | null {
+  const parsed = parseFiniteNumber(raw)
+  if (parsed === null) return null
+  const wrapped = ((parsed % 360) + 360) % 360
+  return Math.round(wrapped * 1000) / 1000
+}
+
+function deriveSignFromLongitude(raw: unknown): string | null {
+  const longitude = normalizeLongitude(raw)
+  if (longitude === null) return null
+  return ZODIAC_SIGNS_FR[Math.floor(longitude / 30)] ?? null
+}
+
+function deriveDegreeFromLongitude(raw: unknown): number | null {
+  const longitude = normalizeLongitude(raw)
+  if (longitude === null) return null
+  return Math.round((longitude % 30) * 10) / 10
+}
+
+function extractDegree(obj: Record<string, unknown>): number | null {
+  const candidates = ['degree', 'degre', 'deg', 'longitude_in_sign', 'pos']
+  for (const k of candidates) {
+    const parsed = parseFiniteNumber(obj[k])
+    if (parsed !== null) return Math.round(parsed * 10) / 10
+  }
+  return deriveDegreeFromLongitude(obj.lon ?? obj.longitude ?? obj.lng ?? obj.ecliptic_longitude)
+}
+
+function extractSign(obj: Record<string, unknown>): string | null {
+  const signRaw =
+    obj.sign ??
+    obj.sign_name ?? obj.signName ??
+    obj.signe ??
+    obj.sign_fr ?? obj.signFr ?? obj.signFR ??
+    obj.zodiac_sign ?? obj.zodiacSign ??
+    obj.constellation ??
+    obj.name ?? obj.label ??
+    null
+  return normaliseSign(signRaw) ?? deriveSignFromLongitude(obj.lon ?? obj.longitude ?? obj.lng ?? obj.ecliptic_longitude)
+}
+
+function extractFlatPlacement(raw: Record<string, unknown>, key: string): CoreAstroPlacement | null {
+  const signKeyCandidates = [`${key}_sign`, `${key}Sign`, `${key}_signe`]
+  for (const signKey of signKeyCandidates) {
+    const sign = normaliseSign(raw[signKey])
+    if (!sign) continue
+    const degree =
+      parseFiniteNumber(raw[`${key}_degree`]) ??
+      parseFiniteNumber(raw[`${key}Degree`]) ??
+      parseFiniteNumber(raw[`${key}_degre`]) ??
+      null
+    return { sign, degree: degree !== null ? Math.round(degree * 10) / 10 : null, rawValue: raw[signKey] }
+  }
+
+  const longitude =
+    raw[`${key}_lon`] ??
+    raw[`${key}_longitude`] ??
+    raw[`${key}Longitude`] ??
+    raw[`${key}_lng`] ??
+    null
+  const sign = deriveSignFromLongitude(longitude)
+  if (!sign) return null
+  return {
+    sign,
+    degree: deriveDegreeFromLongitude(longitude),
+    rawValue: longitude,
+  }
+
   return null
 }
 
@@ -127,17 +209,7 @@ function resolvePlacement(raw: Record<string, unknown>, keys: string[]): CoreAst
     // Object value — extract sign + degree
     if (typeof value === 'object' && !Array.isArray(value)) {
       const obj = value as Record<string, unknown>
-      // Covers snake_case, camelCase and French variants from various Railway response shapes
-      const signRaw =
-        obj.sign ??
-        obj.sign_name ?? obj.signName ??
-        obj.signe ??
-        obj.sign_fr ?? obj.signFr ?? obj.signFR ??
-        obj.zodiac_sign ?? obj.zodiacSign ??
-        obj.constellation ??
-        obj.name ?? obj.label ??
-        null
-      const sign = normaliseSign(signRaw)
+      const sign = extractSign(obj)
       if (sign) {
         return {
           sign,
@@ -157,17 +229,8 @@ function resolvePlacement(raw: Record<string, unknown>, keys: string[]): CoreAst
 
   // Flat key variants: e.g. sun_sign + sun_degree at root level
   for (const key of keys) {
-    const signKey = `${key}_sign`
-    const signRaw = raw[signKey]
-    if (signRaw) {
-      const sign = normaliseSign(signRaw)
-      if (sign) {
-        const degreeKey = `${key}_degree`
-        const degRaw = raw[degreeKey]
-        const degree = typeof degRaw === 'number' ? degRaw : null
-        return { sign, degree, rawValue: signRaw }
-      }
-    }
+    const flat = extractFlatPlacement(raw, key)
+    if (flat) return flat
   }
 
   return null

@@ -50,6 +50,10 @@ export const EXACT_DATA_REQUIRED_SUBCATEGORIES = new Set<string>([
   'orientation_habitat', // Space orientation — requires Kua number
   'orientation_bureau',  // Desk orientation — requires Kua number
   'direction_sommeil',   // Sleeping direction — requires Kua number
+
+  // ── Enneagram ────────────────────────────────────────────────────────────
+  'type_enn',         // Enneagram type — requires exact source data
+  'aile_enn',         // Wing — requires exact neighboring-type data
 ])
 
 /** Whether a subcategory requires exact calculated API data */
@@ -185,6 +189,49 @@ export type CompactNatalContext = {
   compactDataBlock: string
 }
 
+const ZODIAC_SIGNS_FR = [
+  'Bélier',
+  'Taureau',
+  'Gémeaux',
+  'Cancer',
+  'Lion',
+  'Vierge',
+  'Balance',
+  'Scorpion',
+  'Sagittaire',
+  'Capricorne',
+  'Verseau',
+  'Poissons',
+] as const
+
+function parseFiniteNumber(raw: unknown): number | null {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  if (typeof raw === 'string') {
+    const parsed = parseFloat(raw)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+function normalizeLongitude(raw: unknown): number | null {
+  const parsed = parseFiniteNumber(raw)
+  if (parsed === null) return null
+  const wrapped = ((parsed % 360) + 360) % 360
+  return Math.round(wrapped * 1000) / 1000
+}
+
+function deriveSignFromLongitude(raw: unknown): string | null {
+  const longitude = normalizeLongitude(raw)
+  if (longitude === null) return null
+  return ZODIAC_SIGNS_FR[Math.floor(longitude / 30)] ?? null
+}
+
+function deriveDegreeFromLongitude(raw: unknown): number | null {
+  const longitude = normalizeLongitude(raw)
+  if (longitude === null) return null
+  return Math.round((longitude % 30) * 10) / 10
+}
+
 function extractStr(obj: Record<string, unknown>, ...keys: string[]): string | null {
   for (const k of keys) {
     const v = obj[k]
@@ -201,6 +248,10 @@ function extractStr(obj: Record<string, unknown>, ...keys: string[]): string | n
         nested.constellation ??
         nested.name ?? nested.label
       if (typeof sign === 'string' && sign.trim()) return sign.trim()
+      const derived = deriveSignFromLongitude(
+        nested.lon ?? nested.longitude ?? nested.lng ?? nested.ecliptic_longitude,
+      )
+      if (derived) return derived
     }
   }
   return null
@@ -209,15 +260,16 @@ function extractStr(obj: Record<string, unknown>, ...keys: string[]): string | n
 function extractNum(obj: Record<string, unknown>, ...keys: string[]): number | null {
   for (const k of keys) {
     const v = obj[k]
-    if (typeof v === 'number' && !isNaN(v)) return Math.round(v * 10) / 10
-    if (typeof v === 'string') {
-      const n = parseFloat(v)
-      if (!isNaN(n)) return Math.round(n * 10) / 10
-    }
+    const direct = parseFiniteNumber(v)
+    if (direct !== null) return Math.round(direct * 10) / 10
     if (v && typeof v === 'object' && !Array.isArray(v)) {
       const nested = v as Record<string, unknown>
-      const deg = nested.degree ?? nested.degre ?? nested.pos
-      if (typeof deg === 'number') return Math.round(deg * 10) / 10
+      const deg = parseFiniteNumber(nested.degree ?? nested.degre ?? nested.pos ?? nested.longitude_in_sign)
+      if (deg !== null) return Math.round(deg * 10) / 10
+      const derived = deriveDegreeFromLongitude(
+        nested.lon ?? nested.longitude ?? nested.lng ?? nested.ecliptic_longitude,
+      )
+      if (derived !== null) return derived
     }
   }
   return null

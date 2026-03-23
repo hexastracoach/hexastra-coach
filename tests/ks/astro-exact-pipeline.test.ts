@@ -83,6 +83,18 @@ function makeFusionFlatRoot() {
   }
 }
 
+/** Structure: tropical planets provide only absolute longitudes (actual Railway fallback shape) */
+function makeFusionWithLongitudesOnly() {
+  return {
+    tropical: {
+      sun: { lon: 280.038993374667, lat: 0.00016201670210021107 },
+      moon: { lon: 155.9921878541953, lat: 3.5675548479243115 },
+      ascendant: { lon: 205.3 },
+      mercury: { lon: 294.7 },
+    },
+  }
+}
+
 // ── resolveAstroSource ────────────────────────────────────────────────────────
 
 describe('resolveAstroSource — path detection', () => {
@@ -177,6 +189,16 @@ describe('extractCoreAstroPlacements — with tropical.planets structure', () =>
     expect(placements.moon?.degree).toBe(14.3)
   })
 
+  it('derives signs and in-sign degrees from longitude-only planetary objects', () => {
+    const placements = extractCoreAstroPlacements(makeFusionWithLongitudesOnly())
+    expect(placements.sun?.sign).toBe('Capricorne')
+    expect(placements.sun?.degree).toBe(10)
+    expect(placements.moon?.sign).toBe('Vierge')
+    expect(placements.moon?.degree).toBe(6)
+    expect(placements.rising?.sign).toBe('Balance')
+    expect(placements.rising?.degree).toBe(25.3)
+  })
+
   it('returns null for all when raw is null', () => {
     const placements = extractCoreAstroPlacements(null)
     expect(placements.sun).toBeNull()
@@ -226,6 +248,16 @@ describe('buildCompactNatalReadingContext — nested tropical.planets', () => {
     expect(ctx.moonSign).not.toBeNull()
     expect(ctx.risingSign).not.toBeNull()
   })
+
+  it('extracts sun/moon/rising from longitude-only tropical objects', () => {
+    const ctx = buildCompactNatalReadingContext(makeFusionWithLongitudesOnly())
+    expect(ctx.sunSign).toBe('Capricorne')
+    expect(ctx.moonSign).toBe('Vierge')
+    expect(ctx.risingSign).toBe('Balance')
+    expect(ctx.sunDegree).toBe(10)
+    expect(ctx.moonDegree).toBe(6)
+    expect(ctx.risingDegree).toBe(25.3)
+  })
 })
 
 // ── isReliableExactData — astrology ──────────────────────────────────────────
@@ -268,6 +300,21 @@ describe('isReliableExactData — astrology with nested tropical.planets', () =>
     expect(result.missingFields).toContain('ascendant')
     expect(result.missingFields).not.toContain('sun')
     expect(result.missingFields).not.toContain('moon')
+  })
+
+  it('returns reliable=false for ascendant subcategory when ascendant is missing', () => {
+    const raw = {
+      tropical: {
+        planets: {
+          sun: { sign: 'Aries', degree: 5.2 },
+          moon: { sign: 'Cancer', degree: 14.3 },
+        },
+      },
+    } as Record<string, unknown>
+    const result = isReliableExactData('astrology', 'ascendant', raw)
+    expect(result.reliable).toBe(false)
+    expect(result.completeness).toBe(0)
+    expect(result.missingFields).toContain('ascendant')
   })
 
   it('lists all missing planets for theme_natal when only sun present', () => {

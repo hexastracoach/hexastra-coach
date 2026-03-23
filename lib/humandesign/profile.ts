@@ -78,6 +78,124 @@ function safeObj(value: unknown): Record<string, unknown> | null {
   return null
 }
 
+type ActivationLineCandidate = {
+  side: 'personality' | 'design'
+  planet: 'sun' | 'earth' | null
+  line: number
+  path: string
+}
+
+function normalizeFragment(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function hasSemanticToken(value: string, tokens: readonly string[]): boolean {
+  return tokens.some((token) => {
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`).test(value)
+  })
+}
+
+function parseLineFromActivationValue(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number' || typeof value === 'string') {
+    const direct = toLine(value)
+    if (direct) return direct
+
+    const text = String(value).trim()
+    const decimal = text.match(/(?:^|[^\d])\d{1,2}\.(\d)(?:[^\d]|$)/)
+    if (decimal) {
+      const parsed = toLine(decimal[1])
+      if (parsed) return parsed
+    }
+  }
+
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>
+    return (
+      toLine(obj.line) ??
+      toLine(obj.profile_line) ??
+      toLine(obj.profileLine) ??
+      parseLineFromActivationValue(obj.activation) ??
+      parseLineFromActivationValue(obj.gate) ??
+      parseLineFromActivationValue(obj.gate_line) ??
+      parseLineFromActivationValue(obj.gateLine)
+    )
+  }
+
+  return null
+}
+
+function collectActivationLineCandidates(
+  value: unknown,
+  path: string,
+  acc: ActivationLineCandidate[],
+  seen = new Set<object>(),
+): void {
+  if (!value || typeof value !== 'object') return
+  if (seen.has(value as object)) return
+  seen.add(value as object)
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectActivationLineCandidates(item, `${path}[${index}]`, acc, seen))
+    return
+  }
+
+  const obj = value as Record<string, unknown>
+  const pathNorm = normalizeFragment(path).replace(/[^a-z0-9]+/g, ' ')
+  const roleNorm = [
+    pathNorm,
+    normalizeFragment(obj.side),
+    normalizeFragment(obj.kind),
+    normalizeFragment(obj.role),
+    normalizeFragment(obj.stream),
+    normalizeFragment(obj.color),
+    normalizeFragment(obj.hemisphere),
+    normalizeFragment(obj.activation_type),
+    normalizeFragment(obj.activationType),
+  ]
+    .join(' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+  const planetNorm = [
+    pathNorm,
+    normalizeFragment(obj.planet),
+    normalizeFragment(obj.celestial_body),
+    normalizeFragment(obj.celestialBody),
+    normalizeFragment(obj.body),
+    normalizeFragment(obj.name),
+    normalizeFragment(obj.label),
+  ]
+    .join(' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+
+  const side =
+    hasSemanticToken(roleNorm, ['personality', 'personnalite', 'conscious', 'noir', 'black'])
+      ? 'personality'
+      : hasSemanticToken(roleNorm, ['design', 'unconscious', 'rouge', 'red'])
+        ? 'design'
+        : null
+
+  const planet =
+    hasSemanticToken(planetNorm, ['sun', 'soleil'])
+      ? 'sun'
+      : hasSemanticToken(planetNorm, ['earth', 'terre'])
+        ? 'earth'
+        : null
+
+  const line = parseLineFromActivationValue(obj)
+  if (side && planet && line) {
+    acc.push({ side, planet, line, path })
+  }
+
+  for (const [key, nested] of Object.entries(obj)) {
+    collectActivationLineCandidates(nested, path ? `${path}.${key}` : key, acc, seen)
+  }
+}
+
 /**
  * Extract HD Profile lines from a /chart/fusion raw response.
  *
@@ -218,7 +336,40 @@ export function extractHDProfileFromRaw(
     }
   }
 
-  // ── Stratégie 3 (fallback): profile string dans objet HD ─────────────────
+  // ── Stratégie 3: scan récursif des activations Personality/Design Sun/Earth ──
+  // Certaines réponses /chart/fusion nichent ces lignes dans des objets plus profonds
+  // (activations, gates, conscious/unconscious, etc.). On préfère toujours ces lignes
+  // à un simple champ "profile" non corroboré.
+  const activationCandidates: ActivationLineCandidate[] = []
+  for (const hdKey of hdCandidateKeys) {
+    const hdObj = safeObj(raw[hdKey])
+    if (!hdObj) continue
+    collectActivationLineCandidates(hdObj, hdKey, activationCandidates)
+  }
+
+  const pickCandidate = (side: 'personality' | 'design') =>
+    activationCandidates.find((candidate) => candidate.side === side && candidate.planet === 'sun') ??
+    activationCandidates.find((candidate) => candidate.side === side && candidate.planet === 'earth') ??
+    null
+
+  const personalityActivation = pickCandidate('personality')
+  const designActivation = pickCandidate('design')
+  if (personalityActivation && designActivation) {
+    const result = {
+      personalityLine: personalityActivation.line,
+      designLine: designActivation.line,
+      profile: `${personalityActivation.line}/${designActivation.line}`,
+      calculated: true,
+      source: `${personalityActivation.path}+${designActivation.path}`,
+    }
+    console.log('[HD_PROFILE_EXTRACT] found via recursive activation scan [priority 3]', {
+      ...result,
+      candidatesFound: activationCandidates.length,
+    })
+    return result
+  }
+
+  // ── Stratégie 4 (fallback faible): profile string dans objet HD ───────────
   for (const hdKey of hdCandidateKeys) {
     const hdObj = safeObj(raw[hdKey])
     if (!hdObj) continue
@@ -229,33 +380,33 @@ export function extractHDProfileFromRaw(
         const result = {
           ...parsed,
           profile: `${parsed.personalityLine}/${parsed.designLine}`,
-          calculated: true,
+          calculated: false,
           source: `${hdKey}.${profileKey}`,
           rawValue: hdObj[profileKey],
         }
-        console.log('[HD_PROFILE_EXTRACT] found via HD object profile string [priority 3 — fallback]', result)
+        console.warn('[HD_PROFILE_EXTRACT] found via HD object profile string [non-deterministic fallback]', result)
         return result
       }
     }
   }
 
-  // ── Stratégie 3 (fallback): profile string au niveau racine ──────────────
+  // ── Stratégie 5 (fallback faible): profile string au niveau racine ───────
   for (const profileKey of ['profil_hd', 'profile_hd', 'hd_profile', 'hd_profil']) {
     const parsed = parseProfileString(raw[profileKey])
     if (parsed) {
       const result = {
         ...parsed,
         profile: `${parsed.personalityLine}/${parsed.designLine}`,
-        calculated: true,
+        calculated: false,
         source: profileKey,
         rawValue: raw[profileKey],
       }
-      console.log('[HD_PROFILE_EXTRACT] found via root profile string [priority 3 — fallback]', result)
+      console.warn('[HD_PROFILE_EXTRACT] found via root profile string [non-deterministic fallback]', result)
       return result
     }
   }
 
-  // ── Stratégie 4: gates imbriqués — Personality Gate 1 + Design Gate 1 ────
+  // ── Stratégie 6: gates imbriqués — Personality Gate 1 + Design Gate 1 ────
   // Certaines APIs exposent les listes de gates plutôt que les lignes extraites
   const hdRoot = safeObj(raw.human_design)
   const gatesObj = safeObj(raw.gates ?? hdRoot?.gates)

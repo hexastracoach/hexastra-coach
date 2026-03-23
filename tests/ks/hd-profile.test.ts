@@ -70,7 +70,7 @@ describe('extractHDProfileFromRaw — extraction depuis les données API', () =>
     expect(result.profile).toBe('3/5')
     expect(result.personalityLine).toBe(3)
     expect(result.designLine).toBe(5)
-    expect(result.calculated).toBe(true)
+    expect(result.calculated).toBe(false)
   })
 
   it('TC08 — extrait depuis human_design.personality_line + design_line', () => {
@@ -84,20 +84,39 @@ describe('extractHDProfileFromRaw — extraction depuis les données API', () =>
     const raw = { humanDesign: { profile: '4/6' } }
     const result = extractHDProfileFromRaw(raw)
     expect(result.profile).toBe('4/6')
-    expect(result.calculated).toBe(true)
+    expect(result.calculated).toBe(false)
   })
 
   it('TC10 — extrait depuis profil_hd à la racine', () => {
     const raw = { profil_hd: '2/4', type_hd: 'Projector' }
     const result = extractHDProfileFromRaw(raw)
     expect(result.profile).toBe('2/4')
-    expect(result.calculated).toBe(true)
+    expect(result.calculated).toBe(false)
   })
 
   it('TC11 — extrait depuis personality_line + design_line à la racine', () => {
     const raw = { personality_line: 5, design_line: 1 }
     const result = extractHDProfileFromRaw(raw)
     expect(result.profile).toBe('5/1')
+    expect(result.calculated).toBe(true)
+  })
+
+  it('TC11b — extrait depuis des activations récursives sun/earth quand le champ profile est trompeur', () => {
+    const raw = {
+      humanDesignFull: {
+        profile: '5/1',
+        activations: {
+          conscious: {
+            sun: { line: 3 },
+          },
+          unconscious: {
+            earth: { line: 5 },
+          },
+        },
+      },
+    }
+    const result = extractHDProfileFromRaw(raw)
+    expect(result.profile).toBe('3/5')
     expect(result.calculated).toBe(true)
   })
 

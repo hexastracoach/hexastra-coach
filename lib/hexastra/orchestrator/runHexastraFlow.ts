@@ -1497,6 +1497,9 @@ export async function runHexastraFlow(input: {
         isAstroExact ||
         isHumanDesignExact ||
         isHoroscopeRoute ||
+        ((universalClassif.requestKind === 'exact_fact' || universalClassif.requestKind === 'exact_profile') &&
+          universalClassif.science !== 'general' &&
+          universalClassif.science !== 'fusion') ||
         (semanticCtx.contextType !== 'profile' &&
           semanticCtx.contextType !== 'unknown' &&
           semanticCtx.confidence >= 0.8)
@@ -1542,6 +1545,11 @@ export async function runHexastraFlow(input: {
 
       const flowStep = isHoroscopeRoute
         ? 'analysis'
+        : isDirectRequest &&
+            computedFlowStep !== 'sensitive_support' &&
+            computedFlowStep !== 'birthdata' &&
+            computedFlowStep !== 'practitioner_usage'
+          ? 'analysis'
         : forceDirectReading && computedFlowStep !== 'sensitive_support'
           ? 'analysis'
           : computedFlowStep
