@@ -1259,6 +1259,10 @@ export function resolveAstroFollowupRoutingState(params: {
   semanticContextType: string
   currentRoute: DomainRoute
   science: string | null | undefined
+  isAstroExact?: boolean
+  hasBirthData?: boolean
+  subcategory?: string | null
+  requestKind?: string | null
 }): {
   branch: 'analysis' | null
   route: DomainRoute
@@ -1266,8 +1270,16 @@ export function resolveAstroFollowupRoutingState(params: {
   isAstroExact: boolean
   shouldUseApiBackbone: boolean
   effectiveDomainForApi: DomainRoute
+  lockTrigger: 'astro_followup' | 'astro_exact_with_birth_data' | null
+  forcedWithoutSubcategory: boolean
+  forcedWithUnknownRequestKind: boolean
 } {
-  if (params.semanticContextType === 'astro_followup') {
+  const shouldForceAstroExactScienceRoute =
+    params.science === 'astrology' &&
+    params.isAstroExact === true &&
+    params.hasBirthData === true
+
+  if (params.semanticContextType === 'astro_followup' || shouldForceAstroExactScienceRoute) {
     return {
       branch: 'analysis',
       route: 'science',
@@ -1275,6 +1287,14 @@ export function resolveAstroFollowupRoutingState(params: {
       isAstroExact: true,
       shouldUseApiBackbone: true,
       effectiveDomainForApi: 'science',
+      lockTrigger:
+        params.semanticContextType === 'astro_followup'
+          ? 'astro_followup'
+          : 'astro_exact_with_birth_data',
+      forcedWithoutSubcategory:
+        shouldForceAstroExactScienceRoute && !params.subcategory,
+      forcedWithUnknownRequestKind:
+        shouldForceAstroExactScienceRoute && params.requestKind === 'unknown',
     }
   }
 
@@ -1285,6 +1305,9 @@ export function resolveAstroFollowupRoutingState(params: {
     isAstroExact: false,
     shouldUseApiBackbone: false,
     effectiveDomainForApi: params.currentRoute,
+    lockTrigger: null,
+    forcedWithoutSubcategory: false,
+    forcedWithUnknownRequestKind: false,
   }
 }
 
@@ -1497,11 +1520,18 @@ export async function runHexastraFlow(input: {
 
       // human_design_exact: HD chart request ("design humain", "mon hd", "bodygraph", etc.)
       const isHumanDesignExact = semanticCtx.contextType === 'human_design_exact'
+      const hasBirthData = isBirthComplete(userContext.birthData)
+      const shouldForceAstroExactScienceRoute =
+        universalClassif.science === 'astrology' &&
+        isAstroExact &&
+        hasBirthData
 
       flowLog('info', 'SCIENCE_ROUTE_SELECTED', {
         science: universalClassif.science,
         isAstroExact,
         isHumanDesignExact,
+        hasBirthData,
+        shouldForceAstroExactScienceRoute,
         requestKind: universalClassif.requestKind,
         subcategory: universalClassif.subcategory,
         confidence: universalClassif.confidence,
@@ -1713,15 +1743,31 @@ export async function runHexastraFlow(input: {
     flowLog('debug', 'orchestration trace', {
       branch: orchestrationDecision.branch,
       route: isHoroscopeRoute ? 'horoscope_direct' : orchestrationDecision.effectiveRoute,
+      effectiveRouteAfterLocks: isHoroscopeRoute
+        ? 'horoscope_direct'
+        : shouldForceAstroExactScienceRoute
+          ? 'science'
+          : orchestrationDecision.effectiveRoute,
       renderTemplate: orchestrationExecution.renderTemplate,
       reasons: orchestrationDecision.reasonCodes,
       routeChosenReason: isHoroscopeRoute
         ? 'horoscope_direct'
-        : orchestrationDecision.effectiveRoute === 'general'
+        : shouldForceAstroExactScienceRoute
+          ? 'astro_exact_locked_to_science'
+          : orchestrationDecision.effectiveRoute === 'general'
           ? 'fallback_general'
           : 'explicit_match',
-      fallbackUsed: !isHoroscopeRoute && orchestrationDecision.effectiveRoute === 'general',
+      fallbackUsed:
+        !isHoroscopeRoute &&
+        !shouldForceAstroExactScienceRoute &&
+        orchestrationDecision.effectiveRoute === 'general',
       semanticContext: isHoroscopeRoute ? 'horoscope' : (semanticCtx?.contextType ?? 'unknown'),
+      hasBirthData,
+      shouldForceAstroExactScienceRoute,
+      forcedWithoutSubcategory:
+        shouldForceAstroExactScienceRoute && !universalClassif.subcategory,
+      forcedWithUnknownRequestKind:
+        shouldForceAstroExactScienceRoute && universalClassif.requestKind === 'unknown',
     })
 
     if (isHoroscopeRoute && orchestrationDecision.effectiveRoute === 'general') {
@@ -1732,7 +1778,19 @@ export async function runHexastraFlow(input: {
       })
     }
 
-    const isBirthNeeded = !isBirthComplete(userContext.birthData)
+    if (shouldForceAstroExactScienceRoute && orchestrationDecision.effectiveRoute === 'general') {
+      flowLog('info', 'ASTRO_EXACT_GENERAL_FALLBACK_BYPASSED', {
+        science: universalClassif.science,
+        isAstroExact,
+        hasBirthData,
+        subcategory: universalClassif.subcategory,
+        requestKind: universalClassif.requestKind,
+        bypassedRoute: orchestrationDecision.effectiveRoute,
+        forcedRoute: 'science',
+      })
+    }
+
+    const isBirthNeeded = !hasBirthData
     const needsPreciseBirthContext = requiresPreciseBirthContext(latestUserMessage)
     const isPreciseBirthContextMissing =
       needsPreciseBirthContext && !hasPreciseBirthContext(userContext.birthData)
@@ -2100,8 +2158,36 @@ export async function runHexastraFlow(input: {
       semanticContextType: semanticCtx.contextType,
       currentRoute: initialDomainRoute,
       science: universalClassif.science,
+      isAstroExact,
+      hasBirthData,
+      subcategory: universalClassif.subcategory,
+      requestKind: universalClassif.requestKind,
     })
     const domainRoute = astroFollowupRouting.route
+
+    if (astroFollowupRouting.lockTrigger === 'astro_exact_with_birth_data') {
+      flowLog(
+        'info',
+        astroFollowupRouting.forcedWithoutSubcategory
+          ? 'ASTRO_EXACT_ROUTE_FORCED_WITHOUT_SUBCATEGORY'
+          : 'ASTRO_EXACT_ROUTE_FORCED',
+        {
+          science: universalClassif.science,
+          isAstroExact,
+          hasBirthData,
+          needsExactData: universalClassif.needsExactData,
+          subcategory: universalClassif.subcategory,
+          requestKind: universalClassif.requestKind,
+          message: latestUserMessage.slice(0, 100),
+          chosenRoute: astroFollowupRouting.route,
+          lockedRoute: astroFollowupRouting.route,
+          effectiveDomainForApi: astroFollowupRouting.effectiveDomainForApi,
+          forcedWithoutSubcategory: astroFollowupRouting.forcedWithoutSubcategory,
+          forcedWithUnknownRequestKind: astroFollowupRouting.forcedWithUnknownRequestKind,
+          lockTrigger: 'science === astrology && isAstroExact && hasBirthData',
+        },
+      )
+    }
 
     const retrievalQuery = [
       latestUserMessage,
@@ -2232,10 +2318,12 @@ export async function runHexastraFlow(input: {
       orchestrationRoute: orchestrationExecution.route,
       effectiveDomainForApi,
       isAstroExact,
+      hasBirthData,
       isExactDataSubcategory,
       semanticContextType: semanticCtx.contextType,
       detectedSubcategory: orchestrationExecution.detectedSubcategory,
       shouldUseApiBackbone,
+      lockTrigger: astroFollowupRouting.lockTrigger,
     })
 
     if (semanticCtx.contextType === 'astro_followup' && shouldUseApiBackbone) {

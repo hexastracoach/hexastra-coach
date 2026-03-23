@@ -62,6 +62,12 @@ describe('detectContext', () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.9)
   })
 
+  it('détecte "astro_exact" pour la formulation courte "Je suis quel signe"', () => {
+    const result = detectContext('Je suis quel signe')
+    expect(result.contextType).toBe('astro_exact')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9)
+  })
+
   it('détecte "profile" pur pour "Qui suis-je" sans mention astro', () => {
     const result = detectContext('Qui suis-je ? Quels sont mes talents et mes forces ?')
     expect(result.contextType).toBe('profile')

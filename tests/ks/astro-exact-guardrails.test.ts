@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { detectContext } from '@/lib/hexastra/orchestration/detectContext'
+import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
 import { resolveAstroFollowupRoutingState } from '@/lib/hexastra/orchestrator/runHexastraFlow'
 import {
   buildCompactNatalReadingContext,
@@ -49,7 +50,59 @@ describe('astro exact guardrails', () => {
     expect(routing.isAstroExact).toBe(true)
     expect(routing.shouldUseApiBackbone).toBe(true)
     expect(routing.effectiveDomainForApi).toBe('science')
+    expect(routing.lockTrigger).toBe('astro_followup')
   })
+
+  it('forces science route when astro exact stays ambiguous (subcategory=null, requestKind=unknown)', () => {
+    const routing = resolveAstroFollowupRoutingState({
+      semanticContextType: 'astro_exact',
+      currentRoute: 'general',
+      science: 'astrology',
+      isAstroExact: true,
+      hasBirthData: true,
+      subcategory: null,
+      requestKind: 'unknown',
+    })
+
+    expect(routing.route).toBe('science')
+    expect(routing.effectiveDomainForApi).toBe('science')
+    expect(routing.shouldUseApiBackbone).toBe(true)
+    expect(routing.lockTrigger).toBe('astro_exact_with_birth_data')
+    expect(routing.forcedWithoutSubcategory).toBe(true)
+    expect(routing.forcedWithUnknownRequestKind).toBe(true)
+  })
+
+  it.each([
+    'quel est mon signe astrologique',
+    'quel est mon signe satrologique',
+    'je suis quel signe',
+    "c'est quoi mon signe solaire",
+  ])(
+    'forces science route for simple astro exact phrasing: $message',
+    (message) => {
+      const semantic = detectContext(message)
+      const classification = classifyMessage(message)
+      const routing = resolveAstroFollowupRoutingState({
+        semanticContextType: semantic.contextType,
+        currentRoute: 'general',
+        science: classification.science,
+        isAstroExact: semantic.contextType === 'astro_exact' || semantic.contextType === 'astro_followup',
+        hasBirthData: true,
+        subcategory: classification.subcategory,
+        requestKind: classification.requestKind,
+      })
+
+      expect(semantic.contextType).toBe('astro_exact')
+      expect(classification.science).toBe('astrology')
+      expect(classification.needsExactData).toBe(true)
+      expect(routing.route).toBe('science')
+      expect(routing.effectiveDomainForApi).toBe('science')
+      expect(routing.shouldUseApiBackbone).toBe(true)
+      expect(routing.lockTrigger).toBe('astro_exact_with_birth_data')
+      expect(routing.route).not.toBe('general')
+      expect(routing.effectiveDomainForApi).not.toBe('general')
+    },
+  )
 
   it('propagates usedLocalFallback=true when the exact local fallback was really used', () => {
     const diagnostics = getNormalizationDiagnostics({
