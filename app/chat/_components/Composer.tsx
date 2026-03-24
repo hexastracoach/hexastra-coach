@@ -183,24 +183,7 @@ export default function Composer({
 
   return (
     <div className="hx-composer-wrap">
-      {showFusionEntry && onFusionEntry && (
-        <div className="hx-composer-suggestions" aria-label="Entrée Hexastra">
-          <button
-            type="button"
-            onClick={() => onFusionEntry('Je veux une analyse Hexastra claire et directe de ma situation.')}
-            className="hx-chip"
-            disabled={disabled}
-          >
-            Explorer votre situation
-          </button>
-        </div>
-      )}
-
-      {suggestions && suggestions.length > 0 && onSuggestionSelect && (
-        <SuggestionChips suggestions={suggestions} onSelect={onSuggestionSelect} />
-      )}
-
-      {showQuickPrompts && !suggestions?.length && (
+      {showQuickPrompts && !(suggestions && suggestions.length > 0) && (
         <div className="hx-composer-suggestions">
           {['Découvrir mon profil', 'Comprendre mon ascendant', 'Faire un bilan', 'Analyser ma situation'].map(
             (prompt) => (

@@ -1823,14 +1823,8 @@ transition: all 0.35s ease;
 }
 
 @keyframes hxMsgIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .hx-message-row {
@@ -1838,8 +1832,8 @@ transition: all 0.35s ease;
   align-items: flex-start;
   padding: 6px 0;
   align-self: center;
-  will-change: opacity, transform;
-  animation: hxMsgIn 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  will-change: opacity;
+  animation: hxMsgIn 220ms ease both;
 }
 
 .hx-message-row.is-user {
@@ -6938,10 +6932,21 @@ select {
 
   .hx-app-bottom { padding: 8px 8px 12px; padding-bottom: max(10px, env(safe-area-inset-bottom, 10px)); }
   .hx-app-composer-wrap { padding: 0 8px; gap: 6px; }
-  .hx-composer-box { padding: 10px 12px; border-radius: 16px; gap: 8px; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .hx-composer-box {
+    padding: 10px 12px;
+    border-radius: 16px;
+    gap: 8px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* Supprimer toutes les transitions sur mobile — évite le saut visuel au focus/clavier */
+    transition: none;
+    transform: none !important;
+  }
+  .hx-composer-box.is-focused {
+    transform: none !important;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
   .hx-composer-actions-left { gap: 4px; }
-  .hx-composer-textarea { font-size: 15px; line-height: 1.5; padding: 6px 0;
-  align-self: center; max-width: 100%; }
+  .hx-composer-textarea { font-size: 16px; line-height: 1.5; padding: 6px 0; align-self: center; max-width: 100%; }
 }
 
 /* ── Messages ── */
