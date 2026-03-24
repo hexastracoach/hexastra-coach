@@ -130,18 +130,18 @@ const CTA_HREF = '/chat'
 
 const FR_COPY: CopyBundle = {
   header: {
-    how: 'Comment Ã§a marche',
+    how: 'Comment ça marche',
     plans: 'Premium',
     chat: 'Ouvrir le chat',
   },
   hero: {
-    eyebrow: 'Pour les moments oÃ¹ tout devient flou',
-    title: 'Quand tout se brouille, Hexastra vous aide Ã  voir juste.',
+    eyebrow: 'Pour les moments où tout devient flou',
+    title: 'Quand tout se brouille, Hexastra vous aide à voir juste.',
     subtitle:
-      "Vous tournez en rond, vous hÃ©sitez, vous sentez que quelque chose se joue sans rÃ©ussir Ã  le nommer. DÃ©crivez votre situation. Hexastra vous aide Ã  y voir clair et Ã  savoir quoi faire ensuite.",
+      "Vous tournez en rond, vous hésitez, vous sentez que quelque chose se joue sans réussir à le nommer. Décrivez votre situation. Hexastra vous aide à y voir clair et à savoir quoi faire ensuite.",
     primary: 'Voir clair maintenant',
-    secondary: 'Comment Ã§a marche',
-    trust: 'Entrez dans le chat. Une situation rÃ©elle. Une rÃ©ponse claire.',
+    secondary: 'Comment ça marche',
+    trust: 'Entrez dans le chat. Une situation réelle. Une réponse claire.',
     panelEyebrow: 'Ce que vous obtenez',
     panelTitle: 'Moins de bruit. Plus de direction.',
     panelRows: [
@@ -149,17 +149,17 @@ const FR_COPY: CopyBundle = {
       'Ce qui compte maintenant',
       'Le prochain pas qui a du sens',
     ],
-    panelNote: 'Direct, lisible, utile. Pas de systÃ¨me Ã  apprendre.',
+    panelNote: 'Direct, lisible, utile. Pas de système à apprendre.',
   },
   problem: {
-    eyebrow: 'Le vrai problÃ¨me',
-    title: "Vous n'avez pas besoin de plus d'informations. Vous avez besoin de clartÃ©.",
+    eyebrow: 'Le vrai problème',
+    title: "Vous n'avez pas besoin de plus d'informations. Vous avez besoin de clarté.",
     subtitle:
-      "Quand une situation compte vraiment, on mÃ©lange facilement peur, intuition, fatigue et attachement. Alors on suranalyse, on attend, et rien ne bouge.",
+      "Quand une situation compte vraiment, on mélange facilement peur, intuition, fatigue et attachement. Alors on suranalyse, on attend, et rien ne bouge.",
     items: [
       {
         title: 'Vous pensez trop',
-        body: "Chaque option semble juste puis mauvaise l'instant d'aprÃ¨s.",
+        body: "Chaque option semble juste puis mauvaise l'instant d'après.",
       },
       {
         title: "Vous sentez qu'il se passe quelque chose",
@@ -167,7 +167,7 @@ const FR_COPY: CopyBundle = {
       },
       {
         title: 'Vous voulez une direction',
-        body: "Pas une autre couche de thÃ©orie ou d'information de plus.",
+        body: "Pas une autre couche de théorie ou d'information de plus.",
       },
     ],
   },
@@ -269,49 +269,49 @@ const FR_COPY: CopyBundle = {
     ],
   },
   plans: {
-    eyebrow: 'AccÃ¨s',
+    eyebrow: 'Accès',
     title: 'Choisissez la profondeur qui vous convient.',
     subtitle:
-      "La mÃªme expÃ©rience Hexastra. Plus ou moins de profondeur selon l'importance du moment.",
-    note: "Premium est le meilleur point d'Ã©quilibre pour les dÃ©cisions importantes.",
+      "La même expérience Hexastra. Plus ou moins de profondeur selon l'importance du moment.",
+    note: "Premium est le meilleur point d'équilibre pour les décisions importantes.",
     items: [
       {
         key: 'free',
         title: 'Free',
-        price: '0â‚¬',
-        cadence: '/ accÃ¨s dÃ©couverte',
-        description: 'Pour ressentir la clartÃ© Hexastra sur une situation simple.',
-        bullets: ['AccÃ¨s limitÃ© chaque jour', 'Parfait pour essayer', 'Commencez immÃ©diatement'],
+        price: '0€',
+        cadence: '/ accès découverte',
+        description: 'Pour ressentir la clarté Hexastra sur une situation simple.',
+        bullets: ['Accès limité chaque jour', 'Parfait pour essayer', 'Commencez immédiatement'],
         cta: 'Essayer maintenant',
       },
       {
         key: 'essential',
         title: 'Essential',
-        price: '9â‚¬',
+        price: '9€',
         cadence: '/ mois',
-        description: 'Pour un usage fluide et quotidien, avec des rÃ©ponses claires et concises.',
-        bullets: ['Usage illimitÃ©', 'Guidance directe', 'PensÃ© pour le quotidien'],
+        description: 'Pour un usage fluide et quotidien, avec des réponses claires et concises.',
+        bullets: ['Usage illimité', 'Guidance directe', 'Pensé pour le quotidien'],
         cta: 'Continuer avec Essential',
       },
       {
         key: 'premium',
         title: 'Premium',
-        price: '19â‚¬',
+        price: '19€',
         cadence: '/ mois',
         description: 'Pour aller plus loin quand la situation compte vraiment.',
-        bullets: ['Analyse plus profonde', 'Plus de nuance', 'Le meilleur choix pour une dÃ©cision importante'],
+        bullets: ['Analyse plus profonde', 'Plus de nuance', 'Le meilleur choix pour une décision importante'],
         cta: 'Choisir Premium',
-        badge: 'RecommandÃ©',
+        badge: 'Recommandé',
         highlighted: true,
       },
       {
         key: 'practitioner',
         title: 'Practitioner',
-        price: '49â‚¬',
+        price: '49€',
         cadence: '/ mois',
-        description: 'Pour un usage avancÃ©, plus exigeant, et les futurs besoins pro.',
-        bullets: ['Usage avancÃ©', 'Cadre plus expert', 'Positionnement premium'],
-        cta: 'Voir le niveau avancÃ©',
+        description: 'Pour un usage avancé, plus exigeant, et les futurs besoins pro.',
+        bullets: ['Usage avancé', 'Cadre plus expert', 'Positionnement premium'],
+        cta: 'Voir le niveau avancé',
       },
     ],
   },
@@ -319,14 +319,14 @@ const FR_COPY: CopyBundle = {
     eyebrow: "Quand vous n'y voyez plus clair",
     title: 'Commencez par votre situation.',
     body:
-      'Pas besoin de la question parfaite. Dites simplement ce qui se passe. Hexastra vous aide Ã  voir juste.',
+      'Pas besoin de la question parfaite. Dites simplement ce qui se passe. Hexastra vous aide à voir juste.',
     cta: 'Ouvrir le chat',
   },
   footer: {
-    tagline: 'La clartÃ© change tout.',
+    tagline: 'La clarté change tout.',
     support: 'Support',
     contact: 'Contact',
-    privacy: 'ConfidentialitÃ©',
+    privacy: 'Confidentialité',
     terms: 'Conditions',
   },
 }
@@ -481,7 +481,7 @@ const EN_COPY: CopyBundle = {
       {
         key: 'free',
         title: 'Free',
-        price: 'â‚¬0',
+        price: '€0',
         cadence: '/ discovery access',
         description: 'Feel the Hexastra experience on a simple situation.',
         bullets: ['Limited daily access', 'Perfect to try', 'Start immediately'],
@@ -490,7 +490,7 @@ const EN_COPY: CopyBundle = {
       {
         key: 'essential',
         title: 'Essential',
-        price: 'â‚¬9',
+        price: '€9',
         cadence: '/ month',
         description: 'For fluid everyday use with clear and concise guidance.',
         bullets: ['Unlimited use', 'Direct guidance', 'Built for everyday clarity'],
@@ -499,7 +499,7 @@ const EN_COPY: CopyBundle = {
       {
         key: 'premium',
         title: 'Premium',
-        price: 'â‚¬19',
+        price: '€19',
         cadence: '/ month',
         description: 'Go deeper when the situation truly matters.',
         bullets: ['Deeper analysis', 'More nuance', 'The best choice for an important decision'],
@@ -510,7 +510,7 @@ const EN_COPY: CopyBundle = {
       {
         key: 'practitioner',
         title: 'Practitioner',
-        price: 'â‚¬49',
+        price: '€49',
         cadence: '/ month',
         description: 'For more advanced usage and future professional needs.',
         bullets: ['Advanced usage', 'More expert frame', 'Premium positioning'],

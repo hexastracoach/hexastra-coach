@@ -1382,21 +1382,24 @@ export default function ChatPageClient() {
       handleBirthDataChange(normalized)
       handlePartnerBirthDataChange(normalizedPartner)
 
-      // Persist to Supabase profiles table (fire-and-forget — non-blocking)
-      console.log('[BIRTH_FORM] birth data saved to localStorage, syncing to Supabase', {
-        firstName: normalized.firstName,
-        birthDate: normalized.birthDate,
-        birthCity: normalized.birthCity,
-        hasLat: !!normalized.birthLat,
-        hasLng: !!normalized.birthLng,
-      })
-      fetch('/api/profile/birth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(normalized),
-      }).catch((err) => {
-        console.warn('[BIRTH_FORM] Supabase sync failed (non-critical)', err)
-      })
+      // Sync with Supabase only for authenticated users. Guests keep local progress.
+      if (authUserId) {
+        console.log('[BIRTH_FORM] birth data saved to localStorage, syncing to Supabase', {
+          userId: authUserId,
+          firstName: normalized.firstName,
+          birthDate: normalized.birthDate,
+          birthCity: normalized.birthCity,
+          hasLat: !!normalized.birthLat,
+          hasLng: !!normalized.birthLng,
+        })
+        fetch('/api/profile/birth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(normalized),
+        }).catch((err) => {
+          console.warn('[BIRTH_FORM] Supabase sync failed (non-critical)', err)
+        })
+      }
 
       if (normalized.firstName) {
         setEvolutionProfile((prev) => {
@@ -1465,6 +1468,7 @@ export default function ChatPageClient() {
     },
     [
       activeContextType,
+      authUserId,
       appendBirthDataSavedMessage,
       birthAutoIntroCompleted,
       handleBirthDataChange,

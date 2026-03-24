@@ -5,7 +5,7 @@ export const FUSION_ONLY_ANALYSIS_MODE = 'hexastra_fusion' as const
 export const FUSION_ONLY_ENTRY_LABEL = 'Explorer votre situation'
 export const FUSION_ONLY_ANALYSIS_LABEL = 'Analyse Hexastra'
 export const SCIENCE_BREAKDOWN_FALLBACK_MESSAGE =
-  'Je peux te donner une rÃ©ponse directe si tu me parles de ta situation.'
+  'Je peux te donner une réponse directe si tu me parles de ta situation.'
 
 export type PublicScience =
   | 'astrology'
@@ -166,7 +166,7 @@ function normalizeScienceRequestText(value: string) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’']/g, ' ')
+    .replace(/[\u2019']/g, ' ')
     .replace(/[^a-z0-9\s/+-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()

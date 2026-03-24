@@ -1,4 +1,4 @@
-﻿import type { Mode } from '@/app/chat/_lib/chat'
+import type { Mode } from '@/app/chat/_lib/chat'
 import type {
   PlanKey,
   AnalysisDepth,
@@ -10,7 +10,7 @@ import { getPlanContract, getPlanQuotaLimit, PLAN_CONTRACTS } from '@/lib/hexast
 
 export type { PlanKey, AnalysisDepth, PlanCapabilities, PlanUiData, PlanApiContext }
 
-// â”€â”€â”€ Capabilities par plan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Capabilities par plan ─────────────────────────────────────────────────
 
 function toAnalysisDepth(plan: PlanKey): AnalysisDepth {
   const contract = getPlanContract(plan)
@@ -83,7 +83,7 @@ export const PLAN_CAPABILITIES: Record<PlanKey, PlanCapabilities> = {
   },
 }
 
-// â”€â”€â”€ DonnÃ©es UI (source unique pour homepage + pricing pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Données UI (source unique pour homepage + pricing pages) ──────────────
 
 export const PLANS_UI: PlanUiData[] = [
   {
@@ -150,7 +150,7 @@ export const PLANS_UI: PlanUiData[] = [
   },
 ]
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ──────────────────────────────────────────────────────────────
 
 export function getPlanCapabilities(plan: PlanKey): PlanCapabilities {
   return PLAN_CAPABILITIES[plan]
@@ -213,7 +213,7 @@ export function getPlanCheckoutAuthHref(plan: PlanKey): string {
   return `/auth?plan=${plan}&next=${next}`
 }
 
-/** Retourne le plan immÃ©diatement supÃ©rieur pour les CTA d'upgrade */
+/** Retourne le plan immédiatement supérieur pour les CTA d'upgrade */
 export function getUpgradeTarget(plan: PlanKey): {
   plan: PlanKey
   label: string
@@ -249,7 +249,7 @@ export function getPlanLabel(plan: PlanKey): string {
   return PLANS_UI.find((p) => p.key === plan)?.label ?? plan
 }
 
-/** Label affichÃ© quand un mode est bloquÃ© */
+/** Label affiché quand un mode est bloqué */
 export function getModeUnlockLabel(mode: Mode): string {
   if (mode === 'premium') return 'Disponible avec le plan Premium'
   if (mode === 'praticien') return 'Disponible avec le plan Praticien'
@@ -268,15 +268,15 @@ export function buildPlanApiContext(plan: PlanKey): PlanApiContext {
   }
 }
 
-// â”€â”€â”€ localStorage keys pour le suivi free â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── localStorage keys pour le suivi free ─────────────────────────────────
 
 export const FREE_USAGE_STORAGE_KEY = 'hexastra.free.usage'
 /** @deprecated replaced by FREE_USAGE_FIRST_MSG_KEY */
 export const FREE_USAGE_DATE_KEY = 'hexastra.free.date'
-/** ISO timestamp du premier message envoyÃ© dans la fenÃªtre de 24h en cours */
+/** ISO timestamp du premier message envoyé dans la fenêtre de 24h en cours */
 export const FREE_USAGE_FIRST_MSG_KEY = 'hexastra.free.firstmsg'
 
-/** RÃ©initialise complÃ¨tement le compteur free dans localStorage */
+/** Réinitialise complètement le compteur free dans localStorage */
 export function resetFreeUsage(): void {
   try {
     localStorage.removeItem(FREE_USAGE_STORAGE_KEY)
@@ -285,7 +285,7 @@ export function resetFreeUsage(): void {
   } catch { /* noop */ }
 }
 
-/** Retourne le timestamp de reset (firstMsg + 24h), ou null si pas de fenÃªtre active */
+/** Retourne le timestamp de reset (firstMsg + 24h), ou null si pas de fenêtre active */
 export function getFreeResetAt(): Date | null {
   try {
     const raw = localStorage.getItem(FREE_USAGE_FIRST_MSG_KEY)
