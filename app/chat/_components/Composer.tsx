@@ -78,8 +78,8 @@ function getHelperLabel({
   }
 
   return isEnglish
-    ? 'Press Enter to send, Shift + Enter for a new line.'
-    : 'Entrée pour envoyer, Maj + Entrée pour une nouvelle ligne.'
+    ? 'You can start simply. You do not need to be precise.'
+    : "Tu peux commencer simplement. Pas besoin d'être précis."
 }
 
 export default function Composer({
@@ -99,7 +99,7 @@ export default function Composer({
   showFusionEntry,
   onFusionEntry,
 }: Props) {
-  const { lang, t } = useTranslation()
+  const { lang } = useTranslation()
   const [focused, setFocused] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
@@ -169,7 +169,9 @@ export default function Composer({
     ? lang.startsWith('en')
       ? 'Transcribing your message...'
       : 'Je transcris votre message...'
-    : t('chat.placeholder')
+    : lang.startsWith('en')
+      ? 'What is blocking you or making you hesitate right now?'
+      : "Qu’est-ce qui te bloque ou te fait hésiter en ce moment ?"
   const statusLabel = getStatusLabel({
     lang,
     focused,

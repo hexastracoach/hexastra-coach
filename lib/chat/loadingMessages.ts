@@ -2,14 +2,14 @@ export const LOADING_MESSAGE_ROTATION_MS = 1700
 
 const LOADING_MESSAGES = {
   fr: [
-    'Je regarde ce qui est en train de se jouer…',
+    'Je regarde ce qui se joue…',
     'Je clarifie les points importants…',
-    'Je relie les éléments entre eux…',
+    'Je relie les éléments…',
   ],
   en: [
-    'I am looking at what is really unfolding…',
+    'I am looking at what is unfolding…',
     'I am clarifying the important points…',
-    'I am connecting the pieces together…',
+    'I am connecting the elements…',
   ],
 } as const
 

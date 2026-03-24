@@ -1,5 +1,6 @@
 ﻿'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { useSearchParams } from 'next/navigation'
 import PremiumBackground from '@/app/components/PremiumBackground'
@@ -7,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import Composer from './Composer'
 import LeftSidebar from './LeftSidebar'
 import MessageList from './MessageList'
+import WelcomeHero from './WelcomeHero'
 import BirthDataInlineForm from './BirthDataInlineForm'
 import PractitionerUsageStep from './PractitionerUsageStep'
 import RenderModeStep from './RenderModeStep'
@@ -154,41 +156,6 @@ const CONVERSATION_STORAGE_KEY = 'hexastra_conversation_id'
 const USER_MEMORY_STORAGE_KEY = 'hexastra.userMemory'
 const CACHE_LIMIT = 50
 const DUPLICATE_MESSAGE_WINDOW_MS = 1200
-
-function getWelcomeContent(language: string) {
-  switch (language) {
-    case 'en':
-      return `Hello.
-
-You do not need the perfect question.
-Tell me what feels unclear, heavy, or stuck for you right now.
-
-I will help you understand what is happening, then see the clearest next direction.`
-    case 'es':
-      return `Hola.
-
-Soy HexAstra Coach.
-Estoy aqui para ayudarte a comprender tu situacion, tu timing y la direccion mas util a seguir.
-
-Para lanzar tu primera lectura automatica, abre el formulario de datos de nacimiento en la barra de chat y completalo una vez.`
-    default:
-      return `Bonjour.
-
-Tu n'as pas besoin d'arriver avec une question parfaite.
-Parle-moi simplement de ce qui est flou, lourd ou bloqué pour toi.
-
-Je t'aiderai à comprendre ce qui se joue, puis à voir la direction la plus juste.`
-  }
-}
-
-function createWelcomeMessage(language: string): Msg {
-  return {
-    id: 'welcome',
-    role: 'assistant',
-    content: getWelcomeContent(language),
-    created_at: new Date().toISOString(),
-  }
-}
 
 function normalizeText(value: string) {
   return value
@@ -618,14 +585,35 @@ export default function ChatPageClient() {
 
   const desktopLeft = viewportWidth >= 1100
   const userInitials = getInitials(userEmail)
+  const isEnglishChat = chatLanguage.startsWith('en')
   const isLimitReached = isQuotaLimitedPlan(userPlan) && !canContinueChat(userPlan, quotaMessagesUsed)
-  const returnNote = chatLanguage?.startsWith('en')
+  const returnNote = isEnglishChat
     ? 'Come back with your situation. Things evolve, and your reading can evolve too.'
     : 'Reviens avec ta situation. Les choses évoluent, ta lecture aussi.'
   const shouldShowReturnNote =
     bootstrapUi.chatReady &&
     !isLimitReached &&
     messages.some((message) => message.role === 'assistant' && message.id !== 'welcome')
+  const showSoftUpgradePrompt =
+    userPlan === 'free' &&
+    userMessages.length >= 3 &&
+    !premiumLock &&
+    !isLimitReached &&
+    !isTyping
+  const headerTitle = isWelcome
+    ? isEnglishChat
+      ? 'Guided clarity'
+      : 'Clarté guidée'
+    : isTyping
+      ? isEnglishChat
+        ? 'Analysis in progress'
+        : 'Analyse en cours'
+      : isEnglishChat
+        ? 'Conversation'
+        : 'Conversation'
+  const headerSubtitle = isEnglishChat
+    ? 'A direct reading to help you decide more clearly.'
+    : 'Une lecture directe pour t’aider à décider plus clairement.'
 
   const isReadingFlowStep = useCallback((step?: string | null) => {
     if (!step) return false
@@ -1956,7 +1944,7 @@ export default function ChatPageClient() {
   )
 
   const handleNewReading = useCallback(() => {
-    setMessages([createWelcomeMessage(chatLanguage)])
+    setMessages([])
     setConversationId(null)
     setInput('')
     setMenuItems([])
@@ -1979,7 +1967,7 @@ export default function ChatPageClient() {
     try {
       removeScopedStorage(window.localStorage, CONVERSATION_STORAGE_KEY, storageScope)
     } catch {}
-  }, [chatLanguage, storageScope])
+  }, [storageScope])
 
   const handleCreateProject = useCallback(
     (name: string) => {
@@ -2013,6 +2001,7 @@ export default function ChatPageClient() {
       projects={projects}
       readings={readings}
       userInitials={userInitials}
+      userPlan={userPlan}
       onNewReading={handleNewReading}
       onCreateProject={handleCreateProject}
       onOpenReading={handleOpenReading}
@@ -2061,15 +2050,50 @@ export default function ChatPageClient() {
     showFusionEntry: bootstrapUi.chatReady && !isLimitReached,
     onFusionEntry: (prompt: string) => void handleSend(prompt),
   }
-  const isEnglishChat = chatLanguage.startsWith('en')
-  const topbarStatusLabel = isTyping
-    ? isEnglishChat
-      ? 'Hexastra is analyzing'
-      : 'Hexastra analyse'
-    : isEnglishChat
-      ? 'Hexastra live'
-      : 'Hexastra en direct'
-  const journeyLabel = isEnglishChat ? 'Track my Hexastra journey' : 'Suivre mon parcours Hexastra'
+  const composerSurface = (
+    <div className="hx-app-composer-wrap">
+      {activeInsight && activeInsight.confidence >= 0.55 && bootstrapUi.chatReady && !isLimitReached && !isWelcome && (
+        <MemoryHint
+          hint={activeInsight.memoryHint}
+          suggestionPrompt={activeInsight.suggestionPrompt}
+          onPrompt={(v) => void handleSend(v)}
+        />
+      )}
+
+      {showInlineBirthForm && (
+        <div className="hx-inline-birth">
+          <BirthDataInlineForm
+            data={birthData}
+            partnerData={partnerBirthData}
+            submitLabel={birthSubmitLabel}
+            onSave={(next, partner) => {
+              handleBirthDataSave(next, partner)
+              setShowInlineBirthForm(false)
+            }}
+          />
+        </div>
+      )}
+
+      {bootstrapOverlay ??
+        (isLimitReached ? (
+          <PaywallBanner
+            plan={userPlan}
+            resetAt={quotaResetAt}
+            isAuthenticated={Boolean(authUserId)}
+          />
+        ) : (
+          <Composer {...composerProps} />
+        ))}
+
+      {shouldShowReturnNote && !bootstrapOverlay && !isWelcome && (
+        <p className="hx-app-return-note">{returnNote}</p>
+      )}
+
+      {!isLimitReached && !bootstrapOverlay && (
+        <p className="hx-app-disclaimer">{t('chat.disclaimer')}</p>
+      )}
+    </div>
+  )
 
   return (
     <div className="hx-chat-page">
@@ -2092,7 +2116,7 @@ export default function ChatPageClient() {
 
         <main className="hx-app-main">
           <div className="hx-app-topbar">
-            <div className="hx-app-topbar-left">
+            <div className="flex min-w-0 items-center gap-3">
               {!desktopLeft && (
                 <button
                   type="button"
@@ -2104,39 +2128,96 @@ export default function ChatPageClient() {
                 </button>
               )}
 
-              <div className={`hx-topbar-presence${isTyping ? ' is-busy' : ''}`}>
-                <span className="hx-topbar-presence-dot" aria-hidden="true" />
-                <span>{topbarStatusLabel}</span>
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-300/18 bg-emerald-300/[0.07] shadow-[0_0_30px_rgba(16,185,129,0.12)]">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_20px_rgba(110,231,183,0.85)]" />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] uppercase tracking-[0.22em] text-slate-400/70">
+                    Hexastra
+                  </p>
+                  <p className="truncate text-sm font-medium text-slate-100/90">{headerTitle}</p>
+                  <p className="hidden truncate text-xs text-slate-400/70 md:block">{headerSubtitle}</p>
+                </div>
               </div>
             </div>
 
-            <div className="hx-topbar-controls">
-              <label className="hx-topbar-journey">
-                <input
-                  type="checkbox"
-                  checked={journeyEnabled}
-                  onChange={(e) => handleJourneyToggle(e.target.checked)}
-                />
-                <span>{journeyLabel}</span>
-              </label>
+            <div className="flex items-center gap-3">
               <LanguageSwitcher variant="flag" className="hx-nav-lang" />
+              <Link
+                href="/account"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-slate-100 transition duration-200 hover:border-emerald-300/18 hover:bg-emerald-300/[0.08]"
+                aria-label={isEnglishChat ? 'Open profile' : 'Ouvrir le profil'}
+              >
+                {userInitials}
+              </Link>
             </div>
           </div>
 
           <div className="hx-app-feed hx-scroll-soft">
-            <div className="hx-app-feed-inner">
-              <MessageList
-                messages={messages}
-                isTyping={isTyping}
-                lastUserMessage={lastUserMessage}
-                onRetry={(fallback) => {
-                  if (fallback) {
-                    void handleSend(fallback)
-                  } else {
-                    void handleSend(lastUserMessage)
-                  }
-                }}
-              />
+            <div className={`hx-app-feed-inner ${isWelcome ? 'flex min-h-full !max-w-[1120px] flex-col justify-center' : ''}`}>
+              {isWelcome ? (
+                <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center">
+                  <WelcomeHero onPrompt={(value) => void handleSend(value)} />
+                  <div className="mt-2 w-full max-w-3xl">{composerSurface}</div>
+                </div>
+              ) : (
+                <MessageList
+                  messages={messages}
+                  isTyping={isTyping}
+                  lastUserMessage={lastUserMessage}
+                  onRetry={(fallback) => {
+                    if (fallback) {
+                      void handleSend(fallback)
+                    } else {
+                      void handleSend(lastUserMessage)
+                    }
+                  }}
+                />
+              )}
+
+              {!isWelcome && showSoftUpgradePrompt && (
+                <div className="mx-auto mt-6 w-full max-w-2xl rounded-[28px] border border-emerald-300/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_18px_50px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-100/92">
+                        {isEnglishChat ? 'We can go further if you want.' : 'On peut aller plus loin si tu veux.'}
+                      </p>
+                      <p className="mt-1 text-sm leading-6 text-slate-300/70">
+                        {isEnglishChat
+                          ? 'Unlock a deeper reading with more precision and clearer decision support.'
+                          : 'Débloque une lecture plus profonde, plus précise, et plus utile pour décider.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center rounded-2xl border border-emerald-300/18 bg-emerald-300/[0.08] px-4 py-2.5 text-sm font-medium text-emerald-50 transition duration-200 hover:-translate-y-0.5 hover:bg-emerald-300/[0.14]"
+                      onClick={() => {
+                        const destination = authUserId
+                          ? getPlanCheckoutHref('premium')
+                          : getPlanCheckoutAuthHref('premium')
+                        trackHexastraFunnel('chat_upgrade_clicked', {
+                          location: 'soft_upgrade_prompt',
+                          plan: userPlan,
+                          source: entrySource,
+                          targetPlan: 'premium',
+                          reason: 'engagement',
+                        })
+                        trackHexastraFunnel('upgradeClicked', {
+                          location: 'soft_upgrade_prompt',
+                          plan: userPlan,
+                          source: entrySource,
+                          targetPlan: 'premium',
+                          reason: 'engagement',
+                        })
+                        window.location.href = destination
+                      }}
+                    >
+                      {isEnglishChat ? 'Discover Premium' : 'Découvrir Premium'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {premiumLock && (
                 <div className="hx-premium-lock">
@@ -2204,51 +2285,7 @@ export default function ChatPageClient() {
             </div>
           </div>
 
-          <div className="hx-app-bottom">
-            <div className="hx-app-composer-wrap">
-              {/* Memory hint — affiché subtilement quand un pattern récurrent est détecté */}
-              {activeInsight && activeInsight.confidence >= 0.55 && bootstrapUi.chatReady && !isLimitReached && (
-                <MemoryHint
-                  hint={activeInsight.memoryHint}
-                  suggestionPrompt={activeInsight.suggestionPrompt}
-                  onPrompt={(v) => void handleSend(v)}
-                />
-              )}
-
-              {showInlineBirthForm && (
-                <div className="hx-inline-birth">
-                  <BirthDataInlineForm
-                    data={birthData}
-                    partnerData={partnerBirthData}
-                    submitLabel={birthSubmitLabel}
-                    onSave={(next, partner) => {
-                      handleBirthDataSave(next, partner)
-                      setShowInlineBirthForm(false)
-                    }}
-                  />
-                </div>
-              )}
-
-              {bootstrapOverlay ??
-                (isLimitReached ? (
-                  <PaywallBanner
-                    plan={userPlan}
-                    resetAt={quotaResetAt}
-                    isAuthenticated={Boolean(authUserId)}
-                  />
-                ) : (
-                  <Composer {...composerProps} />
-                ))}
-
-              {shouldShowReturnNote && !bootstrapOverlay && (
-                <p className="hx-app-return-note">{returnNote}</p>
-              )}
-
-              {!isLimitReached && !bootstrapOverlay && (
-                <p className="hx-app-disclaimer">{t('chat.disclaimer')}</p>
-              )}
-            </div>
-          </div>
+          {!isWelcome && <div className="hx-app-bottom">{composerSurface}</div>}
         </main>
       </div>
     </div>
