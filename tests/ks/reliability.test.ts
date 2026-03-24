@@ -238,6 +238,40 @@ describe('isReliableExactData — numerology', () => {
     expect(result.missingFields).toContain('chemin_de_vie')
     expect(result.missingFields).not.toContain('annee_personnelle')
   })
+
+  it('handles controlled aliases inside humanDesign and humanDesignFull', () => {
+    const result = isReliableExactData('human_design', null, {
+      humanDesign: {
+        type: 'Projecteur',
+        profile_hd: '1/3',
+      },
+      humanDesignFull: {
+        strategy_hd: "Attendre l'invitation",
+        innerAuthority: 'Splenique',
+      },
+    })
+
+    expect(result.reliable).toBe(true)
+    expect(result.missingFields).not.toContain('type_hd')
+    expect(result.missingFields).not.toContain('profil_hd')
+    expect(result.missingFields).not.toContain('autorite_ou_strategie')
+  })
+
+  it('does not invent missing normalized fields', () => {
+    const result = isReliableExactData('human_design', null, {
+      humanDesign: {
+        profile: '4/6',
+      },
+      humanDesignFull: {
+        centres_hd: ['Gorge'],
+      },
+    })
+
+    expect(result.reliable).toBe(false)
+    expect(result.missingFields).toContain('type_hd')
+    expect(result.missingFields).toContain('autorite_ou_strategie')
+    expect(result.missingFields).not.toContain('profil_hd')
+  })
 })
 
 // ─── Kua ──────────────────────────────────────────────────────────────────────

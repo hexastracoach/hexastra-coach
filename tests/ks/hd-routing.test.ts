@@ -85,6 +85,41 @@ describe('classifyQuery — Human Design detection', () => {
   it('TC07 — unrelated message does NOT route to science', () => {
     expect(classifyQuery('comment gérer mon stress au travail')).not.toBe('science')
   })
+
+  it('TC37 â€” normalise les variantes controlÃ©es depuis humanDesign puis humanDesignFull', () => {
+    const ctx = buildCompactHumanDesignContext({
+      humanDesign: {
+        type: 'Projecteur',
+      },
+      humanDesignFull: {
+        strategy_hd: "Attendre l'invitation",
+        innerAuthority: 'SplÃ©nique',
+        profile_hd: '1/3',
+      },
+    })
+
+    expect(ctx.hdType).toBe('Projecteur')
+    expect(ctx.hdStrategy).toBe("Attendre l'invitation")
+    expect(ctx.hdAuthority).toBe('SplÃ©nique')
+    expect(ctx.hdProfile).toBe('1/3')
+    expect(ctx.compactDataBlock).toContain('1/3')
+  })
+
+  it('TC38 â€” ne renseigne pas les champs normalisÃ©s absents', () => {
+    const ctx = buildCompactHumanDesignContext({
+      humanDesign: {
+        profile: '4/6',
+      },
+      humanDesignFull: {
+        centres_hd: ['Gorge'],
+      },
+    })
+
+    expect(ctx.hdType).toBeNull()
+    expect(ctx.hdAuthority).toBeNull()
+    expect(ctx.hdStrategy).toBeNull()
+    expect(ctx.hdProfile).toBe('4/6')
+  })
 })
 
 // ─── detectContext ────────────────────────────────────────────────────────────
@@ -183,7 +218,7 @@ describe('buildCompactHumanDesignContext — HD-only extraction', () => {
   it('TC24 — extrait type/profil/autorité correctement', () => {
     const ctx = buildCompactHumanDesignContext(RAW_HD_FULL)
     expect(ctx.hdType).toBe('Projecteur')
-    expect(ctx.hdProfile).toBeNull()
+    expect(ctx.hdProfile).toBe('3/5')
     expect(ctx.hdAuthority).toBe('Autorité Splénique')
   })
 
@@ -225,7 +260,7 @@ describe('buildCompactHumanDesignContext — HD-only extraction', () => {
     const ctx = buildCompactHumanDesignContext(RAW_HD_FULL)
     expect(ctx.compactDataBlock).toContain('DONNÉES HUMAN DESIGN')
     expect(ctx.compactDataBlock).toContain('Projecteur')
-    expect(ctx.compactDataBlock).not.toContain('3/5')
+    expect(ctx.compactDataBlock).toContain('3/5')
   })
 
   it('TC32 — respecte la limite maxChars', () => {
@@ -236,7 +271,7 @@ describe('buildCompactHumanDesignContext — HD-only extraction', () => {
   it('TC33 — fonctionne avec données minimales', () => {
     const ctx = buildCompactHumanDesignContext(RAW_HD_MINIMAL)
     expect(ctx.hdType).toBe('Générateur')
-    expect(ctx.hdProfile).toBeNull()
+    expect(ctx.hdProfile).toBe('2/4')
     expect(ctx.hdDefinedCenters).toHaveLength(0)
     expect(ctx.hdActivatedGates).toHaveLength(0)
   })

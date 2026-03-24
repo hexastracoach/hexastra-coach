@@ -25,6 +25,8 @@
  *   profil_hd                       → "3/5"
  */
 
+import { resolveHumanDesignField } from '@/lib/humandesign/fieldResolver'
+
 export type HumanDesignProfileResult = {
   /** Computed profile string e.g. "3/5". Null if data insufficient. */
   profile: string | null
@@ -237,6 +239,7 @@ export function extractHDProfileFromRaw(
   const auditFirstDesignSun = auditFirstHD
     ? safeObj(auditFirstHD.design_sun ?? auditFirstHD.designSun)
     : null
+  const normalizedProfileFallback = resolveHumanDesignField(raw, 'hdProfile')
 
   const auditLog = {
     'humanDesign.profile': hdHumanDesign?.['profile'] ?? hdHumanDesign?.['profil'],
@@ -253,6 +256,8 @@ export function extractHDProfileFromRaw(
       raw.designLine,
     'personality_sun.line': auditFirstSun?.line,
     'design_sun.line': auditFirstDesignSun?.line,
+    'normalized.hdProfile': normalizedProfileFallback.value,
+    'normalized.hdProfilePath': normalizedProfileFallback.path,
   }
 
   console.log('[HD_PROFILE_AUDIT]', auditLog)
@@ -408,6 +413,23 @@ export function extractHDProfileFromRaw(
 
   // ── Stratégie 6: gates imbriqués — Personality Gate 1 + Design Gate 1 ────
   // Certaines APIs exposent les listes de gates plutôt que les lignes extraites
+  const parsedNormalizedProfile = parseProfileString(normalizedProfileFallback.value)
+  if (parsedNormalizedProfile) {
+    const result = {
+      ...parsedNormalizedProfile,
+      profile: `${parsedNormalizedProfile.personalityLine}/${parsedNormalizedProfile.designLine}`,
+      calculated: false,
+      source: normalizedProfileFallback.path ?? normalizedProfileFallback.source,
+      rawValue: normalizedProfileFallback.rawValue,
+    }
+    console.warn('[HD_PROFILE_EXTRACT] found via normalized profile fallback [non-deterministic fallback]', {
+      ...result,
+      alias: normalizedProfileFallback.alias,
+      sourceContainer: normalizedProfileFallback.source,
+    })
+    return result
+  }
+
   const hdRoot = safeObj(raw.human_design)
   const gatesObj = safeObj(raw.gates ?? hdRoot?.gates)
   if (gatesObj) {

@@ -9,6 +9,10 @@
 
 import type { Science } from '@/lib/hexastra/orchestration/universalClassification'
 import { resolveStrictAstroContext } from '@/lib/hexastra/guards/extractCoreAstro'
+import {
+  mergeHumanDesignSources,
+  resolveHumanDesignCoreFields,
+} from '@/lib/humandesign/fieldResolver'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -65,17 +69,6 @@ function safeStr(v: unknown): string | null {
  * Like safeStr, but also extracts a string from a nested object.
  * Handles e.g. { type: { name: "Generator", label: "..." } } → "Generator"
  */
-function safeStrDeep(v: unknown): string | null {
-  if (typeof v === 'string' && v.trim()) return v.trim()
-  if (v && typeof v === 'object' && !Array.isArray(v)) {
-    const obj = v as Record<string, unknown>
-    for (const k of ['name', 'label', 'value', 'text', 'title', 'fr', 'en', 'id']) {
-      if (typeof obj[k] === 'string' && (obj[k] as string).trim()) return (obj[k] as string).trim()
-    }
-  }
-  return null
-}
-
 function mergeNested(raw: Record<string, unknown>, ...nestKeys: string[]): Record<string, unknown> {
   for (const key of nestKeys) {
     const block = raw[key]
@@ -94,24 +87,6 @@ function mergeNested(raw: Record<string, unknown>, ...nestKeys: string[]): Recor
     return { ...blockObj, ...raw }
   }
   return raw
-}
-
-/**
- * Merge ALL known Human Design source objects from a raw /chart/fusion response.
- * Railway may split data across humanDesign (summary) and humanDesignFull (chart).
- * Later sources override earlier ones; raw root wins over everything.
- */
-function mergeHDSources(raw: Record<string, unknown>): Record<string, unknown> {
-  const merged: Record<string, unknown> = {}
-  // Order: humanDesign first (lower priority), humanDesignFull overrides, hd last
-  for (const key of ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull']) {
-    const block = raw[key]
-    if (block && typeof block === 'object' && !Array.isArray(block)) {
-      Object.assign(merged, block as Record<string, unknown>)
-    }
-  }
-  // Root-level raw overrides nested (e.g. explicit top-level type_hd field)
-  return { ...merged, ...raw }
 }
 
 /**
@@ -301,48 +276,12 @@ function checkHDReliability(
   const missing: string[] = []
   const errors: string[] = []
 
-  // Merge ALL HD sources: humanDesign + humanDesignFull + human_design + hd
-  // Railway splits summary (humanDesign) and full chart (humanDesignFull)
-  const merged = mergeHDSources(raw)
-  const hdSourceKeys = ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull'] as const
-
-  const typeOk =
-    findPresentAliasInSources(
-      merged,
-      ['type_hd', 'hd_type', 'type', 'hdType', 'type_label', 'type_name'],
-      hdSourceKeys,
-    ) ??
-    safeStrDeep(merged.type_hd) ?? safeStrDeep(merged.hd_type) ?? safeStrDeep(merged.type) ??
-    safeStrDeep(merged.hdType) ?? safeStrDeep(merged.type_label) ?? safeStrDeep(merged.type_name)
-
-  const profileOk =
-    findPresentAliasInSources(
-      merged,
-      ['profil_hd', 'profile_hd', 'profile', 'profil', 'hdProfile', 'profileLine', 'profile_line', 'personality_line'],
-      hdSourceKeys,
-    ) ??
-    safeStrDeep(merged.profil_hd) ?? safeStrDeep(merged.profile_hd) ?? safeStrDeep(merged.profile) ??
-    safeStrDeep(merged.profil) ?? safeStrDeep(merged.hdProfile) ?? safeStrDeep(merged.profileLine) ??
-    safeStrDeep(merged.profile_line) ?? safeStrDeep(merged.personality_line)
-
-  const authorityOk =
-    findPresentAliasInSources(
-      merged,
-      ['autorite_hd', 'authority', 'inner_authority', 'innerAuthority', 'hdAuthority'],
-      hdSourceKeys,
-    ) ??
-    safeStrDeep(merged.autorite_hd) ?? safeStrDeep(merged.authority) ??
-    safeStrDeep(merged.inner_authority) ?? safeStrDeep(merged.innerAuthority) ??
-    safeStrDeep(merged.hdAuthority)
-
-  const strategyOk =
-    findPresentAliasInSources(
-      merged,
-      ['strategie_hd', 'strategy', 'hdStrategy'],
-      hdSourceKeys,
-    ) ??
-    safeStrDeep(merged.strategie_hd) ?? safeStrDeep(merged.strategy) ??
-    safeStrDeep(merged.hdStrategy)
+  const merged = mergeHumanDesignSources(raw)
+  const normalizedCore = resolveHumanDesignCoreFields(raw)
+  const typeOk = normalizedCore.hdType.value
+  const profileOk = normalizedCore.hdProfile.value
+  const authorityOk = normalizedCore.hdAuthority.value
+  const strategyOk = normalizedCore.hdStrategy.value
 
   if (!typeOk) missing.push('type_hd')
   // Profile is enrichment: noted if absent but never blocks reliability
@@ -382,8 +321,15 @@ function checkHDReliability(
   const reliable = Boolean(typeOk) && (Boolean(authorityOk) || Boolean(strategyOk))
 
   console.log('[HD_RELIABILITY]', {
-    sourcesFound: ['human_design', 'hd', 'HD', 'humanDesign', 'humanDesignFull'].filter(k => !!raw[k]),
-    typeOk, profileOk, authorityOk, strategyOk,
+    sourcesFound: normalizedCore.sourcesFound,
+    hdType: normalizedCore.hdType,
+    hdProfile: normalizedCore.hdProfile,
+    hdAuthority: normalizedCore.hdAuthority,
+    hdStrategy: normalizedCore.hdStrategy,
+    typeOk,
+    profileOk,
+    authorityOk,
+    strategyOk,
     missingFields: missing,
     completeness,
     reliable,

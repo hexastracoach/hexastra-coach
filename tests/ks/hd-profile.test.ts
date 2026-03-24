@@ -38,6 +38,13 @@ describe('computeHumanDesignProfile — règles de calcul pur', () => {
     expect(result.calculated).toBe(false)
   })
 
+  it('TC09b â€” extrait aussi depuis humanDesignFull.hdProfile', () => {
+    const raw = { humanDesignFull: { hdProfile: '1/3' } }
+    const result = extractHDProfileFromRaw(raw)
+    expect(result.profile).toBe('1/3')
+    expect(result.calculated).toBe(false)
+  })
+
   it('TC04 — retourne calculated=false si designLine hors plage (0)', () => {
     const result = computeHumanDesignProfile({ personalityLine: 3, designLine: 0 })
     expect(result.profile).toBeNull()
