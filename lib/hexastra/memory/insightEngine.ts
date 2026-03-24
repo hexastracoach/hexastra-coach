@@ -52,8 +52,8 @@ const INSIGHT_DEFS: InsightDef[] = [
       /\b(d[eé]cis|choisir|choi[sx]|trancher|option|alternative|dilemme)\b/i,
       /\b(pro|travail|carri[eè]re|boulot|opportunit[eé]|poste|emploi)\b/i,
     ],
-    memoryHint: "On dirait que tu explores souvent les décisions et la direction de vie… tu veux creuser ça ?",
-    suggestionPrompt: 'Fais-moi une lecture fusionnée sur mes décisions de vie actuelles.',
+    memoryHint: 'Tu reviens souvent sur les décisions importantes. On peut reprendre ce qui a bougé depuis la dernière fois.',
+    suggestionPrompt: 'Aide-moi à voir plus clair avant de décider.',
   },
   {
     tag: 'transit_seeker',
@@ -62,7 +62,7 @@ const INSIGHT_DEFS: InsightDef[] = [
       /\b(transit|timing|moment|cycle|p[eé]riode|maintenant|quand agir)\b/i,
       /\b(aujourd.hui|cette semaine|ce mois|prochains? jours?)\b/i,
     ],
-    memoryHint: "Tu reviens souvent sur le timing et les cycles… une lecture prévision t'aiderait ?",
+    memoryHint: 'Le bon timing semble compter pour toi. Reviens avec ta situation quand elle bouge.',
     suggestionPrompt: 'Quel est le meilleur moment pour agir dans ma situation actuelle ?',
   },
   {
@@ -72,8 +72,8 @@ const INSIGHT_DEFS: InsightDef[] = [
       /\b(relation|couple|partenaire|amour|ami|famille|entourage)\b/i,
       /\b(conflit|tension|lien|connexion|compatibilit[eé])\b/i,
     ],
-    memoryHint: "Tes questions gravitent souvent autour des relations… tu veux explorer ça en profondeur ?",
-    suggestionPrompt: 'Analyse la dynamique de mes relations importantes en ce moment.',
+    memoryHint: 'Tes questions reviennent souvent vers les liens importants. On peut voir ce qui évolue vraiment dans la relation.',
+    suggestionPrompt: 'Analyse la dynamique de ma relation la plus importante en ce moment.',
   },
   {
     tag: 'emotional_exploration',
@@ -82,8 +82,8 @@ const INSIGHT_DEFS: InsightDef[] = [
       /\b(perdu|bloqu[eé]|sens[ie]?|ressens?|[eé]motion|anxieux|anxiet[eé]|stress|peur|tristesse)\b/i,
       /\b(int[eé]rieur|[aà] l.int[eé]rieur|profond|vraiment|moi)\b/i,
     ],
-    memoryHint: "Tu explores beaucoup tes états intérieurs… une lecture bien-être t'aiderait ?",
-    suggestionPrompt: 'Je veux une lecture de mon état émotionnel et intérieur du moment.',
+    memoryHint: "Tu explores souvent ce qui se passe à l'intérieur. On peut reprendre ta situation au moment où elle a changé.",
+    suggestionPrompt: 'Aide-moi à comprendre ce qui se joue en moi en ce moment.',
   },
   {
     tag: 'career_focus',
@@ -92,8 +92,8 @@ const INSIGHT_DEFS: InsightDef[] = [
       /\b(projet|lancer|cr[eé]er|entreprise|freelance|mission|vocation|sens\s+pro)\b/i,
       /\b(argent|revenu|finances?|success|r[eé]ussite|ambition)\b/i,
     ],
-    memoryHint: "Projet et ambition reviennent souvent dans tes questions… tu veux une lecture dédiée ?",
-    suggestionPrompt: 'Fais-moi une lecture sur ma trajectoire professionnelle et mon projet de vie.',
+    memoryHint: 'Projet et ambition reviennent souvent. Reviens avec ce qui a avancé, bloqué ou changé.',
+    suggestionPrompt: 'Fais-moi le point sur ma trajectoire professionnelle actuelle.',
   },
   {
     tag: 'depth_seeker',
@@ -102,8 +102,8 @@ const INSIGHT_DEFS: InsightDef[] = [
       /\b(approfondi|complet|d[eé]tail|expliqu|analys|comprendre|savoir)\b/i,
       /\b(th[eè]me natal|profil complet|analyse globale|multi-sciences)\b/i,
     ],
-    memoryHint: "Tu aimes aller en profondeur — une lecture multi-sciences complète t'intéresserait ?",
-    suggestionPrompt: "Fais-moi une analyse approfondie multi-sciences de ma situation.",
+    memoryHint: 'Tu aimes aller au fond des choses. On peut reprendre cette situation avec plus de recul et de précision.',
+    suggestionPrompt: 'Je veux aller plus loin dans la compréhension de ma situation.',
   },
 ]
 
@@ -124,15 +124,11 @@ function scoreInsight(def: InsightDef, userMessages: string[]): number {
 /**
  * Analyze conversation history for recurring user patterns.
  * Only considers user messages (not assistant responses).
- *
- * @param messages  Full conversation history
  */
 export function buildUserInsights(
   messages: Array<{ role: string; content: string }>,
 ): InsightResult {
-  const userMessages = messages
-    .filter((m) => m.role === 'user')
-    .map((m) => m.content)
+  const userMessages = messages.filter((m) => m.role === 'user').map((m) => m.content)
 
   if (userMessages.length < MIN_MESSAGES) {
     return { insights: [], dominant: null, activeHint: null }
@@ -153,7 +149,7 @@ export function buildUserInsights(
   const insights: UserInsight[] = scored.map(({ def, confidence }) => ({
     tag: def.tag,
     label: def.label,
-    confidence: Math.min(confidence, 0.95), // jamais absolu
+    confidence: Math.min(confidence, 0.95),
     memoryHint: def.memoryHint,
     suggestionPrompt: def.suggestionPrompt,
   }))
@@ -178,5 +174,5 @@ export function buildInsightContext(
   const top = insights.slice(0, 2)
   const lines = top.map((i) => `- ${i.label} (conf. ${(i.confidence * 100).toFixed(0)}%)`)
 
-  return ['[PATTERNS DÉTECTÉS — USAGE INTERNE]', ...lines, '[FIN PATTERNS]'].join('\n')
+  return ['[PATTERNS DETECTES - USAGE INTERNE]', ...lines, '[FIN PATTERNS]'].join('\n')
 }

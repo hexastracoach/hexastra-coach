@@ -190,11 +190,28 @@ export function shouldPersistQuotaLocally(plan: PlanKey): boolean {
   return plan === 'free'
 }
 
+export function getPlanHref(plan: PlanKey): string {
+  switch (plan) {
+    case 'essential':
+      return '/pricing/essentiel'
+    case 'premium':
+      return '/pricing/premium'
+    case 'practitioner':
+      return '/pricing/praticien'
+    default:
+      return '/pricing'
+  }
+}
+
 /** Retourne le plan immédiatement supérieur pour les CTA d'upgrade */
 export function getUpgradeTarget(plan: PlanKey): { label: string; labelKey: string; href: string } {
-  if (plan === 'free') return { label: 'Essentiel', labelKey: 'pricing.essentialLabel', href: '/pricing/essentiel' }
-  if (plan === 'essential') return { label: 'Premium', labelKey: 'pricing.premiumLabel', href: '/pricing/premium' }
-  return { label: 'Praticien', labelKey: 'pricing.practitionerLabel', href: '/pricing/praticien' }
+  if (plan === 'free') {
+    return { label: 'Essentiel', labelKey: 'pricing.essentialLabel', href: getPlanHref('essential') }
+  }
+  if (plan === 'essential') {
+    return { label: 'Premium', labelKey: 'pricing.premiumLabel', href: getPlanHref('premium') }
+  }
+  return { label: 'Praticien', labelKey: 'pricing.practitionerLabel', href: getPlanHref('practitioner') }
 }
 
 /** Retourne le label lisible d'un plan */

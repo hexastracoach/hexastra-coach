@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import type { PlanUiData } from '@/types/subscription'
+import { buildChatEntryHref } from '@/lib/chat/chatEntryHref'
 
 export function usePlansUI(): PlanUiData[] {
   const { t } = useTranslation()
@@ -15,7 +16,7 @@ export function usePlansUI(): PlanUiData[] {
       desc: t('pricing.freeDesc'),
       features: [t('pricing.freeF1'), t('pricing.freeF2'), t('pricing.freeF3'), t('pricing.freeF4')],
       cta: t('pricing.freeCta'),
-      href: '/auth',
+      href: buildChatEntryHref({ prompt: t('chat.suggestion1'), source: 'pricing_free' }),
     },
     {
       key: 'essential',

@@ -8,6 +8,8 @@ import LanguageSwitcher from './components/LanguageSwitcher'
 import { createClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { usePlansUI } from '@/lib/usePlansUI'
+import { buildChatEntryHref } from '@/lib/chat/chatEntryHref'
+import { trackHexastraFunnel } from '@/lib/analytics/hexastraFunnel'
 
 export default function HomePage() {
   const haloRef = useRef<HTMLDivElement>(null)
@@ -50,7 +52,9 @@ export default function HomePage() {
 
   const [user, setUser] = useState<any>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const chatHref = user ? '/chat' : '/auth'
+  const accountHref = user ? '/chat' : '/auth'
+  const heroChatHref = buildChatEntryHref({ prompt: t('chat.suggestion1'), source: 'landing_hero' })
+  const finalChatHref = buildChatEntryHref({ prompt: t('chat.suggestion4'), source: 'landing_final' })
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -116,7 +120,7 @@ export default function HomePage() {
             <a href="#difference" onClick={closeMobileNav}>{t('nav.whyHexAstra')}</a>
             <a href="#offres" onClick={closeMobileNav}>{t('nav.pricing')}</a>
             {user ? (
-              <Link href={chatHref} className="hx-mobile-nav-cta" onClick={closeMobileNav}>
+              <Link href={accountHref} className="hx-mobile-nav-cta" onClick={closeMobileNav}>
                 {t('nav.myAccount')}
               </Link>
             ) : (
@@ -150,7 +154,7 @@ export default function HomePage() {
             <a href="#difference">{t('nav.whyHexAstra')}</a>
             <a href="#offres">{t('nav.pricing')}</a>
             {user ? (
-              <Link href={chatHref} className="hx-home-login">{t('nav.myAccount')}</Link>
+              <Link href={accountHref} className="hx-home-login">{t('nav.myAccount')}</Link>
             ) : (
               <Link href="/auth" className="hx-home-login">{t('nav.signIn')}</Link>
             )}
@@ -184,7 +188,13 @@ export default function HomePage() {
               </div>
 
               <div className="hx-home-hero-actions">
-                <Link href={chatHref} className="hx-home-hero-primary">{t('home.heroPrimary')}</Link>
+                <Link
+                  href={heroChatHref}
+                  className="hx-home-hero-primary"
+                  onClick={() => trackHexastraFunnel('landing_chat_cta_clicked', { location: 'hero' })}
+                >
+                  {t('home.heroPrimary')}
+                </Link>
                 <a href="#how-it-works" className="hx-home-hero-secondary">{t('home.heroSecondary')}</a>
               </div>
             </div>
@@ -319,7 +329,23 @@ export default function HomePage() {
                     </p>
                   ))}
                 </div>
-                <Link href={plan.href} className="hx-home-pricing-cta">{plan.cta}</Link>
+                <Link
+                  href={plan.href}
+                  className="hx-home-pricing-cta"
+                  onClick={() => {
+                    if (plan.key === 'free') {
+                      trackHexastraFunnel('landing_chat_cta_clicked', { location: 'pricing_free' })
+                      return
+                    }
+
+                    trackHexastraFunnel('chat_upgrade_clicked', {
+                      location: 'pricing_card',
+                      targetPlan: plan.key,
+                    })
+                  }}
+                >
+                  {plan.cta}
+                </Link>
               </article>
             ))}
           </div>
@@ -333,7 +359,13 @@ export default function HomePage() {
             <h2>{t('home.ctaTitle')}</h2>
             <p className="hx-home-copy">{t('home.ctaCopy')}</p>
             <div className="hx-home-hero-actions is-centered">
-              <Link href={chatHref} className="hx-home-hero-secondary is-prominent">{t('home.ctaAuth')}</Link>
+              <Link
+                href={finalChatHref}
+                className="hx-home-hero-secondary is-prominent"
+                onClick={() => trackHexastraFunnel('landing_chat_cta_clicked', { location: 'final_cta' })}
+              >
+                {t('home.ctaAuth')}
+              </Link>
             </div>
           </div>
         </div>

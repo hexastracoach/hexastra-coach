@@ -24,6 +24,7 @@ import {
   FREE_USAGE_STORAGE_KEY,
   FREE_USAGE_FIRST_MSG_KEY,
   canContinueChat,
+  getPlanHref,
   isQuotaLimitedPlan,
   shouldPersistQuotaLocally,
   type PlanKey,
@@ -94,6 +95,7 @@ import MenuDock from './MenuDock'
 import { buildContextualSuggestions } from '@/lib/chat/suggestions'
 import { buildUserInsights } from '@/lib/hexastra/memory/insightEngine'
 import MemoryHint from './MemoryHint'
+import { trackHexastraFunnel } from '@/lib/analytics/hexastraFunnel'
 import type {
   ContextType,
   HexastraApiResponse,
@@ -415,6 +417,7 @@ export default function ChatPageClient() {
   const supabase = createClient()
   const chatLanguage = useChatLanguage()
   const { t } = useTranslation()
+  const entrySource = searchParams.get('source') ?? 'direct'
 
   const [messages, setMessages] = useState<Msg[]>([])
   const [premiumLock, setPremiumLock] = useState<{
@@ -472,6 +475,11 @@ export default function ChatPageClient() {
   const [quotaResetAt, setQuotaResetAt] = useState<Date | null>(null)
 
   const cacheRef = useRef<Map<string, string>>(new Map())
+  const funnelTrackingRef = useRef({
+    firstMessageSent: false,
+    secondMessageSent: false,
+    limitReached: false,
+  })
   const hasPrefilled = useRef(false)
   const microTriggerRef = useRef<string | null>(null)
   const forceMicroBootstrapRef = useRef(false)
@@ -595,6 +603,13 @@ export default function ChatPageClient() {
   const desktopLeft = viewportWidth >= 1100
   const userInitials = getInitials(userEmail)
   const isLimitReached = isQuotaLimitedPlan(userPlan) && !canContinueChat(userPlan, quotaMessagesUsed)
+  const returnNote = chatLanguage?.startsWith('en')
+    ? 'Come back with your situation. Things evolve, and your reading can evolve too.'
+    : 'Reviens avec ta situation. Les choses évoluent, ta lecture aussi.'
+  const shouldShowReturnNote =
+    bootstrapUi.chatReady &&
+    !isLimitReached &&
+    messages.some((message) => message.role === 'assistant' && message.id !== 'welcome')
 
   const isReadingFlowStep = useCallback((step?: string | null) => {
     if (!step) return false
@@ -710,10 +725,19 @@ export default function ChatPageClient() {
       }
     }
 
-    if (responsePolicy.quotaExceeded && isQuotaLimitedPlan(userPlan)) {
-      setQuotaMessagesUsed(responsePolicy.quotaExceeded.used)
-      setQuotaResetAt(responsePolicy.quotaExceeded.resetAt)
-    }
+      if (responsePolicy.quotaExceeded && isQuotaLimitedPlan(userPlan)) {
+        setQuotaMessagesUsed(responsePolicy.quotaExceeded.used)
+        setQuotaResetAt(responsePolicy.quotaExceeded.resetAt)
+        if (!funnelTrackingRef.current.limitReached) {
+          funnelTrackingRef.current.limitReached = true
+          trackHexastraFunnel('chat_limit_reached', {
+            plan: userPlan,
+            source: entrySource,
+            usedMessages: responsePolicy.quotaExceeded.used,
+            via: 'server',
+          })
+        }
+      }
 
     if (responsePolicy.premiumLock.action === 'set') {
       setPremiumLock(responsePolicy.premiumLock.value)
@@ -722,7 +746,7 @@ export default function ChatPageClient() {
     }
 
     return responsePolicy.reply
-  }, [storageScope, userPlan])
+  }, [entrySource, storageScope, userPlan])
 
   const postChatPayload = useCallback(
     async (payload: unknown): Promise<HexastraApiResponse> => {
@@ -1556,6 +1580,21 @@ export default function ChatPageClient() {
         activeContextFrame,
       })
 
+      const nextUserMessageCount = userMessages.length + 1
+      if (nextUserMessageCount === 1 && !funnelTrackingRef.current.firstMessageSent) {
+        funnelTrackingRef.current.firstMessageSent = true
+        trackHexastraFunnel('chat_first_message_sent', {
+          plan: userPlan,
+          source: entrySource,
+        })
+      } else if (nextUserMessageCount === 2 && !funnelTrackingRef.current.secondMessageSent) {
+        funnelTrackingRef.current.secondMessageSent = true
+        trackHexastraFunnel('chat_second_message_sent', {
+          plan: userPlan,
+          source: entrySource,
+        })
+      }
+
       const _depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
       const memorySignals = detectMemorySignals(baseContent)
       setUserMemory((prev) => {
@@ -1650,6 +1689,15 @@ export default function ChatPageClient() {
 
         if (localDecision.premiumLock) {
           setPremiumLock(localDecision.premiumLock)
+          if (!funnelTrackingRef.current.limitReached) {
+            funnelTrackingRef.current.limitReached = true
+            trackHexastraFunnel('chat_limit_reached', {
+              plan: userPlan,
+              source: entrySource,
+              usedMessages: quotaMessagesUsed,
+              via: 'client',
+            })
+          }
         }
 
         setInput('')
@@ -1806,6 +1854,7 @@ export default function ChatPageClient() {
       chatLanguage,
       conversationId,
       evolutionProfile,
+      entrySource,
       quotaMessagesUsed,
       input,
       isTyping,
@@ -1827,6 +1876,7 @@ export default function ChatPageClient() {
       activeClarificationQuestion,
       activeContextFrame,
       storageScope,
+      userMessages,
     ]
   )
 
@@ -1844,6 +1894,11 @@ export default function ChatPageClient() {
     setActiveClarificationQuestion(null)
     microTriggerRef.current = null
     lastMessageRef.current = null
+    funnelTrackingRef.current = {
+      firstMessageSent: false,
+      secondMessageSent: false,
+      limitReached: false,
+    }
     try {
       removeScopedStorage(window.localStorage, CONVERSATION_STORAGE_KEY, storageScope)
     } catch {}
@@ -2011,7 +2066,15 @@ export default function ChatPageClient() {
                     <button
                       className="hx-premium-lock-btn"
                       onClick={() => {
-                        window.location.href = `/pricing?upgrade=${premiumLock.targetPlan}`
+                        trackHexastraFunnel('chat_upgrade_clicked', {
+                          location: 'premium_lock',
+                          plan: userPlan,
+                          source: entrySource,
+                          targetPlan: premiumLock.targetPlan,
+                        })
+                        window.location.href = getPlanHref(
+                          premiumLock.targetPlan as 'essential' | 'premium' | 'practitioner',
+                        )
                       }}
                     >
                       {premiumLock.ctaLabel}
@@ -2082,6 +2145,10 @@ export default function ChatPageClient() {
                 ) : (
                   <Composer {...composerProps} />
                 ))}
+
+              {shouldShowReturnNote && !bootstrapOverlay && (
+                <p className="hx-app-return-note">{returnNote}</p>
+              )}
 
               {!isLimitReached && !bootstrapOverlay && (
                 <p className="hx-app-disclaimer">{t('chat.disclaimer')}</p>

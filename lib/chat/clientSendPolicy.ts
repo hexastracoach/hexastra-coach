@@ -59,7 +59,7 @@ export function findMenuItemByKey(items: HexastraMenuItem[], key: string | null)
 export function resolveNumericMenuSelection(
   items: HexastraMenuItem[],
   choice: number,
-  selectedMenuKey: string | null
+  selectedMenuKey: string | null,
 ): ResolvedMenuSelection | null {
   const selectedParent = findMenuItemByKey(items, selectedMenuKey)
 
@@ -99,15 +99,15 @@ function buildModerationReply(params: {
 
 function buildFreeQuotaReply() {
   return {
-    reply: `Tu as atteint la limite de ton accès découverte pour le moment.
+    reply: `Tu as déjà ouvert l'essentiel de cette situation.
 
-Ton espace gratuit se rouvrira automatiquement dans 24h.
-Si tu veux continuer maintenant, tu peux passer à Essentiel.`,
+Ton accès découverte revient automatiquement dans 24h.
+Si tu veux continuer maintenant, tu peux débloquer l'accès complet et aller plus loin dans ta compréhension.`,
     premiumLock: {
       targetPlan: 'essential',
-      ctaLabel: 'Passer à Essentiel',
-      text:
-        'Ton accès gratuit est temporairement arrivé à sa limite. Reviens dans 24h ou passe à Essentiel pour continuer maintenant.',
+      ctaLabel: 'Continuer avec Essentiel',
+      text: `Tu peux continuer.
+Débloque l'accès complet et va plus loin dans ta compréhension.`,
     },
   }
 }

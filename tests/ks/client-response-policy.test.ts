@@ -5,7 +5,7 @@ import type { HexastraApiResponse } from '@/lib/hexastra/types'
 describe('client response policy', () => {
   it('normalizes menu, context, memory and quota sync from an API response', () => {
     const policy = resolveClientResponsePolicy({
-      message: 'Lecture prête',
+      message: 'Lecture prete',
       mode: 'libre',
       plan: 'free',
       flowState: { step: 'analysis', completed: true },
@@ -36,7 +36,7 @@ describe('client response policy', () => {
       },
     } as HexastraApiResponse)
 
-    expect(policy.reply).toBe('Lecture prête')
+    expect(policy.reply).toBe('Lecture prete')
     expect(policy.menu.action).toBe('open')
     expect(policy.context.selectedMenuKey).toBe('science')
     expect(policy.context.selectedSubmenuKey).toBe('science_porteum')
@@ -49,7 +49,7 @@ describe('client response policy', () => {
 
   it('turns quota exceeded responses into a premium lock decision', () => {
     const policy = resolveClientResponsePolicy({
-      message: 'Limite atteinte',
+      message: 'Tu peux continuer.',
       mode: 'libre',
       plan: 'free',
       flowState: { step: 'quota_limit', completed: true },
@@ -60,7 +60,7 @@ describe('client response policy', () => {
         limit: 10,
         resetAt: '2026-03-20T08:00:00.000Z',
         upgradeTargetPlan: 'essential',
-        upgradeCtaLabel: 'Passer à Essentiel',
+        upgradeCtaLabel: 'Continuer avec Essentiel',
       },
     } as HexastraApiResponse)
 
@@ -68,7 +68,7 @@ describe('client response policy', () => {
     expect(policy.premiumLock.action).toBe('set')
     if (policy.premiumLock.action !== 'set') return
     expect(policy.premiumLock.value.targetPlan).toBe('essential')
-    expect(policy.premiumLock.value.ctaLabel).toBe('Passer à Essentiel')
+    expect(policy.premiumLock.value.ctaLabel).toBe('Continuer avec Essentiel')
   })
 
   it('turns premium preview locks into a premium upsell decision', () => {
@@ -86,6 +86,7 @@ describe('client response policy', () => {
     expect(policy.premiumLock.action).toBe('set')
     if (policy.premiumLock.action !== 'set') return
     expect(policy.premiumLock.value.targetPlan).toBe('premium')
+    expect(policy.premiumLock.value.ctaLabel).toBe('Aller plus loin avec Premium')
   })
 
   it('preserves menu state when the response does not explicitly change it', () => {

@@ -8,47 +8,47 @@ import type { PlanKey } from '@/types/subscription'
 
 export const STARTER_SUGGESTIONS = [
   'Explorer votre situation',
-  'Analyse Hexastra',
-  'Faire un bilan du moment',
-  'Clarifier ma situation actuelle',
+  'Voir plus clair avant de décider',
+  'Comprendre ce qui bloque en ce moment',
+  'Faire le point sur ce qui évolue',
 ]
 
 const SCIENCE_FOLLOWUPS: Record<string, string[]> = {
   astrology: [
     'Voir ce qui se joue le plus fort maintenant',
     'Approfondir le bon timing',
-    'Lire les points de vigilance du moment',
-    'Obtenir une vue d ensemble plus claire',
+    'Identifier le point de vigilance utile',
+    'Revenir sur ce qui a bougé depuis la dernière fois',
   ],
   numerology: [
     'Lire la phase active en ce moment',
-    'Comprendre le rythme de cette periode',
+    'Comprendre le rythme de cette période',
     'Voir ce qui demande un ajustement',
-    'Obtenir une synthese plus complete',
+    'Faire le point sur ce qui évolue',
   ],
   human_design: [
-    'Comprendre mon fonctionnement du moment',
-    'Voir comment mieux decider',
-    'Identifier mon axe de stabilite',
-    'Obtenir une lecture plus approfondie',
+    'Comprendre ce qui te stabilise le plus',
+    'Voir comment avancer plus justement',
+    'Identifier le bon levier du moment',
+    'Revenir sur ce qui a changé dans la situation',
   ],
   enneagram: [
-    'Mieux comprendre ma reaction actuelle',
+    'Mieux comprendre ta réaction actuelle',
     'Voir ce qui se rejoue en profondeur',
-    'Identifier mon levier d evolution',
-    'Obtenir une lecture plus fine',
+    "Identifier ton levier d'ajustement",
+    'Revenir sur ce qui a bougé depuis la dernière fois',
   ],
   kua: [
-    'Voir ce qui me remet le plus en axe',
-    'Approfondir la question d environnement',
-    'Identifier le meilleur ajustement concret',
-    'Obtenir une lecture plus complete',
+    'Voir ce qui te remet le plus en axe',
+    "Approfondir l'ajustement concret du moment",
+    'Identifier le meilleur recentrage utile',
+    'Faire le point sur ce qui évolue',
   ],
   hexastra_fusion: [
-    'Analyse Hexastra approfondie',
-    'Timing optimal pour agir',
-    'Clarifier une relation importante',
     'Voir la situation dans son ensemble',
+    'Approfondir ce qui se joue vraiment',
+    'Clarifier la meilleure prochaine direction',
+    'Revenir sur ce qui a bougé depuis la dernière fois',
   ],
 }
 
@@ -60,7 +60,6 @@ export function buildContextualSuggestions(params: {
 
   if (messages.length === 0) return STARTER_SUGGESTIONS
 
-  // Détecter la science depuis le dernier message utilisateur
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
   if (!lastUser?.content) return STARTER_SUGGESTIONS
 
@@ -73,9 +72,8 @@ export function buildContextualSuggestions(params: {
 
   const base = [...SCIENCE_FOLLOWUPS[science]].slice(0, 3)
 
-  // Propose une lecture Hexastra approfondie pour les plans payants
   if (plan !== 'free' && science !== 'hexastra_fusion') {
-    base.push('Analyse Hexastra approfondie')
+    base.push('Approfondir la situation avec plus de précision')
   }
 
   return base

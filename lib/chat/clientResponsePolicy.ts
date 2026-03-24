@@ -63,7 +63,7 @@ function getStableApiReply(data: (HexastraApiResponse & { content?: unknown }) |
 }
 
 export function resolveClientResponsePolicy(
-  data: (HexastraApiResponse & { content?: unknown }) | null | undefined
+  data: (HexastraApiResponse & { content?: unknown }) | null | undefined,
 ): ClientResponsePolicy {
   const reply = getStableApiReply(data)
   const metadata = data?.metadata ?? {}
@@ -111,8 +111,8 @@ export function resolveClientResponsePolicy(
           typeof metadata.used === 'number'
             ? metadata.used
             : typeof metadata.limit === 'number'
-            ? metadata.limit
-            : 3,
+              ? metadata.limit
+              : 3,
         resetAt: toDate(metadata.resetAt),
       }
     : null
@@ -123,8 +123,8 @@ export function resolveClientResponsePolicy(
       action: 'set',
       value: {
         targetPlan: metadata.upgradeTargetPlan ?? 'essential',
-        ctaLabel: metadata.upgradeCtaLabel ?? 'Passer à Essentiel',
-        text: reply || 'Ton accès gratuit a atteint sa limite pour le moment.',
+        ctaLabel: metadata.upgradeCtaLabel ?? 'Continuer avec Essentiel',
+        text: reply || "Tu peux continuer.\nDébloque l'accès complet et va plus loin dans ta compréhension.",
       },
     }
   } else if (metadata.premiumPreviewLocked) {
@@ -132,8 +132,9 @@ export function resolveClientResponsePolicy(
       action: 'set',
       value: {
         targetPlan: metadata.upgradeTargetPlan ?? 'premium',
-        ctaLabel: metadata.upgradeCtaLabel ?? 'Passer à Premium',
-        text: "La suite de l'analyse complète est disponible dans le plan supérieur.",
+        ctaLabel: metadata.upgradeCtaLabel ?? 'Aller plus loin avec Premium',
+        text:
+          "Tu as déjà le cœur de la réponse. Passe en Premium pour aller plus loin, avec plus de précision et une lecture plus profonde.",
       },
     }
   }

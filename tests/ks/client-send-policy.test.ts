@@ -118,7 +118,8 @@ describe('client send policy', () => {
     expect(decision.kind).toBe('local_reply')
     if (decision.kind !== 'local_reply') return
     expect(decision.premiumLock?.targetPlan).toBe('essential')
-    expect(decision.reply.toLowerCase()).toContain('limite')
+    expect(decision.reply.toLowerCase()).toContain("essentiel de cette situation")
+    expect(decision.premiumLock?.ctaLabel).toBe('Continuer avec Essentiel')
   })
 
   it('blocks obvious technical questions before the API call', () => {
