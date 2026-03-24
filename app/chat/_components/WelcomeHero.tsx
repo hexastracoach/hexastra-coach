@@ -1,5 +1,6 @@
 'use client'
 
+import type { CSSProperties, ReactNode } from 'react'
 import { DS, cardStyle } from '../_lib/chat'
 
 type WelcomeHeroProps = {
@@ -7,24 +8,24 @@ type WelcomeHeroProps = {
 }
 
 const quickPrompts = [
-  'Je me sens bloqué en ce moment.',
-  'Est-ce le bon moment pour agir ?',
-  'Pourquoi cette relation me prend autant de place ?',
-  'Quelle direction semble la plus juste pour moi ?',
+  'Je tourne en rond dans une situation importante.',
+  "Je sens qu'il faut bouger, mais je ne vois pas comment.",
+  'Pourquoi cette situation me touche autant ?',
+  'Aide-moi à y voir clair avant de décider.',
 ]
 
 const entryCards = [
   {
-    title: 'Tu poses. HexAstra écoute.',
-    text: 'Décris ce que tu traverses, ton dilemme ou ta question. Pas besoin de tout expliquer — le point de départ suffit.',
+    title: 'Tu poses la situation.',
+    text: 'Dis ce qui pèse, ce qui bloque ou ce qui revient. Pas besoin de tout expliquer.',
   },
   {
-    title: "La lecture s'ajuste à toi.",
-    text: "Le système approfondit seulement quand c'est utile. L'expérience reste légère, même si le moteur est dense.",
+    title: 'Hexastra clarifie.',
+    text: 'Je vais au nœud du sujet. Pas au bruit autour.',
   },
   {
-    title: 'Plusieurs angles, une seule lecture.',
-    text: "HexAstra croise plusieurs approches d'observation humaine pour donner une image plus complète de ta situation.",
+    title: 'Tu repars avec un appui.',
+    text: 'Une direction plus nette. Un point clair. Une action utile.',
   },
 ]
 
@@ -60,7 +61,7 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
               fontFamily: DS.monoFont,
             }}
           >
-            GPS intérieur — HexAstra
+            Hexastra Coach · clarté directe
           </div>
 
           <div
@@ -86,11 +87,11 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
               fontFamily: DS.titleFont,
             }}
           >
-            Ce que tu portes
+            Tu n&apos;as pas besoin
             <br />
-            mérite d'être
+            de tout porter
             <br />
-            compris.
+            dans ta tête.
           </h1>
 
           <p
@@ -102,15 +103,23 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
               maxWidth: 720,
             }}
           >
-            Pose ce que tu traverses — une situation, un doute, une décision. HexAstra croise plusieurs angles d'observation pour t'aider à voir ce qui se joue vraiment.
+            Dis simplement ce qui te travaille. Un doute. Une tension. Une décision.
+            <br />
+            Hexastra t&apos;aide à comprendre ce qui se joue, puis à voir la direction la plus juste.
           </p>
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 24 }}>
-            <button onClick={() => onPrompt('Je veux une analyse Hexastra claire de ma situation actuelle.')} style={primaryButton}>
+            <button
+              onClick={() => onPrompt('Je veux une réponse claire sur ma situation actuelle.')}
+              style={primaryButton}
+            >
               Explorer votre situation
             </button>
 
-            <button onClick={() => onPrompt('Je veux une analyse Hexastra claire et directe.')} style={secondaryButton}>
+            <button
+              onClick={() => onPrompt('Je veux une analyse Hexastra claire et directe.')}
+              style={secondaryButton}
+            >
               Analyse Hexastra
             </button>
           </div>
@@ -144,7 +153,9 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
               }}
             >
               <div style={{ color: DS.text, fontWeight: 700, fontSize: 15 }}>{item.title}</div>
-              <div style={{ color: DS.textMuted, fontSize: 13, lineHeight: 1.7, marginTop: 8 }}>{item.text}</div>
+              <div style={{ color: DS.textMuted, fontSize: 13, lineHeight: 1.7, marginTop: 8 }}>
+                {item.text}
+              </div>
             </div>
           ))}
         </div>
@@ -172,7 +183,9 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
             >
               Aperçu du chat
             </div>
-            <div style={{ color: DS.text, fontSize: 16, fontWeight: 700, marginTop: 4 }}>Conversation en direct</div>
+            <div style={{ color: DS.text, fontSize: 16, fontWeight: 700, marginTop: 4 }}>
+              Conversation en direct
+            </div>
           </div>
 
           <div style={{ color: DS.emerald, fontSize: 13, fontWeight: 700 }}>En ligne</div>
@@ -190,15 +203,25 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
           }}
         >
           <PreviewBubble>
-            Dis-moi ce que tu traverses. Je t'aide à y voir plus clair.
+            Parle-moi de ta situation.
+            <br />
+            Même en quelques phrases.
           </PreviewBubble>
 
           <PreviewBubble user>
-            J'hésite entre continuer mon activité actuelle ou lancer autre chose.
+            J&apos;hésite entre continuer mon activité actuelle ou lancer autre chose.
           </PreviewBubble>
 
           <PreviewBubble>
-            Il y a peut-être moins quelque chose à forcer qu'un mouvement à comprendre. On peut clarifier ton état actuel, puis regarder ce que le bon timing d'action dit vraiment.
+            Tu n&apos;essaies pas seulement de choisir.
+            <br />
+            Tu essaies aussi de te rassurer.
+            <br />
+            <br />
+            Le vrai sujet, c&apos;est ce qui a déjà changé en toi.
+            <br />
+            <br />
+            Commence par regarder ce que tu ne veux plus porter.
           </PreviewBubble>
         </div>
       </div>
@@ -206,7 +229,7 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
   )
 }
 
-function PreviewBubble({ children, user = false }: { children: React.ReactNode; user?: boolean }) {
+function PreviewBubble({ children, user = false }: { children: ReactNode; user?: boolean }) {
   return (
     <div
       style={{
@@ -227,7 +250,7 @@ function PreviewBubble({ children, user = false }: { children: React.ReactNode; 
   )
 }
 
-const primaryButton: React.CSSProperties = {
+const primaryButton: CSSProperties = {
   border: 'none',
   cursor: 'pointer',
   padding: '14px 22px',
@@ -239,7 +262,7 @@ const primaryButton: React.CSSProperties = {
   boxShadow: '0 12px 30px rgba(25,195,125,0.18)',
 }
 
-const secondaryButton: React.CSSProperties = {
+const secondaryButton: CSSProperties = {
   border: `1px solid ${DS.line}`,
   cursor: 'pointer',
   padding: '14px 22px',

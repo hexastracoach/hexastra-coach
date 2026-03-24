@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from '@/lib/i18n/useTranslation'
 import SuggestionChips from './SuggestionChips'
 
 type Props = {
@@ -18,7 +19,7 @@ type Props = {
   /** Suggestions contextuelles dynamiques */
   suggestions?: string[]
   onSuggestionSelect?: (value: string) => void
-  /** Point d entree fusion-only */
+  /** Point d'entrée fusion-only */
   showFusionEntry?: boolean
   onFusionEntry?: (prompt: string) => void
 }
@@ -40,6 +41,7 @@ export default function Composer({
   showFusionEntry,
   onFusionEntry,
 }: Props) {
+  const { lang, t } = useTranslation()
   const [focused, setFocused] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
@@ -76,14 +78,16 @@ export default function Composer({
           if (typeof data.text === 'string' && data.text.trim()) {
             onChange(value ? `${value} ${data.text.trim()}` : data.text.trim())
           }
-        } catch { /* noop */ }
+        } catch {
+          // noop
+        }
         setTranscribing(false)
       }
       recorder.start()
       mediaRecorderRef.current = recorder
       setRecording(true)
     } catch {
-      alert('Accès au microphone refusé. Veuillez autoriser le micro dans votre navigateur.')
+      alert("Accès au microphone refusé. Veuillez autoriser le micro dans votre navigateur.")
     }
   }
 
@@ -99,11 +103,16 @@ export default function Composer({
   }
 
   const canSend = value.trim().length > 0 && !disabled && !transcribing
+  const placeholder = transcribing
+    ? lang?.startsWith('en')
+      ? 'Transcribing your message…'
+      : 'Je transcris ton message…'
+    : t('chat.placeholder')
 
   return (
     <div className="hx-composer-wrap">
       {showFusionEntry && onFusionEntry && (
-        <div className="hx-composer-suggestions" aria-label="Entree Hexastra">
+        <div className="hx-composer-suggestions" aria-label="Entrée Hexastra">
           <button
             type="button"
             onClick={() => onFusionEntry('Je veux une analyse Hexastra claire et directe de ma situation.')}
@@ -123,11 +132,13 @@ export default function Composer({
       {/* Quick prompts legacy (gardé pour compat) */}
       {showQuickPrompts && !suggestions?.length && (
         <div className="hx-composer-suggestions">
-          {['Découvrir mon profil', 'Comprendre mon ascendant', 'Faire un bilan', 'Analyser ma situation'].map((p) => (
-            <button key={p} type="button" onClick={() => onQuickPrompt(p)} className="hx-chip">
-              {p}
-            </button>
-          ))}
+          {['Découvrir mon profil', 'Comprendre mon ascendant', 'Faire un bilan', 'Analyser ma situation'].map(
+            (p) => (
+              <button key={p} type="button" onClick={() => onQuickPrompt(p)} className="hx-chip">
+                {p}
+              </button>
+            ),
+          )}
         </div>
       )}
 
@@ -136,9 +147,7 @@ export default function Composer({
         <div className="hx-composer-attach-row">
           <span className="hx-composer-attach-pill">
             <AttachIcon size={12} />
-            <span className="hx-composer-attach-name">
-              {attachedFileName}
-            </span>
+            <span className="hx-composer-attach-name">{attachedFileName}</span>
             <button
               type="button"
               className="hx-composer-attach-remove"
@@ -160,16 +169,14 @@ export default function Composer({
       )}
       {transcribing && (
         <div className="hx-composer-recording-bar hx-composer-transcribing-bar">
-          Transcription en cours…
+          {lang?.startsWith('en') ? 'Transcribing…' : 'Transcription en cours…'}
         </div>
       )}
 
       {/* Main glass bar */}
       <div className={`hx-composer-box${focused ? ' is-focused' : ''}${canSend ? ' has-content' : ''}`}>
-
         {/* Left actions */}
         <div className="hx-composer-actions-left">
-
           {/* Birth data avatar */}
           <button
             type="button"
@@ -230,11 +237,7 @@ export default function Composer({
               if (canSend) onSend()
             }
           }}
-          placeholder={
-            transcribing
-              ? 'Transcription en cours…'
-              : 'Pose ta question...'
-          }
+          placeholder={placeholder}
           disabled={disabled || transcribing}
         />
 
@@ -273,7 +276,17 @@ export default function Composer({
 
 function AvatarIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
     </svg>
@@ -282,7 +295,17 @@ function AvatarIcon() {
 
 function AttachIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
     </svg>
   )
@@ -290,7 +313,17 @@ function AttachIcon({ size = 16 }: { size?: number }) {
 
 function MicIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <rect x="9" y="2" width="6" height="11" rx="3" />
       <path d="M19 10v2a7 7 0 01-14 0v-2" />
       <line x1="12" y1="19" x2="12" y2="23" />
@@ -302,11 +335,11 @@ function MicIcon() {
 function WaveformIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 20 16" fill="currentColor" aria-hidden="true">
-      <rect className="hx-wf-bar hx-wf-b1" x="0"  y="5"  width="2.5" height="6"  rx="1.25" />
-      <rect className="hx-wf-bar hx-wf-b2" x="4"  y="2"  width="2.5" height="12" rx="1.25" />
-      <rect className="hx-wf-bar hx-wf-b3" x="8"  y="0"  width="2.5" height="16" rx="1.25" />
-      <rect className="hx-wf-bar hx-wf-b4" x="12" y="3"  width="2.5" height="10" rx="1.25" />
-      <rect className="hx-wf-bar hx-wf-b5" x="16" y="6"  width="2.5" height="4"  rx="1.25" />
+      <rect className="hx-wf-bar hx-wf-b1" x="0" y="5" width="2.5" height="6" rx="1.25" />
+      <rect className="hx-wf-bar hx-wf-b2" x="4" y="2" width="2.5" height="12" rx="1.25" />
+      <rect className="hx-wf-bar hx-wf-b3" x="8" y="0" width="2.5" height="16" rx="1.25" />
+      <rect className="hx-wf-bar hx-wf-b4" x="12" y="3" width="2.5" height="10" rx="1.25" />
+      <rect className="hx-wf-bar hx-wf-b5" x="16" y="6" width="2.5" height="4" rx="1.25" />
     </svg>
   )
 }

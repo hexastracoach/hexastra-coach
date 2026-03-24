@@ -68,7 +68,7 @@ describe('fusion-only mode', () => {
 
   it('keeps the science-breakdown fallback copy stable', () => {
     expect(SCIENCE_BREAKDOWN_FALLBACK_MESSAGE).toBe(
-      'Hexastra integre plusieurs systemes pour te donner une reponse claire et directe.',
+      'Je peux te donner une réponse directe si tu me parles de ta situation.',
     )
   })
 

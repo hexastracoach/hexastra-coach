@@ -246,8 +246,8 @@ function buildPractitionerUsageMessage(language: string): string {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function buildGreetingMessage(mode: ReturnType<typeof getModeForPlan>, language: string): string {
   const intro = tr(language, {
-    en: 'Hello, I’m HexAstra. I can help you clarify a situation, explore a life theme, or start a personalized reading.',
-    fr: 'Bonjour, je suis HexAstra. Je peux t’aider à clarifier une situation, explorer un thème de vie, ou lancer une lecture personnalisée.',
+    en: 'Hello. Tell me about your situation, even in a few lines.',
+    fr: 'Bonjour. Parle-moi de ta situation, même en quelques lignes.',
     es: 'Hola, soy HexAstra. Puedo ayudarte a clarificar una situación, explorar un tema de vida o iniciar una lectura personalizada.',
     pt: 'Olá, sou a HexAstra. Posso ajudar a clarificar uma situação, explorar um tema de vida ou iniciar uma leitura personalizada.',
     de: 'Hallo, ich bin HexAstra. Ich kann dir helfen, eine Situation zu klären, ein Lebensthema zu erkunden oder eine persönliche Lesung zu starten.',
@@ -255,8 +255,8 @@ function buildGreetingMessage(mode: ReturnType<typeof getModeForPlan>, language:
   })
 
   const invite = tr(language, {
-    en: 'I’m here to help. Ask your question or explore an angle below.',
-    fr: 'Je suis là pour t’accompagner. Pose ta question ou explore un angle ci-dessous.',
+    en: 'I will help you understand what is happening, then see the clearest next direction.',
+    fr: 'Je t’aiderai à comprendre ce qui se joue, puis à voir plus clair.',
     es: 'Estoy aquí para acompañarte. Haz tu pregunta o explora un ángulo justo debajo.',
     pt: 'Estou aqui para acompanhar-te. Faz a tua pergunta ou explora um ângulo abaixo.',
     de: 'Ich begleite dich: Stelle deine Frage oder wähle einen Blickwinkel unten.',

@@ -1321,6 +1321,23 @@ transition: all 0.35s ease;
   opacity: 0.82;
 }
 
+.hx-home-emphasis {
+  margin: 22px 0 0;
+  max-width: 40ch;
+  font-family: Sora, system-ui, sans-serif;
+  font-size: clamp(1.08rem, 2vw, 1.35rem);
+  line-height: 1.45;
+  letter-spacing: -0.03em;
+  color: #f6fbff;
+}
+
+.hx-home-testimonial-meta {
+  margin-top: 14px !important;
+  color: rgba(20, 36, 48, 0.7);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 /* ============================= */
 /* PRICING GRID */
 /* ============================= */
@@ -4144,6 +4161,20 @@ transition: all 0.35s ease;
 
   padding:0 24px;
 
+}
+
+.hx-footer-left{
+  display:grid;
+  gap:8px;
+}
+
+.hx-footer-tagline{
+  max-width:28ch;
+  color:#f3f8ff;
+  font-family:Sora, system-ui, sans-serif;
+  font-size:0.96rem;
+  line-height:1.5;
+  letter-spacing:-0.02em;
 }
 
 .hx-footer-links{

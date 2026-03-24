@@ -5,7 +5,7 @@ export const FUSION_ONLY_ANALYSIS_MODE = 'hexastra_fusion' as const
 export const FUSION_ONLY_ENTRY_LABEL = 'Explorer votre situation'
 export const FUSION_ONLY_ANALYSIS_LABEL = 'Analyse Hexastra'
 export const SCIENCE_BREAKDOWN_FALLBACK_MESSAGE =
-  'Hexastra integre plusieurs systemes pour te donner une reponse claire et directe.'
+  'Je peux te donner une réponse directe si tu me parles de ta situation.'
 
 const FUSION_PUBLIC_MENU: HexastraMenuItem[] = [
   {

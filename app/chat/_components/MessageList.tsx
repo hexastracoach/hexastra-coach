@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Msg } from '../_lib/chat'
 import MessageBubble from './MessageBubble'
+import { useTranslation } from '@/lib/i18n/useTranslation'
+import { getLoadingMessages, LOADING_MESSAGE_ROTATION_MS } from '@/lib/chat/loadingMessages'
 
 type Props = {
   messages: Msg[]
@@ -13,12 +15,28 @@ type Props = {
 
 export default function MessageList({ messages, isTyping, lastUserMessage, onRetry }: Props) {
   const bottomRef = useRef<HTMLDivElement | null>(null)
+  const { lang } = useTranslation()
   const visibleMessages = messages.filter((message) => message.content !== '__loading_micro__')
+  const loadingMessages = useMemo(() => getLoadingMessages(lang), [lang])
+  const [loadingIndex, setLoadingIndex] = useState(0)
 
   useEffect(() => {
     if (!bottomRef.current) return
     bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [visibleMessages, isTyping])
+
+  useEffect(() => {
+    if (!isTyping) {
+      setLoadingIndex(0)
+      return
+    }
+
+    const timer = window.setInterval(() => {
+      setLoadingIndex((current) => (current + 1) % loadingMessages.length)
+    }, LOADING_MESSAGE_ROTATION_MS)
+
+    return () => window.clearInterval(timer)
+  }, [isTyping, loadingMessages])
 
   return (
     <div
@@ -43,6 +61,8 @@ export default function MessageList({ messages, isTyping, lastUserMessage, onRet
 
       {isTyping && (
         <div
+          role="status"
+          aria-live="polite"
           style={{
             width: '100%',
             maxWidth: 820,
@@ -56,7 +76,7 @@ export default function MessageList({ messages, isTyping, lastUserMessage, onRet
             textAlign: 'left',
           }}
         >
-          HexAstra écrit...
+          {loadingMessages[loadingIndex]}
         </div>
       )}
       <div ref={bottomRef} />

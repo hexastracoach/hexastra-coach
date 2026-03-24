@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import HexastraLogo from './components/HexastraLogo'
 import PremiumBackground from './components/PremiumBackground'
 import LanguageSwitcher from './components/LanguageSwitcher'
@@ -15,14 +15,38 @@ export default function HomePage() {
   const { t } = useTranslation()
   const plansUI = usePlansUI()
 
-  const MODULES_DATA = useMemo(() => [
-    { title: 'Astrolex',  text: t('home.module1Text'), cases: t('home.module1Cases'), dimension: t('home.module1Dim') },
-    { title: 'Porteum',   text: t('home.module2Text'), cases: t('home.module2Cases'), dimension: t('home.module2Dim') },
-    { title: 'NeuroSoma', text: t('home.module3Text'), cases: t('home.module3Cases'), dimension: t('home.module3Dim') },
-    { title: 'Fusion',    text: t('home.module4Text'), cases: t('home.module4Cases'), dimension: t('home.module4Dim') },
-    { title: 'SpiritLex', text: t('home.module5Text'), cases: t('home.module5Cases'), dimension: t('home.module5Dim') },
-    { title: 'Présence',  text: t('home.module6Text'), cases: t('home.module6Cases'), dimension: t('home.module6Dim') },
-  ], [t])
+  const problemCards = [
+    { title: t('home.problemCard1Title'), text: t('home.problemCard1Text') },
+    { title: t('home.problemCard2Title'), text: t('home.problemCard2Text') },
+    { title: t('home.problemCard3Title'), text: t('home.problemCard3Text') },
+  ]
+
+  const stepCards = [
+    { title: t('home.step1Title'), text: t('home.step1Text') },
+    { title: t('home.step2Title'), text: t('home.step2Text') },
+    { title: t('home.step3Title'), text: t('home.step3Text') },
+  ]
+
+  const benefitCards = [
+    { title: t('home.benefit1Title'), text: t('home.benefit1Text') },
+    { title: t('home.benefit2Title'), text: t('home.benefit2Text') },
+    { title: t('home.benefit3Title'), text: t('home.benefit3Text') },
+    { title: t('home.benefit4Title'), text: t('home.benefit4Text') },
+    { title: t('home.benefit5Title'), text: t('home.benefit5Text') },
+    { title: t('home.benefit6Title'), text: t('home.benefit6Text') },
+  ]
+
+  const differentiationCards = [
+    { title: t('home.diffCard1Title'), text: t('home.diffCard1Text') },
+    { title: t('home.diffCard2Title'), text: t('home.diffCard2Text') },
+    { title: t('home.diffCard3Title'), text: t('home.diffCard3Text') },
+  ]
+
+  const testimonials = [
+    { quote: t('home.testimonial1Quote'), author: t('home.testimonial1Author') },
+    { quote: t('home.testimonial2Quote'), author: t('home.testimonial2Author') },
+    { quote: t('home.testimonial3Quote'), author: t('home.testimonial3Author') },
+  ]
 
   const [user, setUser] = useState<any>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
@@ -34,12 +58,15 @@ export default function HomePage() {
     })
   }, [supabase])
 
-  /* Escape key + scroll lock for mobile nav */
   useEffect(() => {
     if (!mobileNavOpen) return
-    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileNavOpen(false) }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileNavOpen(false)
+    }
+
     document.addEventListener('keydown', handleKey)
     document.body.style.overflow = 'hidden'
+
     return () => {
       document.removeEventListener('keydown', handleKey)
       document.body.style.overflow = ''
@@ -52,6 +79,7 @@ export default function HomePage() {
       haloRef.current.style.left = `${e.clientX}px`
       haloRef.current.style.top = `${e.clientY}px`
     }
+
     window.addEventListener('mousemove', move)
     return () => window.removeEventListener('mousemove', move)
   }, [])
@@ -64,14 +92,12 @@ export default function HomePage() {
         <PremiumBackground hero />
         <div className="hx-home-hero-overlay" />
 
-        {/* ── Mobile nav overlay (backdrop) ── */}
         <div
           className={`hx-mobile-nav-overlay${mobileNavOpen ? ' is-open' : ''}`}
           onClick={closeMobileNav}
           aria-hidden="true"
         />
 
-        {/* ── Mobile nav sheet ── */}
         <div
           className={`hx-mobile-nav-sheet${mobileNavOpen ? ' is-open' : ''}`}
           role="dialog"
@@ -86,7 +112,7 @@ export default function HomePage() {
             </button>
           </div>
           <nav className="hx-mobile-nav-links">
-            <a href="#modules" onClick={closeMobileNav}>{t('nav.howItWorks')}</a>
+            <a href="#how-it-works" onClick={closeMobileNav}>{t('nav.howItWorks')}</a>
             <a href="#difference" onClick={closeMobileNav}>{t('nav.whyHexAstra')}</a>
             <a href="#offres" onClick={closeMobileNav}>{t('nav.pricing')}</a>
             {user ? (
@@ -104,7 +130,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ── Header / Navbar ── */}
         <header className="hx-home-header">
           <div ref={haloRef} className="hx-header-halo" />
           <div className="hx-header-stars" />
@@ -112,11 +137,7 @@ export default function HomePage() {
           <Link href="/" className="hx-home-brand" aria-label="HexAstra Coach">
             <div className="hx-home-brand-badge">
               <span className="hx-home-brand-halo" />
-              <HexastraLogo
-                size={25}
-                variant="navbar"
-                priority
-              />
+              <HexastraLogo size={25} variant="navbar" priority />
             </div>
             <div className="hx-home-brand-text">
               <div className="hx-home-brand-title">HexAstra Coach</div>
@@ -124,9 +145,8 @@ export default function HomePage() {
             </div>
           </Link>
 
-          {/* Desktop nav — hidden on mobile via CSS */}
           <nav className="hx-home-nav" aria-label="Navigation principale">
-            <a href="#modules">{t('nav.howItWorks')}</a>
+            <a href="#how-it-works">{t('nav.howItWorks')}</a>
             <a href="#difference">{t('nav.whyHexAstra')}</a>
             <a href="#offres">{t('nav.pricing')}</a>
             {user ? (
@@ -137,7 +157,6 @@ export default function HomePage() {
             <LanguageSwitcher variant="flag" />
           </nav>
 
-          {/* Mobile burger — hidden on desktop via CSS */}
           <button
             type="button"
             className="hx-mobile-nav-toggle"
@@ -154,7 +173,6 @@ export default function HomePage() {
           </button>
         </header>
 
-        {/* ── Hero content ── */}
         <div className="hx-home-hero-inner">
           <div className="hx-home-hero-grid">
             <div className="hx-home-hero-left">
@@ -166,7 +184,8 @@ export default function HomePage() {
               </div>
 
               <div className="hx-home-hero-actions">
-                <Link href={chatHref} className="hx-home-hero-secondary">{t('home.heroFree')}</Link>
+                <Link href={chatHref} className="hx-home-hero-primary">{t('home.heroPrimary')}</Link>
+                <a href="#how-it-works" className="hx-home-hero-secondary">{t('home.heroSecondary')}</a>
               </div>
             </div>
 
@@ -182,110 +201,97 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Modules ── */}
-      <section id="modules" className="hx-home-section hx-home-section-darkfusion">
+      <section className="hx-home-section hx-home-section-darkfusion">
         <div className="hx-home-section-wrap">
-          <div className="hx-home-kicker">{t('home.modulesKicker')}</div>
-          <h2 className="hx-home-title hx-home-title-light">{t('home.modulesTitle')}</h2>
-          <p className="hx-home-copy">{t('home.modulesCopy')}</p>
+          <div className="hx-home-kicker">{t('home.problemKicker')}</div>
+          <h2 className="hx-home-title hx-home-title-light">{t('home.problemTitle')}</h2>
+          <p className="hx-home-copy">{t('home.problemCopy')}</p>
 
-          <div className="hx-home-dimension-grid">
-            {MODULES_DATA.map((item) => (
+          <div className="hx-home-dimension-grid hx-home-grid-compact">
+            {problemCards.map((item) => (
               <article className="hx-home-dimension-card" key={item.title}>
                 <div className="hx-home-dimension-dot" />
                 <h3>{item.title}</h3>
                 <p>{item.text}</p>
-                <p className="hx-home-module-meta">
-                  <strong>{t('home.modulesCasesLabel')}</strong>
-                  <br />
-                  {item.cases}
-                </p>
-                <p className="hx-home-module-meta">
-                  <strong>{t('home.modulesDimLabel')}</strong>
-                  <br />
-                  {item.dimension}
-                </p>
               </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Use cases ── */}
-      <section className="hx-home-section hx-home-section-cream">
+      <section id="how-it-works" className="hx-home-section hx-home-section-cream">
         <div className="hx-home-section-wrap">
-          <div className="hx-home-kicker">{t('home.useCasesKicker')}</div>
-          <h2 className="hx-home-title">{t('home.useCasesTitle')}</h2>
-          <p className="hx-home-copy hx-home-copy-dark">{t('home.useCasesCopy')}</p>
+          <div className="hx-home-kicker">{t('home.solutionKicker')}</div>
+          <h2 className="hx-home-title">{t('home.solutionTitle')}</h2>
+          <p className="hx-home-copy hx-home-copy-dark">{t('home.solutionCopy')}</p>
 
           <div className="hx-home-dimension-grid hx-home-grid-compact">
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.useCase1Title')}</h3>
-              <p>{t('home.useCase1Text')}</p>
-            </article>
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.useCase2Title')}</h3>
-              <p>{t('home.useCase2Text')}</p>
-            </article>
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.useCase3Title')}</h3>
-              <p>{t('home.useCase3Text')}</p>
-            </article>
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.useCase4Title')}</h3>
-              <p>{t('home.useCase4Text')}</p>
-            </article>
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.useCase5Title')}</h3>
-              <p>{t('home.useCase5Text')}</p>
-            </article>
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.useCase6Title')}</h3>
-              <p>{t('home.useCase6Text')}</p>
-            </article>
+            {stepCards.map((item) => (
+              <article className="hx-home-dimension-card hx-home-card-light" key={item.title}>
+                <div className="hx-home-dimension-dot" />
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── Différences ── */}
-      <section id="difference" className="hx-home-section hx-home-section-light">
+      <section className="hx-home-section hx-home-section-light">
+        <div className="hx-home-section-wrap">
+          <div className="hx-home-kicker">{t('home.valueKicker')}</div>
+          <h2 className="hx-home-title">{t('home.valueTitle')}</h2>
+          <p className="hx-home-copy hx-home-copy-dark">{t('home.valueCopy')}</p>
+
+          <div className="hx-home-dimension-grid hx-home-grid-compact">
+            {benefitCards.map((item) => (
+              <article className="hx-home-dimension-card hx-home-card-light" key={item.title}>
+                <div className="hx-home-dimension-dot" />
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="difference" className="hx-home-section hx-home-section-darkfusion">
         <div className="hx-home-section-wrap">
           <div className="hx-home-kicker">{t('home.diffKicker')}</div>
-          <h2 className="hx-home-title">{t('home.diffTitle')}</h2>
-          <p className="hx-home-copy hx-home-copy-dark">{t('home.diffCopy')}</p>
+          <h2 className="hx-home-title hx-home-title-light">{t('home.diffTitle')}</h2>
+          <p className="hx-home-copy">{t('home.diffCopy')}</p>
+          <p className="hx-home-emphasis">{t('home.diffQuote')}</p>
 
           <div className="hx-home-dimension-grid hx-home-grid-compact">
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.diff1Title')}</h3>
-              <p>{t('home.diff1Text')}</p>
-            </article>
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.diff2Title')}</h3>
-              <p>{t('home.diff2Text')}</p>
-            </article>
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.diff3Title')}</h3>
-              <p>{t('home.diff3Text')}</p>
-            </article>
-            <article className="hx-home-dimension-card hx-home-card-light">
-              <div className="hx-home-dimension-dot" />
-              <h3>{t('home.diff4Title')}</h3>
-              <p>{t('home.diff4Text')}</p>
-            </article>
+            {differentiationCards.map((item) => (
+              <article className="hx-home-dimension-card" key={item.title}>
+                <div className="hx-home-dimension-dot" />
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── Pricing ── */}
+      <section className="hx-home-section hx-home-section-cream">
+        <div className="hx-home-section-wrap">
+          <div className="hx-home-kicker">{t('home.socialKicker')}</div>
+          <h2 className="hx-home-title">{t('home.socialTitle')}</h2>
+          <p className="hx-home-copy hx-home-copy-dark">{t('home.socialCopy')}</p>
+
+          <div className="hx-home-dimension-grid hx-home-grid-compact">
+            {testimonials.map((item) => (
+              <article className="hx-home-dimension-card hx-home-card-light" key={item.author}>
+                <div className="hx-home-dimension-dot" />
+                <h3>{item.quote}</h3>
+                <p className="hx-home-testimonial-meta">{item.author}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="offres" className="hx-home-section hx-home-section-cream">
         <div className="hx-home-section-wrap">
           <div className="hx-home-kicker">{t('home.pricingKicker')}</div>
@@ -298,9 +304,7 @@ export default function HomePage() {
                 key={plan.key}
                 className={`hx-home-pricing-card${plan.highlighted ? ' is-highlighted' : ''}`}
               >
-                {plan.badge && (
-                  <div className="hx-home-pricing-badge">{plan.badge}</div>
-                )}
+                {plan.badge ? <div className="hx-home-pricing-badge">{plan.badge}</div> : null}
                 <div className="hx-home-kicker">{plan.label}</div>
                 <div className="hx-home-pricing-price">
                   {plan.price}
@@ -310,7 +314,7 @@ export default function HomePage() {
                 <div className="hx-home-pricing-list">
                   {plan.features.map((item) => (
                     <p className="hx-home-pricing-item" key={item}>
-                      <span className="hx-home-pricing-check" aria-hidden="true">✦</span>
+                      <span className="hx-home-pricing-check" aria-hidden="true">*</span>
                       {item}
                     </p>
                   ))}
@@ -322,7 +326,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Final CTA ── */}
       <section className="hx-home-section hx-home-section-finalcta">
         <div className="hx-home-section-wrap">
           <div className="hx-home-finalcta">
@@ -336,10 +339,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
       <footer className="hx-home-footer">
         <div className="hx-footer-inner">
-          <div className="hx-footer-left">{t('home.footerCopyright')}</div>
+          <div className="hx-footer-left">
+            <div className="hx-footer-tagline">{t('home.footerTagline')}</div>
+            <div>{t('home.footerCopyright')}</div>
+          </div>
           <div className="hx-footer-links">
             <Link href="/support">Support</Link>
             <Link href="/contact">Contact</Link>

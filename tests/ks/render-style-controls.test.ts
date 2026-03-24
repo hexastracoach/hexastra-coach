@@ -63,7 +63,28 @@ describe('render style controls', () => {
     })
 
     expect(prompt).toContain("Interdiction d'afficher automatiquement des rubriques visibles")
-    expect(prompt).toContain('preferer 1 a 3 paragraphes fluides')
+    expect(prompt).toContain('Chaque reponse suit 4 mouvements invisibles')
+    expect(prompt).toContain('preferer 1 a 4 paragraphes courts')
+    expect(prompt).toContain('Phrases courtes. Lignes respirantes.')
+    expect(prompt).toContain('Les premieres reponses doivent etre simples et marquantes')
+  })
+
+  it('redirects science-specific asks back to the situation instead of explaining the system', () => {
+    const prompt = buildSystemPrompt({
+      plan: 'free',
+      mode: 'libre',
+      language: 'fr',
+      contextType: 'science',
+      practitionerUsage: null,
+      requestType: 'chat',
+      domainRoute: 'science',
+      flowStep: 'analysis',
+      messages: [{ role: 'user', content: 'Montre-moi mon Human Design' }],
+    })
+
+    expect(prompt).toContain(
+      `Redirige simplement avec: "Je peux te donner une reponse directe si tu me parles de ta situation."`,
+    )
   })
 
   it('keeps maslow as a background support and not a public menu science', () => {

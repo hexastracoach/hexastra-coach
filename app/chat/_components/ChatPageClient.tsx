@@ -145,10 +145,10 @@ function getWelcomeContent(language: string) {
     case 'en':
       return `Hello.
 
-I'm HexAstra Coach.
-I'm here to help you understand your situation, your timing, and the most useful direction to take.
+You do not need the perfect question.
+Tell me what feels unclear, heavy, or stuck for you right now.
 
-To launch your first automatic reading, open the birth data form in the chat bar and fill it in once.`
+I will help you understand what is happening, then see the clearest next direction.`
     case 'es':
       return `Hola.
 
@@ -159,10 +159,10 @@ Para lanzar tu primera lectura automatica, abre el formulario de datos de nacimi
     default:
       return `Bonjour.
 
-Je suis HexAstra Coach.
-Un outil de lecture strategique pour t'aider a comprendre ta situation, ton timing et la meilleure direction a prendre.
+Tu n'as pas besoin d'arriver avec une question parfaite.
+Parle-moi simplement de ce qui est flou, lourd ou bloqué pour toi.
 
-Pour lancer ta premiere lecture automatique, ouvre le formulaire de donnees de naissance dans la barre de chat et remplis-le une seule fois.`
+Je t'aiderai à comprendre ce qui se joue, puis à voir la direction la plus juste.`
   }
 }
 
