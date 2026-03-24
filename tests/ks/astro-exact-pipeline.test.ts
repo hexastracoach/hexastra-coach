@@ -95,6 +95,37 @@ function makeFusionWithLongitudesOnly() {
   }
 }
 
+function makeFusionWithDataEnvelope() {
+  return {
+    data: {
+      tropical: {
+        planets: {
+          sun: { sign: 'Aries', degree: 5.2 },
+          moon: { sign: 'Cancer', degree: 14.3 },
+        },
+        ascendant: { sign: 'Virgo', degree: 22.1, lon: 172.1, zodiac_mode: 'tropical' },
+      },
+    },
+    tropical: {
+      ascendant: { sign: 'Wrong', degree: 1.1 },
+    },
+  }
+}
+
+function makeFusionWithDataEnvelopePlanetsAscendant() {
+  return {
+    data: {
+      tropical: {
+        planets: {
+          sun: { sign: 'Aries', degree: 5.2 },
+          moon: { sign: 'Cancer', degree: 14.3 },
+          ascendant: { sign: 'Libra', degree: 7.7, lon: 187.7 },
+        },
+      },
+    },
+  }
+}
+
 // ── resolveAstroSource ────────────────────────────────────────────────────────
 
 describe('resolveAstroSource — path detection', () => {
@@ -120,6 +151,11 @@ describe('resolveAstroSource — path detection', () => {
     const raw = makeFusionFlatRoot()
     const { path } = resolveAstroSource(raw)
     expect(path).toBe('root')
+  })
+
+  it('prefers data.tropical when the API wraps astrology under data', () => {
+    const { path } = resolveAstroSource(makeFusionWithDataEnvelope())
+    expect(path).toBe('data.tropical+data.tropical.planets')
   })
 })
 
@@ -152,6 +188,12 @@ describe('resolveAstroSource — source contents', () => {
       },
     }
     const { source } = resolveAstroSource(raw)
+    const asc = source.ascendant as Record<string, unknown>
+    expect(asc?.sign).toBe('Virgo')
+  })
+
+  it('data.tropical root ascendant wins over data.tropical.planets.ascendant', () => {
+    const { source } = resolveAstroSource(makeFusionWithDataEnvelope())
     const asc = source.ascendant as Record<string, unknown>
     expect(asc?.sign).toBe('Virgo')
   })
@@ -207,6 +249,22 @@ describe('extractCoreAstroPlacements — with tropical.planets structure', () =>
     expect(placements.allResolved).toBe(false)
     expect(placements.missing).toContain('sun')
   })
+
+  it('extracts rising from data.tropical.ascendant before other candidates', () => {
+    const placements = extractCoreAstroPlacements(makeFusionWithDataEnvelope())
+    expect(placements.rising?.sign).toBe('Vierge')
+    expect(placements.rising?.degree).toBe(22.1)
+    expect(placements.rising?.lon).toBe(172.1)
+    expect(placements.rising?.signIndex).toBe(5)
+    expect(placements.rising?.zodiacMode).toBe('tropical')
+  })
+
+  it('extracts rising from data.tropical.planets.ascendant when tropical.ascendant is absent', () => {
+    const placements = extractCoreAstroPlacements(makeFusionWithDataEnvelopePlanetsAscendant())
+    expect(placements.rising?.sign).toBe('Balance')
+    expect(placements.rising?.degree).toBe(7.7)
+    expect(placements.rising?.lon).toBe(187.7)
+  })
 })
 
 // ── buildCompactNatalReadingContext ───────────────────────────────────────────
@@ -257,6 +315,22 @@ describe('buildCompactNatalReadingContext — nested tropical.planets', () => {
     expect(ctx.sunDegree).toBe(10)
     expect(ctx.moonDegree).toBe(6)
     expect(ctx.risingDegree).toBe(25.3)
+  })
+
+  it('tracks the ascendant source and raw payload when the API responds under data.tropical', () => {
+    const ctx = buildCompactNatalReadingContext(makeFusionWithDataEnvelope())
+    expect(ctx.risingSign).toBe('Vierge')
+    expect(ctx.fieldSources.ascendant).toBe('data.tropical.ascendant')
+    expect(ctx.risingRaw?.sign).toBe('Vierge')
+    expect(ctx.risingRaw?.lon).toBe(172.1)
+    expect(ctx.compactDataBlock).toContain('ASCENDANT: Vierge')
+  })
+
+  it('falls back to data.tropical.planets.ascendant when needed and keeps the compact block coherent', () => {
+    const ctx = buildCompactNatalReadingContext(makeFusionWithDataEnvelopePlanetsAscendant())
+    expect(ctx.risingSign).toBe('Balance')
+    expect(ctx.fieldSources.ascendant).toBe('data.tropical.planets.ascendant')
+    expect(ctx.compactDataBlock).toContain('ASCENDANT: Balance')
   })
 })
 

@@ -87,6 +87,22 @@ describe('isReliableExactData — astrology', () => {
     expect(result.missingFields).not.toContain('ascendant')
   })
 
+  it('accepts the ascendant when astrology is wrapped under data.tropical', () => {
+    const result = isReliableExactData('astrology', 'ascendant', {
+      data: {
+        tropical: {
+          planets: {
+            sun: { sign: 'Aries', degree: 5.2 },
+            moon: { sign: 'Cancer', degree: 14.3 },
+          },
+          ascendant: { sign: 'Virgo', degree: 22.1 },
+        },
+      },
+    })
+    expect(result.reliable).toBe(true)
+    expect(result.missingFields).not.toContain('ascendant')
+  })
+
   it('detects missing houses for maisons subcategory', () => {
     const result = isReliableExactData('astrology', 'maisons', {
       sun: 'Lion',

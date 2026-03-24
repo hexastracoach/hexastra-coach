@@ -3043,6 +3043,7 @@ export async function runHexastraFlow(input: {
           sunSign: compactCtx.sunSign,
           moonSign: compactCtx.moonSign,
           risingSign: compactCtx.risingSign,
+          risingSource: compactCtx.fieldSources.ascendant ?? null,
           keyAspectsCount: compactCtx.keyAspects.length,
           dominantHousesCount: compactCtx.dominantHouses.length,
           stelliumsCount: compactCtx.stelliums.length,

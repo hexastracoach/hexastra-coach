@@ -257,6 +257,43 @@ describe('astro exact guardrails', () => {
     expect(answer).toBe('Ton signe solaire est Verseau.')
   })
 
+  it('builds a short deterministic answer for simple ascendant questions when the field exists', () => {
+    const ctx: CompactNatalContext = {
+      sunSign: 'Verseau',
+      sunDegree: 4.1,
+      moonSign: 'Capricorne',
+      moonDegree: 12.6,
+      risingSign: 'Gemeaux',
+      risingDegree: 18.4,
+      mercurySign: null,
+      venusSign: null,
+      marsSign: null,
+      jupiterSign: null,
+      saturnSign: null,
+      dominantSigns: [],
+      dominantElements: [],
+      dominantModalities: [],
+      stelliums: [],
+      keyAspects: [],
+      dominantHouses: [],
+      chartShape: null,
+      natalSummarySeeds: [],
+      fieldSources: { ascendant: 'data.tropical.ascendant' },
+      missingFields: [],
+      compactDataBlock: 'SOLEIL: Verseau\nLUNE: Capricorne\nASCENDANT: Gemeaux',
+    }
+
+    const answer = buildDeterministicAstroExactAnswer({
+      message: 'quel est mon ascendant',
+      ctx,
+      language: 'fr',
+      subcategory: 'ascendant',
+      requestKind: 'exact_fact',
+    })
+
+    expect(answer).toBe('Ton ascendant est Gemeaux.')
+  })
+
   it('falls back to a deterministic exact answer instead of returning a wrong rendered sign', () => {
     const ctx: CompactNatalContext = {
       sunSign: 'Verseau',
@@ -298,6 +335,48 @@ describe('astro exact guardrails', () => {
     expect(enforced.message).toBe('Ton signe solaire est Verseau.')
     expect(enforced.message).not.toContain('Capricorne')
     expect(enforced.validation.violations).toContain('sun:expected_Verseau:received_Capricorne')
+  })
+
+  it('never keeps a rendered ascendant when the exact source does not provide one', () => {
+    const ctx: CompactNatalContext = {
+      sunSign: 'Verseau',
+      sunDegree: 4.1,
+      moonSign: 'Capricorne',
+      moonDegree: 12.6,
+      risingSign: null,
+      risingDegree: null,
+      mercurySign: null,
+      venusSign: null,
+      marsSign: null,
+      jupiterSign: null,
+      saturnSign: null,
+      dominantSigns: [],
+      dominantElements: [],
+      dominantModalities: [],
+      stelliums: [],
+      keyAspects: [],
+      dominantHouses: [],
+      chartShape: null,
+      natalSummarySeeds: [],
+      fieldSources: {},
+      missingFields: ['ascendant'],
+      compactDataBlock: 'SOLEIL: Verseau\nLUNE: Capricorne\nASCENDANT: indisponible',
+    }
+
+    const enforced = enforceAstroExactRender({
+      message: 'Ton ascendant est Cancer.',
+      ctx,
+      language: 'fr',
+      firstName: null,
+      latestUserMessage: 'quel est mon ascendant',
+      subcategory: 'ascendant',
+      requestKind: 'exact_fact',
+    })
+
+    expect(enforced.usedFallback).toBe(true)
+    expect(enforced.fallbackType).toBe('astro_exact_simple_local')
+    expect(enforced.message).toBe('Ton ascendant est indisponible dans les donnees exactes validees.')
+    expect(enforced.validation.violations).toContain('ascendant:rendered_without_validated_source:Cancer')
   })
 
   it('rejects aspects that are absent from the validated exact block', () => {

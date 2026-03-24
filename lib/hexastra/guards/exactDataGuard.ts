@@ -5,7 +5,7 @@
  * the compact natal block must stay pinned to the validated tropical source.
  */
 
-import { normalizeAstroSign, resolveStrictAstroContext } from './extractCoreAstro'
+import { normalizeAstroSign, resolveStrictAstroContext, type CoreAstroPlacement } from './extractCoreAstro'
 
 /** All subcategory keys where deterministic API data is mandatory */
 export const EXACT_DATA_REQUIRED_SUBCATEGORIES = new Set<string>([
@@ -133,6 +133,7 @@ export type CompactNatalContext = {
   moonDegree: number | null
   risingSign: string | null
   risingDegree: number | null
+  risingRaw?: CoreAstroPlacement | null
   mercurySign: string | null
   venusSign: string | null
   marsSign: string | null
@@ -403,6 +404,7 @@ export function buildCompactNatalReadingContext(
   const moonDegree = strictAstro.placements.moon.placement?.degree ?? null
   const risingSign = strictAstro.placements.ascendant.placement?.sign ?? null
   const risingDegree = strictAstro.placements.ascendant.placement?.degree ?? null
+  const risingRaw = strictAstro.placements.ascendant.placement ?? null
   const mercurySign = strictAstro.placements.mercury.placement?.sign ?? null
   const venusSign = strictAstro.placements.venus.placement?.sign ?? null
   const marsSign = strictAstro.placements.mars.placement?.sign ?? null
@@ -490,6 +492,14 @@ export function buildCompactNatalReadingContext(
   appendCompactLine(blockLines, `- SIGNES DOMINANTS: ${dominantSigns.length ? dominantSigns.join(', ') : 'indisponible'}`, maxChars)
 
   const compactDataBlock = blockLines.join('\n')
+  if (risingSign) {
+    console.log('[COMPACT_NATAL] rising included', {
+      sourcePath: fieldSources.ascendant ?? null,
+      sign: risingSign,
+      degree: risingDegree,
+      includedInCompactBlock: compactDataBlock.includes('ASCENDANT'),
+    })
+  }
   console.log('[COMPACT_NATAL] block built', {
     astroPath,
     fieldSources,
@@ -505,6 +515,7 @@ export function buildCompactNatalReadingContext(
     moonDegree,
     risingSign,
     risingDegree,
+    risingRaw,
     mercurySign,
     venusSign,
     marsSign,

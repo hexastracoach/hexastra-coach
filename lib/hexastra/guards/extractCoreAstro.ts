@@ -17,6 +17,9 @@
 export type CoreAstroPlacement = {
   sign: string | null          // Normalised sign name e.g. "Taureau", "Cancer", "Scorpion"
   degree: number | null        // Ecliptic degree within the sign (0–29.99)
+  lon?: number | null          // Absolute ecliptic longitude when available
+  signIndex?: number | null    // Zodiac index (0..11) when available
+  zodiacMode?: string | null   // tropical / sidereal when explicitly present
   retrograde?: boolean | null  // Whether the body is retrograde (planets only)
   rawValue?: unknown           // Original raw value for traceability
 }
@@ -90,6 +93,8 @@ const ZODIAC_SIGNS_FR = [
   'Poissons',
 ] as const
 
+const ASTRO_ROOT_KEYS = ['tropical', 'astrology', 'natal', 'chart'] as const
+
 function normaliseSign(raw: unknown): string | null {
   if (!raw) return null
   if (typeof raw !== 'string') return null
@@ -125,6 +130,46 @@ function deriveDegreeFromLongitude(raw: unknown): number | null {
   return Math.round((longitude % 30) * 10) / 10
 }
 
+function deriveSignIndex(sign: string | null, longitude: unknown): number | null {
+  const normalizedLongitude = normalizeLongitude(longitude)
+  if (normalizedLongitude !== null) return Math.floor(normalizedLongitude / 30)
+  if (!sign) return null
+  const normalizedSign = normaliseSign(sign)
+  if (!normalizedSign) return null
+  const signIndex = ZODIAC_SIGNS_FR.indexOf(normalizedSign as (typeof ZODIAC_SIGNS_FR)[number])
+  return signIndex >= 0 ? signIndex : null
+}
+
+function extractLongitude(obj: Record<string, unknown>): number | null {
+  return normalizeLongitude(obj.lon ?? obj.longitude ?? obj.lng ?? obj.ecliptic_longitude)
+}
+
+function extractZodiacMode(obj: Record<string, unknown>): string | null {
+  const rawMode = obj.zodiac_mode ?? obj.zodiacMode ?? obj.mode ?? null
+  if (typeof rawMode !== 'string' || !rawMode.trim()) return null
+  return rawMode.trim().toLowerCase()
+}
+
+function buildPlacement(params: {
+  sign: string
+  degree: number | null
+  rawValue: unknown
+  retrograde?: boolean | null
+  lon?: number | null
+  zodiacMode?: string | null
+}): CoreAstroPlacement {
+  const lon = params.lon ?? null
+  return {
+    sign: params.sign,
+    degree: params.degree,
+    lon,
+    signIndex: deriveSignIndex(params.sign, lon),
+    zodiacMode: params.zodiacMode ?? null,
+    retrograde: params.retrograde ?? null,
+    rawValue: params.rawValue,
+  }
+}
+
 function extractDegree(obj: Record<string, unknown>): number | null {
   const candidates = ['degree', 'degre', 'deg', 'longitude_in_sign', 'pos']
   for (const k of candidates) {
@@ -157,7 +202,12 @@ function extractFlatPlacement(raw: Record<string, unknown>, key: string): CoreAs
       parseFiniteNumber(raw[`${key}Degree`]) ??
       parseFiniteNumber(raw[`${key}_degre`]) ??
       null
-    return { sign, degree: degree !== null ? Math.round(degree * 10) / 10 : null, rawValue: raw[signKey] }
+    return buildPlacement({
+      sign,
+      degree: degree !== null ? Math.round(degree * 10) / 10 : null,
+      rawValue: raw[signKey],
+      zodiacMode: extractZodiacMode(raw),
+    })
   }
 
   const longitude =
@@ -168,11 +218,13 @@ function extractFlatPlacement(raw: Record<string, unknown>, key: string): CoreAs
     null
   const sign = deriveSignFromLongitude(longitude)
   if (!sign) return null
-  return {
+  return buildPlacement({
     sign,
     degree: deriveDegreeFromLongitude(longitude),
     rawValue: longitude,
-  }
+    lon: normalizeLongitude(longitude),
+    zodiacMode: extractZodiacMode(raw),
+  })
 
   return null
 }
@@ -203,7 +255,14 @@ function resolvePlacement(raw: Record<string, unknown>, keys: string[]): CoreAst
     // Flat string value — sign name directly
     if (typeof value === 'string') {
       const sign = normaliseSign(value)
-      if (sign) return { sign, degree: null, rawValue: value }
+      if (sign) {
+        return buildPlacement({
+          sign,
+          degree: null,
+          rawValue: value,
+          zodiacMode: extractZodiacMode(raw),
+        })
+      }
     }
 
     // Object value — extract sign + degree
@@ -211,12 +270,14 @@ function resolvePlacement(raw: Record<string, unknown>, keys: string[]): CoreAst
       const obj = value as Record<string, unknown>
       const sign = extractSign(obj)
       if (sign) {
-        return {
+        return buildPlacement({
           sign,
           degree: extractDegree(obj),
           retrograde: extractRetrograde(obj),
           rawValue: value,
-        }
+          lon: extractLongitude(obj),
+          zodiacMode: extractZodiacMode(obj) ?? extractZodiacMode(raw),
+        })
       }
       // Log the raw object structure when sign extraction fails — helps diagnose new API formats
       console.warn('[ASTRO_CORE] resolvePlacement: object found but no sign extracted', {
@@ -253,7 +314,12 @@ export function resolveAstroSource(raw: Record<string, unknown>): {
   /** Dot-path string showing where data was found — useful for logging */
   path: string
 } {
-  const TOP_KEYS = ['tropical', 'astrology', 'natal', 'chart'] as const
+  const dataBlock = asRecord(raw.data)
+  if (dataBlock && hasAstroPayloadShape(dataBlock)) {
+    return resolveAstroSourceCandidate(dataBlock, 'data')
+  }
+
+  const TOP_KEYS = ASTRO_ROOT_KEYS
 
   for (const topKey of TOP_KEYS) {
     const block = raw[topKey]
@@ -312,12 +378,60 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>
 }
 
+function hasAstroPayloadShape(raw: Record<string, unknown>): boolean {
+  if (ASTRO_ROOT_KEYS.some((key) => asRecord(raw[key]))) return true
+  return Boolean(
+    raw.sun ??
+      raw.moon ??
+      raw.ascendant ??
+      raw.Sun ??
+      raw.Moon ??
+      raw.Ascendant ??
+      raw.planets ??
+      raw.Planets,
+  )
+}
+
+function joinPath(basePath: string, segment: string): string {
+  return basePath ? `${basePath}.${segment}` : segment
+}
+
+function resolveAstroSourceCandidate(
+  raw: Record<string, unknown>,
+  basePath = '',
+): { source: Record<string, unknown>; path: string } {
+  for (const topKey of ASTRO_ROOT_KEYS) {
+    const block = raw[topKey]
+    if (!block || typeof block !== 'object' || Array.isArray(block)) continue
+    const blockObj = block as Record<string, unknown>
+    const blockPath = joinPath(basePath, topKey)
+
+    const planetsBlock = blockObj.planets ?? blockObj.Planets
+    if (planetsBlock && typeof planetsBlock === 'object' && !Array.isArray(planetsBlock)) {
+      return {
+        source: { ...(planetsBlock as Record<string, unknown>), ...blockObj },
+        path: `${blockPath}+${joinPath(basePath, `${topKey}.planets`)}`,
+      }
+    }
+
+    return { source: blockObj, path: blockPath }
+  }
+
+  return { source: raw, path: basePath || 'root' }
+}
+
 function placementFromValue(value: unknown): CoreAstroPlacement | null {
   if (value === undefined || value === null) return null
 
   if (typeof value === 'string') {
     const sign = normaliseSign(value)
-    return sign ? { sign, degree: null, rawValue: value } : null
+    return sign
+      ? buildPlacement({
+          sign,
+          degree: null,
+          rawValue: value,
+        })
+      : null
   }
 
   const obj = asRecord(value)
@@ -326,12 +440,14 @@ function placementFromValue(value: unknown): CoreAstroPlacement | null {
   const sign = extractSign(obj)
   if (!sign) return null
 
-  return {
+  return buildPlacement({
     sign,
     degree: extractDegree(obj),
     retrograde: extractRetrograde(obj),
     rawValue: value,
-  }
+    lon: extractLongitude(obj),
+    zodiacMode: extractZodiacMode(obj),
+  })
 }
 
 function capitalizeKey(value: string): string {
@@ -343,7 +459,32 @@ function resolveStrictSource(raw: Record<string, unknown>): {
   path: string
   usesTropical: boolean
   tropicalBlock: Record<string, unknown> | null
+  tropicalPath: string | null
 } {
+  const dataBlock = asRecord(raw.data)
+  if (dataBlock && hasAstroPayloadShape(dataBlock)) {
+    const dataTropical = asRecord(dataBlock.tropical)
+    if (dataTropical) {
+      const planetsBlock = asRecord(dataTropical.planets ?? dataTropical.Planets)
+      return {
+        source: planetsBlock ? { ...planetsBlock, ...dataTropical } : dataTropical,
+        path: planetsBlock ? 'data.tropical+data.tropical.planets' : 'data.tropical',
+        usesTropical: true,
+        tropicalBlock: dataTropical,
+        tropicalPath: 'data.tropical',
+      }
+    }
+
+    const nestedSource = resolveAstroSourceCandidate(dataBlock, 'data')
+    return {
+      source: nestedSource.source,
+      path: nestedSource.path,
+      usesTropical: false,
+      tropicalBlock: null,
+      tropicalPath: null,
+    }
+  }
+
   const tropical = asRecord(raw.tropical)
   if (tropical) {
     const planetsBlock = asRecord(tropical.planets ?? tropical.Planets)
@@ -352,6 +493,7 @@ function resolveStrictSource(raw: Record<string, unknown>): {
       path: planetsBlock ? 'tropical+tropical.planets' : 'tropical',
       usesTropical: true,
       tropicalBlock: tropical,
+      tropicalPath: 'tropical',
     }
   }
 
@@ -361,6 +503,7 @@ function resolveStrictSource(raw: Record<string, unknown>): {
     path,
     usesTropical: false,
     tropicalBlock: null,
+    tropicalPath: null,
   }
 }
 
@@ -518,7 +661,7 @@ function resolveAscendantFromBlock(params: {
 export function resolveStrictAstroContext(raw: Record<string, unknown>): StrictAstroContext {
   const strictSource = resolveStrictSource(raw)
   const baseBlock = strictSource.tropicalBlock ?? strictSource.source
-  const basePath = strictSource.usesTropical ? 'tropical' : strictSource.path
+  const basePath = strictSource.tropicalPath ?? strictSource.path
 
   const placements: StrictAstroContext['placements'] = {
     sun: resolvePlacementFromBlock({ baseBlock, basePath, canonicalKey: 'sun', keys: SUN_KEYS }),
@@ -591,6 +734,17 @@ export function extractCoreAstroPlacements(
   if (!moon)   missing.push('moon')
   if (!rising) missing.push('rising')
 
+  if (rising) {
+    console.log('[ASTRO_CORE] rising extracted', {
+      sourcePath: placements.ascendant.sourcePath,
+      sign: rising.sign,
+      degree: rising.degree,
+      lon: rising.lon ?? null,
+      signIndex: rising.signIndex ?? null,
+      zodiacMode: rising.zodiacMode ?? null,
+    })
+  }
+
   const allResolved = missing.length === 0
 
   console.log('[ASTRO_CORE] extracted', {
@@ -606,6 +760,7 @@ export function extractCoreAstroPlacements(
   if (missing.length > 0) {
     console.warn('[ASTRO_CORE] missing field(s)', {
       missing,
+      missingFields: missing,
       resolvedPath: path,
       sourceKeys: Object.keys(source).slice(0, 40),
       fieldSources: {
