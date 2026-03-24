@@ -11,16 +11,15 @@ import {
 describe('client plan alignment with orchestration contracts', () => {
   it('uses orchestration quota limits for client chat gating', () => {
     expect(getPlanCapabilities('free').maxMessagesPerDay).toBe(10)
-    expect(getPlanCapabilities('essential').maxMessagesPerDay).toBe(60)
+    expect(getPlanCapabilities('essential').maxMessagesPerDay).toBeNull()
     expect(canContinueChat('free', 9)).toBe(true)
     expect(canContinueChat('free', 10)).toBe(false)
-    expect(canContinueChat('essential', 59)).toBe(true)
-    expect(canContinueChat('essential', 60)).toBe(false)
+    expect(canContinueChat('essential', 999)).toBe(true)
   })
 
   it('exposes quota-limited plans and local persistence separately', () => {
     expect(isQuotaLimitedPlan('free')).toBe(true)
-    expect(isQuotaLimitedPlan('essential')).toBe(true)
+    expect(isQuotaLimitedPlan('essential')).toBe(false)
     expect(isQuotaLimitedPlan('premium')).toBe(false)
     expect(shouldPersistQuotaLocally('free')).toBe(true)
     expect(shouldPersistQuotaLocally('essential')).toBe(false)
@@ -35,6 +34,6 @@ describe('client plan alignment with orchestration contracts', () => {
 
     expect(practitionerApi.practitionerEnabled).toBe(true)
     expect(practitionerApi.professionalUseAllowed).toBe(true)
-    expect(freeApi.analysisDepth).toBe('high')
+    expect(freeApi.analysisDepth).toBe('low')
   })
 })

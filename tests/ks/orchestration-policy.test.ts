@@ -159,6 +159,9 @@ describe('orchestration policy layer', () => {
 
   it('exposes the server-side plan contract used by the policy engine', () => {
     expect(getPlanQuotaLimit('free')).toBe(10)
+    expect(getPlanQuotaLimit('essential')).toBeNull()
+    expect(getPlanContract('free').responseDepth).toBe('short')
+    expect(getPlanContract('essential').responseDepth).toBe('medium')
     expect(getPlanContract('practitioner').responseDepth).toBe('expert')
     expect(getQuotaState({ plan: 'free', blocked: false, remaining: 2 })).toBe('soft_limit')
   })

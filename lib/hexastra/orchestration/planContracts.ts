@@ -5,9 +5,9 @@ export const PLAN_CONTRACTS: Record<PlanKey, PlanContract> = {
   free: {
     id: 'free',
     mode: 'libre',
-    responseDepth: 'long',
+    responseDepth: 'short',
     maxDepth: 'light',
-    maxOutputLength: 'medium',
+    maxOutputLength: 'short',
     quotaLimit: 10,
     features: {
       microReadings: true,
@@ -34,10 +34,10 @@ export const PLAN_CONTRACTS: Record<PlanKey, PlanContract> = {
   essential: {
     id: 'essential',
     mode: 'libre_avance',
-    responseDepth: 'long',
+    responseDepth: 'medium',
     maxDepth: 'guided',
-    maxOutputLength: 'long',
-    quotaLimit: 60,
+    maxOutputLength: 'medium',
+    quotaLimit: null,
     features: {
       microReadings: true,
       menuNavigation: true,

@@ -4,6 +4,9 @@ export type HexastraFunnelEventName =
   | 'chat_second_message_sent'
   | 'chat_limit_reached'
   | 'chat_upgrade_clicked'
+  | 'upgradeShown'
+  | 'upgradeClicked'
+  | 'conversionSuccess'
 
 type HexastraFunnelPayload = Record<string, unknown> & {
   event: HexastraFunnelEventName

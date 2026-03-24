@@ -54,12 +54,21 @@ type AdjustOptions = {
   isReading?: boolean
 }
 
-export function adjustResponseDepth(reply: string, { level, isReading }: AdjustOptions): string {
+export function adjustResponseDepth(reply: string, { level, plan, isReading }: AdjustOptions): string {
   if (!reply) return reply
   let lines = reply.trim().split(/\r?\n/).filter(Boolean)
 
   if (!isReading) {
-    const cap = level === 'LEVEL_1' ? 6 : level === 'LEVEL_2' ? 9 : level === 'LEVEL_3' ? 14 : 18
+    const planCap =
+      plan === 'free'
+        ? 6
+        : plan === 'essential'
+          ? 9
+          : plan === 'premium'
+            ? 14
+            : 18
+    const levelCap = level === 'LEVEL_1' ? 6 : level === 'LEVEL_2' ? 9 : level === 'LEVEL_3' ? 14 : 18
+    const cap = Math.min(planCap, levelCap)
     if (lines.length > cap) lines = lines.slice(0, cap)
   }
 

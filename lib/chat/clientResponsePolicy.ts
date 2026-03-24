@@ -4,6 +4,7 @@ export type ClientPremiumLockPayload = {
   targetPlan: string
   ctaLabel: string
   text: string
+  reason?: 'engagement' | 'quota_limit' | 'preview' | string | null
 }
 
 export type ClientPremiumLockPolicy =
@@ -52,14 +53,20 @@ function toDate(value: unknown): Date | null {
 
 function getStableApiReply(data: (HexastraApiResponse & { content?: unknown }) | null | undefined) {
   if (!data) {
-    return "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
+    return "Je n'ai pas pu terminer la lecture pour le moment. On reessaie dans un instant."
   }
 
   if (typeof data.message === 'string' && data.message.trim()) return data.message
   if (typeof data.reply === 'string' && data.reply.trim()) return data.reply
   if (typeof data.content === 'string' && data.content.trim()) return data.content
 
-  return "Je n'ai pas pu terminer la lecture pour le moment. On réessaie dans un instant."
+  return "Je n'ai pas pu terminer la lecture pour le moment. On reessaie dans un instant."
+}
+
+function getDefaultUpgradeLabel(targetPlan: string | null | undefined) {
+  if (targetPlan === 'premium') return 'Aller plus loin avec Premium'
+  if (targetPlan === 'practitioner') return 'Continuer avec Praticien'
+  return 'Continuer avec Essentiel'
 }
 
 export function resolveClientResponsePolicy(
@@ -117,14 +124,45 @@ export function resolveClientResponsePolicy(
       }
     : null
 
+  const upgradeReason =
+    typeof metadata.upgradeReason === 'string'
+      ? metadata.upgradeReason
+      : quotaExceeded
+        ? 'quota_limit'
+        : metadata.premiumPreviewLocked
+          ? 'preview'
+          : null
+
+  const upgradeText =
+    typeof metadata.upgradeText === 'string' && metadata.upgradeText.trim()
+      ? metadata.upgradeText
+      : null
+
   let premiumLock: ClientPremiumLockPolicy = { action: 'clear' }
+
   if (quotaExceeded) {
     premiumLock = {
       action: 'set',
       value: {
         targetPlan: metadata.upgradeTargetPlan ?? 'essential',
         ctaLabel: metadata.upgradeCtaLabel ?? 'Continuer avec Essentiel',
-        text: reply || "Tu peux continuer.\nDébloque l'accès complet et va plus loin dans ta compréhension.",
+        text:
+          upgradeText ??
+          reply ??
+          "Tu peux continuer.\nDebloque l'acces complet et va plus loin dans ta comprehension.",
+        reason: upgradeReason ?? 'quota_limit',
+      },
+    }
+  } else if (metadata.upgradeShown && typeof metadata.upgradeTargetPlan === 'string') {
+    premiumLock = {
+      action: 'set',
+      value: {
+        targetPlan: metadata.upgradeTargetPlan,
+        ctaLabel: metadata.upgradeCtaLabel ?? getDefaultUpgradeLabel(metadata.upgradeTargetPlan),
+        text:
+          upgradeText ??
+          "On peut aller plus loin si tu veux.\nJe peux t'aider a clarifier encore plus cette situation.",
+        reason: upgradeReason ?? 'engagement',
       },
     }
   } else if (metadata.premiumPreviewLocked) {
@@ -134,7 +172,8 @@ export function resolveClientResponsePolicy(
         targetPlan: metadata.upgradeTargetPlan ?? 'premium',
         ctaLabel: metadata.upgradeCtaLabel ?? 'Aller plus loin avec Premium',
         text:
-          "Tu as déjà le cœur de la réponse. Passe en Premium pour aller plus loin, avec plus de précision et une lecture plus profonde.",
+          "Tu as deja le coeur de la reponse. Passe en Premium pour aller plus loin, avec plus de precision et une lecture plus profonde.",
+        reason: upgradeReason ?? 'preview',
       },
     }
   }

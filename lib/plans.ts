@@ -1,4 +1,4 @@
-import type { Mode } from '@/app/chat/_lib/chat'
+﻿import type { Mode } from '@/app/chat/_lib/chat'
 import type {
   PlanKey,
   AnalysisDepth,
@@ -10,7 +10,7 @@ import { getPlanContract, getPlanQuotaLimit, PLAN_CONTRACTS } from '@/lib/hexast
 
 export type { PlanKey, AnalysisDepth, PlanCapabilities, PlanUiData, PlanApiContext }
 
-// ─── Capabilities par plan ─────────────────────────────────────────────────
+// â”€â”€â”€ Capabilities par plan â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function toAnalysisDepth(plan: PlanKey): AnalysisDepth {
   const contract = getPlanContract(plan)
@@ -83,74 +83,74 @@ export const PLAN_CAPABILITIES: Record<PlanKey, PlanCapabilities> = {
   },
 }
 
-// ─── Données UI (source unique pour homepage + pricing pages) ──────────────
+// â”€â”€â”€ DonnÃ©es UI (source unique pour homepage + pricing pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const PLANS_UI: PlanUiData[] = [
   {
     key: 'free',
     label: 'Gratuit',
-    price: '0\u20ac',
+    price: '0 EUR',
     period: '/mois',
-    desc: 'Pour entrer dans HexAstra sans engagement. Gratuit, direct, sans carte.',
+    desc: 'Pour essayer HexAstra tout de suite, avec un acces decouverte limite chaque jour.',
     features: [
-      'Lectures complètes avec quota quotidien',
-      "Accès au cœur de l'expérience HexAstra",
-      'Toutes les approches disponibles',
-      'Sans carte bancaire requise',
+      'Acces decouverte immediat',
+      "Acces au coeur de l'experience",
+      'Messages limites par jour',
+      'Sans engagement',
     ],
-    cta: "Commencer — c'est gratuit",
+    cta: 'Commencer gratuitement',
     href: '/chat',
   },
   {
     key: 'essential',
     label: 'Essentiel',
-    price: '4,90\u20ac',
+    price: '9 EUR',
     period: '/mois',
-    desc: 'Pour un usage régulier — sans compter tes lectures.',
+    desc: 'Pour continuer quand vous voulez, avec des reponses plus directes et concises.',
     features: [
-      'Usage non limité',
-      'Lectures complètes sans quota',
-      'Clarté approfondie sur les sujets importants',
-      'Idéal pour un usage quotidien',
+      'Usage illimite',
+      'Reponses concises et fluides',
+      'Aucune coupure dans vos echanges',
+      'Ideal pour un usage regulier',
     ],
-    cta: 'Commencer avec Essentiel',
+    cta: 'Choisir Essentiel',
     href: '/pricing/essentiel',
   },
   {
     key: 'premium',
     label: 'Premium',
-    price: '9,90\u20ac',
+    price: '19 EUR',
     period: '/mois',
-    desc: 'Pour explorer en profondeur, sans aucune restriction.',
+    desc: 'Pour aller plus loin avec plus de profondeur, de precision et de recul.',
     features: [
-      'Mode libre complet',
-      'Sans limitation de rythme ni de thèmes',
-      'Relations, périodes, blocages, décisions',
-      'Accès à toutes les lectures spécialisées',
+      'Analyses plus profondes',
+      'Guidance plus precise',
+      'Meilleur soutien aux decisions importantes',
+      'Le meilleur equilibre entre clarte et profondeur',
     ],
-    cta: 'Accéder au plan Premium',
+    cta: 'Passer en Premium',
     href: '/pricing/premium',
-    badge: 'Le plus complet',
+    badge: 'Recommande',
     highlighted: true,
   },
   {
     key: 'practitioner',
     label: 'Praticien',
-    price: '24,90\u20ac',
+    price: '49 EUR',
     period: '/mois',
-    desc: "Pour aller plus loin — ou accompagner d'autres personnes.",
+    desc: 'Pour les usages avances et les futures fonctions professionnelles.',
     features: [
-      'Mode Praticien avec vocabulaire avancé',
-      'Lectures pour soi ou pour un client',
-      'Analyse croisée de deux profils',
-      'Pensé pour les profils experts ou accompagnants',
+      'Usage avance',
+      'Cadre plus expert',
+      'Preparation aux futures fonctions pro',
+      'Pense pour les praticiens et power users',
     ],
-    cta: 'Ouvrir le mode Praticien',
+    cta: 'Acceder a Praticien',
     href: '/pricing/praticien',
   },
 ]
 
-// ─── Helpers ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function getPlanCapabilities(plan: PlanKey): PlanCapabilities {
   return PLAN_CAPABILITIES[plan]
@@ -203,15 +203,45 @@ export function getPlanHref(plan: PlanKey): string {
   }
 }
 
-/** Retourne le plan immédiatement supérieur pour les CTA d'upgrade */
-export function getUpgradeTarget(plan: PlanKey): { label: string; labelKey: string; href: string } {
+export function getPlanCheckoutHref(plan: PlanKey): string {
+  const href = getPlanHref(plan)
+  return `${href}${href.includes('?') ? '&' : '?'}checkout=1`
+}
+
+export function getPlanCheckoutAuthHref(plan: PlanKey): string {
+  const next = encodeURIComponent(getPlanCheckoutHref(plan))
+  return `/auth?plan=${plan}&next=${next}`
+}
+
+/** Retourne le plan immÃ©diatement supÃ©rieur pour les CTA d'upgrade */
+export function getUpgradeTarget(plan: PlanKey): {
+  plan: PlanKey
+  label: string
+  labelKey: string
+  href: string
+} {
   if (plan === 'free') {
-    return { label: 'Essentiel', labelKey: 'pricing.essentialLabel', href: getPlanHref('essential') }
+    return {
+      plan: 'essential',
+      label: 'Essentiel',
+      labelKey: 'pricing.essentialLabel',
+      href: getPlanHref('essential'),
+    }
   }
   if (plan === 'essential') {
-    return { label: 'Premium', labelKey: 'pricing.premiumLabel', href: getPlanHref('premium') }
+    return {
+      plan: 'premium',
+      label: 'Premium',
+      labelKey: 'pricing.premiumLabel',
+      href: getPlanHref('premium'),
+    }
   }
-  return { label: 'Praticien', labelKey: 'pricing.practitionerLabel', href: getPlanHref('practitioner') }
+  return {
+    plan: 'practitioner',
+    label: 'Praticien',
+    labelKey: 'pricing.practitionerLabel',
+    href: getPlanHref('practitioner'),
+  }
 }
 
 /** Retourne le label lisible d'un plan */
@@ -219,7 +249,7 @@ export function getPlanLabel(plan: PlanKey): string {
   return PLANS_UI.find((p) => p.key === plan)?.label ?? plan
 }
 
-/** Label affiché quand un mode est bloqué */
+/** Label affichÃ© quand un mode est bloquÃ© */
 export function getModeUnlockLabel(mode: Mode): string {
   if (mode === 'premium') return 'Disponible avec le plan Premium'
   if (mode === 'praticien') return 'Disponible avec le plan Praticien'
@@ -238,15 +268,15 @@ export function buildPlanApiContext(plan: PlanKey): PlanApiContext {
   }
 }
 
-// ─── localStorage keys pour le suivi free ─────────────────────────────────
+// â”€â”€â”€ localStorage keys pour le suivi free â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export const FREE_USAGE_STORAGE_KEY = 'hexastra.free.usage'
 /** @deprecated replaced by FREE_USAGE_FIRST_MSG_KEY */
 export const FREE_USAGE_DATE_KEY = 'hexastra.free.date'
-/** ISO timestamp du premier message envoyé dans la fenêtre de 24h en cours */
+/** ISO timestamp du premier message envoyÃ© dans la fenÃªtre de 24h en cours */
 export const FREE_USAGE_FIRST_MSG_KEY = 'hexastra.free.firstmsg'
 
-/** Réinitialise complètement le compteur free dans localStorage */
+/** RÃ©initialise complÃ¨tement le compteur free dans localStorage */
 export function resetFreeUsage(): void {
   try {
     localStorage.removeItem(FREE_USAGE_STORAGE_KEY)
@@ -255,7 +285,7 @@ export function resetFreeUsage(): void {
   } catch { /* noop */ }
 }
 
-/** Retourne le timestamp de reset (firstMsg + 24h), ou null si pas de fenêtre active */
+/** Retourne le timestamp de reset (firstMsg + 24h), ou null si pas de fenÃªtre active */
 export function getFreeResetAt(): Date | null {
   try {
     const raw = localStorage.getItem(FREE_USAGE_FIRST_MSG_KEY)
@@ -265,3 +295,4 @@ export function getFreeResetAt(): Date | null {
     return new Date(t + 24 * 60 * 60 * 1000)
   } catch { return null }
 }
+

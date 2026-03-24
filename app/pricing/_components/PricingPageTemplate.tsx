@@ -6,34 +6,41 @@ import HexastraLogo from '@/app/components/HexastraLogo'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { usePlansUI } from '@/lib/usePlansUI'
 import type { PlanKey } from '@/types/subscription'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { priceKeyFromPlan } from '@/lib/billing/stripePlans'
 import { useRouter } from 'next/navigation'
+import { getPlanCheckoutAuthHref } from '@/lib/plans'
 
 export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
   const { t } = useTranslation()
   const plans = usePlansUI()
   const plan = plans.find((p) => p.key === planKey)!
   const supabase = createClient()
-  const [checkoutHref, setCheckoutHref] = useState<string>(`/auth?plan=${planKey}`)
+  const [checkoutHref, setCheckoutHref] = useState<string>(getPlanCheckoutAuthHref(planKey))
   const [loading, setLoading] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [shouldAutoCheckout, setShouldAutoCheckout] = useState(false)
   const router = useRouter()
+  const autoCheckoutStartedRef = useRef(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    setShouldAutoCheckout(params.get('checkout') === '1')
+  }, [])
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) {
         setCheckoutHref('stripe')
       } else {
-        setCheckoutHref(`/auth?plan=${planKey}`)
+        setCheckoutHref(getPlanCheckoutAuthHref(planKey))
       }
     })
   }, [planKey, supabase])
 
-  async function handleCta(e: React.MouseEvent) {
-    if (checkoutHref !== 'stripe') return
-    e.preventDefault()
+  async function startCheckout() {
     const priceKey = priceKeyFromPlan(planKey)
     if (!priceKey) {
       router.push('/auth')
@@ -56,7 +63,7 @@ export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
       if (res.ok && json?.url) {
         window.location.href = json.url
       } else if (res.status === 401) {
-        router.push(`/auth?plan=${planKey}`)
+        router.push(getPlanCheckoutAuthHref(planKey))
       } else {
         setCheckoutError(json?.error ?? 'Une erreur est survenue. Veuillez réessayer.')
       }
@@ -66,6 +73,21 @@ export default function PricingPageTemplate({ planKey }: { planKey: PlanKey }) {
       setLoading(false)
     }
   }
+
+  async function handleCta(e: React.MouseEvent) {
+    if (checkoutHref !== 'stripe') return
+    e.preventDefault()
+    await startCheckout()
+  }
+
+  useEffect(() => {
+    if (!shouldAutoCheckout || checkoutHref !== 'stripe' || loading || autoCheckoutStartedRef.current) {
+      return
+    }
+
+    autoCheckoutStartedRef.current = true
+    void startCheckout()
+  }, [checkoutHref, loading, shouldAutoCheckout])
 
   return (
     <main className="hx-pricing-page">

@@ -1,12 +1,21 @@
 'use client'
 
-import { useTranslation } from '@/lib/i18n/useTranslation'
-import { getUpgradeTarget, type PlanKey } from '@/lib/plans'
 import { trackHexastraFunnel } from '@/lib/analytics/hexastraFunnel'
+import { useTranslation } from '@/lib/i18n/useTranslation'
+import {
+  getPlanCheckoutAuthHref,
+  getPlanCheckoutHref,
+  getUpgradeTarget,
+  type PlanKey,
+} from '@/lib/plans'
 
-type Props = { plan: PlanKey; resetAt: Date | null }
+type Props = {
+  plan: PlanKey
+  resetAt: Date | null
+  isAuthenticated?: boolean
+}
 
-export default function PaywallBanner({ plan, resetAt }: Props) {
+export default function PaywallBanner({ plan, resetAt, isAuthenticated = false }: Props) {
   const { t, lang } = useTranslation()
   const upgrade = getUpgradeTarget(plan)
   const upgradeLabel = t(upgrade.labelKey)
@@ -16,12 +25,15 @@ export default function PaywallBanner({ plan, resetAt }: Props) {
   const resetDateLabel = resetAt
     ? resetAt.toLocaleDateString(lang, { day: 'numeric', month: 'long' })
     : null
+  const upgradeHref = isAuthenticated
+    ? getPlanCheckoutHref(upgrade.plan)
+    : getPlanCheckoutAuthHref(upgrade.plan)
 
   return (
     <div className="hx-paywall-banner">
       <div className="hx-paywall-inner">
         <div className="hx-paywall-icon" aria-hidden="true">
-          ✦
+          *
         </div>
         <p className="hx-paywall-title">{t('chat.paywallTitle')}</p>
         <p className="hx-paywall-text">
@@ -33,15 +45,22 @@ export default function PaywallBanner({ plan, resetAt }: Props) {
             : t('chat.paywallUnlimitedText').replace('{label}', upgradeLabel)}
         </p>
         <a
-          href={upgrade.href}
+          href={upgradeHref}
           className="hx-paywall-cta"
-          onClick={() =>
+          onClick={() => {
             trackHexastraFunnel('chat_upgrade_clicked', {
               location: 'paywall_banner',
               plan,
-              targetPlan: upgrade.label.toLowerCase(),
+              targetPlan: upgrade.plan,
+              reason: 'quota_limit',
             })
-          }
+            trackHexastraFunnel('upgradeClicked', {
+              location: 'paywall_banner',
+              plan,
+              targetPlan: upgrade.plan,
+              reason: 'quota_limit',
+            })
+          }}
         >
           {t('chat.paywallCta').replace('{label}', upgradeLabel)}
         </a>

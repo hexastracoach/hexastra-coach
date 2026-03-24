@@ -114,6 +114,11 @@ import {
   ANTI_CONTRADICTION_DIRECTIVE,
   detectResponseModeMismatch,
 } from '@/lib/hexastra/guards/hallucinationGuard'
+import {
+  buildSmartPricingSessionState,
+  buildSmartUpgradeDecision,
+  toSessionStatePatch,
+} from '@/lib/monetization/smartPricing'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
@@ -3446,6 +3451,17 @@ export async function runHexastraFlow(input: {
         "Tes données sont bien enregistrées. Je peux maintenant ouvrir ton profil ou explorer une question."
     }
 
+    const pricingSessionState = buildSmartPricingSessionState({
+      messages: limitedMessages,
+      lastInteractionTimestamp: new Date().toISOString(),
+      previousState: sessionContext.state,
+    })
+    const smartUpgradeDecision = buildSmartUpgradeDecision({
+      plan,
+      sessionState: pricingSessionState,
+      previousState: sessionContext.state,
+    })
+
     try {
       await persistConversationMessage(
         supabase,
@@ -3488,6 +3504,7 @@ export async function runHexastraFlow(input: {
         last_timing: sessionContext.timing,
         last_precision: sessionContext.precision,
         last_reading_level: sessionContext.readingLevel,
+        ...toSessionStatePatch(pricingSessionState, smartUpgradeDecision),
       })
     } catch (memoryError) {
       logger.error('[runHexastraFlow] memory/session persistence failed', { error: memoryError })
@@ -3604,8 +3621,23 @@ export async function runHexastraFlow(input: {
         orchestrationTrace,
         usedLocalFallback,
         fallbackType,
+        upgradeShown: smartUpgradeDecision.shouldShow,
+        upgradeReason: smartUpgradeDecision.reason,
+        upgradeText: smartUpgradeDecision.message,
+        upgradeTargetPlan: smartUpgradeDecision.targetPlan ?? undefined,
+        upgradeCtaLabel: smartUpgradeDecision.ctaLabel ?? undefined,
+        pricingSessionState,
         fusionOnlyExperience: true,
         scienceBreakdownAvailable,
+        advancedAnalysisAvailable: plan === 'practitioner',
+        responseDepth:
+          plan === 'practitioner'
+            ? 'expert'
+            : plan === 'premium'
+              ? 'long'
+              : plan === 'essential'
+                ? 'medium'
+                : 'short',
       },
       updatedEvolutionProfile: input.evolutionProfile ?? null,
     } as HexastraApiResponse

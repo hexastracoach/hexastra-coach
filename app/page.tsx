@@ -8,14 +8,51 @@ import LanguageSwitcher from './components/LanguageSwitcher'
 import { createClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { usePlansUI } from '@/lib/usePlansUI'
-import { buildChatEntryHref } from '@/lib/chat/chatEntryHref'
 import { trackHexastraFunnel } from '@/lib/analytics/hexastraFunnel'
 
 export default function HomePage() {
   const haloRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
-  const { t } = useTranslation()
+  const { t, lang } = useTranslation()
   const plansUI = usePlansUI()
+  const pricingTitle =
+    lang === 'en'
+      ? 'Start free. Upgrade only when you want more depth.'
+      : 'Commencez gratuitement. Passez au niveau superieur seulement quand vous voulez plus de profondeur.'
+  const pricingCopy =
+    lang === 'en'
+      ? 'Free to try. Essential to continue without friction. Premium is the recommended plan when you want deeper and more precise guidance.'
+      : 'Free pour essayer. Essential pour continuer sans friction. Premium est le plan recommande quand vous voulez une lecture plus profonde et plus precise.'
+  const heroContent =
+    lang === 'en'
+      ? {
+          kicker: 'Clarity for real decisions',
+          title: 'Understand your situation. Know what to do next.',
+          text: 'Describe what feels blocked. Hexastra helps you see what is happening and what direction makes sense now.',
+          microcopy: 'Start in the chat with one message.',
+          primary: 'Start in chat',
+          cardKicker: 'What you get',
+          cardTitle: 'A clear answer, fast.',
+          cardItems: [
+            'What is really happening',
+            'What matters most right now',
+            'One concrete next step',
+          ],
+        }
+      : {
+          kicker: 'De la clarte pour les vraies decisions',
+          title: 'Comprenez votre situation. Sachez quoi faire ensuite.',
+          text: 'Decrivez ce qui vous bloque. Hexastra vous aide a voir clairement ce qui se passe et la direction la plus juste maintenant.',
+          microcopy: 'Entrez dans le chat et commencez en une phrase.',
+          primary: 'Commencer dans le chat',
+          cardKicker: 'Ce que vous obtenez',
+          cardTitle: 'Une reponse claire, rapidement.',
+          cardItems: [
+            'Ce qui se joue vraiment',
+            'Ce qui compte le plus maintenant',
+            'Une prochaine action concrete',
+          ],
+        }
 
   const problemCards = [
     { title: t('home.problemCard1Title'), text: t('home.problemCard1Text') },
@@ -53,8 +90,8 @@ export default function HomePage() {
   const [user, setUser] = useState<any>(null)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const accountHref = user ? '/chat' : '/auth'
-  const heroChatHref = buildChatEntryHref({ prompt: t('chat.suggestion1'), source: 'landing_hero' })
-  const finalChatHref = buildChatEntryHref({ prompt: t('chat.suggestion4'), source: 'landing_final' })
+  const heroChatHref = '/chat'
+  const finalChatHref = '/chat'
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -178,37 +215,41 @@ export default function HomePage() {
         </header>
 
         <div className="hx-home-hero-inner">
-          <div className="hx-home-hero-grid">
-            <div className="hx-home-hero-left">
-              <div className="hx-home-kicker">{t('home.heroKicker')}</div>
-              <h1 className="hx-home-hero-title">{t('home.heroTitle')}</h1>
-              <p className="hx-home-hero-text">{t('home.heroText')}</p>
-              <div className="hx-home-microcopy">
-                <p>{t('home.heroMicrocopy')}</p>
+            <div className="hx-home-hero-grid">
+              <div className="hx-home-hero-left">
+                <div className="hx-home-kicker">{heroContent.kicker}</div>
+                <h1 className="hx-home-hero-title">{heroContent.title}</h1>
+                <p className="hx-home-hero-text">{heroContent.text}</p>
+                <div className="hx-home-microcopy">
+                  <p>{heroContent.microcopy}</p>
+                </div>
+
+                <div className="hx-home-hero-actions">
+                  <Link
+                    href={heroChatHref}
+                    className="hx-home-hero-primary"
+                    onClick={() => trackHexastraFunnel('landing_chat_cta_clicked', { location: 'hero' })}
+                  >
+                    {heroContent.primary}
+                  </Link>
+                  <a href="#how-it-works" className="hx-home-hero-secondary">{t('home.heroSecondary')}</a>
+                </div>
               </div>
 
-              <div className="hx-home-hero-actions">
-                <Link
-                  href={heroChatHref}
-                  className="hx-home-hero-primary"
-                  onClick={() => trackHexastraFunnel('landing_chat_cta_clicked', { location: 'hero' })}
-                >
-                  {t('home.heroPrimary')}
-                </Link>
-                <a href="#how-it-works" className="hx-home-hero-secondary">{t('home.heroSecondary')}</a>
+              <div className="hx-home-preview-card">
+                <div className="hx-home-kicker">{heroContent.cardKicker}</div>
+                <h2 className="hx-home-preview-title">{heroContent.cardTitle}</h2>
+                <div className="hx-home-preview-list" aria-label={heroContent.cardKicker}>
+                  {heroContent.cardItems.map((item, index) => (
+                    <div className="hx-home-preview-row" key={item}>
+                      <span className="hx-home-preview-index">0{index + 1}</span>
+                      <p>{item}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-
-            <div className="hx-home-preview-card">
-              <div className="hx-home-kicker">{t('home.previewKicker')}</div>
-              <div className="hx-home-preview-bubble is-user">{t('home.previewUser1')}</div>
-              <div className="hx-home-preview-bubble is-assistant">{t('home.previewAI1')}</div>
-              <div className="hx-home-preview-bubble is-assistant">{t('home.previewAI2')}</div>
-              <div className="hx-home-preview-bubble is-user">{t('home.previewUser2')}</div>
-              <div className="hx-home-preview-bubble is-assistant">{t('home.previewAI3')}</div>
             </div>
           </div>
-        </div>
       </section>
 
       <section className="hx-home-section hx-home-section-darkfusion">
@@ -305,8 +346,8 @@ export default function HomePage() {
       <section id="offres" className="hx-home-section hx-home-section-cream">
         <div className="hx-home-section-wrap">
           <div className="hx-home-kicker">{t('home.pricingKicker')}</div>
-          <h2 className="hx-home-title">{t('home.pricingTitle')}</h2>
-          <p className="hx-home-copy hx-home-copy-dark">{t('home.pricingCopy')}</p>
+          <h2 className="hx-home-title">{pricingTitle}</h2>
+          <p className="hx-home-copy hx-home-copy-dark">{pricingCopy}</p>
 
           <div className="hx-home-pricing-grid">
             {plansUI.map((plan) => (

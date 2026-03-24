@@ -129,11 +129,24 @@ export type HexastraApiResponse = {
     resetAt?: string | null
     used?: number
     limit?: number
+    upgradeShown?: boolean
+    upgradeReason?: 'engagement' | 'quota_limit' | 'preview' | null
+    upgradeText?: string | null
     upgradeTargetPlan?: string
     upgradeCtaLabel?: string
     premiumPreviewLocked?: boolean
     fusionOnlyExperience?: boolean
     scienceBreakdownAvailable?: boolean
+    advancedAnalysisAvailable?: boolean
+    pricingSessionState?: {
+      messagesCount: number
+      emotionalEngagement: 'low' | 'medium' | 'high'
+      clarityScore: number
+      lastInteractionTimestamp: string
+      lastUpgradeShownAt?: string | null
+      upgradeShownCount?: number
+      lastUpgradeTargetPlan?: string | null
+    }
     intentDetected?: string
     responseDepth?: 'short' | 'medium' | 'long' | 'expert'
     ksSummary?: {
@@ -187,6 +200,13 @@ export type SessionStateRecord = {
   last_subcategory?: string | null
   /** Dernier mode d'analyse choisi */
   last_analysis_mode?: 'science_by_science' | 'hexastra_fusion' | null
+  pricing_messages_count?: number | null
+  pricing_emotional_engagement?: 'low' | 'medium' | 'high' | string | null
+  pricing_clarity_score?: number | null
+  pricing_last_interaction_at?: string | null
+  pricing_last_upgrade_shown_at?: string | null
+  pricing_upgrade_shown_count?: number | null
+  pricing_last_upgrade_target_plan?: string | null
 }
 
 export type UserMemoryRecord = {

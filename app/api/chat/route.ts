@@ -32,6 +32,10 @@ import {
   normalizeFusionOnlyAnalysisMode,
   sanitizeFusionOnlySelectionKey,
 } from '@/lib/hexastra/fusionOnly'
+import {
+  buildQuotaUpgradeDecision,
+  buildSmartPricingSessionState,
+} from '@/lib/monetization/smartPricing'
 
 const memoryCache = new Map<string, { value: unknown; expires: number }>()
 const CACHE_TTL_MS = 10 * 60 * 1000
@@ -551,26 +555,37 @@ function buildSafeErrorResponse() {
   )
 }
 
-function buildQuotaErrorResponse(params: { plan: PlanKey; used: number; limit: number; resetAt: string | null }) {
-  const { plan, used, limit, resetAt } = params
+function buildQuotaErrorResponse(params: {
+  plan: PlanKey
+  used: number
+  limit: number
+  resetAt: string | null
+  messages?: ChatMessage[]
+}) {
+  const { plan, used, limit, resetAt, messages = [] } = params
+  const upgradeDecision = buildQuotaUpgradeDecision(plan)
+  const pricingSessionState = buildSmartPricingSessionState({
+    messages,
+    lastInteractionTimestamp: new Date().toISOString(),
+  })
 
   const planLabel =
     plan === 'essential'
       ? 'Essentiel'
       : plan === 'premium'
         ? 'Premium'
-        : plan === 'practitioner'
+      : plan === 'practitioner'
           ? 'Praticien'
           : 'Gratuit'
 
-  const freeMessage = `Tu as atteint la limite de ton accès découverte pour le moment.
+  const freeMessage = `Tu as atteint la limite de ton acces decouverte pour le moment.
 
-Ton espace gratuit se réouvrira automatiquement dans 24h.
-Si tu veux continuer maintenant, tu peux passer à Essentiel.`
+Ton espace gratuit se reouvrira automatiquement dans 24h.
+Si tu veux continuer maintenant, tu peux aller plus loin avec Essentiel.`
 
   const paidMessage = `Tu as atteint la limite de ton plan ${planLabel} pour le moment.
 
-Tu pourras réessayer plus tard, ou passer à l’offre supérieure si tu veux continuer tout de suite.`
+Tu pourras reessayer plus tard, ou passer a l'offre superieure si tu veux continuer tout de suite.`
 
   const finalMessage = plan === 'free' ? freeMessage : paidMessage
 
@@ -584,9 +599,16 @@ Tu pourras réessayer plus tard, ou passer à l’offre supérieure si tu veux c
       metadata: {
         shouldPersistMemory: false,
         quotaExceeded: true,
+        upgradeShown: upgradeDecision.shouldShow,
+        upgradeReason: upgradeDecision.reason,
+        upgradeText: upgradeDecision.message,
+        upgradeTargetPlan: upgradeDecision.targetPlan ?? undefined,
+        upgradeCtaLabel: upgradeDecision.ctaLabel ?? undefined,
         resetAt,
         used,
         limit,
+        advancedAnalysisAvailable: plan === 'practitioner',
+        pricingSessionState,
       },
     },
     {
@@ -1088,6 +1110,7 @@ export async function POST(req: NextRequest) {
             used: quota.used,
             limit: quota.limit,
             resetAt: quota.resetAt,
+            messages: sanitizedMessages,
           }),
           postQuotaTrace
         )

@@ -69,6 +69,7 @@ describe('client response policy', () => {
     if (policy.premiumLock.action !== 'set') return
     expect(policy.premiumLock.value.targetPlan).toBe('essential')
     expect(policy.premiumLock.value.ctaLabel).toBe('Continuer avec Essentiel')
+    expect(policy.premiumLock.value.reason).toBe('quota_limit')
   })
 
   it('turns premium preview locks into a premium upsell decision', () => {
@@ -87,6 +88,32 @@ describe('client response policy', () => {
     if (policy.premiumLock.action !== 'set') return
     expect(policy.premiumLock.value.targetPlan).toBe('premium')
     expect(policy.premiumLock.value.ctaLabel).toBe('Aller plus loin avec Premium')
+    expect(policy.premiumLock.value.reason).toBe('preview')
+  })
+
+  it('surfaces engagement-based upgrade prompts without blocking the reply', () => {
+    const policy = resolveClientResponsePolicy({
+      message: 'Voici ce qui ressort de ta situation.',
+      mode: 'libre',
+      plan: 'free',
+      flowState: { step: 'analysis', completed: true },
+      conversationId: 'conv_policy_4b',
+      metadata: {
+        upgradeShown: true,
+        upgradeReason: 'engagement',
+        upgradeText:
+          "On peut aller plus loin si tu veux.\nJe peux t'aider a clarifier encore plus cette situation.",
+        upgradeTargetPlan: 'premium',
+        upgradeCtaLabel: 'Aller plus loin avec Premium',
+      },
+    } as HexastraApiResponse)
+
+    expect(policy.reply).toBe('Voici ce qui ressort de ta situation.')
+    expect(policy.premiumLock.action).toBe('set')
+    if (policy.premiumLock.action !== 'set') return
+    expect(policy.premiumLock.value.targetPlan).toBe('premium')
+    expect(policy.premiumLock.value.reason).toBe('engagement')
+    expect(policy.premiumLock.value.text).toContain('On peut aller plus loin')
   })
 
   it('preserves menu state when the response does not explicitly change it', () => {

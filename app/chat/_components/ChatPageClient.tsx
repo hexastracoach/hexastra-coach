@@ -24,7 +24,8 @@ import {
   FREE_USAGE_STORAGE_KEY,
   FREE_USAGE_FIRST_MSG_KEY,
   canContinueChat,
-  getPlanHref,
+  getPlanCheckoutAuthHref,
+  getPlanCheckoutHref,
   isQuotaLimitedPlan,
   shouldPersistQuotaLocally,
   type PlanKey,
@@ -120,10 +121,22 @@ type ChatApiMetadata = Record<string, unknown> & {
   resetAt?: string | null
   used?: number
   limit?: number
+  upgradeShown?: boolean
+  upgradeReason?: 'engagement' | 'quota_limit' | 'preview' | null
+  upgradeText?: string | null
   upgradeTargetPlan?: string
   upgradeCtaLabel?: string
   premiumPreviewLocked?: boolean
   intentDetected?: string
+  pricingSessionState?: {
+    messagesCount: number
+    emotionalEngagement: 'low' | 'medium' | 'high'
+    clarityScore: number
+    lastInteractionTimestamp: string
+    lastUpgradeShownAt?: string | null
+    upgradeShownCount?: number
+    lastUpgradeTargetPlan?: string | null
+  }
 }
 
 function IconMenu() {
@@ -424,6 +437,7 @@ export default function ChatPageClient() {
     targetPlan: string
     ctaLabel: string
     text: string
+    reason?: string | null
   } | null>(null)
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -479,6 +493,8 @@ export default function ChatPageClient() {
     firstMessageSent: false,
     secondMessageSent: false,
     limitReached: false,
+    lastUpgradeFingerprint: null as string | null,
+    conversionSuccessTracked: false,
   })
   const hasPrefilled = useRef(false)
   const microTriggerRef = useRef<string | null>(null)
@@ -656,8 +672,41 @@ export default function ChatPageClient() {
     [pushJourneyMessage]
   )
 
+  const trackUpgradeShown = useCallback(
+    (params: {
+      targetPlan: string
+      reason?: string | null
+      text: string
+      location: string
+      conversationId?: string | null
+    }) => {
+      const fingerprint = [
+        params.location,
+        params.targetPlan,
+        params.reason ?? 'unknown',
+        params.conversationId ?? 'none',
+        params.text,
+      ].join('::')
+
+      if (funnelTrackingRef.current.lastUpgradeFingerprint === fingerprint) {
+        return
+      }
+
+      funnelTrackingRef.current.lastUpgradeFingerprint = fingerprint
+      trackHexastraFunnel('upgradeShown', {
+        plan: userPlan,
+        source: entrySource,
+        location: params.location,
+        targetPlan: params.targetPlan,
+        reason: params.reason ?? 'unknown',
+      })
+    },
+    [entrySource, userPlan],
+  )
+
   const applyApiResponse = useCallback((data: HexastraApiResponse | null | undefined) => {
     const responsePolicy = resolveClientResponsePolicy(data)
+    const metadata = ((data?.metadata ?? {}) as ChatApiMetadata)
 
     if (responsePolicy.conversationId) setConversationId(responsePolicy.conversationId)
 
@@ -725,28 +774,35 @@ export default function ChatPageClient() {
       }
     }
 
-      if (responsePolicy.quotaExceeded && isQuotaLimitedPlan(userPlan)) {
-        setQuotaMessagesUsed(responsePolicy.quotaExceeded.used)
-        setQuotaResetAt(responsePolicy.quotaExceeded.resetAt)
-        if (!funnelTrackingRef.current.limitReached) {
-          funnelTrackingRef.current.limitReached = true
-          trackHexastraFunnel('chat_limit_reached', {
-            plan: userPlan,
-            source: entrySource,
-            usedMessages: responsePolicy.quotaExceeded.used,
-            via: 'server',
-          })
-        }
+    if (responsePolicy.quotaExceeded && isQuotaLimitedPlan(userPlan)) {
+      setQuotaMessagesUsed(responsePolicy.quotaExceeded.used)
+      setQuotaResetAt(responsePolicy.quotaExceeded.resetAt)
+      if (!funnelTrackingRef.current.limitReached) {
+        funnelTrackingRef.current.limitReached = true
+        trackHexastraFunnel('chat_limit_reached', {
+          plan: userPlan,
+          source: entrySource,
+          usedMessages: responsePolicy.quotaExceeded.used,
+          via: 'server',
+        })
       }
+    }
 
     if (responsePolicy.premiumLock.action === 'set') {
       setPremiumLock(responsePolicy.premiumLock.value)
+      trackUpgradeShown({
+        targetPlan: responsePolicy.premiumLock.value.targetPlan,
+        reason: responsePolicy.premiumLock.value.reason ?? metadata.upgradeReason ?? null,
+        text: responsePolicy.premiumLock.value.text,
+        location: responsePolicy.quotaExceeded ? 'quota_response' : 'chat_response',
+        conversationId: data?.conversationId ?? null,
+      })
     } else {
       setPremiumLock(null)
     }
 
     return responsePolicy.reply
-  }, [entrySource, storageScope, userPlan])
+  }, [entrySource, storageScope, trackUpgradeShown, userPlan])
 
   const postChatPayload = useCallback(
     async (payload: unknown): Promise<HexastraApiResponse> => {
@@ -1195,11 +1251,19 @@ export default function ChatPageClient() {
     if (!query || hasPrefilled.current) return
     hasPrefilled.current = true
     setInput(query)
-  }, [searchParams])
+  }, [entrySource, searchParams, userPlan])
 
   useEffect(() => {
     if (searchParams.get('payment') === 'success') {
       setPaymentSuccess(true)
+      if (!funnelTrackingRef.current.conversionSuccessTracked) {
+        funnelTrackingRef.current.conversionSuccessTracked = true
+        trackHexastraFunnel('conversionSuccess', {
+          plan: userPlan,
+          source: entrySource,
+          location: 'chat_return',
+        })
+      }
       const timer = setTimeout(() => setPaymentSuccess(false), 6000)
       return () => clearTimeout(timer)
     }
@@ -1689,6 +1753,13 @@ export default function ChatPageClient() {
 
         if (localDecision.premiumLock) {
           setPremiumLock(localDecision.premiumLock)
+          trackUpgradeShown({
+            targetPlan: localDecision.premiumLock.targetPlan,
+            reason: 'quota_limit',
+            text: localDecision.premiumLock.text,
+            location: 'local_quota_guard',
+            conversationId,
+          })
           if (!funnelTrackingRef.current.limitReached) {
             funnelTrackingRef.current.limitReached = true
             trackHexastraFunnel('chat_limit_reached', {
@@ -1898,6 +1969,8 @@ export default function ChatPageClient() {
       firstMessageSent: false,
       secondMessageSent: false,
       limitReached: false,
+      lastUpgradeFingerprint: null,
+      conversionSuccessTracked: false,
     }
     try {
       removeScopedStorage(window.localStorage, CONVERSATION_STORAGE_KEY, storageScope)
@@ -2066,15 +2139,25 @@ export default function ChatPageClient() {
                     <button
                       className="hx-premium-lock-btn"
                       onClick={() => {
+                        const targetPlan = premiumLock.targetPlan as 'essential' | 'premium' | 'practitioner'
+                        const destination = authUserId
+                          ? getPlanCheckoutHref(targetPlan)
+                          : getPlanCheckoutAuthHref(targetPlan)
                         trackHexastraFunnel('chat_upgrade_clicked', {
                           location: 'premium_lock',
                           plan: userPlan,
                           source: entrySource,
                           targetPlan: premiumLock.targetPlan,
+                          reason: premiumLock.reason ?? null,
                         })
-                        window.location.href = getPlanHref(
-                          premiumLock.targetPlan as 'essential' | 'premium' | 'practitioner',
-                        )
+                        trackHexastraFunnel('upgradeClicked', {
+                          location: 'premium_lock',
+                          plan: userPlan,
+                          source: entrySource,
+                          targetPlan: premiumLock.targetPlan,
+                          reason: premiumLock.reason ?? null,
+                        })
+                        window.location.href = destination
                       }}
                     >
                       {premiumLock.ctaLabel}
@@ -2141,7 +2224,11 @@ export default function ChatPageClient() {
 
               {bootstrapOverlay ??
                 (isLimitReached ? (
-                  <PaywallBanner plan={userPlan} resetAt={quotaResetAt} />
+                  <PaywallBanner
+                    plan={userPlan}
+                    resetAt={quotaResetAt}
+                    isAuthenticated={Boolean(authUserId)}
+                  />
                 ) : (
                   <Composer {...composerProps} />
                 ))}

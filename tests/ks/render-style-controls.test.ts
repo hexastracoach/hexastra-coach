@@ -17,6 +17,24 @@ describe('render style controls', () => {
     expect(reply).toBe('Salut, oui ca va.')
   })
 
+  it('keeps free replies shorter than premium replies at the same depth level', () => {
+    const longReply = Array.from({ length: 16 }, (_, index) => `Ligne ${index + 1}`).join('\n')
+
+    const freeReply = adjustResponseDepth(longReply, {
+      level: 'LEVEL_4',
+      plan: 'free',
+      isReading: false,
+    })
+    const premiumReply = adjustResponseDepth(longReply, {
+      level: 'LEVEL_4',
+      plan: 'premium',
+      isReading: false,
+    })
+
+    expect(freeReply.split('\n')).toHaveLength(6)
+    expect(premiumReply.split('\n')).toHaveLength(14)
+  })
+
   it('does not block short numeric choices used in guided flows', () => {
     expect(moderateMessage('3')).toBe('SAFE')
   })

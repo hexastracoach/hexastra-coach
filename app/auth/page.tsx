@@ -22,9 +22,15 @@ function validatePassword(pw: string): string | null {
   return null
 }
 
+function sanitizeNextPath(value: string | null): string {
+  if (!value || typeof value !== 'string') return '/chat'
+  return value.startsWith('/') ? value : '/chat'
+}
+
 export default function AuthPage() {
   const supabase = createClient()
   const router = useRouter()
+  const [nextPath, setNextPath] = useState('/chat')
 
   const [mode, setMode] = useState<AuthMode>('login')
   const [firstName, setFirstName] = useState('')
@@ -38,12 +44,18 @@ export default function AuthPage() {
   const [isError, setIsError] = useState(false)
   const [pwError, setPwError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    setNextPath(sanitizeNextPath(params.get('next')))
+  }, [])
+
   // Already logged in? go straight to chat
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) router.replace('/chat')
+      if (data.user) router.replace(nextPath)
     })
-  }, [router, supabase])
+  }, [nextPath, router, supabase])
 
   /* Sign out on tab/browser close when "rester connecté" is off */
   useEffect(() => {
@@ -64,7 +76,7 @@ export default function AuthPage() {
     setLoading(true)
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${location.origin}/auth/callback?next=/chat` },
+      options: { redirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}` },
     })
     setLoading(false)
   }
@@ -84,7 +96,7 @@ export default function AuthPage() {
       sessionStorage.removeItem('hx.noremember')
     }
     router.refresh()
-    router.replace('/chat')
+    router.replace(nextPath)
   }
 
   async function handleSignup() {
@@ -98,7 +110,7 @@ export default function AuthPage() {
       password,
       options: {
         data: { first_name: firstName, last_name: lastName },
-        emailRedirectTo: `${location.origin}/auth/callback?next=/chat`,
+        emailRedirectTo: `${location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
       },
     })
     if (error) {
@@ -110,7 +122,7 @@ export default function AuthPage() {
   const { data: sessionData } = await supabase.auth.getSession()
   if (sessionData.session) {
     router.refresh()
-    router.replace('/chat')
+    router.replace(nextPath)
   } else {
     notify('Compte créé ! Vérifiez votre e-mail pour confirmer votre inscription.', false)
     setLoading(false)
