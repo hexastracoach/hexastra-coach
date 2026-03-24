@@ -272,6 +272,8 @@ export type BuildPromptInput = {
   renderMode?: 'simple' | 'approfondie' | 'praticien' | 'hexastra_horoscope' | null
   /** Science sélectionnée dans le menu (clé du menu level 1) */
   selectedScience?: string | null
+  /** Sous-categorie ou sous-angle detecte dans la science active */
+  selectedSubcategory?: string | null
   /** Contexte praticien: self = perso, client = pour un client, duo = lecture croisée 2 personnes */
   practitionerContext?: 'self' | 'client' | 'duo' | null
   /**

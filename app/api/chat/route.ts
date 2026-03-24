@@ -378,7 +378,7 @@ function detectIntentLocal(
   if (/(menu|angle|angles|option|choix|navigation)/.test(norm)) return 'menu'
   if (isContextualFlowCommand(message, history, selectedMenuKey, selectedSubmenuKey)) return 'analysis'
   if (isReadingFollowUp(message, history)) return 'analysis'
-  if (/(profil|analyse|lecture|theme|thème|astral|natal|astro|human design|porteum|\bhd\b|porte|portes|canal|canaux|centre|centres|autorite|strategie|relation|travail|periode|période|decision|décision|blocage|question|hexastra|neurokua|kua|etat du jour|état du jour)/.test(norm)) {
+  if (/(profil|analyse|lecture|theme|thème|astral|natal|astro|astrology|human design|design humain|porteum|\bhd\b|porte|portes|canal|canaux|centre|centres|autorite|strategie|numerologie|numerology|enneagramme|enneagram|relation|travail|periode|période|decision|décision|blocage|question|hexastra|neurokua|kua|etat du jour|état du jour)/.test(norm)) {
     return 'analysis'
   }
   if (

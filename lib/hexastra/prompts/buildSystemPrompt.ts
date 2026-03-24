@@ -4,8 +4,64 @@ import { isSimpleAstroFactQuestion } from '@/lib/hexastra/guards/exactDataGuard'
 import { buildEvolutionContext } from '@/lib/evolution/evolutionContextBuilder'
 import { buildInsightContext } from '@/lib/hexastra/memory/insightEngine'
 import { buildHoroscopeSystemPrompt } from '@/lib/hexastra/prompts/horoscopePrompt'
+import type { PublicScience } from '@/lib/hexastra/fusionOnly'
 import type { UserEvolutionProfile } from '@/types/evolution'
 import type { BuildPromptInput } from '@/lib/hexastra/types'
+
+function resolveRequestedScience(science?: string | null): PublicScience | null {
+  switch (science) {
+    case 'astrology':
+      return 'astrology'
+    case 'human_design':
+      return 'human_design'
+    case 'numerology':
+      return 'numerology'
+    case 'enneagram':
+      return 'enneagram'
+    case 'kua':
+      return 'kua'
+    default:
+      return null
+  }
+}
+
+function resolveRequestedScienceLabel(science?: string | null): string | null {
+  switch (resolveRequestedScience(science)) {
+    case 'astrology':
+      return 'Astrologie'
+    case 'human_design':
+      return 'Human Design'
+    case 'numerology':
+      return 'Numerologie'
+    case 'enneagram':
+      return 'Enneagramme'
+    case 'kua':
+      return 'Kua'
+    default:
+      return null
+  }
+}
+
+function resolveScienceAngleFraming(science?: string | null): string | null {
+  switch (resolveRequestedScience(science)) {
+    case 'astrology':
+      return 'avec un angle astrologique'
+    case 'human_design':
+      return 'avec un angle Human Design'
+    case 'numerology':
+      return 'avec une lecture numerologique'
+    case 'enneagram':
+      return 'avec une lecture Enneagramme'
+    case 'kua':
+      return 'avec une lecture Kua'
+    default:
+      return null
+  }
+}
+
+function hasExplicitScienceAngle(input: BuildPromptInput): boolean {
+  return Boolean(resolveRequestedScience(input.selectedScience))
+}
 
 function modeDirective(mode: BuildPromptInput['mode']): string {
   if (mode === 'praticien') {
@@ -37,6 +93,7 @@ function technicalLanguageDirective(input: BuildPromptInput): string {
   const latestUserMessage = input.messages?.[input.messages.length - 1]?.content ?? ''
   const labels = `${input.selectedMenuLabel ?? ''} ${input.selectedSubmenuLabel ?? ''}`
   const combined = `${latestUserMessage} ${labels}`.toLowerCase()
+  const explicitScienceLabel = resolveRequestedScienceLabel(input.selectedScience)
 
   const explicitTechnicalRequest =
     /(jargon|technique|scientifique|vocabulaire technique|termes techniques|plus technique|plus precis|plus détaillé|plus detaille|sous-science|sous science|nom des sciences|nom des sous-sciences)/i.test(
@@ -51,6 +108,16 @@ function technicalLanguageDirective(input: BuildPromptInput): string {
     )
 
   if (explicitTechnicalRequest || scientificAngle) {
+    if (explicitScienceLabel) {
+      return `
+Langage technique: OUVERT si utile.
+- Il est permis de nommer publiquement la science demandee (${explicitScienceLabel}) et ses notions utiles.
+- Chaque terme technique doit etre reformule dans une phrase concrete, simple et directement utile.
+- Ne pas exposer les autres sciences ni l architecture interne.
+- Garder les identifiants internes KS.* invisibles.
+`.trim()
+    }
+
     return `
 Langage technique: OUVERT si utile.
 - Tous les plans peuvent recevoir une lecture plus technique si cela aide vraiment la comprehension.
@@ -293,6 +360,7 @@ Comprendre, clarifier, orienter, puis donner un levier prioritaire.
 
 function ksDirective(input: BuildPromptInput): string {
   const route = input.domainRoute ?? 'general'
+  const explicitScienceLabel = resolveRequestedScienceLabel(input.selectedScience)
   const source = input.specializedSource
     ? `Source metier prioritaire disponible: ${input.specializedSource}.`
     : 'Aucune source metier structuree recue.'
@@ -378,7 +446,9 @@ Architecture KS active:
 - Si un resultat metier structure est fourni, il prime sur le retrieval documentaire.
 - Le vector store sert a enrichir et stabiliser, pas a remplacer un moteur specialise.
 - Ne revele jamais les identifiants internes KS.* au grand public.
-- Ne jamais nommer publiquement les disciplines ou sous-disciplines internes. Toujours reformuler en lecture HexAstra unifiee.
+- ${explicitScienceLabel
+    ? `Il est permis de nommer publiquement ${explicitScienceLabel} quand cette science est demandee explicitement, mais seulement comme angle de lecture HexAstra.`
+    : 'Ne jamais nommer publiquement les disciplines ou sous-disciplines internes. Toujours reformuler en lecture HexAstra unifiee.'}
 - La structure finale doit suivre en priorite la Structure de sortie attendue lorsqu'elle existe.
 - Le signal KS dominant et les sous-modules deja executes servent de squelette de reponse, pas de decor.
 - Ne laisse pas la narration effacer ou contredire les signaux deja arbitres.
@@ -414,8 +484,16 @@ function depthDirective(depth?: string): string {
 
 function analysisModeDirective(input: BuildPromptInput): string {
   const parts: string[] = []
+  const explicitScienceLabel = resolveRequestedScienceLabel(input.selectedScience)
 
-  if (input.analysisMode === 'hexastra_fusion' || !input.analysisMode) {
+  if (explicitScienceLabel) {
+    parts.push(
+      `Mode de lecture choisi: ANGLE ${explicitScienceLabel.toUpperCase()} SOUS CADRE HEXASTRA. Repondre depuis cet angle, tout en gardant la clarte, la structure et l utilite HexAstra.`,
+    )
+    parts.push(
+      `Autorisation publique: il est permis de nommer ${explicitScienceLabel} quand l utilisateur l a demande explicitement. Cette science reste un angle de lecture HexAstra, pas un produit separe.`,
+    )
+  } else if (input.analysisMode === 'hexastra_fusion' || !input.analysisMode) {
     parts.push('Mode de lecture choisi: FUSION HEXASTRA. Repondre comme une intelligence unifiee. Croiser les signaux utiles, resoudre les contradictions et livrer une synthese claire, directe et actionnable.')
     parts.push('Interdiction publique: ne jamais dire "selon l astrologie", "ton Human Design", "ta numerologie", "ton enneagramme" ou toute formulation equivalent.')
   }
@@ -526,7 +604,21 @@ Cette lecture concerne des données qui doivent être calculées (ascendant, typ
   return parts.join('\n')
 }
 
-function scopeDirective(): string {
+function scopeDirective(input: BuildPromptInput): string {
+  if (hasExplicitScienceAngle(input)) {
+    const explicitScienceLabel = resolveRequestedScienceLabel(input.selectedScience)
+
+    return `
+Perimetre strict:
+- Tu es specialise dans l'analyse humaine HexAstra: situations de vie, decisions, dynamiques interieures, relations, cycles et timing.
+- Si une demande est clairement hors de ce perimetre (code informatique, recette de cuisine, diagnostic medical, devoir scolaire, information generale), decline poliment et invite l'utilisateur a reformuler dans le cadre HexAstra.
+- Ne jamais improviser une reponse hors perimetre pour "faire plaisir".
+- Si la demande est ambigue, cherche d'abord l'angle HexAstra avant de decliner.
+- Si l'utilisateur demande explicitement ${explicitScienceLabel}, tu peux repondre depuis cet angle.
+- Ne jamais expliquer l architecture interne ni transformer la reponse en cours de theorie generale. Reviens toujours a une lecture utile, claire et appliquee a la personne ou a sa situation.
+`.trim()
+  }
+
   return `
 Perimetre strict:
 - Tu es specialise dans l'analyse humaine HexAstra: situations de vie, decisions, dynamiques interieures, relations, cycles et timing.
@@ -537,7 +629,10 @@ Perimetre strict:
 `.trim()
 }
 
-function conversationDirective(_input: BuildPromptInput): string {
+function conversationDirective(input: BuildPromptInput): string {
+  const explicitScienceLabel = resolveRequestedScienceLabel(input.selectedScience)
+  const explicitScienceFraming = resolveScienceAngleFraming(input.selectedScience)
+
   return `
 Style conversationnel obligatoire:
 - Toujours repondre dans la langue du message utilisateur.
@@ -567,9 +662,15 @@ Style conversationnel obligatoire:
 - Pour toute question de vie, d'etat interieur, de fatigue, de stress, de confusion, de relation, de travail ou de decision, lire d'abord la dynamique interieure via les sciences HexAstra actives avant de donner des conseils pratiques.
 - Ne jamais faire d'une checklist grand public (sommeil, alimentation, hydratation, exercice, etc.) le corps principal de la reponse.
 - Si un rappel de prudence sante est pertinent, le placer a la fin en une phrase courte, jamais a la place de l'analyse HexAstra.
-- Ne jamais nommer publiquement les disciplines internes. Toujours parler d'une analyse HexAstra unifiee.
-- Ne jamais exposer la mecanique systeme interne comme une architecture technique brute.
-- Chercher l'effet utilisateur: "Je me sens compris. Je vois plus clair. Je sais quoi faire."
+- ${explicitScienceLabel
+    ? `Il est permis de nommer publiquement ${explicitScienceLabel} parce que l utilisateur l a demande explicitement. Commencer si utile par une phrase breve du type: "On peut regarder cela ${explicitScienceFraming}."`
+    : "Ne jamais nommer publiquement les disciplines internes. Toujours parler d'une analyse HexAstra unifiee."}
+- ${explicitScienceLabel
+    ? "La reponse doit ressembler a une lecture HexAstra orientee par cette science, pas a un outil separe, pas a une encyclopedie, pas a un cours."
+    : "Ne jamais exposer la mecanique systeme interne comme une architecture technique brute."}
+- ${explicitScienceLabel
+    ? 'Tu peux proposer en derniere ligne, seulement si c est utile: "Si tu veux, je peux ensuite croiser cela avec une lecture plus globale."'
+    : 'Chercher l effet utilisateur: "Je me sens compris. Je vois plus clair. Je sais quoi faire."'}
 `.trim()
 }
 
@@ -640,6 +741,7 @@ function buildCompactAstroExactPrompt(input: BuildPromptInput): string {
   const firstName = input.firstName ? `Prénom : ${input.firstName}.` : ''
   const lang = input.language?.slice(0, 2).toLowerCase() === 'en' ? 'en' : 'fr'
   const isFr = lang === 'fr'
+  const explicitScienceAngle = resolveRequestedScience(input.selectedScience) === 'astrology'
 
   const roleBlock = isFr
     ? `Tu es HexAstra Coach. Mission : produire une lecture utile, incarnee et structuree a partir des donnees exactes calculees ci-dessous, sans exposer la mecanique interne.`
@@ -648,6 +750,23 @@ function buildCompactAstroExactPrompt(input: BuildPromptInput): string {
   const identity = [firstName, isFr ? `Langue : français.` : `Language: English.`]
     .filter(Boolean)
     .join(' ')
+  const scienceAngleDirective = explicitScienceAngle
+    ? isFr
+      ? `
+ANGLE PUBLIC AUTORISE:
+- L utilisateur a demande une lecture astrologique.
+- Tu peux nommer l astrologie comme angle de lecture.
+- Commencer si utile par: "On peut regarder cela avec un angle astrologique."
+- Rester direct, utile et non encyclopedique.
+`.trim()
+      : `
+PUBLIC ANGLE ALLOWED:
+- The user explicitly asked for an astrology reading.
+- You may name astrology as the reading angle.
+- If useful, begin with: "We can look at this through an astrology angle."
+- Stay direct, useful, and non-encyclopedic.
+`.trim()
+    : ''
 
   // Use 12-sphere structure when user asks for natal + transits combined exploration
   const lastMsg = (input.messages?.[input.messages?.length - 1]?.content ?? '')
@@ -744,7 +863,7 @@ EXACT DATA FIDELITY:
 - If the request is broader, interpret only from the provided data.
 `.trim()
 
-  const parts = [roleBlock, identity, readingDirective, dataFidelityRules]
+  const parts = [roleBlock, identity, scienceAngleDirective, readingDirective, dataFidelityRules]
   if (input.exactDataBlock) {
     parts.push(input.exactDataBlock)
   }
@@ -775,6 +894,14 @@ export function buildSystemPrompt(input: BuildPromptInput): string {
   const labels = [input.selectedMenuLabel, input.selectedSubmenuLabel]
     .filter(Boolean)
     .join(' -> ')
+  const explicitScienceLabel = resolveRequestedScienceLabel(input.selectedScience)
+  const publicSciencePolicyLines = explicitScienceLabel
+    ? `- La lecture HexAstra reste le cadre principal sur tous les plans, mais ${explicitScienceLabel} peut etre nommee comme angle de lecture quand l utilisateur la demande explicitement.
+- Si l'utilisateur demande un angle tres specifique ou un vocabulaire technique dans ${explicitScienceLabel}, tu peux le garder visible tout en restant clair, humain et utile.
+- Plans free / essential / premium: garder la lecture lisible et pedagogique, sans exposer les autres disciplines ni la mecanique interne.`
+    : `- La lecture HexAstra reste une lecture fusionnee sur tous les plans. Le plan change surtout le quota, le rythme, la densite et la profondeur.
+- Si l'utilisateur demande un angle tres specifique ou un vocabulaire technique, absorber cet angle dans une reponse HexAstra unifiee sans nommer les disciplines internes.
+- Plans free / essential / premium: garder la lecture lisible et pedagogique, sans exposer publiquement les disciplines sous-jacentes.`
 
   const userNameDirective = input.firstName
     ? `Adresse-toi a l'utilisateur en utilisant son prenom: ${input.firstName}. Ne mentionne jamais son email.`
@@ -812,9 +939,7 @@ Contraintes:
 - La Pyramide de Maslow peut servir de grille d'appui interne pour qualifier le besoin dominant, la frustration ou le palier de stabilisation, mais elle ne doit pas etre proposee spontanement comme science publique, ni ouvrir un menu ou une lecture comme angle autonome. Si l'utilisateur la cite, absorber cet angle dans une lecture de bien-etre, d'equilibre ou de stabilisation au lieu d'en faire une science affichee.
 - Si les donnees de naissance/profil et le plan le permettent, utiliser les calculs API HexAstra comme source prioritaire; sinon produire un fallback interne structure en conservant le ton HexAstra.
 - Adapter la profondeur et le niveau de personnalisation au plan (free / essential / premium / praticien) sans regressions metier.
-- La lecture HexAstra reste une lecture fusionnee sur tous les plans. Le plan change surtout le quota, le rythme, la densite et la profondeur.
-- Si l'utilisateur demande un angle tres specifique ou un vocabulaire technique, absorber cet angle dans une reponse HexAstra unifiee sans nommer les disciplines internes.
-- Plans free / essential / premium: garder la lecture lisible et pedagogique, sans exposer publiquement les disciplines sous-jacentes.
+${publicSciencePolicyLines}
 - Mode praticien: structure plus dense, plus explicite, plus technique par defaut.
 - Si le flux de demarrage n'est pas termine, ne pas ouvrir de lecture complete hors sequence.
 - Ne pas reafficher le message de bienvenue une fois le flux initialise.
@@ -828,7 +953,7 @@ Usage praticien: ${input.practitionerUsage ?? 'non renseigne'}
 Contexte praticien: ${input.practitionerContext ?? 'non defini'}
 Mode d'analyse: ${input.analysisMode ?? 'non defini'}
 Niveau de restitution: ${input.renderMode ?? 'non defini'}
-Cadre analytique public: fusion_only
+Cadre analytique public: ${explicitScienceLabel ? `science_angle_${explicitScienceLabel.toLowerCase().replace(/\s+/g, '_')}` : 'fusion_only'}
 Entree UI: ${labels || 'aucune'}
 Domaine route: ${input.domainRoute ?? 'general'}
 Step de session: ${input.flowStep ?? 'analysis'}
@@ -862,7 +987,7 @@ ${hdProfileDirective(input)}
 ${input.antiHallucinationRules ? input.antiHallucinationRules : ''}
 ${exactDataDirective(input)}
 ${input.antiContradictionDirective ? input.antiContradictionDirective : ''}
-${scopeDirective()}
+${scopeDirective(input)}
 `
 
   // ── Mémoire utilisateur (< 200 tokens) ──────────────────────────────

@@ -87,7 +87,7 @@ describe('render style controls', () => {
     expect(prompt).toContain('Les premieres reponses doivent etre simples et marquantes')
   })
 
-  it('redirects science-specific asks back to the situation instead of explaining the system', () => {
+  it('allows an explicit science angle without exposing the whole internal system', () => {
     const prompt = buildSystemPrompt({
       plan: 'free',
       mode: 'libre',
@@ -97,11 +97,14 @@ describe('render style controls', () => {
       requestType: 'chat',
       domainRoute: 'science',
       flowStep: 'analysis',
+      selectedScience: 'human_design',
       messages: [{ role: 'user', content: 'Montre-moi mon Human Design' }],
     })
 
-    expect(prompt).toContain(
-      `Redirige simplement avec: "Je peux te donner une reponse directe si tu me parles de ta situation."`,
+    expect(prompt).toContain('Il est permis de nommer publiquement Human Design')
+    expect(prompt).toContain('pas a un outil separe, pas a une encyclopedie, pas a un cours')
+    expect(prompt).not.toContain(
+      'Redirige simplement avec: "Je peux te donner une reponse directe si tu me parles de ta situation."',
     )
   })
 

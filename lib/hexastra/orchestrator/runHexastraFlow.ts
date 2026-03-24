@@ -11,6 +11,7 @@ import { compressKnowledgeContext } from '@/lib/contextCompressor'
 import { getAdaptiveRetrievalConfig } from '@/lib/retrievalPolicy'
 import {
   getMenuForMode,
+  getInternalMenuForMode,
   findMenuItem,
   resolveKsSelectionKeyFromMenuKey,
 } from '@/lib/hexastra/menus/getMenuForMode'
@@ -60,11 +61,11 @@ import {
   resolveScienceSubanalysisSelection,
 } from '@/lib/hexastra/orchestrator/contextualSelection'
 import {
-  SCIENCE_BREAKDOWN_FALLBACK_MESSAGE,
   canAccessScienceBreakdown,
-  isScienceBreakdownRequest,
-  isScienceMenuKey,
+  detectExplicitScienceIntent,
+  isFusionFollowupRequest,
   normalizeFusionOnlyAnalysisMode,
+  resolvePublicScienceFromSelectionKey,
   sanitizeFusionOnlySelectionKey,
 } from '@/lib/hexastra/fusionOnly'
 
@@ -1462,10 +1463,6 @@ export async function runHexastraFlow(input: {
 
     const latestUserMessage =
       limitedMessages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
-    const scienceBreakdownRequested =
-      isScienceBreakdownRequest(latestUserMessage) ||
-      isScienceMenuKey(input.selectedMenuKey ?? null) ||
-      isScienceMenuKey(input.selectedSubmenuKey ?? null)
     const isGreeting = /^(bonjour|salut|hello|hey|bonsoir|coucou|yo)\s*$/i.test(
       latestUserMessage.trim()
     )
@@ -1510,17 +1507,27 @@ export async function runHexastraFlow(input: {
       journeyEnabled = normalizedJourneyToggle ?? userContext.journeyEnabled ?? false
       userContext = { ...userContext, journeyEnabled }
 
-      const menuItems = safeArray(getMenuForMode(mode)).map((item) => normalizeMenuItem(item))
+      const publicMenuItems = safeArray(getMenuForMode(mode)).map((item) => normalizeMenuItem(item))
+      const contextualMenuItems = [
+        ...publicMenuItems,
+        ...safeArray(getInternalMenuForMode(mode, plan)).map((item) => normalizeMenuItem(item)),
+      ]
       const lastAssistantMessage =
         [...limitedMessages].reverse().find((message) => message.role === 'assistant')?.content ?? ''
       let selectedMenuKey = normalizedSelectedMenuKey
       let selectedSubmenuKey = normalizedSelectedSubmenuKey
       let uiAction = normalizedUiAction
+
+      if (isFusionFollowupRequest(latestUserMessage)) {
+        selectedMenuKey = null
+        selectedSubmenuKey = null
+      }
+
       const contextualSelection = resolveContextualSelection({
         message: latestUserMessage,
         language: userContext.language ?? fallbackLanguage,
         practitionerMode: mode === 'praticien',
-        menuItems,
+        menuItems: contextualMenuItems,
         selectedMenuKey,
         selectedSubmenuKey,
         lastAssistantMessage,
@@ -1565,6 +1572,11 @@ export async function runHexastraFlow(input: {
 
       // Universal classification: intent + science + subcategory + requestKind in one call
       const universalClassif = classifyMessage(latestUserMessage, limitedMessages)
+      const explicitScienceIntent = detectExplicitScienceIntent({
+        message: latestUserMessage,
+        scienceHint: universalClassif.science,
+        subcategory: universalClassif.subcategory,
+      })
       flowLog('info', 'CLASSIFICATION_RESOLVED', {
         intent: universalClassif.intent,
         science: universalClassif.science,
@@ -1575,7 +1587,24 @@ export async function runHexastraFlow(input: {
         needsVectorEnrichment: universalClassif.needsVectorEnrichment,
         confidence: universalClassif.confidence,
         domainRoute: universalClassif.domainRoute,
+        explicitScienceIntent: explicitScienceIntent?.science ?? null,
       })
+
+      const shouldForceScienceAngleDirectRead =
+        Boolean(explicitScienceIntent) &&
+        (!contextualSelection || contextualSelection.kind === 'science')
+
+      if (explicitScienceIntent && shouldForceScienceAngleDirectRead) {
+        selectedMenuKey = 'science'
+        selectedSubmenuKey = explicitScienceIntent.selectionKey
+        uiAction = 'send_message'
+
+        flowLog('info', 'SCIENCE_ANGLE_REQUEST_DETECTED', {
+          science: explicitScienceIntent.science,
+          selectionKey: explicitScienceIntent.selectionKey,
+          source: contextualSelection?.kind ?? 'message',
+        })
+      }
 
       // astro_followup is treated as astro_exact everywhere downstream
       const isAstroExact =
@@ -1707,8 +1736,8 @@ export async function runHexastraFlow(input: {
       }
 
     const selectedMenu =
-      selectedMenuKey && menuItems
-        ? findMenuItem(menuItems, selectedMenuKey)
+      selectedMenuKey && contextualMenuItems
+        ? findMenuItem(contextualMenuItems, selectedMenuKey)
         : null
 
     const selectedSubmenu =
@@ -2015,7 +2044,7 @@ export async function runHexastraFlow(input: {
         plan,
         conversationId,
         flowState: { step: 'clarification', completed: false },
-        menu: { visible: true, items: menuItems },
+        menu: { visible: true, items: publicMenuItems },
         metadata: {
           contextType: selectedMenu.contextType ?? normalizedContextType,
           practitionerUsage: userContext.practitionerUsage ?? null,
@@ -2048,7 +2077,7 @@ export async function runHexastraFlow(input: {
         plan,
         conversationId,
         flowState: { step: 'clarification', completed: false },
-        menu: { visible: true, items: menuItems },
+        menu: { visible: true, items: publicMenuItems },
         metadata: {
           contextType: 'science',
           practitionerUsage: userContext.practitionerUsage ?? null,
@@ -2227,7 +2256,7 @@ export async function runHexastraFlow(input: {
       subcategory: universalClassif.subcategory,
       requestKind: universalClassif.requestKind,
     })
-    const domainRoute = scienceBreakdownRequested ? 'fusion' : astroFollowupRouting.route
+    const domainRoute = astroFollowupRouting.route
 
     if (astroFollowupRouting.lockTrigger === 'astro_exact_with_birth_data') {
       flowLog(
@@ -3136,13 +3165,24 @@ export async function runHexastraFlow(input: {
       : null
 
     const scienceBreakdownAvailable = canAccessScienceBreakdown(plan)
+    const activeSelectionScience =
+      resolvePublicScienceFromSelectionKey(selectedSubmenuKey) ??
+      resolvePublicScienceFromSelectionKey(selectedMenuKey)
+    const selectedScienceForPrompt =
+      explicitScienceIntent?.science ??
+      activeSelectionScience ??
+      (domainRoute === 'science' || domainRoute === 'gps_kua'
+        ? resolvePublicScienceFromSelectionKey(
+            resolveKsSelectionKeyFromMenuKey(selectedSubmenuKey ?? selectedMenuKey),
+          ) ?? resolvePublicScienceFromSelectionKey(selectedSubmenuKey ?? selectedMenuKey)
+        : null)
 
     const systemPrompt = buildSystemPrompt({
       plan,
       mode,
       language: userContext.language ?? fallbackLanguage,
       firstName: userContext.firstName ?? userContext.name ?? null,
-      contextType: normalizedContextType,
+      contextType: selectedContextType ?? normalizedContextType,
       practitionerUsage: userContext.practitionerUsage ?? null,
       practitionerContext: input.practitionerContext ?? normalizedPractitionerUsage,
       selectedMenuLabel,
@@ -3167,7 +3207,8 @@ export async function runHexastraFlow(input: {
       messages: limitedMessages,
       analysisMode: normalizedAnalysisMode,
       renderMode: input.renderMode ?? null,
-      selectedScience: null,
+      selectedScience: selectedScienceForPrompt,
+      selectedSubcategory: universalClassif.subcategory,
       exactDataBlock: exactDataBlockForPrompt,
       requiresExactData: exactDataNeeded,
       hdProfileBlock,
@@ -3444,7 +3485,7 @@ export async function runHexastraFlow(input: {
     })
     const menuVisible = finalFlowPresentation.menuVisible
 
-    const menuItemsReturned = menuItems
+    const menuItemsReturned = publicMenuItems
 
     if (menuVisible && (!message || !message.trim())) {
       message =
@@ -3504,6 +3545,12 @@ export async function runHexastraFlow(input: {
         last_timing: sessionContext.timing,
         last_precision: sessionContext.precision,
         last_reading_level: sessionContext.readingLevel,
+        last_science_used:
+          selectedScienceForPrompt ??
+          activeSelectionScience ??
+          sessionContext.state?.last_science_used ??
+          null,
+        last_subcategory: universalClassif.subcategory ?? sessionContext.state?.last_subcategory ?? null,
         ...toSessionStatePatch(pricingSessionState, smartUpgradeDecision),
       })
     } catch (memoryError) {
@@ -3538,10 +3585,7 @@ export async function runHexastraFlow(input: {
       }
     }
 
-    const finalMessage =
-      scienceBreakdownRequested && !message.startsWith(SCIENCE_BREAKDOWN_FALLBACK_MESSAGE)
-        ? `${SCIENCE_BREAKDOWN_FALLBACK_MESSAGE}\n\n${message}`
-        : message
+    const finalMessage = message
     const finalStepLogMeta = {
       branch: orchestrationDecision.branch,
       uiAction,
