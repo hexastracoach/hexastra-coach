@@ -53,7 +53,7 @@ function getStatusLabel({
     return isEnglish ? 'Hexastra is focused on your situation' : 'Hexastra se concentre sur votre situation'
   }
 
-  return isEnglish ? 'Direct, calm, and clear' : 'Direct, calme et clair'
+  return isEnglish ? 'Direct. Calm. Clear.' : 'Direct. Calme. Clair.'
 }
 
 function getHelperLabel({
@@ -248,6 +248,12 @@ export default function Composer({
         </div>
       )}
 
+      {!recording && !transcribing && (
+        <p className="hx-composer-reassurance">
+          {lang.startsWith('en') ? 'Direct. Calm. Clear.' : 'Direct. Calme. Clair.'}
+        </p>
+      )}
+
       <div className="hx-composer-shell">
         <div className="hx-composer-meta">
           <div className="hx-composer-status">
@@ -260,7 +266,7 @@ export default function Composer({
           <p className="hx-composer-helper">{helperLabel}</p>
         </div>
 
-        <div className={`hx-composer-box${focused ? ' is-focused' : ''}${canSend ? ' has-content' : ''}`}>
+        <div className={`hx-composer-box${focused ? ' is-focused' : ''}${canSend ? ' has-content' : ''}${disabled && !canSend ? ' is-busy' : ''}`}>
           <div className="hx-composer-actions-left">
             <button
               type="button"
