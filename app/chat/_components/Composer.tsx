@@ -356,6 +356,12 @@ export default function Composer({
           </button>
         </div>
       </div>
+
+      {!recording && !transcribing && !focused && !canSend && (
+        <p className="hx-composer-hint">
+          {lang.startsWith('en') ? 'You can start simply.' : 'Tu peux commencer simplement.'}
+        </p>
+      )}
     </div>
   )
 }

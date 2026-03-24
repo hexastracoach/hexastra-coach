@@ -55,11 +55,13 @@ export default function LeftSidebar({
   }, [readings])
 
   return (
-    <div className="flex h-full flex-col border-r border-white/10 bg-[#051019]/80 text-slate-100 backdrop-blur-2xl">
-      <div className="border-b border-white/8 px-5 pb-5 pt-6">
-        <div className="flex items-center gap-2.5">
-          <HexastraLogo size={32} animated={false} />
-          <p className="truncate text-sm font-semibold tracking-[-0.01em] text-slate-100/92">
+    <div className="flex h-full flex-col border-r border-white/[0.06] bg-[#040d16]/75 text-slate-100 backdrop-blur-2xl">
+
+      {/* Brand */}
+      <div className="px-4 pb-4 pt-5">
+        <div className="mb-4 flex items-center gap-2.5 px-1">
+          <HexastraLogo size={28} animated={false} />
+          <p className="truncate text-[13px] font-semibold tracking-[-0.01em] text-slate-100/88">
             Hexastra Coach
           </p>
         </div>
@@ -67,45 +69,46 @@ export default function LeftSidebar({
         <button
           type="button"
           onClick={onNewReading}
-          className="mt-5 inline-flex w-full items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.08] px-4 py-3 text-sm font-medium text-emerald-50 transition duration-200 hover:-translate-y-0.5 hover:bg-emerald-300/[0.14]"
+          className="group inline-flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300/18 bg-emerald-300/[0.07] px-4 py-2.5 text-[13px] font-medium text-emerald-50/90 transition-all duration-150 hover:border-emerald-300/30 hover:bg-emerald-300/[0.13] hover:text-emerald-50 active:scale-[0.98]"
         >
+          <span className="text-emerald-300/70 transition-colors group-hover:text-emerald-300">+</span>
           {isEnglish ? 'New reflection' : 'Nouvelle réflexion'}
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-5">
-        <div className="mb-3 flex items-center justify-between px-1">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400/70">
-            {isEnglish ? 'Recent history' : 'Historique récent'}
-          </p>
-          <span className="text-xs text-slate-500">{recentReadings.length}</span>
-        </div>
+      <div className="mx-4 h-px bg-white/[0.05]" />
+
+      {/* History */}
+      <div className="flex-1 overflow-y-auto px-3 py-4">
+        <p className="mb-2.5 px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          {isEnglish ? 'Recent' : 'Récent'}
+        </p>
 
         {recentReadings.length === 0 ? (
-          <div className="rounded-3xl border border-white/8 bg-white/[0.025] px-4 py-5 text-sm leading-6 text-slate-300/68">
+          <p className="px-1.5 py-2 text-[12px] leading-5 text-slate-500/80">
             {isEnglish
-              ? 'Your reflections will appear here as the conversation grows.'
-              : 'Tes réflexions apparaîtront ici au fil des échanges.'}
-          </div>
+              ? 'Your reflections will appear here.'
+              : 'Tes réflexions apparaîtront ici.'}
+          </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-0.5">
             {recentReadings.map((reading) => (
               <button
                 key={reading.id}
                 type="button"
                 onClick={() => onOpenReading?.(reading)}
-                className="group flex w-full flex-col rounded-2xl border border-white/8 bg-white/[0.025] px-4 py-3 text-left transition duration-200 hover:border-emerald-300/18 hover:bg-emerald-300/[0.05]"
+                className="group flex w-full flex-col rounded-xl px-2.5 py-2 text-left transition-all duration-150 hover:bg-white/[0.04] active:bg-white/[0.06]"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="line-clamp-1 text-sm font-medium text-slate-100/90">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="line-clamp-1 text-[13px] font-medium text-slate-200/85 transition-colors group-hover:text-slate-100">
                     {reading.title}
                   </span>
-                  <span className="shrink-0 text-[11px] text-slate-500">
+                  <span className="shrink-0 text-[10px] text-slate-600">
                     {formatReadingDate(reading.date)}
                   </span>
                 </div>
                 {reading.preview ? (
-                  <span className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400/78">
+                  <span className="mt-0.5 line-clamp-1 text-[11px] leading-4 text-slate-500/80">
                     {reading.preview}
                   </span>
                 ) : null}
@@ -115,24 +118,23 @@ export default function LeftSidebar({
         )}
       </div>
 
-      <div className="border-t border-white/8 px-4 py-4">
+      {/* Account */}
+      <div className="mx-4 h-px bg-white/[0.05]" />
+      <div className="px-3 py-3">
         <Link
           href="/account"
-          className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-3 transition duration-200 hover:border-emerald-300/18 hover:bg-emerald-300/[0.05]"
+          className="group flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 transition-all duration-150 hover:bg-white/[0.04]"
           aria-label={isEnglish ? 'Open profile' : 'Ouvrir le profil'}
         >
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-sm font-semibold text-slate-100">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.05] text-[11px] font-semibold text-slate-200 transition-colors group-hover:border-emerald-300/20 group-hover:bg-emerald-300/[0.07]">
             {userInitials}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-slate-100/90">
+            <div className="text-[13px] font-medium text-slate-200/85 group-hover:text-slate-100">
               {isEnglish ? 'My account' : 'Mon espace'}
             </div>
-            <div className="text-xs text-slate-400/75">{planLabel(userPlan)}</div>
+            <div className="text-[11px] text-slate-500">{planLabel(userPlan)}</div>
           </div>
-          <span className="rounded-full border border-emerald-300/15 bg-emerald-300/[0.08] px-2 py-1 text-[11px] font-medium text-emerald-100/80">
-            {planLabel(userPlan)}
-          </span>
         </Link>
       </div>
     </div>

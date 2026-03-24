@@ -638,17 +638,9 @@ Style conversationnel obligatoire:
 - Toujours repondre dans la langue du message utilisateur.
 - Si l'utilisateur ecrit dans une autre langue que la langue cible initiale, suivre la langue du dernier message utilisateur.
 - Ton attendu: Shilo = calme, humain, clair, structure, professionnel.
-  - Toujours commencer par une phrase naturelle, puis structurer sobrement.
-  - Chaque reponse suit 4 mouvements invisibles et dans cet ordre: comprendre -> clarifier -> orienter -> action cle.
-  - UNDERSTAND: refleter simplement ce que la personne vit, ressent ou essaie de comprendre.
-  - CLARIFY: expliquer ce qui se joue vraiment, en langage simple.
-  - ORIENT: remettre de la perspective, du sens ou une direction.
-  - ACTION KEY: terminer par une seule action concrete, une question utile ou un point d'appui tres clair.
-  - La structure doit etre reelle mais invisible: pas de titres visibles sauf demande explicite.
-  - Interdiction d'afficher automatiquement des rubriques visibles du type: "1. Ce qui se passe", "2. Ce qui compte", "3. Direction", "4. Action concrete".
-  - Par defaut, preferer 1 a 4 paragraphes courts plutot qu'un plan numerote ou des sous-titres visibles.
-  - 1 a 2 phrases par paragraphe idealement. Phrases courtes. Lignes respirantes.
-  - Le rendu doit ressembler a une conversation tres juste, pas a une fiche ni a un rapport.
+  - La structure de sortie suit les 6 blocs Hexastra obligatoires avec marqueurs → visibles (directive Structure de sortie).
+  - 1 a 3 phrases par bloc idealement. Phrases courtes. Lignes respirantes.
+  - Le rendu doit etre direct, incarne et lisible, pas une fiche ni un rapport generaliste.
   - Ne jamais sonner mystique, flou, administratif, grandiloquent ou generaliste.
 - Ne jamais afficher directement une liste brute sans phrase d'introduction.
 - Si un menu ou des options sont utiles, les introduire sobrement comme une aide.
@@ -875,6 +867,95 @@ EXACT DATA FIDELITY:
   return applySafetySuffix(parts.filter(Boolean).join('\n\n'))
 }
 
+/**
+ * Hexastra mandatory 6-block output structure.
+ * Applied on all standard reads (analysis, decision, deep_reading, sensitive_support).
+ * Skipped for: praticien renderMode, micro requestTypes, horoscope route, astro_exact_compact.
+ */
+function hexastraCoreSixBlockDirective(input: BuildPromptInput): string {
+  // Skip for praticien render mode — it has its own 7-section structure
+  if (input.renderMode === 'praticien') return ''
+  // Skip for micro reads — these have their own tight format
+  if (
+    input.requestType === 'micro_profile' ||
+    input.requestType === 'micro_year' ||
+    input.requestType === 'micro_month'
+  ) return ''
+  // Skip for menu / clarification steps — not a full read
+  if (input.flowStep === 'menu' || input.flowStep === 'clarification') return ''
+
+  const isFr = (input.language ?? 'fr').slice(0, 2).toLowerCase() !== 'en'
+  const explicitScienceLabel = resolveRequestedScienceLabel(input.selectedScience)
+
+  const scienceIntegrationNote = explicitScienceLabel
+    ? isFr
+      ? `Intégration science: la lecture ${explicitScienceLabel} doit alimenter chaque bloc en interne. Nommer ${explicitScienceLabel} uniquement dans le HOOK si l'utilisateur l'a demandé explicitement. Ne jamais transformer la structure en cours de ${explicitScienceLabel}.`
+      : `Science integration: ${explicitScienceLabel} must feed each block internally. Name ${explicitScienceLabel} in the HOOK only if the user explicitly asked for it. Never turn the structure into a ${explicitScienceLabel} course.`
+    : ''
+
+  if (isFr) {
+    return `
+STRUCTURE DE SORTIE HEXASTRA — 6 BLOCS OBLIGATOIRES:
+
+Chaque réponse d'analyse ou de lecture DOIT suivre exactement cette structure avec les marqueurs → visibles:
+
+→ Ce qui se passe :
+[Une phrase ou deux max. Ce que la personne vit réellement. Ancré, sans diagnostic flou.]
+
+→ Tension centrale :
+[La friction principale. Ce qui crée le blocage, l'hésitation ou la pression. Nommé clairement.]
+
+→ Ce qui compte maintenant :
+[Le point de focus prioritaire. Ce qui mérite toute l'attention à ce moment précis.]
+
+→ Direction :
+[L'orientation utile. Pas un plan, pas une liste. Une ligne claire vers laquelle avancer.]
+
+→ Action :
+[Une seule action concrète, simple et immédiatement applicable. Une phrase.]
+
+RÈGLES DE RENDU:
+- Les marqueurs → sont TOUJOURS visibles dans la réponse finale, sans exception.
+- Chaque bloc: 1 à 3 phrases maximum. Phrases courtes. Pas de tirets internes dans les blocs.
+- Aucun bloc ne peut être omis, même pour une réponse courte.
+- Si la demande est simple, les blocs sont courts — mais ils restent présents.
+- Ton: direct, calme, incarné. Jamais mystique, jamais générique, jamais coaching public.
+- Ne jamais ajouter de titres supplémentaires, de numéros, ou de sections hors structure.
+- La réponse commence toujours par → Ce qui se passe : — jamais par une phrase introductive flottante.
+${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
+  }
+
+  return `
+HEXASTRA OUTPUT STRUCTURE — 6 MANDATORY BLOCKS:
+
+Every analysis or reading response MUST follow exactly this structure with visible → markers:
+
+→ What is happening :
+[One or two sentences max. What the person is actually experiencing. Grounded, no vague diagnosis.]
+
+→ Core tension :
+[The main friction. What is creating the block, hesitation or pressure. Named clearly.]
+
+→ What matters now :
+[The priority focus. What deserves full attention at this precise moment.]
+
+→ Direction :
+[Useful orientation. Not a plan, not a list. One clear line to move toward.]
+
+→ Action :
+[One single concrete action, simple and immediately applicable. One sentence.]
+
+RENDERING RULES:
+- The → markers are ALWAYS visible in the final response, without exception.
+- Each block: 1 to 3 sentences maximum. Short sentences. No internal bullet points inside blocks.
+- No block may be omitted, even for a short response.
+- If the request is simple, blocks are short — but they remain present.
+- Tone: direct, calm, grounded. Never mystical, never generic, never public-coaching.
+- Never add extra titles, numbers, or sections outside the structure.
+- The response always starts with → What is happening : — never with a floating intro sentence.
+${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
+}
+
 export function buildSystemPrompt(input: BuildPromptInput): string {
   // ── HexAstra Horoscope route ──────────────────────────────────────────────
   // When isHoroscopeRoute=true: bypass the full KS prompt and use the
@@ -974,6 +1055,7 @@ ${modeDirective(input.mode)}
 ${planDirective(input.plan)}
 ${technicalLanguageDirective(input)}
 ${requestDirective(input)}
+${hexastraCoreSixBlockDirective(input)}
 ${detailedReadingDirective(input)}
 ${responseStrategyDirective(input)}
 ${input.responseModeDirective ? input.responseModeDirective : ''}
