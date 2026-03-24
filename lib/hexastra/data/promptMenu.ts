@@ -9,7 +9,34 @@ export type PromptMenuNode = {
   children?: PromptMenuNode[]
 }
 
-export const PROMPT_MENU: Record<HexastraMode, PromptMenuNode[]> = {
+function sanitizePromptNode(node: PromptMenuNode): PromptMenuNode | null {
+  if (node.key === 'science') return null
+
+  if (node.key === 'neurokua' || node.key === 'pract_neurokua') {
+    return {
+      ...node,
+      label: 'Etat interieur',
+      description:
+        node.key === 'pract_neurokua'
+          ? 'Diagnostic interne et ajustements prioritaires.'
+          : 'Regule ton etat interieur et ton energie du moment.',
+      children: node.children?.map(sanitizePromptNode).filter((child): child is PromptMenuNode => Boolean(child)),
+    }
+  }
+
+  return {
+    ...node,
+    children: node.children?.map(sanitizePromptNode).filter((child): child is PromptMenuNode => Boolean(child)),
+  }
+}
+
+function sanitizePromptMenu(nodes: PromptMenuNode[]): PromptMenuNode[] {
+  return nodes
+    .map(sanitizePromptNode)
+    .filter((node): node is PromptMenuNode => Boolean(node))
+}
+
+const RAW_PROMPT_MENU: Record<HexastraMode, PromptMenuNode[]> = {
   libre: [
     {
       key: 'neurokua',
@@ -176,4 +203,11 @@ export const PROMPT_MENU: Record<HexastraMode, PromptMenuNode[]> = {
   ],
   libre_avance: [],
   libre_approfondi: [],
+}
+
+export const PROMPT_MENU: Record<HexastraMode, PromptMenuNode[]> = {
+  libre: sanitizePromptMenu(RAW_PROMPT_MENU.libre),
+  praticien: sanitizePromptMenu(RAW_PROMPT_MENU.praticien),
+  libre_avance: sanitizePromptMenu(RAW_PROMPT_MENU.libre_avance),
+  libre_approfondi: sanitizePromptMenu(RAW_PROMPT_MENU.libre_approfondi),
 }

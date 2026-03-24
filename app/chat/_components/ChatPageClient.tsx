@@ -9,7 +9,6 @@ import LeftSidebar from './LeftSidebar'
 import MessageList from './MessageList'
 import BirthDataInlineForm from './BirthDataInlineForm'
 import PractitionerUsageStep from './PractitionerUsageStep'
-import AnalysisModeStep from './AnalysisModeStep'
 import RenderModeStep from './RenderModeStep'
 import PaywallBanner from './PaywallBanner'
 import {
@@ -63,6 +62,7 @@ import {
   type PractitionerUsage,
 } from '@/lib/chat/bootstrapTypes'
 import type { AnalysisMode, RenderMode } from '@/lib/hexastra/sciences/scienceTaxonomy'
+import { FUSION_ONLY_ANALYSIS_MODE } from '@/lib/hexastra/fusionOnly'
 import {
   resolveClientSendPolicy,
   resolveSelectionContext,
@@ -454,7 +454,7 @@ export default function ChatPageClient() {
   const [planLoaded, setPlanLoaded] = useState(false)
 
   const [practitionerUsage, setPractitionerUsage] = useState<PractitionerUsage>(null)
-  const [analysisMode, setAnalysisMode] = useState<AnalysisMode | null>(null)
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(FUSION_ONLY_ANALYSIS_MODE)
   const [renderMode, setRenderMode] = useState<RenderMode | null>(null)
 
   const [microReadings, setMicroReadings] = useState<MicroReadings>({
@@ -1126,10 +1126,8 @@ export default function ChatPageClient() {
 
   useEffect(() => {
     try {
-      const storedMode = localStorage.getItem(ANALYSIS_MODE_KEY)
-      if (storedMode === 'science_by_science' || storedMode === 'hexastra_fusion') {
-        setAnalysisMode(storedMode)
-      }
+      setAnalysisMode(FUSION_ONLY_ANALYSIS_MODE)
+      localStorage.setItem(ANALYSIS_MODE_KEY, FUSION_ONLY_ANALYSIS_MODE)
       const storedRender = localStorage.getItem(RENDER_MODE_KEY)
       if (storedRender === 'simple' || storedRender === 'approfondie' || storedRender === 'praticien') {
         setRenderMode(storedRender)
@@ -1394,13 +1392,6 @@ export default function ChatPageClient() {
     setPractitionerUsage(usage)
     try {
       localStorage.setItem(PRACTITIONER_USAGE_KEY, usage ?? '')
-    } catch {}
-  }, [])
-
-  const handleAnalysisModeSelect = useCallback((mode: AnalysisMode) => {
-    setAnalysisMode(mode)
-    try {
-      localStorage.setItem(ANALYSIS_MODE_KEY, mode)
     } catch {}
   }, [])
 
@@ -1914,10 +1905,6 @@ export default function ChatPageClient() {
       <div className="hx-bootstrap-overlay">
         <PractitionerUsageStep onSelect={handlePractitionerUsageSelect} />
       </div>
-    ) : step === 'analysis_mode_selection' ? (
-      <div className="hx-bootstrap-overlay">
-        <AnalysisModeStep onSelect={handleAnalysisModeSelect} />
-      </div>
     ) : step === 'render_mode_selection' ? (
       <div className="hx-bootstrap-overlay">
         <RenderModeStep onSelect={handleRenderModeSelect} />
@@ -1939,10 +1926,8 @@ export default function ChatPageClient() {
     // Suggestions contextuelles dynamiques
     suggestions: bootstrapUi.chatReady && !isLimitReached ? contextualSuggestions : [],
     onSuggestionSelect: (v: string) => void handleSend(v),
-    // Sélecteur de sciences
-    showScienceSelector: bootstrapUi.chatReady && !isLimitReached,
-    onScienceSelect: (prompt: string) => void handleSend(prompt),
-    sciencePlan: userPlan,
+    showFusionEntry: bootstrapUi.chatReady && !isLimitReached,
+    onFusionEntry: (prompt: string) => void handleSend(prompt),
   }
 
   return (
@@ -2038,8 +2023,8 @@ export default function ChatPageClient() {
               {shouldShowMenuDock && (
                 <MenuDock
                   items={menuItems}
-                  title="HexAstra Coach"
-                  subtitle="Quel angle souhaites-tu explorer ?"
+                  title="Explorer votre situation"
+                  subtitle="Choisis le cadre le plus utile pour lancer ton analyse Hexastra."
                   userPlan={userPlan}
                   lastUserMessage={lastUserMessage}
                   openParentKey={openMenuParentKey}

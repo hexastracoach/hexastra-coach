@@ -106,12 +106,12 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
           </p>
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 24 }}>
-            <button onClick={() => onPrompt('Je veux une lecture claire de ma situation actuelle.')} style={primaryButton}>
-              Commencer ma lecture
+            <button onClick={() => onPrompt('Je veux une analyse Hexastra claire de ma situation actuelle.')} style={primaryButton}>
+              Explorer votre situation
             </button>
 
-            <button onClick={() => onPrompt('Explique-moi comment fonctionne HexAstra Coach.')} style={secondaryButton}>
-              Comment ça fonctionne ?
+            <button onClick={() => onPrompt('Je veux une analyse Hexastra claire et directe.')} style={secondaryButton}>
+              Analyse Hexastra
             </button>
           </div>
 

@@ -6,10 +6,10 @@ const metadataBaseUrl = process.env.NEXT_PUBLIC_BASE_URL?.trim() || 'https://hex
 
 export const metadata: Metadata = {
   metadataBase: new URL(metadataBaseUrl),
-  title: 'HexAstra — Clarté intérieure, décisions, profondeur',
+  title: 'HexAstra - Clarte interieure, decisions, profondeur',
   description:
-    'HexAstra lit ta situation à travers plusieurs angles d\'observation humaine — astrologie, Human Design, numérologie — pour t\'aider à décider, comprendre et avancer avec plus de clarté.',
-  keywords: ['astrologie', 'human design', 'numérologie', 'clarté intérieure', 'lecture de situation', 'IA'],
+    'HexAstra analyse ta situation, tes dynamiques et ton timing pour t aider a decider, comprendre et avancer avec plus de clarte.',
+  keywords: ['analyse Hexastra', 'clarte interieure', 'lecture de situation', 'decision', 'IA'],
   authors: [{ name: 'HexAstra' }],
   alternates: {
     canonical: '/',
@@ -28,8 +28,8 @@ export const metadata: Metadata = {
     shortcut: '/favicon/favicon-32x32.png',
   },
   openGraph: {
-    title: 'HexAstra — Clarté intérieure, décisions, profondeur',
-    description: 'Lecture de situation par IA — astrologie, Human Design, numérologie. Un espace pour comprendre ce que tu traverses.',
+    title: 'HexAstra - Clarte interieure, decisions, profondeur',
+    description: 'Lecture de situation par IA - une analyse Hexastra claire, directe et utile.',
     url: 'https://hexastra.app',
     siteName: 'HexAstra',
     images: [
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
         url: '/social/hexastra-og-image.png',
         width: 1200,
         height: 1200,
-        alt: 'HexAstra — GPS intérieur',
+        alt: 'HexAstra - GPS interieur',
       },
     ],
     locale: 'fr_FR',
@@ -45,8 +45,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'HexAstra — Clarté intérieure, décisions, profondeur',
-    description: 'Lecture de situation par IA — astrologie, Human Design, numérologie. Un espace pour comprendre ce que tu traverses.',
+    title: 'HexAstra - Clarte interieure, decisions, profondeur',
+    description: 'Lecture de situation par IA - une analyse Hexastra claire, directe et utile.',
     images: ['/social/hexastra-twitter.png'],
   },
   manifest: '/manifest.json',

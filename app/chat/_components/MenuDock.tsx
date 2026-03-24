@@ -66,8 +66,8 @@ function IconArrow() {
 
 export default function MenuDock({
   items,
-  title = 'Explorer un angle',
-  subtitle = 'Choisis simplement la direction que tu veux approfondir.',
+  title = 'Explorer votre situation',
+  subtitle = 'Choisis simplement la direction la plus utile pour ton analyse Hexastra.',
   onSelect,
   userPlan,
   lastUserMessage,

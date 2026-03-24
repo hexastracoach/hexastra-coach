@@ -28,6 +28,10 @@ import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrch
 import type { ExecutionPlan, OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
 import { updateUserEvolutionProfile } from '@/lib/evolution/evolutionEngine'
 import type { UserEvolutionProfile } from '@/types/evolution'
+import {
+  normalizeFusionOnlyAnalysisMode,
+  sanitizeFusionOnlySelectionKey,
+} from '@/lib/hexastra/fusionOnly'
 
 const memoryCache = new Map<string, { value: unknown; expires: number }>()
 const CACHE_TTL_MS = 10 * 60 * 1000
@@ -387,7 +391,7 @@ function buildOutOfScopeResponse(plan: PlanKey, mode: string, conversationId?: s
   return buildConsistentResponse(
     {
       message:
-        "Je reste dans le cadre d'HexAstra Coach : lectures, sciences KS, timing, dynamiques personnelles, relationnelles, professionnelles et decisions.\n\nSi tu veux, reformule ta demande dans cet angle ou choisis une lecture du menu.",
+        "Je reste dans le cadre d'HexAstra Coach : lecture de situation, timing, dynamiques personnelles, relationnelles, professionnelles et decisions.\n\nSi tu veux, reformule ta demande dans cet angle ou choisis une lecture du menu.",
       type: 'out_of_scope',
       plan,
       mode,
@@ -771,10 +775,12 @@ export async function POST(req: NextRequest) {
         ? ((body as Record<string, unknown>).conversationId as string)
         : null
     const bodyRecord = body as Record<string, unknown>
-    const requestedSelectedMenuKey =
-      typeof bodyRecord.selectedMenuKey === 'string' ? (bodyRecord.selectedMenuKey as string) : null
-    const requestedSelectedSubmenuKey =
-      typeof bodyRecord.selectedSubmenuKey === 'string' ? (bodyRecord.selectedSubmenuKey as string) : null
+    const requestedSelectedMenuKey = sanitizeFusionOnlySelectionKey(
+      typeof bodyRecord.selectedMenuKey === 'string' ? (bodyRecord.selectedMenuKey as string) : null,
+    )
+    const requestedSelectedSubmenuKey = sanitizeFusionOnlySelectionKey(
+      typeof bodyRecord.selectedSubmenuKey === 'string' ? (bodyRecord.selectedSubmenuKey as string) : null,
+    )
 
     failureContext = {
       requestType,
@@ -803,10 +809,11 @@ export async function POST(req: NextRequest) {
 
     const normalizedBirthData = normalizeBirthData(bodyRecord.birthData)
     const normalizedPractitionerUsage = normalizePractitionerUsage(bodyRecord.practitionerUsage)
-    const requestedAnalysisMode =
+    const requestedAnalysisMode = normalizeFusionOnlyAnalysisMode(
       bodyRecord.analysisMode === 'science_by_science' || bodyRecord.analysisMode === 'hexastra_fusion'
         ? (bodyRecord.analysisMode as 'science_by_science' | 'hexastra_fusion')
-        : null
+        : null,
+    )
     const requestedRenderMode =
       bodyRecord.renderMode === 'simple' || bodyRecord.renderMode === 'approfondie' || bodyRecord.renderMode === 'praticien'
         ? (bodyRecord.renderMode as 'simple' | 'approfondie' | 'praticien')

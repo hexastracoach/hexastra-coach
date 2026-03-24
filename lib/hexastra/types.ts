@@ -132,6 +132,8 @@ export type HexastraApiResponse = {
     upgradeTargetPlan?: string
     upgradeCtaLabel?: string
     premiumPreviewLocked?: boolean
+    fusionOnlyExperience?: boolean
+    scienceBreakdownAvailable?: boolean
     intentDetected?: string
     responseDepth?: 'short' | 'medium' | 'long' | 'expert'
     ksSummary?: {

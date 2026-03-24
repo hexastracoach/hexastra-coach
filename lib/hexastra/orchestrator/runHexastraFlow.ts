@@ -59,6 +59,14 @@ import {
   getScienceSubanalysisDefinition,
   resolveScienceSubanalysisSelection,
 } from '@/lib/hexastra/orchestrator/contextualSelection'
+import {
+  SCIENCE_BREAKDOWN_FALLBACK_MESSAGE,
+  canAccessScienceBreakdown,
+  isScienceBreakdownRequest,
+  isScienceMenuKey,
+  normalizeFusionOnlyAnalysisMode,
+  sanitizeFusionOnlySelectionKey,
+} from '@/lib/hexastra/fusionOnly'
 
 import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInput'
 import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
@@ -182,25 +190,6 @@ function isBirthComplete(birth: BirthProfile | null): boolean {
 function tr(language: string, variants: Partial<Record<string, string>>, fallback = 'fr'): string {
   const code = language?.slice(0, 2).toLowerCase() || fallback
   return variants[code] ?? variants[fallback] ?? ''
-}
-
-function toPromptScienceLabel(science: string | null | undefined): string | null {
-  switch (science) {
-    case 'astrology':
-      return 'Astrologie'
-    case 'human_design':
-      return 'Human Design'
-    case 'numerology':
-      return 'Numerologie'
-    case 'enneagram':
-      return 'Enneagramme'
-    case 'kua':
-      return 'Kua'
-    case 'hexastra_fusion':
-      return 'Fusion Hexastra'
-    default:
-      return null
-  }
 }
 
 function requiresPreciseBirthContext(message: string): boolean {
@@ -1414,10 +1403,11 @@ export async function runHexastraFlow(input: {
     const normalizedContextType: ContextType = input.contextType ?? 'general'
     const normalizedBirthData = normalizeBirthData(input.birthData)
     const normalizedPractitionerUsage = input.practitionerUsage ?? null
-    const normalizedSelectedMenuKey = input.selectedMenuKey ?? null
-    const normalizedSelectedSubmenuKey = input.selectedSubmenuKey ?? null
+    const normalizedSelectedMenuKey = sanitizeFusionOnlySelectionKey(input.selectedMenuKey ?? null)
+    const normalizedSelectedSubmenuKey = sanitizeFusionOnlySelectionKey(input.selectedSubmenuKey ?? null)
     const normalizedUiAction = input.uiAction ?? 'send_message'
     const normalizedJourneyToggle = Boolean(input?.journeyEnabled)
+    const normalizedAnalysisMode = normalizeFusionOnlyAnalysisMode(input.analysisMode ?? null)
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       logger.error('[runHexastraFlow] Supabase public env missing')
@@ -1467,6 +1457,10 @@ export async function runHexastraFlow(input: {
 
     const latestUserMessage =
       limitedMessages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
+    const scienceBreakdownRequested =
+      isScienceBreakdownRequest(latestUserMessage) ||
+      isScienceMenuKey(input.selectedMenuKey ?? null) ||
+      isScienceMenuKey(input.selectedSubmenuKey ?? null)
     const isGreeting = /^(bonjour|salut|hello|hey|bonsoir|coucou|yo)\s*$/i.test(
       latestUserMessage.trim()
     )
@@ -1790,7 +1784,7 @@ export async function runHexastraFlow(input: {
       hasExplicitGuidance: Boolean(selectedMenuKey || selectedSubmenuKey || uiAction !== 'send_message'),
       journeyEnabled,
       messages: limitedMessages,
-      analysisMode: input.analysisMode ?? null,
+      analysisMode: normalizedAnalysisMode,
       renderMode: input.renderMode ?? null,
     })
     const orchestration = evaluateOrchestration({
@@ -2228,7 +2222,7 @@ export async function runHexastraFlow(input: {
       subcategory: universalClassif.subcategory,
       requestKind: universalClassif.requestKind,
     })
-    const domainRoute = astroFollowupRouting.route
+    const domainRoute = scienceBreakdownRequested ? 'fusion' : astroFollowupRouting.route
 
     if (astroFollowupRouting.lockTrigger === 'astro_exact_with_birth_data') {
       flowLog(
@@ -3136,6 +3130,8 @@ export async function runHexastraFlow(input: {
         )
       : null
 
+    const scienceBreakdownAvailable = canAccessScienceBreakdown(plan)
+
     const systemPrompt = buildSystemPrompt({
       plan,
       mode,
@@ -3164,12 +3160,9 @@ export async function runHexastraFlow(input: {
       responseStrategy,
       evolutionProfile: input.evolutionProfile ?? null,
       messages: limitedMessages,
-      analysisMode: input.analysisMode ?? null,
+      analysisMode: normalizedAnalysisMode,
       renderMode: input.renderMode ?? null,
-      selectedScience:
-        selectedParentScience?.label ??
-        (selectedMenuKey?.startsWith('science_') ? selectedMenuLabel : null) ??
-        toPromptScienceLabel(universalClassif.science),
+      selectedScience: null,
       exactDataBlock: exactDataBlockForPrompt,
       requiresExactData: exactDataNeeded,
       hdProfileBlock,
@@ -3528,7 +3521,10 @@ export async function runHexastraFlow(input: {
       }
     }
 
-    const finalMessage = message
+    const finalMessage =
+      scienceBreakdownRequested && !message.startsWith(SCIENCE_BREAKDOWN_FALLBACK_MESSAGE)
+        ? `${SCIENCE_BREAKDOWN_FALLBACK_MESSAGE}\n\n${message}`
+        : message
     const finalStepLogMeta = {
       branch: orchestrationDecision.branch,
       uiAction,
@@ -3608,6 +3604,8 @@ export async function runHexastraFlow(input: {
         orchestrationTrace,
         usedLocalFallback,
         fallbackType,
+        fusionOnlyExperience: true,
+        scienceBreakdownAvailable,
       },
       updatedEvolutionProfile: input.evolutionProfile ?? null,
     } as HexastraApiResponse

@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import SuggestionChips from './SuggestionChips'
-import ScienceSelector from './ScienceSelector'
-import type { PlanKey } from '@/types/subscription'
 
 type Props = {
   value: string
@@ -20,10 +18,9 @@ type Props = {
   /** Suggestions contextuelles dynamiques */
   suggestions?: string[]
   onSuggestionSelect?: (value: string) => void
-  /** Sélecteur de sciences */
-  showScienceSelector?: boolean
-  onScienceSelect?: (prompt: string) => void
-  sciencePlan?: PlanKey
+  /** Point d entree fusion-only */
+  showFusionEntry?: boolean
+  onFusionEntry?: (prompt: string) => void
 }
 
 export default function Composer({
@@ -40,9 +37,8 @@ export default function Composer({
   disabled,
   suggestions,
   onSuggestionSelect,
-  showScienceSelector,
-  onScienceSelect,
-  sciencePlan = 'free',
+  showFusionEntry,
+  onFusionEntry,
 }: Props) {
   const [focused, setFocused] = useState(false)
   const [recording, setRecording] = useState(false)
@@ -106,15 +102,17 @@ export default function Composer({
 
   return (
     <div className="hx-composer-wrap">
-      {/* Science selector */}
-      {showScienceSelector && onScienceSelect && (
-        <ScienceSelector
-          plan={sciencePlan}
-          onSelect={(prompt) => {
-            onScienceSelect(prompt)
-          }}
-          disabled={disabled}
-        />
+      {showFusionEntry && onFusionEntry && (
+        <div className="hx-composer-suggestions" aria-label="Entree Hexastra">
+          <button
+            type="button"
+            onClick={() => onFusionEntry('Je veux une analyse Hexastra claire et directe de ma situation.')}
+            className="hx-chip"
+            disabled={disabled}
+          >
+            Explorer votre situation
+          </button>
+        </div>
       )}
 
       {/* Suggestions contextuelles dynamiques */}

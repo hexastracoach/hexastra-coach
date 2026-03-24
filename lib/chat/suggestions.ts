@@ -7,48 +7,48 @@ import { detectSubcategory } from '@/lib/hexastra/orchestration/detectSubcategor
 import type { PlanKey } from '@/types/subscription'
 
 export const STARTER_SUGGESTIONS = [
-  'Découvrir mon profil Hexastra',
-  'Comprendre mon ascendant',
+  'Explorer votre situation',
+  'Analyse Hexastra',
   'Faire un bilan du moment',
-  'Analyser ma situation actuelle',
+  'Clarifier ma situation actuelle',
 ]
 
 const SCIENCE_FOLLOWUPS: Record<string, string[]> = {
   astrology: [
-    'Mes transits du jour',
-    'Mon ascendant en détail',
-    'Mes aspects du moment',
-    'Mon thème natal complet',
+    'Voir ce qui se joue le plus fort maintenant',
+    'Approfondir le bon timing',
+    'Lire les points de vigilance du moment',
+    'Obtenir une vue d ensemble plus claire',
   ],
   numerology: [
-    'Mon année personnelle',
-    'Mon chemin de vie',
-    'Mon mois personnel',
-    'Mon jour numérique',
+    'Lire la phase active en ce moment',
+    'Comprendre le rythme de cette periode',
+    'Voir ce qui demande un ajustement',
+    'Obtenir une synthese plus complete',
   ],
   human_design: [
-    'Mon type Human Design',
-    'Mon autorité intérieure',
-    'Ma stratégie HD',
-    "Ma croix d'incarnation",
+    'Comprendre mon fonctionnement du moment',
+    'Voir comment mieux decider',
+    'Identifier mon axe de stabilite',
+    'Obtenir une lecture plus approfondie',
   ],
   enneagram: [
-    'Mon type ennéagramme',
-    'Mon aile dominante',
-    'Mon instinct dominant',
-    "Niveau d'intégration ennéa",
+    'Mieux comprendre ma reaction actuelle',
+    'Voir ce qui se rejoue en profondeur',
+    'Identifier mon levier d evolution',
+    'Obtenir une lecture plus fine',
   ],
   kua: [
-    'Mon nombre Kua',
-    'Mes directions favorables',
-    'Orientation de mon bureau',
-    'Direction de sommeil Kua',
+    'Voir ce qui me remet le plus en axe',
+    'Approfondir la question d environnement',
+    'Identifier le meilleur ajustement concret',
+    'Obtenir une lecture plus complete',
   ],
   hexastra_fusion: [
-    'Lecture fusionnée complète',
+    'Analyse Hexastra approfondie',
     'Timing optimal pour agir',
-    'Compatibilité Hexastra',
-    'Situation globale multi-sciences',
+    'Clarifier une relation importante',
+    'Voir la situation dans son ensemble',
   ],
 }
 
@@ -73,9 +73,9 @@ export function buildContextualSuggestions(params: {
 
   const base = [...SCIENCE_FOLLOWUPS[science]].slice(0, 3)
 
-  // Propose la fusion pour les plans payants
+  // Propose une lecture Hexastra approfondie pour les plans payants
   if (plan !== 'free' && science !== 'hexastra_fusion') {
-    base.push('Lecture fusionnée Hexastra')
+    base.push('Analyse Hexastra approfondie')
   }
 
   return base

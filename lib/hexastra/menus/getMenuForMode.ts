@@ -1,4 +1,5 @@
 import type { HexastraMenuItem, HexastraMode } from '@/lib/hexastra/types'
+import { getFusionOnlyMenu } from '@/lib/hexastra/fusionOnly'
 
 /**
  * Science-first menu architecture.
@@ -261,22 +262,30 @@ export function resolveKsSelectionKeyFromMenuKey(key?: string | null): string | 
   return CURRENT_TO_KS_SELECTION_KEY[key] ?? CURRENT_TO_LEGACY_MENU_KEY[key] ?? key
 }
 
-export function getMenuForMode(mode: HexastraMode, plan?: string): HexastraMenuItem[] {
+export function getInternalMenuForMode(_mode: HexastraMode, plan?: string): HexastraMenuItem[] {
   if (plan === 'free') return freeMenu
   return scienceMenu
 }
 
+export function getMenuForMode(mode: HexastraMode, _plan?: string): HexastraMenuItem[] {
+  return getFusionOnlyMenu(mode)
+}
+
 export function findMenuItem(items: HexastraMenuItem[], key?: string | null): HexastraMenuItem | null {
   if (!key || !Array.isArray(items)) return null
-  if (key === 'science') return buildLegacyScienceMenu(items)
+  if (key === 'science') return buildLegacyScienceMenu(scienceMenu)
 
   const normalizedKey = resolveCurrentMenuKey(key)
   if (!normalizedKey) return null
 
-  for (const item of items) {
-    if (item.key === normalizedKey) return normalizedKey === key ? item : cloneMenuItem(item, key)
-    const sub = item.submenu?.find((child) => child.key === normalizedKey)
-    if (sub) return normalizedKey === key ? sub : cloneMenuItem(sub, key)
+  const searchBuckets = [items, scienceMenu, freeMenu]
+
+  for (const bucket of searchBuckets) {
+    for (const item of bucket) {
+      if (item.key === normalizedKey) return normalizedKey === key ? item : cloneMenuItem(item, key)
+      const sub = item.submenu?.find((child) => child.key === normalizedKey)
+      if (sub) return normalizedKey === key ? sub : cloneMenuItem(sub, key)
+    }
   }
 
   const fallbackItem = LEGACY_SCIENCE_FALLBACK_ITEMS[key]

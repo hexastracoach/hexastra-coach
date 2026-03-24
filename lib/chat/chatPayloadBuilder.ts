@@ -6,6 +6,7 @@ import type { UserEvolutionProfile } from '@/types/evolution'
 import { getEntitlements } from './entitlements'
 import type { PractitionerUsage } from './bootstrapTypes'
 import type { AnalysisMode, RenderMode } from '@/lib/hexastra/sciences/scienceTaxonomy'
+import { FUSION_ONLY_ANALYSIS_MODE } from '@/lib/hexastra/fusionOnly'
 
 export type RequestType = 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
 
@@ -148,7 +149,7 @@ export function buildChatPayload({
   selectedSubmenuKey = null,
   uiAction = 'send_message',
   journeyEnabled = false,
-  analysisMode = null,
+  analysisMode = FUSION_ONLY_ANALYSIS_MODE,
   renderMode = null,
 }: {
   requestType: RequestType

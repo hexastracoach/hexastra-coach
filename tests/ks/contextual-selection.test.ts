@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
+import { getInternalMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
 import {
   buildContextSelectionPrompt,
   findLooseMenuSelection,
@@ -27,7 +27,7 @@ describe('contextual selection helpers', () => {
 
   it('understands a typed science path with arrows down to the current submenu', () => {
     const match = findLooseMenuSelection({
-      items: getMenuForMode('libre'),
+      items: getInternalMenuForMode('libre'),
       message: 'Human Design -> Portes actives',
       selectedMenuKey: null,
     })
@@ -41,7 +41,7 @@ describe('contextual selection helpers', () => {
 
   it('understands a loose submenu selection inside an already active science', () => {
     const match = findLooseMenuSelection({
-      items: getMenuForMode('libre'),
+      items: getInternalMenuForMode('libre'),
       message: 'portes actives',
       selectedMenuKey: 'science_human_design',
     })

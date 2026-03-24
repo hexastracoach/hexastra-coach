@@ -38,7 +38,7 @@ export function getEntitlements(plan: PlanKey): Entitlements {
     canMicroReadings: contract.features.microReadings,
     canPractitionerMode: contract.features.practitionerStructure,
     canAskPractitionerUsage: contract.features.clientUsage,
-    canSelectAnalysisMode: plan !== 'free',
+    canSelectAnalysisMode: contract.features.allowedAnalysisModes.length > 1,
     canSelectRenderMode: contract.features.practitionerStructure,
     canSelectPractitionerContext: contract.features.allowsPractitionerContext,
     chatMode,

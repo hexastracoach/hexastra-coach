@@ -113,6 +113,8 @@ export type PlanContract = {
     practitionerStructure: boolean
     clientUsage: boolean
     scienceMenu: boolean
+    fusionOnlyExperience: boolean
+    scienceBreakdownAccess: boolean
     externalCalculation: boolean
     /** Which analysisMode values are unlocked (empty = none) */
     allowedAnalysisModes: ('science_by_science' | 'hexastra_fusion')[]
