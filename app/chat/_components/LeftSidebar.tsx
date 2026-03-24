@@ -5,6 +5,7 @@ import { useMemo } from 'react'
 import type { Project, Reading } from '../_lib/chat'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import type { PlanKey } from '@/lib/plans'
+import HexastraLogo from '@/app/components/HexastraLogo'
 
 type Props = {
   projects: Project[]
@@ -56,16 +57,11 @@ export default function LeftSidebar({
   return (
     <div className="flex h-full flex-col border-r border-white/10 bg-[#051019]/80 text-slate-100 backdrop-blur-2xl">
       <div className="border-b border-white/8 px-5 pb-5 pt-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-300/20 bg-[linear-gradient(135deg,rgba(16,185,129,0.18),rgba(16,185,129,0.05))] shadow-[0_0_40px_rgba(16,185,129,0.12)]">
-            <div className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_20px_rgba(110,231,183,0.75)]" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400/80">Hexastra</p>
-            <p className="truncate text-sm font-medium text-slate-100/90">
-              {isEnglish ? 'Clarity & decisions' : 'Clarté et décisions'}
-            </p>
-          </div>
+        <div className="flex items-center gap-2.5">
+          <HexastraLogo size={32} animated={false} />
+          <p className="truncate text-sm font-semibold tracking-[-0.01em] text-slate-100/92">
+            Hexastra Coach
+          </p>
         </div>
 
         <button

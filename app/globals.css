@@ -1654,12 +1654,12 @@ transition: all 0.35s ease;
 }
 
 .hx-welcome-chip {
-  padding: 10px 20px;
+  padding: 12px 24px;
   border-radius: 999px;
-  border: 1px solid rgba(220, 232, 244, 0.11);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(215, 235, 248, 0.8);
-  font-size: 0.88rem;
+  border: 1px solid rgba(220, 232, 244, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(215, 235, 248, 0.86);
+  font-size: 0.94rem;
   font-weight: 400;
   cursor: pointer;
   white-space: nowrap;
@@ -9313,12 +9313,7 @@ select {
 }
 
 .hx-suggestion-chip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: rgba(113, 227, 212, 0.92);
-  box-shadow: 0 0 0 5px rgba(113, 227, 212, 0.08);
-  flex-shrink: 0;
+  display: none;
 }
 
 .hx-suggestion-chip-text {

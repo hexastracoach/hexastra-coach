@@ -504,12 +504,6 @@ export default function ChatPageClient() {
     partnerBirthDataRef.current = partnerBirthData
   }, [partnerBirthData])
 
-  useEffect(() => {
-    if (!isBirthDataComplete(birthData)) {
-      setShowInlineBirthForm(true)
-    }
-  }, [birthData])
-
   const isWelcome = useMemo(() => messages.length === 0, [messages])
 
   // Minimal formatting: keep business response as-is, optionally trim via depth
@@ -2044,10 +2038,10 @@ export default function ChatPageClient() {
     onBirthFormOpen: () => setShowInlineBirthForm((v) => !v),
     highlightBirth: isWelcome && !isBirthDataComplete(birthData),
     disabled: !bootstrapUi.chatReady || isMicroBootstrapPending || isLimitReached || isTyping,
-    // Suggestions contextuelles dynamiques
-    suggestions: bootstrapUi.chatReady && !isLimitReached ? contextualSuggestions : [],
+    // Suggestions contextuelles dynamiques (masquées sur l'écran d'accueil)
+    suggestions: bootstrapUi.chatReady && !isLimitReached && !isWelcome ? contextualSuggestions : [],
     onSuggestionSelect: (v: string) => void handleSend(v),
-    showFusionEntry: bootstrapUi.chatReady && !isLimitReached,
+    showFusionEntry: bootstrapUi.chatReady && !isLimitReached && !isWelcome,
     onFusionEntry: (prompt: string) => void handleSend(prompt),
   }
   const composerSurface = (
@@ -2128,30 +2122,13 @@ export default function ChatPageClient() {
                 </button>
               )}
 
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-300/18 bg-emerald-300/[0.07] shadow-[0_0_30px_rgba(16,185,129,0.12)]">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_20px_rgba(110,231,183,0.85)]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-[10px] uppercase tracking-[0.22em] text-slate-400/70">
-                    Hexastra
-                  </p>
-                  <p className="truncate text-sm font-medium text-slate-100/90">{headerTitle}</p>
-                  <p className="hidden truncate text-xs text-slate-400/70 md:block">{headerSubtitle}</p>
-                </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-100/90">{headerTitle}</p>
+                <p className="hidden truncate text-xs text-slate-400/65 md:block">{headerSubtitle}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <LanguageSwitcher variant="flag" className="hx-nav-lang" />
-              <Link
-                href="/account"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-sm font-semibold text-slate-100 transition duration-200 hover:border-emerald-300/18 hover:bg-emerald-300/[0.08]"
-                aria-label={isEnglishChat ? 'Open profile' : 'Ouvrir le profil'}
-              >
-                {userInitials}
-              </Link>
-            </div>
+            <LanguageSwitcher variant="flag" className="hx-nav-lang" />
           </div>
 
           <div className="hx-app-feed hx-scroll-soft">

@@ -255,16 +255,18 @@ export default function Composer({
       )}
 
       <div className="hx-composer-shell">
-        <div className="hx-composer-meta">
-          <div className="hx-composer-status">
-            <span
-              className={`hx-composer-status-dot${focused || canSend || recording || transcribing ? ' is-active' : ''}${recording ? ' is-recording' : ''}${transcribing ? ' is-transcribing' : ''}`}
-              aria-hidden="true"
-            />
-            <span>{statusLabel}</span>
+        {(focused || recording || transcribing || Boolean(attachedFileName)) && (
+          <div className="hx-composer-meta">
+            <div className="hx-composer-status">
+              <span
+                className={`hx-composer-status-dot${focused || canSend || recording || transcribing ? ' is-active' : ''}${recording ? ' is-recording' : ''}${transcribing ? ' is-transcribing' : ''}`}
+                aria-hidden="true"
+              />
+              <span>{statusLabel}</span>
+            </div>
+            <p className="hx-composer-helper">{helperLabel}</p>
           </div>
-          <p className="hx-composer-helper">{helperLabel}</p>
-        </div>
+        )}
 
         <div className={`hx-composer-box${focused ? ' is-focused' : ''}${canSend ? ' has-content' : ''}${disabled && !canSend ? ' is-busy' : ''}`}>
           <div className="hx-composer-actions-left">
