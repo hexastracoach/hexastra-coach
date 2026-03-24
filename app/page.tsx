@@ -2,30 +2,26 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   ArrowRight,
   BadgeCheck,
-  Brain,
   Compass,
   Menu,
   MessageSquare,
-  MoveRight,
   ShieldCheck,
   Sparkles,
   Target,
   X,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { trackHexastraFunnel } from '@/lib/analytics/hexastraFunnel'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import type { PlanKey } from '@/types/subscription'
 
-type IconCard = {
+type InfoCard = {
   title: string
   body: string
-  icon: LucideIcon
 }
 
 type StepCard = {
@@ -47,6 +43,7 @@ type PlanCard = {
   cadence: string
   description: string
   bullets: string[]
+  cta: string
   badge?: string
   highlighted?: boolean
 }
@@ -54,10 +51,8 @@ type PlanCard = {
 type CopyBundle = {
   header: {
     how: string
-    difference: string
     plans: string
-    signIn: string
-    account: string
+    chat: string
   }
   hero: {
     eyebrow: string
@@ -66,32 +61,34 @@ type CopyBundle = {
     primary: string
     secondary: string
     trust: string
-    previewEyebrow: string
-    previewTitle: string
-    previewItems: string[]
-    previewNote: string
+    panelEyebrow: string
+    panelTitle: string
+    panelRows: string[]
+    panelNote: string
   }
   problem: {
     eyebrow: string
     title: string
     subtitle: string
-    items: Omit<IconCard, 'icon'>[]
+    items: InfoCard[]
   }
   solution: {
     eyebrow: string
     title: string
     body: string
     bullets: string[]
+    steps: StepCard[]
   }
-  steps: {
-    eyebrow: string
+  systems: {
     title: string
-    items: StepCard[]
+    body: string
+    support: string
+    list: string
   }
   benefits: {
     eyebrow: string
     title: string
-    items: Omit<IconCard, 'icon'>[]
+    items: InfoCard[]
   }
   differentiation: {
     eyebrow: string
@@ -112,7 +109,6 @@ type CopyBundle = {
     title: string
     subtitle: string
     note: string
-    cta: string
     items: PlanCard[]
   }
   finalCta: {
@@ -134,210 +130,203 @@ const CTA_HREF = '/chat'
 
 const FR_COPY: CopyBundle = {
   header: {
-    how: 'Comment ça marche',
-    difference: 'Pourquoi Hexastra',
-    plans: 'Accès',
-    signIn: 'Connexion',
-    account: 'Mon espace',
+    how: 'Comment Ã§a marche',
+    plans: 'Premium',
+    chat: 'Ouvrir le chat',
   },
   hero: {
-    eyebrow: 'Clarté pour les moments qui comptent',
-    title: 'Hexastra est votre GPS intérieur.',
+    eyebrow: 'Pour les moments oÃ¹ tout devient flou',
+    title: 'Quand tout se brouille, Hexastra vous aide Ã  voir juste.',
     subtitle:
-      'Comprenez votre situation, voyez plus clair, et avancez avec de meilleures décisions.',
-    primary: 'Explorer ma situation',
-    secondary: 'Voir comment ça marche',
-    trust: 'Simple, direct, et conçu pour vous aider à avancer avec clarté.',
-    previewEyebrow: 'Ce que vous obtenez',
-    previewTitle: 'Une lecture utile en quelques minutes.',
-    previewItems: [
-      'Ce qui se joue vraiment derrière la situation',
-      'Ce qui mérite votre attention maintenant',
-      'Une direction concrète pour la suite',
+      "Vous tournez en rond, vous hÃ©sitez, vous sentez que quelque chose se joue sans rÃ©ussir Ã  le nommer. DÃ©crivez votre situation. Hexastra vous aide Ã  y voir clair et Ã  savoir quoi faire ensuite.",
+    primary: 'Voir clair maintenant',
+    secondary: 'Comment Ã§a marche',
+    trust: 'Entrez dans le chat. Une situation rÃ©elle. Une rÃ©ponse claire.',
+    panelEyebrow: 'Ce que vous obtenez',
+    panelTitle: 'Moins de bruit. Plus de direction.',
+    panelRows: [
+      'Ce qui vous retient vraiment',
+      'Ce qui compte maintenant',
+      'Le prochain pas qui a du sens',
     ],
-    previewNote: 'Pas de jargon. Pas de méthode à décoder. Juste une réponse claire.',
+    panelNote: 'Direct, lisible, utile. Pas de systÃ¨me Ã  apprendre.',
   },
   problem: {
-    eyebrow: 'Quand tout se brouille',
-    title: 'Le plus dur n’est pas toujours la décision. C’est le flou autour.',
+    eyebrow: 'Le vrai problÃ¨me',
+    title: "Vous n'avez pas besoin de plus d'informations. Vous avez besoin de clartÃ©.",
     subtitle:
-      'On pense trop. On ressent beaucoup. Et plus la situation compte, plus il devient difficile de voir ce qui est vraiment en train de se passer.',
+      "Quand une situation compte vraiment, on mÃ©lange facilement peur, intuition, fatigue et attachement. Alors on suranalyse, on attend, et rien ne bouge.",
     items: [
       {
-        title: 'Vous tournez en rond',
-        body: 'Vous repassez les mêmes options sans réussir à sentir laquelle est juste.',
+        title: 'Vous pensez trop',
+        body: "Chaque option semble juste puis mauvaise l'instant d'aprÃ¨s.",
       },
       {
-        title: 'Vous ressentez sans pouvoir nommer',
-        body: 'Quelque chose pèse, mais les mots et la logique n’arrivent pas à suivre.',
+        title: "Vous sentez qu'il se passe quelque chose",
+        body: "Mais impossible de l'expliquer clairement ou de savoir quoi en faire.",
       },
       {
-        title: 'Vous hésitez entre plusieurs directions',
-        body: 'Rester, partir, attendre, relancer. Tout semble possible et rien ne paraît clair.',
-      },
-      {
-        title: 'Vous voulez de la clarté, pas plus de bruit',
-        body: 'Vous n’avez pas besoin d’une théorie de plus. Vous avez besoin d’y voir juste.',
+        title: 'Vous voulez une direction',
+        body: "Pas une autre couche de thÃ©orie ou d'information de plus.",
       },
     ],
   },
   solution: {
-    eyebrow: 'La réponse Hexastra',
-    title: 'Hexastra transforme une situation floue en lecture claire.',
+    eyebrow: 'La reponse',
+    title: 'Hexastra lit la situation, pas seulement la question.',
     body:
-      'Vous décrivez ce qui se passe. Hexastra lit les dynamiques importantes. Puis vous repartez avec une réponse structurée, directe et utile.',
+      "Vous racontez ce qui se passe. Hexastra clarifie la tension centrale, ce qui compte vraiment, et la direction la plus juste pour la suite.",
     bullets: [
-      'Vous mettez des mots sur ce que vous vivez.',
-      'Hexastra clarifie ce qui compte vraiment.',
-      'Vous savez quoi regarder et quoi faire ensuite.',
+      'Comprendre ce qui se joue vraiment',
+      'Retrouver de la perspective rapidement',
+      'Avancer avec une prochaine action claire',
     ],
-  },
-  steps: {
-    eyebrow: 'Comment ça marche',
-    title: 'Trois étapes. Une direction plus claire.',
-    items: [
+    steps: [
       {
         step: '01',
-        title: 'Vous partagez votre situation',
-        body: 'Un blocage, une décision, une relation, un moment de doute.',
+        title: 'Vous parlez de votre situation',
+        body: 'Un doute, une relation, une decision, un moment ou vous ne voyez plus clair.',
       },
       {
         step: '02',
         title: 'Hexastra clarifie',
-        body: 'Le système met en lumière la tension réelle, les enjeux et l’angle juste.',
+        body: "Le systeme fait ressortir le point central et ce qui merite vraiment votre attention.",
       },
       {
         step: '03',
         title: 'Vous repartez avec un cap',
-        body: 'Une lecture compréhensible. Une direction concrète. Moins de charge mentale.',
+        body: 'Une lecture nette. Une direction credible. Plus de calme pour decider.',
       },
     ],
   },
+  systems: {
+    title: 'Une intelligence nourrie par plusieurs approches',
+    body:
+      'Hexastra s\u2019appuie sur plusieurs syst\u00e8mes d\u2019analyse reconnus, crois\u00e9s pour r\u00e9v\u00e9ler ce qui compte vraiment dans votre situation.',
+    support:
+      'Vous n\u2019avez rien \u00e0 d\u00e9coder.\nLa lecture est d\u00e9j\u00e0 clarifi\u00e9e pour vous.',
+    list: 'Astrologie · Human Design · Num\u00e9rologie · Enn\u00e9agramme · Kua',
+  },
   benefits: {
-    eyebrow: 'Ce que ça change',
-    title: 'Plus de clarté dans les moments sensibles.',
+    eyebrow: 'Ce que cela change',
+    title: 'Vous decidez plus calmement.',
     items: [
       {
-        title: 'Décisions plus nettes',
-        body: 'Vous avancez avec plus de discernement et moins d’hésitation.',
+        title: 'Decisions plus nettes',
+        body: "Vous avancez avec plus de discernement et moins d'hesitation.",
       },
       {
-        title: 'Moins de surcharge mentale',
-        body: 'Vous quittez le bruit intérieur pour revenir à ce qui compte.',
+        title: 'Moins de charge mentale',
+        body: "Vous quittez le bruit interieur pour revenir a l'essentiel.",
       },
       {
-        title: 'Meilleure lecture émotionnelle',
-        body: 'Vous comprenez mieux ce que vous ressentez et pourquoi cela vous bloque.',
+        title: 'Mieux comprendre ce que vous ressentez',
+        body: 'Vous nommez enfin ce qui bloque et ce qui appelle une vraie decision.',
       },
       {
-        title: 'Plus de perspective',
-        body: 'Vous voyez la situation dans un cadre plus large et plus calme.',
-      },
-      {
-        title: 'Une réponse utile',
-        body: 'Pas un conseil vague. Une lecture qui aide vraiment à passer à la suite.',
+        title: 'Une direction utilisable',
+        body: 'Pas un conseil vague. Une prochaine etape qui a du sens.',
       },
     ],
   },
   differentiation: {
-    eyebrow: 'Pourquoi c’est différent',
-    title: 'Hexastra ne vous demande pas d’apprendre un système.',
-    quote: 'Vous n’avez pas besoin de comprendre le système. Seulement votre situation.',
+    eyebrow: 'Pourquoi cela fonctionne',
+    title: 'Pas de methode a choisir. Pas de systeme a decoder.',
+    quote: "Vous n'avez pas besoin de comprendre le systeme. Seulement votre situation.",
     cards: [
       {
-        before: 'Choisir une méthode avant d’être aidé',
-        after: 'Recevoir une réponse claire dès le départ',
+        before: "Plus d'informations a trier",
+        after: 'Plus de clarte',
       },
       {
-        before: 'Décoder des résultats complexes',
-        after: 'Comprendre immédiatement ce qui se joue',
-      },
-      {
-        before: 'Accumuler de l’information',
-        after: 'Retrouver de la direction',
+        before: 'Des resultats a interpreter',
+        after: 'Une direction immediate',
       },
     ],
   },
   testimonials: {
-    eyebrow: 'Ce que les utilisateurs ressentent',
-    title: 'Clair, humain, crédible.',
+    eyebrow: 'En quelques minutes',
+    title: 'Le soulagement vient quand la situation devient lisible.',
     items: [
       {
         quote:
-          'Je cherchais surtout à comprendre ce qui me retenait dans une relation. La réponse a été simple, juste, et j’ai senti tout de suite ce qui comptait.',
+          "J'ai arrete de tourner en rond. J'ai compris ce qui me retenait vraiment dans ma relation.",
         author: 'Camille, 33 ans',
-        context: 'Clarté relationnelle',
+        context: 'Clarte relationnelle',
       },
       {
         quote:
-          'J’hésitais sur une décision pro depuis des semaines. Hexastra m’a aidé à voir que le vrai sujet n’était pas le poste, mais l’énergie que j’y laissais.',
+          "Je pensais hesiter entre deux options pro. En realite, j'essayais surtout de ne pas regarder ce qui m'epuisait.",
         author: 'Nicolas, 41 ans',
-        context: 'Décision de travail',
+        context: 'Decision de travail',
       },
       {
         quote:
-          'Je me sentais confuse sans savoir pourquoi. En quelques messages, j’ai eu une lecture calme et cohérente. Ça m’a vraiment soulagée.',
+          "Je me sentais confuse depuis des jours. En quelques messages, j'ai senti la pression retomber.",
         author: 'Sarah, 29 ans',
-        context: 'Confusion émotionnelle',
+        context: 'Confusion emotionnelle',
       },
     ],
   },
   plans: {
-    eyebrow: 'Accès',
-    title: 'Commencez simplement. Allez plus loin quand vous en avez besoin.',
+    eyebrow: 'AccÃ¨s',
+    title: 'Choisissez la profondeur qui vous convient.',
     subtitle:
-      'Chaque plan garde la même expérience Hexastra: claire, directe et centrée sur la décision.',
-    note: 'Premium est recommandé si vous voulez plus de profondeur et plus de précision.',
-    cta: 'Aller au chat',
+      "La mÃªme expÃ©rience Hexastra. Plus ou moins de profondeur selon l'importance du moment.",
+    note: "Premium est le meilleur point d'Ã©quilibre pour les dÃ©cisions importantes.",
     items: [
       {
         key: 'free',
         title: 'Free',
-        price: '0€',
-        cadence: '/ accès découverte',
-        description: 'Pour découvrir Hexastra sans friction.',
-        bullets: ['Accès limité chaque jour', 'Parfait pour essayer', 'Commencez immédiatement'],
+        price: '0â‚¬',
+        cadence: '/ accÃ¨s dÃ©couverte',
+        description: 'Pour ressentir la clartÃ© Hexastra sur une situation simple.',
+        bullets: ['AccÃ¨s limitÃ© chaque jour', 'Parfait pour essayer', 'Commencez immÃ©diatement'],
+        cta: 'Essayer maintenant',
       },
       {
         key: 'essential',
         title: 'Essential',
-        price: '9€',
+        price: '9â‚¬',
         cadence: '/ mois',
-        description: 'Pour utiliser Hexastra quand vous voulez, avec des réponses concises.',
-        bullets: ['Usage illimité', 'Guidance claire et directe', 'Pensé pour le quotidien'],
+        description: 'Pour un usage fluide et quotidien, avec des rÃ©ponses claires et concises.',
+        bullets: ['Usage illimitÃ©', 'Guidance directe', 'PensÃ© pour le quotidien'],
+        cta: 'Continuer avec Essential',
       },
       {
         key: 'premium',
         title: 'Premium',
-        price: '19€',
+        price: '19â‚¬',
         cadence: '/ mois',
-        description: 'Pour une lecture plus profonde, plus précise et plus utile dans les moments importants.',
-        bullets: ['Plus de profondeur', 'Plus de précision', 'Meilleur soutien à la décision'],
-        badge: 'Recommandé',
+        description: 'Pour aller plus loin quand la situation compte vraiment.',
+        bullets: ['Analyse plus profonde', 'Plus de nuance', 'Le meilleur choix pour une dÃ©cision importante'],
+        cta: 'Choisir Premium',
+        badge: 'RecommandÃ©',
         highlighted: true,
       },
       {
         key: 'practitioner',
         title: 'Practitioner',
-        price: '49€',
+        price: '49â‚¬',
         cadence: '/ mois',
-        description: 'Pour les usages avancés, les power users et les futurs cas professionnels.',
-        bullets: ['Usage avancé', 'Structure plus experte', 'Positionnement premium'],
+        description: 'Pour un usage avancÃ©, plus exigeant, et les futurs besoins pro.',
+        bullets: ['Usage avancÃ©', 'Cadre plus expert', 'Positionnement premium'],
+        cta: 'Voir le niveau avancÃ©',
       },
     ],
   },
   finalCta: {
-    eyebrow: 'Quand tout paraît flou',
-    title: 'Hexastra vous aide à y voir clair de nouveau.',
+    eyebrow: "Quand vous n'y voyez plus clair",
+    title: 'Commencez par votre situation.',
     body:
-      'Vous n’avez pas besoin de la question parfaite. Commencez avec ce que vous vivez. La clarté vient ensuite.',
-    cta: 'Commencer maintenant',
+      'Pas besoin de la question parfaite. Dites simplement ce qui se passe. Hexastra vous aide Ã  voir juste.',
+    cta: 'Ouvrir le chat',
   },
   footer: {
-    tagline: 'La clarté change tout.',
+    tagline: 'La clartÃ© change tout.',
     support: 'Support',
     contact: 'Contact',
-    privacy: 'Confidentialité',
+    privacy: 'ConfidentialitÃ©',
     terms: 'Conditions',
   },
 }
@@ -345,148 +334,138 @@ const FR_COPY: CopyBundle = {
 const EN_COPY: CopyBundle = {
   header: {
     how: 'How it works',
-    difference: 'Why Hexastra',
-    plans: 'Access',
-    signIn: 'Sign in',
-    account: 'My space',
+    plans: 'Premium',
+    chat: 'Open chat',
   },
   hero: {
-    eyebrow: 'Clarity for the moments that matter',
-    title: 'Hexastra is your inner GPS.',
+    eyebrow: 'For the moments when everything feels blurred',
+    title: 'When everything feels unclear, Hexastra helps you see what is true.',
     subtitle:
-      'Understand your situation, see more clearly, and move forward with better decisions.',
-    primary: 'Explore my situation',
-    secondary: 'See how it works',
-    trust: 'Simple, direct, and designed to help you move with clarity.',
-    previewEyebrow: 'What you get',
-    previewTitle: 'A useful reading in just a few minutes.',
-    previewItems: [
-      'What is really happening beneath the surface',
-      'What deserves your attention right now',
-      'One concrete direction for what comes next',
+      "You keep circling, hesitating, and feeling that something important is happening without being able to name it. Describe your situation. Hexastra helps you see clearly and know what to do next.",
+    primary: 'See clearly now',
+    secondary: 'How it works',
+    trust: 'Enter the chat. A real situation. A clear response.',
+    panelEyebrow: 'What you get',
+    panelTitle: 'Less noise. More direction.',
+    panelRows: [
+      'What is really holding you back',
+      'What matters right now',
+      'The next move that makes sense',
     ],
-    previewNote: 'No jargon. No system to decode. Just a clear answer.',
+    panelNote: 'Direct, readable, useful. No system to learn first.',
   },
   problem: {
-    eyebrow: 'When everything feels blurred',
-    title: 'The hardest part is not always the decision. It is the fog around it.',
+    eyebrow: 'The real problem',
+    title: 'You do not need more information. You need clarity.',
     subtitle:
-      'You overthink. You feel a lot. And the more the situation matters, the harder it becomes to see what is actually going on.',
+      'When a situation truly matters, fear, intuition, fatigue, and attachment start blending together. So you overthink, delay, and stay stuck.',
     items: [
       {
-        title: 'You keep circling the same thoughts',
-        body: 'You replay the same options without feeling which one is truly right.',
+        title: 'You think too much',
+        body: 'Every option feels right, then wrong, a moment later.',
       },
       {
-        title: 'You feel a lot without naming it clearly',
-        body: 'Something weighs on you, but words and logic still feel one step behind.',
+        title: 'You feel that something is going on',
+        body: 'But you cannot explain it clearly or know what to do with it.',
       },
       {
-        title: 'You hesitate between different directions',
-        body: 'Stay, leave, wait, speak. Every path is possible and none feels obvious.',
-      },
-      {
-        title: 'You want clarity, not more noise',
-        body: 'You do not need another theory. You need a clearer read of the situation.',
+        title: 'You want direction',
+        body: 'Not another layer of theory, noise, or interpretation.',
       },
     ],
   },
   solution: {
-    eyebrow: 'The Hexastra answer',
-    title: 'Hexastra turns a blurred situation into a clear reading.',
+    eyebrow: 'The response',
+    title: 'Hexastra reads the situation, not just the question.',
     body:
-      'You describe what is happening. Hexastra reads the important dynamics. Then you leave with a structured, grounded, useful response.',
+      'You describe what is happening. Hexastra clarifies the central tension, what matters most, and the most grounded direction for what comes next.',
     bullets: [
-      'You put words on what you are living through.',
-      'Hexastra clarifies what matters most.',
-      'You know what to look at and what to do next.',
+      'Understand what is really happening',
+      'Recover perspective quickly',
+      'Move forward with one clear next step',
     ],
-  },
-  steps: {
-    eyebrow: 'How it works',
-    title: 'Three steps. A clearer direction.',
-    items: [
+    steps: [
       {
         step: '01',
-        title: 'You share what is happening',
-        body: 'A block, a decision, a relationship, or a moment of doubt.',
+        title: 'You share your situation',
+        body: 'A doubt, a relationship, a decision, or a moment when you no longer see clearly.',
       },
       {
         step: '02',
-        title: 'Hexastra clarifies the situation',
-        body: 'The system highlights the real tension, the stakes, and the right angle to see.',
+        title: 'Hexastra clarifies',
+        body: 'The system surfaces the core issue and what truly deserves your attention.',
       },
       {
         step: '03',
         title: 'You leave with direction',
-        body: 'A clear reading. A concrete next step. Less mental overload.',
+        body: 'A sharper read. A credible direction. More calm when it is time to decide.',
       },
     ],
   },
+  systems: {
+    title: 'An intelligence shaped by multiple approaches',
+    body:
+      'Hexastra draws on several established analytical systems, combined to reveal what matters most in your situation.',
+    support:
+      'You do not need to decode anything.\nThe reading is already clarified for you.',
+    list: 'Astrology · Human Design · Numerology · Enneagram · Kua',
+  },
   benefits: {
     eyebrow: 'What changes',
-    title: 'More clarity when the moment really matters.',
+    title: 'You decide with more calm.',
     items: [
       {
         title: 'Clearer decisions',
-        body: 'Move forward with more discernment and less hesitation.',
+        body: 'You move with more discernment and less hesitation.',
       },
       {
-        title: 'Less mental overload',
-        body: 'Leave the inner noise and come back to what matters.',
+        title: 'Less mental load',
+        body: 'You leave the inner noise and come back to what matters.',
       },
       {
         title: 'Better emotional understanding',
-        body: 'Understand what you are feeling and why it blocks you.',
+        body: 'You finally name what is blocking you and what calls for a real decision.',
       },
       {
-        title: 'More perspective',
-        body: 'See the situation in a wider and calmer frame.',
-      },
-      {
-        title: 'A useful answer',
-        body: 'Not vague advice. A reading that genuinely helps you move forward.',
+        title: 'A usable direction',
+        body: 'Not vague advice. A next step that actually makes sense.',
       },
     ],
   },
   differentiation: {
-    eyebrow: 'Why it feels different',
-    title: 'Hexastra does not ask you to learn a system first.',
-    quote: 'You don’t need to understand the system. Only your situation.',
+    eyebrow: 'Why it works',
+    title: 'No method to choose. No system to decode.',
+    quote: "You don't need to understand the system. Only your situation.",
     cards: [
       {
-        before: 'Choose a method before getting help',
-        after: 'Get a clear answer from the start',
+        before: 'More information to sort through',
+        after: 'More clarity',
       },
       {
-        before: 'Decode complex outputs',
-        after: 'Understand immediately what is going on',
-      },
-      {
-        before: 'Collect more information',
-        after: 'Recover direction',
+        before: 'Results to interpret',
+        after: 'Immediate direction',
       },
     ],
   },
   testimonials: {
-    eyebrow: 'What users feel',
-    title: 'Clear, human, credible.',
+    eyebrow: 'In a few minutes',
+    title: 'Relief begins when the situation becomes readable.',
     items: [
       {
         quote:
-          'I wanted clarity on what was really holding me back in a relationship. The response was simple, accurate, and immediately useful.',
+          'I stopped going in circles. I understood what was really holding me in that relationship.',
         author: 'Camille, 33',
         context: 'Relationship clarity',
       },
       {
         quote:
-          'I had been stuck on a work decision for weeks. Hexastra helped me see that the real issue was not the job itself, but the energy it was costing me.',
+          'I thought I was choosing between two work options. The real issue was what had been draining me for months.',
         author: 'Nicolas, 41',
         context: 'Work decision',
       },
       {
         quote:
-          'I felt emotionally confused without knowing why. In a few messages, I got a calm, coherent reading. It genuinely eased the pressure.',
+          'I had felt emotionally confused for days. A few messages later, the pressure had dropped.',
         author: 'Sarah, 29',
         context: 'Emotional confusion',
       },
@@ -494,54 +473,57 @@ const EN_COPY: CopyBundle = {
   },
   plans: {
     eyebrow: 'Access',
-    title: 'Start simply. Go deeper when you need it.',
+    title: 'Choose the depth that fits the moment.',
     subtitle:
-      'Every plan keeps the same Hexastra experience: clear, direct, and focused on better decisions.',
-    note: 'Premium is recommended when you want more depth and more precision.',
-    cta: 'Open the chat',
+      'The same Hexastra experience. More or less depth depending on how important the moment is.',
+    note: 'Premium is the best balance when the decision really matters.',
     items: [
       {
         key: 'free',
         title: 'Free',
-        price: '€0',
+        price: 'â‚¬0',
         cadence: '/ discovery access',
-        description: 'Discover Hexastra without friction.',
-        bullets: ['Limited daily access', 'Perfect to try the experience', 'Start right away'],
+        description: 'Feel the Hexastra experience on a simple situation.',
+        bullets: ['Limited daily access', 'Perfect to try', 'Start immediately'],
+        cta: 'Try it now',
       },
       {
         key: 'essential',
         title: 'Essential',
-        price: '€9',
+        price: 'â‚¬9',
         cadence: '/ month',
-        description: 'Use Hexastra whenever you want with concise guidance.',
-        bullets: ['Unlimited use', 'Clear and direct guidance', 'Built for everyday clarity'],
+        description: 'For fluid everyday use with clear and concise guidance.',
+        bullets: ['Unlimited use', 'Direct guidance', 'Built for everyday clarity'],
+        cta: 'Continue with Essential',
       },
       {
         key: 'premium',
         title: 'Premium',
-        price: '€19',
+        price: 'â‚¬19',
         cadence: '/ month',
-        description: 'Go deeper with more precise and more useful guidance in important moments.',
-        bullets: ['More depth', 'More precision', 'Better decision support'],
+        description: 'Go deeper when the situation truly matters.',
+        bullets: ['Deeper analysis', 'More nuance', 'The best choice for an important decision'],
+        cta: 'Choose Premium',
         badge: 'Recommended',
         highlighted: true,
       },
       {
         key: 'practitioner',
         title: 'Practitioner',
-        price: '€49',
+        price: 'â‚¬49',
         cadence: '/ month',
-        description: 'For advanced usage, power users, and future professional needs.',
-        bullets: ['Advanced usage', 'More expert structure', 'Premium positioning'],
+        description: 'For more advanced usage and future professional needs.',
+        bullets: ['Advanced usage', 'More expert frame', 'Premium positioning'],
+        cta: 'See advanced access',
       },
     ],
   },
   finalCta: {
-    eyebrow: 'When things feel blurred',
-    title: 'Hexastra helps you see clearly again.',
+    eyebrow: "When you can't see clearly anymore",
+    title: 'Start with your situation.',
     body:
-      'You do not need the perfect question. Start with what you are living through. The clarity comes next.',
-    cta: 'Start now',
+      'You do not need the perfect question. Just say what is happening. Hexastra helps you see what is true.',
+    cta: 'Open chat',
   },
   footer: {
     tagline: 'Clarity changes everything.',
@@ -552,29 +534,28 @@ const EN_COPY: CopyBundle = {
   },
 }
 
-const PROBLEM_ICONS: LucideIcon[] = [Brain, Sparkles, Compass, ShieldCheck]
-const BENEFIT_ICONS: LucideIcon[] = [Target, Brain, Sparkles, Compass, BadgeCheck]
+const problemIcons: LucideIcon[] = [Sparkles, Compass, ShieldCheck]
+const benefitIcons: LucideIcon[] = [Target, Sparkles, MessageSquare, BadgeCheck]
 
-const buttonPrimary =
+const primaryButtonClass =
   'inline-flex items-center justify-center gap-2 rounded-full bg-emerald-300 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071018]'
 
-const buttonSecondary =
-  'inline-flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-6 py-3 text-sm font-semibold text-white/88 transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071018]'
+const softButtonClass =
+  'inline-flex items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-5 py-3 text-sm font-medium text-white/78 transition hover:border-white/24 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/25 focus-visible:ring-offset-2 focus-visible:ring-offset-[#071018]'
 
 export default function HomePage() {
-  const supabase = createClient()
   const { lang, setLang } = useTranslation()
-  const [hasUser, setHasUser] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const copy = lang === 'en' ? EN_COPY : FR_COPY
-  const accountHref = hasUser ? '/chat' : '/auth'
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setHasUser(Boolean(data.user))
-    })
-  }, [supabase])
+  const problemCards = copy.problem.items.map((item, index) => ({
+    ...item,
+    icon: problemIcons[index],
+  }))
+  const benefitCards = copy.benefits.items.map((item, index) => ({
+    ...item,
+    icon: benefitIcons[index],
+  }))
 
   function handleChatCtaClick(location: string, plan?: PlanKey) {
     if (plan) {
@@ -590,26 +571,15 @@ export default function HomePage() {
     setMobileMenuOpen(false)
   }
 
-  const problemCards = copy.problem.items.map((item, index) => ({
-    ...item,
-    icon: PROBLEM_ICONS[index],
-  }))
-
-  const benefitCards = copy.benefits.items.map((item, index) => ({
-    ...item,
-    icon: BENEFIT_ICONS[index],
-  }))
-
   return (
     <main className="min-h-screen bg-[#061017] text-[#f7f1e8]">
       <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(88,226,194,0.20),_transparent_30%),radial-gradient(circle_at_80%_20%,_rgba(103,124,255,0.14),_transparent_28%),linear-gradient(180deg,_#061017_0%,_#08131d_55%,_#071018_100%)]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[32rem] bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_45%)]" />
-        <div className="pointer-events-none absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(88,226,194,0.18),_transparent_28%),linear-gradient(180deg,_#061017_0%,_#08121b_54%,_#071018_100%)]" />
+        <div className="pointer-events-none absolute left-1/2 top-20 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-300/8 blur-3xl" />
 
-        <header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-5 lg:px-8">
+        <header className="relative z-20 mx-auto flex max-w-6xl items-center justify-between px-6 py-5 lg:px-8">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.05] shadow-[0_18px_40px_rgba(0,0,0,0.25)] backdrop-blur">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/12 bg-white/[0.05] shadow-[0_18px_40px_rgba(0,0,0,0.24)] backdrop-blur">
               <Image
                 src="/logo/hexastra_logo_white_petals_triangles.svg"
                 alt="Hexastra Coach"
@@ -620,21 +590,18 @@ export default function HomePage() {
               />
             </div>
             <div>
-              <div className="font-sora text-sm font-semibold tracking-[0.18em] text-white/92 uppercase">
+              <div className="font-sora text-sm font-semibold uppercase tracking-[0.18em] text-white/92">
                 Hexastra Coach
               </div>
-              <div className="text-sm text-white/55">{copy.footer.tagline}</div>
+              <div className="text-sm text-white/52">{copy.footer.tagline}</div>
             </div>
           </Link>
 
-          <div className="hidden items-center gap-7 lg:flex">
-            <button type="button" onClick={() => scrollToSection('how-it-works')} className="text-sm text-white/66 transition hover:text-white">
+          <div className="hidden items-center gap-6 lg:flex">
+            <button type="button" onClick={() => scrollToSection('how-it-works')} className="text-sm text-white/60 transition hover:text-white">
               {copy.header.how}
             </button>
-            <button type="button" onClick={() => scrollToSection('difference')} className="text-sm text-white/66 transition hover:text-white">
-              {copy.header.difference}
-            </button>
-            <button type="button" onClick={() => scrollToSection('plans')} className="text-sm text-white/66 transition hover:text-white">
+            <button type="button" onClick={() => scrollToSection('plans')} className="text-sm text-white/60 transition hover:text-white">
               {copy.header.plans}
             </button>
             <div className="flex items-center rounded-full border border-white/12 bg-white/[0.04] p-1">
@@ -645,8 +612,8 @@ export default function HomePage() {
                     key={code}
                     type="button"
                     onClick={() => setLang(code)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] transition ${
-                      active ? 'bg-white text-slate-950' : 'text-white/55 hover:text-white'
+                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] transition ${
+                      active ? 'bg-white text-slate-950' : 'text-white/52 hover:text-white'
                     }`}
                   >
                     {code}
@@ -654,8 +621,12 @@ export default function HomePage() {
                 )
               })}
             </div>
-            <Link href={accountHref} className="text-sm font-medium text-white/80 transition hover:text-white">
-              {hasUser ? copy.header.account : copy.header.signIn}
+            <Link
+              href={CTA_HREF}
+              className={softButtonClass}
+              onClick={() => handleChatCtaClick('header')}
+            >
+              {copy.header.chat}
             </Link>
           </div>
 
@@ -663,27 +634,36 @@ export default function HomePage() {
             type="button"
             aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={mobileMenuOpen}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/[0.05] text-white/80 backdrop-blur lg:hidden"
             onClick={() => setMobileMenuOpen((open) => !open)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/12 bg-white/[0.05] text-white/80 backdrop-blur lg:hidden"
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </header>
 
         {mobileMenuOpen ? (
-          <div className="relative z-20 mx-6 rounded-3xl border border-white/12 bg-[#0a1620]/95 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.38)] backdrop-blur lg:hidden">
-            <div className="flex flex-col gap-3 text-sm text-white/82">
-              <button type="button" onClick={() => scrollToSection('how-it-works')} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left">
+          <div className="relative z-20 mx-6 rounded-3xl border border-white/12 bg-[#0b1620]/96 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.34)] backdrop-blur lg:hidden">
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => scrollToSection('how-it-works')}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-sm text-white/80"
+              >
                 {copy.header.how}
               </button>
-              <button type="button" onClick={() => scrollToSection('difference')} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left">
-                {copy.header.difference}
-              </button>
-              <button type="button" onClick={() => scrollToSection('plans')} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left">
+              <button
+                type="button"
+                onClick={() => scrollToSection('plans')}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left text-sm text-white/80"
+              >
                 {copy.header.plans}
               </button>
-              <Link href={accountHref} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-left">
-                {hasUser ? copy.header.account : copy.header.signIn}
+              <Link
+                href={CTA_HREF}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-white/90"
+                onClick={() => handleChatCtaClick('mobile_menu')}
+              >
+                {copy.header.chat}
               </Link>
               <div className="mt-2 flex items-center rounded-full border border-white/12 bg-white/[0.04] p-1">
                 {(['fr', 'en'] as const).map((code) => {
@@ -693,8 +673,8 @@ export default function HomePage() {
                       key={code}
                       type="button"
                       onClick={() => setLang(code)}
-                      className={`flex-1 rounded-full px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
-                        active ? 'bg-white text-slate-950' : 'text-white/55 hover:text-white'
+                      className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition ${
+                        active ? 'bg-white text-slate-950' : 'text-white/52 hover:text-white'
                       }`}
                     >
                       {code}
@@ -706,26 +686,26 @@ export default function HomePage() {
           </div>
         ) : null}
 
-        <section className="relative z-10 mx-auto max-w-7xl px-6 pb-24 pt-12 sm:pb-28 lg:px-8 lg:pb-32 lg:pt-16">
-          <div className="grid gap-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,440px)] lg:items-center">
+        <section className="relative z-10 mx-auto max-w-6xl px-6 pb-24 pt-12 sm:pb-28 lg:px-8 lg:pb-32 lg:pt-16">
+          <div className="grid gap-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,400px)] lg:items-center">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/18 bg-emerald-300/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100/90">
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/18 bg-emerald-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/90">
                 <Compass className="h-3.5 w-3.5" />
                 {copy.hero.eyebrow}
               </div>
 
-              <h1 className="mt-6 max-w-4xl font-sora text-4xl font-semibold leading-[0.98] tracking-[-0.05em] text-white sm:text-5xl lg:text-7xl">
+              <h1 className="mt-6 max-w-4xl font-sora text-4xl font-semibold leading-[0.97] tracking-[-0.05em] text-white sm:text-5xl lg:text-[4.5rem]">
                 {copy.hero.title}
               </h1>
 
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-white/72 sm:text-xl">
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-white/68 sm:text-xl">
                 {copy.hero.subtitle}
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href={CTA_HREF}
-                  className={buttonPrimary}
+                  className={primaryButtonClass}
                   onClick={() => handleChatCtaClick('hero_primary')}
                 >
                   {copy.hero.primary}
@@ -734,13 +714,13 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => scrollToSection('how-it-works')}
-                  className={buttonSecondary}
+                  className="inline-flex items-center justify-center gap-2 px-1 py-3 text-sm font-medium text-white/58 transition hover:text-white"
                 >
                   {copy.hero.secondary}
                 </button>
               </div>
 
-              <div className="mt-5 flex items-start gap-3 text-sm text-white/62">
+              <div className="mt-5 flex items-start gap-3 text-sm text-white/56">
                 <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
                 <p>{copy.hero.trust}</p>
               </div>
@@ -748,37 +728,30 @@ export default function HomePage() {
 
             <div className="relative">
               <div className="absolute -inset-3 rounded-[2rem] bg-emerald-300/10 blur-3xl" />
-              <div className="relative overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.06] p-6 shadow-[0_28px_100px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:p-7">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/85">
-                      {copy.hero.previewEyebrow}
-                    </div>
-                    <h2 className="mt-3 font-sora text-2xl font-semibold tracking-[-0.04em] text-white">
-                      {copy.hero.previewTitle}
-                    </h2>
-                  </div>
-                  <div className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-xs font-semibold text-emerald-100">
-                    Hexastra
-                  </div>
+              <div className="relative rounded-[2rem] border border-white/12 bg-white/[0.05] p-6 shadow-[0_28px_100px_rgba(0,0,0,0.30)] backdrop-blur-xl sm:p-7">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/82">
+                  {copy.hero.panelEyebrow}
                 </div>
+                <h2 className="mt-3 max-w-xs font-sora text-2xl font-semibold tracking-[-0.04em] text-white">
+                  {copy.hero.panelTitle}
+                </h2>
 
                 <div className="mt-8 space-y-3">
-                  {copy.hero.previewItems.map((item, index) => (
+                  {copy.hero.panelRows.map((item, index) => (
                     <div
                       key={item}
-                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-[#0d1822]/80 px-4 py-4"
+                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-[#0c1720]/82 px-4 py-4"
                     >
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-300/12 text-sm font-semibold text-emerald-100">
                         0{index + 1}
                       </div>
-                      <p className="text-sm leading-7 text-white/76">{item}</p>
+                      <p className="text-sm leading-7 text-white/74">{item}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm leading-7 text-white/60">
-                  {copy.hero.previewNote}
+                <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm leading-7 text-white/58">
+                  {copy.hero.panelNote}
                 </div>
               </div>
             </div>
@@ -787,34 +760,34 @@ export default function HomePage() {
       </div>
 
       <section className="border-t border-white/6 bg-[#08121a]">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
           <div className="max-w-3xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
               {copy.problem.eyebrow}
             </p>
             <h2 className="mt-4 font-sora text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
               {copy.problem.title}
             </h2>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-white/68 sm:text-lg">
+            <p className="mt-5 max-w-2xl text-base leading-8 text-white/66 sm:text-lg">
               {copy.problem.subtitle}
             </p>
           </div>
 
-          <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-12 grid gap-4 lg:grid-cols-3">
             {problemCards.map((item) => {
               const Icon = item.icon
               return (
                 <article
                   key={item.title}
-                  className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]"
+                  className="rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-6"
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.06] text-emerald-100">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/[0.05] text-emerald-100">
                     <Icon className="h-5 w-5" />
                   </div>
                   <h3 className="mt-5 font-sora text-xl font-semibold tracking-[-0.03em] text-white">
                     {item.title}
                   </h3>
-                  <p className="mt-3 text-sm leading-7 text-white/64">{item.body}</p>
+                  <p className="mt-3 text-sm leading-7 text-white/62">{item.body}</p>
                 </article>
               )
             })}
@@ -822,16 +795,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[#f7f1e8] text-[#12202a]">
-        <div className="mx-auto grid max-w-7xl gap-12 px-6 py-20 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-center lg:px-8">
+      <section id="how-it-works" className="scroll-mt-24 bg-[#f6efe5] text-[#12202a]">
+        <div className="mx-auto grid max-w-6xl gap-12 px-6 py-20 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start lg:px-8">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#0f766e]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0f766e]">
               {copy.solution.eyebrow}
             </p>
             <h2 className="mt-4 font-sora text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
               {copy.solution.title}
             </h2>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-slate-700 sm:text-lg">
+            <p className="mt-5 max-w-xl text-base leading-8 text-slate-700 sm:text-lg">
               {copy.solution.body}
             </p>
 
@@ -847,62 +820,19 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="rounded-[2rem] border border-slate-900/8 bg-white p-6 shadow-[0_24px_80px_rgba(10,18,28,0.08)] sm:p-7">
-            <div className="rounded-[1.5rem] bg-[#09121b] p-6 text-white">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-300/10 text-emerald-200">
-                  <MessageSquare className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-100/80">
-                    Hexastra
-                  </p>
-                  <p className="text-sm text-white/58">
-                    {lang === 'en' ? 'A direct reading for the moment you are in.' : 'Une lecture directe du moment que vous traversez.'}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-6 space-y-3">
-                <div className="rounded-2xl bg-white/[0.05] px-4 py-4 text-sm leading-7 text-white/72">
-                  {lang === 'en'
-                    ? 'You share what feels unclear.'
-                    : 'Vous partagez ce qui vous semble flou.'}
-                </div>
-                <div className="rounded-2xl bg-emerald-300/10 px-4 py-4 text-sm leading-7 text-emerald-50">
-                  {lang === 'en'
-                    ? 'Hexastra helps you see the real tension, the key lever, and the next move that feels right.'
-                    : 'Hexastra vous aide à voir la tension réelle, le levier important, et la prochaine action juste.'}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="how-it-works" className="scroll-mt-24 bg-[#08121a]">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-          <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
-              {copy.steps.eyebrow}
-            </p>
-            <h2 className="mt-4 font-sora text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
-              {copy.steps.title}
-            </h2>
-          </div>
-
-          <div className="mt-12 grid gap-4 lg:grid-cols-3">
-            {copy.steps.items.map((item) => (
+          <div className="grid gap-4">
+            {copy.solution.steps.map((item) => (
               <article
                 key={item.step}
-                className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-6"
+                className="rounded-[1.7rem] border border-slate-900/8 bg-white p-6 shadow-[0_18px_60px_rgba(10,18,28,0.06)]"
               >
-                <div className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0f766e]">
                   {item.step}
                 </div>
-                <h3 className="mt-4 font-sora text-2xl font-semibold tracking-[-0.04em] text-white">
+                <h3 className="mt-4 font-sora text-2xl font-semibold tracking-[-0.04em] text-slate-900">
                   {item.title}
                 </h3>
-                <p className="mt-3 text-sm leading-7 text-white/64">{item.body}</p>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{item.body}</p>
               </article>
             ))}
           </div>
@@ -910,9 +840,26 @@ export default function HomePage() {
       </section>
 
       <section className="border-t border-white/6 bg-[#09141d]">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <div className="mx-auto max-w-[600px] px-6 py-24 text-center lg:px-8 lg:py-28">
+          <h2 className="font-sora text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
+            {copy.systems.title}
+          </h2>
+          <p className="mt-6 text-base leading-8 text-white/68 sm:text-lg">
+            {copy.systems.body}
+          </p>
+          <p className="mt-6 whitespace-pre-line text-base leading-8 text-white/62 sm:text-lg">
+            {copy.systems.support}
+          </p>
+          <p className="mt-8 text-sm tracking-[0.08em] text-white/65 sm:text-[0.95rem]">
+            {copy.systems.list}
+          </p>
+        </div>
+      </section>
+
+      <section className="border-t border-white/6 bg-[#09141d]">
+        <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
           <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
               {copy.benefits.eyebrow}
             </p>
             <h2 className="mt-4 font-sora text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
@@ -920,13 +867,13 @@ export default function HomePage() {
             </h2>
           </div>
 
-          <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {benefitCards.map((item) => {
               const Icon = item.icon
               return (
                 <article
                   key={item.title}
-                  className="rounded-[1.6rem] border border-white/10 bg-white/[0.04] p-5"
+                  className="rounded-[1.55rem] border border-white/10 bg-white/[0.04] p-5"
                 >
                   <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-300/12 text-emerald-100">
                     <Icon className="h-5 w-5" />
@@ -934,7 +881,7 @@ export default function HomePage() {
                   <h3 className="mt-4 font-sora text-lg font-semibold tracking-[-0.03em] text-white">
                     {item.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-7 text-white/64">{item.body}</p>
+                  <p className="mt-2 text-sm leading-7 text-white/62">{item.body}</p>
                 </article>
               )
             })}
@@ -942,10 +889,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="difference" className="scroll-mt-24 bg-[#f5efe6] text-[#12202a]">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+      <section className="bg-[#f5efe6] text-[#12202a]">
+        <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
           <div className="mx-auto max-w-4xl text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#0f766e]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0f766e]">
               {copy.differentiation.eyebrow}
             </p>
             <h2 className="mt-4 font-sora text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
@@ -956,21 +903,16 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-4 lg:grid-cols-3">
+          <div className="mx-auto mt-12 grid max-w-4xl gap-4 md:grid-cols-2">
             {copy.differentiation.cards.map((item) => (
               <article
                 key={item.before}
-                className="rounded-[1.75rem] border border-slate-900/8 bg-white p-6 shadow-[0_18px_60px_rgba(10,18,28,0.06)]"
+                className="rounded-[1.7rem] border border-slate-900/8 bg-white p-6 shadow-[0_18px_60px_rgba(10,18,28,0.06)]"
               >
-                <div className="text-sm font-medium text-slate-500">{item.before}</div>
+                <div className="text-sm text-slate-500">{item.before}</div>
                 <div className="my-5 h-px bg-slate-200" />
-                <div className="flex items-start gap-3">
-                  <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-100 text-[#0f766e]">
-                    <MoveRight className="h-4 w-4" />
-                  </div>
-                  <p className="font-sora text-xl font-semibold tracking-[-0.03em] text-slate-900">
-                    {item.after}
-                  </p>
+                <div className="font-sora text-2xl font-semibold tracking-[-0.04em] text-slate-900">
+                  {item.after}
                 </div>
               </article>
             ))}
@@ -979,9 +921,9 @@ export default function HomePage() {
       </section>
 
       <section className="bg-[#08121a]">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
           <div className="max-w-2xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
               {copy.testimonials.eyebrow}
             </p>
             <h2 className="mt-4 font-sora text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
@@ -993,12 +935,12 @@ export default function HomePage() {
             {copy.testimonials.items.map((item) => (
               <article
                 key={item.author}
-                className="rounded-[1.75rem] border border-white/10 bg-white/[0.04] p-6"
+                className="rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-6"
               >
-                <div className="inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-medium text-white/56">
+                <div className="inline-flex rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs text-white/54">
                   {item.context}
                 </div>
-                <p className="mt-5 text-base leading-8 text-white/74">“{item.quote}”</p>
+                <p className="mt-5 text-base leading-8 text-white/72">"{item.quote}"</p>
                 <div className="mt-6 text-sm font-semibold text-white">{item.author}</div>
               </article>
             ))}
@@ -1007,16 +949,16 @@ export default function HomePage() {
       </section>
 
       <section id="plans" className="scroll-mt-24 border-t border-white/6 bg-[#09141d]">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
+        <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
                 {copy.plans.eyebrow}
               </p>
               <h2 className="mt-4 font-sora text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
                 {copy.plans.title}
               </h2>
-              <p className="mt-5 max-w-2xl text-base leading-8 text-white/68 sm:text-lg">
+              <p className="mt-5 max-w-2xl text-base leading-8 text-white/66 sm:text-lg">
                 {copy.plans.subtitle}
               </p>
             </div>
@@ -1029,28 +971,28 @@ export default function HomePage() {
             {copy.plans.items.map((plan) => (
               <article
                 key={plan.key}
-                className={`relative flex h-full flex-col rounded-[1.9rem] border p-6 ${
+                className={`relative flex h-full flex-col rounded-[1.85rem] border p-6 ${
                   plan.highlighted
-                    ? 'border-emerald-300/30 bg-[linear-gradient(180deg,rgba(110,231,213,0.16),rgba(255,255,255,0.06))] shadow-[0_25px_80px_rgba(16,185,129,0.20)]'
+                    ? 'border-emerald-300/28 bg-[linear-gradient(180deg,rgba(110,231,213,0.14),rgba(255,255,255,0.05))] shadow-[0_24px_80px_rgba(16,185,129,0.18)]'
                     : 'border-white/10 bg-white/[0.04]'
                 }`}
               >
                 {plan.badge ? (
-                  <div className="absolute right-5 top-5 rounded-full bg-emerald-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-950">
+                  <div className="absolute right-5 top-5 rounded-full bg-emerald-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-950">
                     {plan.badge}
                   </div>
                 ) : null}
 
-                <div className="text-sm font-semibold uppercase tracking-[0.22em] text-white/56">
+                <div className="text-sm font-semibold uppercase tracking-[0.22em] text-white/52">
                   {plan.title}
                 </div>
                 <div className="mt-6 flex items-end gap-2">
                   <span className="font-sora text-4xl font-semibold tracking-[-0.04em] text-white">
                     {plan.price}
                   </span>
-                  <span className="pb-1 text-sm text-white/58">{plan.cadence}</span>
+                  <span className="pb-1 text-sm text-white/56">{plan.cadence}</span>
                 </div>
-                <p className="mt-4 text-sm leading-7 text-white/66">{plan.description}</p>
+                <p className="mt-4 text-sm leading-7 text-white/64">{plan.description}</p>
 
                 <div className="mt-6 space-y-3">
                   {plan.bullets.map((item) => (
@@ -1066,10 +1008,10 @@ export default function HomePage() {
                 <div className="mt-8">
                   <Link
                     href={CTA_HREF}
-                    className={plan.highlighted ? buttonPrimary : buttonSecondary}
+                    className={plan.highlighted ? primaryButtonClass : softButtonClass}
                     onClick={() => handleChatCtaClick('plans', plan.key)}
                   >
-                    {copy.plans.cta}
+                    {plan.cta}
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
@@ -1081,20 +1023,20 @@ export default function HomePage() {
 
       <section className="border-t border-white/6 bg-[#061017]">
         <div className="mx-auto max-w-5xl px-6 py-20 text-center lg:px-8">
-          <div className="rounded-[2.4rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] px-6 py-12 shadow-[0_25px_100px_rgba(0,0,0,0.28)] backdrop-blur-xl sm:px-10">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
+          <div className="rounded-[2.3rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] px-6 py-12 shadow-[0_25px_100px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:px-10">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
               {copy.finalCta.eyebrow}
             </p>
             <h2 className="mx-auto mt-4 max-w-3xl font-sora text-3xl font-semibold tracking-[-0.04em] text-white sm:text-5xl">
               {copy.finalCta.title}
             </h2>
-            <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-white/68 sm:text-lg">
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-8 text-white/66 sm:text-lg">
               {copy.finalCta.body}
             </p>
             <div className="mt-8">
               <Link
                 href={CTA_HREF}
-                className={buttonPrimary}
+                className={primaryButtonClass}
                 onClick={() => handleChatCtaClick('final_cta')}
               >
                 {copy.finalCta.cta}
@@ -1106,7 +1048,7 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-white/6 bg-[#050d14]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8 text-sm text-white/54 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8 text-sm text-white/54 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
             <div className="font-sora text-base font-semibold text-white">Hexastra Coach</div>
             <div className="mt-1">{copy.footer.tagline}</div>
@@ -1129,7 +1071,7 @@ export default function HomePage() {
               className="inline-flex items-center gap-2 font-medium text-white transition hover:text-emerald-100"
               onClick={() => handleChatCtaClick('footer')}
             >
-              {copy.plans.cta}
+              {copy.header.chat}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
