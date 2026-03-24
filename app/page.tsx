@@ -548,6 +548,42 @@ export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const copy = lang === 'en' ? EN_COPY : FR_COPY
+  const heroDisplay =
+    lang === 'en'
+      ? {
+          eyebrow: 'Clarity for the moments that matter',
+          title: 'Hexastra is your inner GPS.',
+          subtitle:
+            'Understand your situation, see more clearly, and move forward with better decisions.',
+          primary: 'Explore my situation',
+          secondary: 'See how it works',
+          trust: 'Simple, direct, and designed to help you move with clarity.',
+          panelEyebrow: 'What you get',
+          panelTitle: 'A useful reading in just a few minutes.',
+          panelRows: [
+            'What is really happening beneath the surface',
+            'What deserves your attention right now',
+            'One concrete direction for what comes next',
+          ],
+          panelNote: 'No jargon. No system to decode. Just a clear answer.',
+        }
+      : {
+          eyebrow: 'Clarte pour les moments qui comptent',
+          title: 'Hexastra est votre GPS interieur.',
+          subtitle:
+            'Comprenez votre situation, voyez plus clair, et avancez avec de meilleures decisions.',
+          primary: 'Explorer ma situation',
+          secondary: 'Voir comment ca marche',
+          trust: 'Simple, direct, et concu pour vous aider a avancer avec clarte.',
+          panelEyebrow: 'Ce que vous obtenez',
+          panelTitle: 'Une lecture utile en quelques minutes.',
+          panelRows: [
+            'Ce qui se joue vraiment derriere la situation',
+            'Ce qui merite votre attention maintenant',
+            'Une direction concrete pour la suite',
+          ],
+          panelNote: 'Pas de jargon. Pas de methode a decoder. Juste une reponse claire.',
+        }
   const problemCards = copy.problem.items.map((item, index) => ({
     ...item,
     icon: problemIcons[index],
@@ -691,15 +727,15 @@ export default function HomePage() {
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/18 bg-emerald-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/90">
                 <Compass className="h-3.5 w-3.5" />
-                {copy.hero.eyebrow}
+                {heroDisplay.eyebrow}
               </div>
 
               <h1 className="mt-6 max-w-4xl font-sora text-4xl font-semibold leading-[0.97] tracking-[-0.05em] text-white sm:text-5xl lg:text-[4.5rem]">
-                {copy.hero.title}
+                {heroDisplay.title}
               </h1>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-white/68 sm:text-xl">
-                {copy.hero.subtitle}
+                {heroDisplay.subtitle}
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -708,7 +744,7 @@ export default function HomePage() {
                   className={primaryButtonClass}
                   onClick={() => handleChatCtaClick('hero_primary')}
                 >
-                  {copy.hero.primary}
+                  {heroDisplay.primary}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <button
@@ -716,13 +752,13 @@ export default function HomePage() {
                   onClick={() => scrollToSection('how-it-works')}
                   className="inline-flex items-center justify-center gap-2 px-1 py-3 text-sm font-medium text-white/58 transition hover:text-white"
                 >
-                  {copy.hero.secondary}
+                  {heroDisplay.secondary}
                 </button>
               </div>
 
               <div className="mt-5 flex items-start gap-3 text-sm text-white/56">
                 <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-200" />
-                <p>{copy.hero.trust}</p>
+                <p>{heroDisplay.trust}</p>
               </div>
             </div>
 
@@ -730,14 +766,14 @@ export default function HomePage() {
               <div className="absolute -inset-3 rounded-[2rem] bg-emerald-300/10 blur-3xl" />
               <div className="relative rounded-[2rem] border border-white/12 bg-white/[0.05] p-6 shadow-[0_28px_100px_rgba(0,0,0,0.30)] backdrop-blur-xl sm:p-7">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/82">
-                  {copy.hero.panelEyebrow}
+                  {heroDisplay.panelEyebrow}
                 </div>
                 <h2 className="mt-3 max-w-xs font-sora text-2xl font-semibold tracking-[-0.04em] text-white">
-                  {copy.hero.panelTitle}
+                  {heroDisplay.panelTitle}
                 </h2>
 
                 <div className="mt-8 space-y-3">
-                  {copy.hero.panelRows.map((item, index) => (
+                  {heroDisplay.panelRows.map((item, index) => (
                     <div
                       key={item}
                       className="flex items-start gap-4 rounded-2xl border border-white/10 bg-[#0c1720]/82 px-4 py-4"
@@ -751,7 +787,7 @@ export default function HomePage() {
                 </div>
 
                 <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm leading-7 text-white/58">
-                  {copy.hero.panelNote}
+                  {heroDisplay.panelNote}
                 </div>
               </div>
             </div>
