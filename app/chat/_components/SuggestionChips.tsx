@@ -18,7 +18,8 @@ export default function SuggestionChips({ suggestions, onSelect }: Props) {
           className="hx-suggestion-chip"
           onClick={() => onSelect(s)}
         >
-          {s}
+          <span className="hx-suggestion-chip-dot" aria-hidden="true" />
+          <span className="hx-suggestion-chip-text">{s}</span>
         </button>
       ))}
     </div>

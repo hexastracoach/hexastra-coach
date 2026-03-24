@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { type ChangeEvent, useEffect, useRef, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import SuggestionChips from './SuggestionChips'
 
@@ -16,12 +16,70 @@ type Props = {
   onBirthFormOpen?: () => void
   highlightBirth?: boolean
   disabled?: boolean
-  /** Suggestions contextuelles dynamiques */
   suggestions?: string[]
   onSuggestionSelect?: (value: string) => void
-  /** Point d'entrée fusion-only */
   showFusionEntry?: boolean
   onFusionEntry?: (prompt: string) => void
+}
+
+function getStatusLabel({
+  lang,
+  focused,
+  recording,
+  transcribing,
+  attachedFileName,
+}: {
+  lang: string
+  focused: boolean
+  recording: boolean
+  transcribing: boolean
+  attachedFileName?: string
+}) {
+  const isEnglish = lang.startsWith('en')
+
+  if (transcribing) {
+    return isEnglish ? 'Transcribing your voice note' : 'Transcription de votre note vocale'
+  }
+
+  if (recording) {
+    return isEnglish ? 'Listening to your voice note' : "J'écoute votre note vocale"
+  }
+
+  if (attachedFileName) {
+    return isEnglish ? 'Attachment ready to analyze' : 'Pièce jointe prête à analyser'
+  }
+
+  if (focused) {
+    return isEnglish ? 'Hexastra is focused on your situation' : 'Hexastra se concentre sur votre situation'
+  }
+
+  return isEnglish ? 'Direct, calm, and clear' : 'Direct, calme et clair'
+}
+
+function getHelperLabel({
+  lang,
+  recording,
+  transcribing,
+}: {
+  lang: string
+  recording: boolean
+  transcribing: boolean
+}) {
+  const isEnglish = lang.startsWith('en')
+
+  if (transcribing) {
+    return isEnglish
+      ? 'The transcript will be added to your message automatically.'
+      : 'Le texte sera ajouté automatiquement à votre message.'
+  }
+
+  if (recording) {
+    return isEnglish ? 'Tap the microphone again to stop.' : 'Touchez à nouveau le micro pour arrêter.'
+  }
+
+  return isEnglish
+    ? 'Press Enter to send, Shift + Enter for a new line.'
+    : 'Entrée pour envoyer, Maj + Entrée pour une nouvelle ligne.'
 }
 
 export default function Composer({
@@ -51,7 +109,6 @@ export default function Composer({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
-  // Auto-resize textarea
   useEffect(() => {
     if (!textareaRef.current) return
     textareaRef.current.style.height = 'auto'
@@ -63,20 +120,21 @@ export default function Composer({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const recorder = new MediaRecorder(stream)
       chunksRef.current = []
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data)
       }
       recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop())
+        stream.getTracks().forEach((track) => track.stop())
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
         setTranscribing(true)
         try {
-          const fd = new FormData()
-          fd.append('file', blob, 'recording.webm')
-          const res = await fetch('/api/transcribe', { method: 'POST', body: fd })
-          const data = await res.json()
+          const formData = new FormData()
+          formData.append('file', blob, 'recording.webm')
+          const response = await fetch('/api/transcribe', { method: 'POST', body: formData })
+          const data = await response.json()
           if (typeof data.text === 'string' && data.text.trim()) {
-            onChange(value ? `${value} ${data.text.trim()}` : data.text.trim())
+            const nextText = value ? `${value} ${data.text.trim()}` : data.text.trim()
+            onChange(nextText)
           }
         } catch {
           // noop
@@ -87,7 +145,11 @@ export default function Composer({
       mediaRecorderRef.current = recorder
       setRecording(true)
     } catch {
-      alert("Accès au microphone refusé. Veuillez autoriser le micro dans votre navigateur.")
+      alert(
+        lang.startsWith('en')
+          ? 'Microphone access was denied. Please allow microphone access in your browser.'
+          : 'Accès au microphone refusé. Autorisez le micro dans votre navigateur.'
+      )
     }
   }
 
@@ -96,18 +158,26 @@ export default function Composer({
     setRecording(false)
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
     if (file) onAttach?.(file)
-    e.target.value = ''
+    event.target.value = ''
   }
 
   const canSend = value.trim().length > 0 && !disabled && !transcribing
   const placeholder = transcribing
-    ? lang?.startsWith('en')
-      ? 'Transcribing your message…'
-      : 'Je transcris ton message…'
+    ? lang.startsWith('en')
+      ? 'Transcribing your message...'
+      : 'Je transcris votre message...'
     : t('chat.placeholder')
+  const statusLabel = getStatusLabel({
+    lang,
+    focused,
+    recording,
+    transcribing,
+    attachedFileName,
+  })
+  const helperLabel = getHelperLabel({ lang, recording, transcribing })
 
   return (
     <div className="hx-composer-wrap">
@@ -124,25 +194,27 @@ export default function Composer({
         </div>
       )}
 
-      {/* Suggestions contextuelles dynamiques */}
       {suggestions && suggestions.length > 0 && onSuggestionSelect && (
         <SuggestionChips suggestions={suggestions} onSelect={onSuggestionSelect} />
       )}
 
-      {/* Quick prompts legacy (gardé pour compat) */}
       {showQuickPrompts && !suggestions?.length && (
         <div className="hx-composer-suggestions">
           {['Découvrir mon profil', 'Comprendre mon ascendant', 'Faire un bilan', 'Analyser ma situation'].map(
-            (p) => (
-              <button key={p} type="button" onClick={() => onQuickPrompt(p)} className="hx-chip">
-                {p}
+            (prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => onQuickPrompt(prompt)}
+                className="hx-chip"
+              >
+                {prompt}
               </button>
-            ),
+            )
           )}
         </div>
       )}
 
-      {/* Attached file badge */}
       {attachedFileName && (
         <div className="hx-composer-attach-row">
           <span className="hx-composer-attach-pill">
@@ -154,125 +226,129 @@ export default function Composer({
               onClick={onRemoveAttach}
               aria-label="Retirer la pièce jointe"
             >
-              ✕
+              ×
             </button>
           </span>
         </div>
       )}
 
-      {/* Recording indicator */}
       {recording && (
         <div className="hx-composer-recording-bar">
           <span className="hx-rec-dot" />
-          Enregistrement… Cliquez sur le micro pour arrêter.
+          {lang.startsWith('en')
+            ? 'Recording in progress. Tap the mic to stop.'
+            : 'Enregistrement en cours. Touchez le micro pour arrêter.'}
         </div>
       )}
       {transcribing && (
         <div className="hx-composer-recording-bar hx-composer-transcribing-bar">
-          {lang?.startsWith('en') ? 'Transcribing…' : 'Transcription en cours…'}
+          {lang.startsWith('en') ? 'Transcription in progress...' : 'Transcription en cours...'}
         </div>
       )}
 
-      {/* Main glass bar */}
-      <div className={`hx-composer-box${focused ? ' is-focused' : ''}${canSend ? ' has-content' : ''}`}>
-        {/* Left actions */}
-        <div className="hx-composer-actions-left">
-          {/* Birth data avatar */}
-          <button
-            type="button"
-            className={`hx-composer-action-btn${highlightBirth ? ' is-highlight' : ''}`}
-            onClick={onBirthFormOpen}
-            title="Données de naissance"
-            aria-label="Ouvrir le formulaire de naissance"
-          >
-            <AvatarIcon />
-          </button>
-
-          {/* File attach */}
-          <button
-            type="button"
-            className="hx-composer-action-btn"
-            onClick={() => fileInputRef.current?.click()}
-            title="Joindre un fichier (PNG, JPG, JPEG, PDF)"
-            aria-label="Joindre un fichier"
-            disabled={disabled}
-          >
-            <AttachIcon />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"
-            aria-hidden="true"
-            tabIndex={-1}
-            className="hx-sr-only"
-            onChange={handleFileChange}
-          />
-
-          {/* Audio record */}
-          <button
-            type="button"
-            className={`hx-composer-action-btn${recording ? ' is-recording' : ''}${transcribing ? ' is-loading' : ''}`}
-            onClick={recording ? stopRecording : startRecording}
-            title={recording ? "Arrêter l'enregistrement" : 'Enregistrer un audio'}
-            aria-label={recording ? "Arrêter l'enregistrement" : 'Enregistrer un audio'}
-            disabled={disabled || transcribing}
-          >
-            {recording ? <WaveformIcon /> : <MicIcon />}
-          </button>
+      <div className="hx-composer-shell">
+        <div className="hx-composer-meta">
+          <div className="hx-composer-status">
+            <span
+              className={`hx-composer-status-dot${focused || canSend || recording || transcribing ? ' is-active' : ''}${recording ? ' is-recording' : ''}${transcribing ? ' is-transcribing' : ''}`}
+              aria-hidden="true"
+            />
+            <span>{statusLabel}</span>
+          </div>
+          <p className="hx-composer-helper">{helperLabel}</p>
         </div>
 
-        {/* Textarea */}
-        <textarea
-          ref={textareaRef}
-          className="hx-composer-textarea"
-          rows={1}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              if (canSend) onSend()
-            }
-          }}
-          placeholder={placeholder}
-          disabled={disabled || transcribing}
-        />
+        <div className={`hx-composer-box${focused ? ' is-focused' : ''}${canSend ? ' has-content' : ''}`}>
+          <div className="hx-composer-actions-left">
+            <button
+              type="button"
+              className={`hx-composer-action-btn${highlightBirth ? ' is-highlight' : ''}`}
+              onClick={onBirthFormOpen}
+              title="Données de naissance"
+              aria-label="Ouvrir le formulaire de naissance"
+            >
+              <AvatarIcon />
+            </button>
 
-        {/* Send button */}
-        <button
-          type="button"
-          className={`hx-send-button${canSend ? ' is-active' : ''}`}
-          onClick={onSend}
-          disabled={!canSend}
-          aria-label="Envoyer"
-        >
-          <svg
-            className={`hx-send-icon${canSend ? ' is-active' : ''}`}
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
+            <button
+              type="button"
+              className="hx-composer-action-btn"
+              onClick={() => fileInputRef.current?.click()}
+              title="Joindre un fichier (PNG, JPG, JPEG, PDF)"
+              aria-label="Joindre un fichier"
+              disabled={disabled}
+            >
+              <AttachIcon />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"
+              aria-hidden="true"
+              tabIndex={-1}
+              className="hx-sr-only"
+              onChange={handleFileChange}
+            />
+
+            <button
+              type="button"
+              className={`hx-composer-action-btn${recording ? ' is-recording' : ''}${transcribing ? ' is-loading' : ''}`}
+              onClick={recording ? stopRecording : startRecording}
+              title={recording ? "Arrêter l'enregistrement" : 'Enregistrer un audio'}
+              aria-label={recording ? "Arrêter l'enregistrement" : 'Enregistrer un audio'}
+              disabled={disabled || transcribing}
+            >
+              {recording ? <WaveformIcon /> : <MicIcon />}
+            </button>
+          </div>
+
+          <textarea
+            ref={textareaRef}
+            className="hx-composer-textarea"
+            rows={1}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                if (canSend) onSend()
+              }
+            }}
+            placeholder={placeholder}
+            disabled={disabled || transcribing}
+            aria-label={lang.startsWith('en') ? 'Describe your situation' : 'Décrivez votre situation'}
+          />
+
+          <button
+            type="button"
+            className={`hx-send-button${canSend ? ' is-active' : ''}`}
+            onClick={onSend}
+            disabled={!canSend}
+            aria-label={lang.startsWith('en') ? 'Send' : 'Envoyer'}
           >
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-        </button>
+            <svg
+              className={`hx-send-icon${canSend ? ' is-active' : ''}`}
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          </button>
+        </div>
       </div>
-
-      {/* Keyboard hint */}
     </div>
   )
 }
-
-/* -- Icons -- */
 
 function AvatarIcon() {
   return (

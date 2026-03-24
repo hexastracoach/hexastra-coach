@@ -39,17 +39,7 @@ export default function MessageList({ messages, isTyping, lastUserMessage, onRet
   }, [isTyping, loadingMessages])
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 18,
-        maxWidth: 980,
-        margin: '0 auto',
-        paddingBottom: 24,
-        width: '100%',
-      }}
-    >
+    <div className="hx-message-stack">
       {visibleMessages.map((message) => (
         <MessageBubble
           key={message.id}
@@ -60,23 +50,19 @@ export default function MessageList({ messages, isTyping, lastUserMessage, onRet
       ))}
 
       {isTyping && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            width: '100%',
-            maxWidth: 820,
-            margin: '0 auto',
-            padding: '4px 0',
-            fontSize: 14,
-            lineHeight: 1.6,
-            color: '#fefefefe',
-            fontStyle: 'italic',
-            letterSpacing: '0.02em',
-            textAlign: 'left',
-          }}
-        >
-          {loadingMessages[loadingIndex]}
+        <div className="hx-chat-typing-shell" role="status" aria-live="polite">
+          <div className="hx-chat-typing-orb" aria-hidden="true">
+            <span />
+          </div>
+          <div className="hx-chat-typing-copy">
+            <div className="hx-chat-typing-label">Hexastra</div>
+            <div className="hx-chat-typing-text">{loadingMessages[loadingIndex]}</div>
+          </div>
+          <div className="hx-chat-typing-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
         </div>
       )}
       <div ref={bottomRef} />

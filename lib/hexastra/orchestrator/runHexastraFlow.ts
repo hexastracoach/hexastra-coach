@@ -995,6 +995,10 @@ function withGlobalTimeout<T>(promise: Promise<T>, timeoutMs: number, meta?: Rec
 }
 
 async function callRailway(path: string, payload: Record<string, unknown>) {
+  if (!API_URL) {
+    throw new Error('HEXASTRA API URL missing')
+  }
+
   const url = `${API_URL}${path}`
 
   const started = Date.now()
@@ -1420,14 +1424,20 @@ export async function runHexastraFlow(input: {
       throw new Error('Supabase env missing')
     }
 
-    if (!API_KEY || !API_URL) {
-      logger.error('[runHexastraFlow] HEXASTRA_API env missing', {
-        hasApiUrl: Boolean(API_URL),
-        apiUrlLength: API_URL?.length ?? 0,
+    if (!API_URL) {
+      logger.warn('[runHexastraFlow] HEXASTRA_API_URL missing — exact-data backbone disabled', {
+        hasApiUrl: false,
+        apiUrlLength: 0,
         hasApiKey: Boolean(API_KEY),
         apiKeyLength: API_KEY?.length ?? 0,
       })
-      throw new Error('HEXASTRA API env missing')
+    } else if (!API_KEY) {
+      logger.warn('[runHexastraFlow] HEXASTRA_API_KEY missing — continuing without x-api-key header', {
+        hasApiUrl: true,
+        apiUrlLength: API_URL.length,
+        hasApiKey: false,
+        apiKeyLength: 0,
+      })
     }
 
     const conversationId = input.conversationId ?? randomUUID()

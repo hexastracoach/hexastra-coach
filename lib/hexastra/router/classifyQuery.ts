@@ -23,7 +23,7 @@ export function classifyQuery(message: string): DomainRoute {
   if (/(maslow|pyramide de maslow)/i.test(text)) return 'wellbeing'
   if (
     refersToHumanDesign ||
-    /(science|astrologie|astrolex|triangle|enneagram|numerologie|neurokua|kua|spiritlex|mutalex|totemlex)/i.test(
+    /(science|astrologie|astrologique|astrolex|triangle|enneagram|numerologie|neurokua|kua|spiritlex|mutalex|totemlex)/i.test(
       text,
     )
   ) {

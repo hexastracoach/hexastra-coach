@@ -18,6 +18,10 @@ describe('KS routing and contracts', () => {
     expect(classifyQuery('Fais-moi une lecture Astrolex')).toBe('science')
   })
 
+  it('routes thème astrologique requests to science', () => {
+    expect(classifyQuery('Donne moi mon thème astrologique')).toBe('science')
+  })
+
   it('routes HD gate questions to science when HD clearly means Human Design', () => {
     expect(classifyQuery('Quelles sont mes portes en HD ?')).toBe('science')
   })

@@ -2061,6 +2061,15 @@ export default function ChatPageClient() {
     showFusionEntry: bootstrapUi.chatReady && !isLimitReached,
     onFusionEntry: (prompt: string) => void handleSend(prompt),
   }
+  const isEnglishChat = chatLanguage.startsWith('en')
+  const topbarStatusLabel = isTyping
+    ? isEnglishChat
+      ? 'Hexastra is analyzing'
+      : 'Hexastra analyse'
+    : isEnglishChat
+      ? 'Hexastra live'
+      : 'Hexastra en direct'
+  const journeyLabel = isEnglishChat ? 'Track my Hexastra journey' : 'Suivre mon parcours Hexastra'
 
   return (
     <div className="hx-chat-page">
@@ -2094,27 +2103,21 @@ export default function ChatPageClient() {
                   <IconMenu />
                 </button>
               )}
+
+              <div className={`hx-topbar-presence${isTyping ? ' is-busy' : ''}`}>
+                <span className="hx-topbar-presence-dot" aria-hidden="true" />
+                <span>{topbarStatusLabel}</span>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  fontSize: 13,
-                  color: 'rgba(255,255,255,0.9)',
-                  cursor: 'pointer',
-                  userSelect: 'none',
-                }}
-              >
+            <div className="hx-topbar-controls">
+              <label className="hx-topbar-journey">
                 <input
                   type="checkbox"
                   checked={journeyEnabled}
                   onChange={(e) => handleJourneyToggle(e.target.checked)}
-                  style={{ accentColor: '#4cd2c0' }}
                 />
-                <span>Suivre mon parcours HexAstra</span>
+                <span>{journeyLabel}</span>
               </label>
               <LanguageSwitcher variant="flag" className="hx-nav-lang" />
             </div>

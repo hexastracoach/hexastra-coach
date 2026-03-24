@@ -104,6 +104,7 @@ const FUSION_SUBCATS = new Set([
  * when no subcategory was detected. Only applied when subcategory is null.
  */
 const EXPLICIT_SCIENCE_PATTERNS: Array<{ pattern: RegExp; science: Science }> = [
+  { pattern: /\b(astrologie|astrology|theme astrologique|thème astrologique|theme astral|thème astral|theme natal|thème natal|carte du ciel|birth chart|natal chart|mon astro)\b/i, science: 'astrology' },
   { pattern: /\b(numerolog|numérolog|chemin de vie|nombre expression|nombre de vie|numéro de vie)/i, science: 'numerology' },
   { pattern: /\b(human design|design humain|bodygraph|mon hd\b|portes? hd|centres? hd|canaux hd)/i, science: 'human_design' },
   { pattern: /\b(enneagramme|ennéagramme|ennéa\b|mon ennea|mon type [1-9]\b)/i, science: 'enneagram' },

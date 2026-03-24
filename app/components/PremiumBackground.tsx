@@ -76,6 +76,7 @@ export default function PremiumBackground({
       <div className="hx-bg-stars hx-bg-stars-1" />
       <div className="hx-bg-stars hx-bg-stars-2" />
       <div className="hx-bg-stars hx-bg-stars-3" />
+      {!hero ? <div className="hx-bg-signal" /> : null}
       <div className="hx-bg-vignette" />
     </div>
   )

@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest'
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
 import { inferRequest } from '@/lib/hexastra/orchestration/inferRequest'
 import { selectResponseMode } from '@/lib/hexastra/orchestration/responseModes'
+import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInput'
 import type { NormalizedInput, MenuContract } from '@/lib/hexastra/orchestration/types'
 
 function makeNormalized(msg: string, uiAction: NormalizedInput['uiAction'] = 'send_message'): NormalizedInput {
@@ -62,6 +63,11 @@ describe('classifyMessage - explicit science override', () => {
     expect(result.science).toBe('numerology')
   })
 
+  it('detects astrology when user explicitly asks for a thème astrologique', () => {
+    const result = classifyMessage('donne moi mon thème astrologique')
+    expect(result.science).toBe('astrology')
+  })
+
   it('detects human_design when user says "design humain"', () => {
     const result = classifyMessage('je veux explorer mon design humain')
     expect(result.science).toBe('human_design')
@@ -81,6 +87,31 @@ describe('classifyMessage - explicit science override', () => {
     const result = classifyMessage('quel est mon ascendant')
     expect(result.science).toBe('astrology')
     expect(result.subcategory).toBe('ascendant')
+  })
+})
+
+describe('buildNormalizedInput - accent handling', () => {
+  it('keeps science keywords readable after accent normalization', () => {
+    const normalized = buildNormalizedInput({
+      requestType: 'chat',
+      selectedMenuKey: null,
+      selectedSubmenuKey: null,
+      userMessage: 'donne moi mon thème astrologique',
+      plan: 'free',
+      quotaState: 'ok',
+      birthData: null,
+      language: 'fr',
+      memoryAvailable: false,
+      uiAction: 'send_message',
+      contextType: 'general',
+      practitionerUsage: null,
+      conversationId: 'accent-test',
+      hasExplicitGuidance: false,
+      journeyEnabled: false,
+      messages: [{ role: 'user', content: 'donne moi mon thème astrologique' }],
+    })
+
+    expect(normalized.normalizedUserMessage).toBe('donne moi mon theme astrologique')
   })
 })
 
