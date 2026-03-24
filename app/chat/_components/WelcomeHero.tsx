@@ -43,9 +43,12 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
           de la question parfaite.
         </span>
         <span className="hx-welcome-title-break" aria-hidden="true" />
-        <span className="hx-welcome-title-mid">Dis-moi ce que tu vis.</span>
+        <span className="hx-welcome-title-mid">
+          Tu as juste besoin<br />
+          d&apos;y voir clair.
+        </span>
         <span className="hx-welcome-title-break" aria-hidden="true" />
-        <span className="hx-welcome-title-em">Je t&apos;aide à y voir clair.</span>
+        <span className="hx-welcome-title-em">Dis-moi ce que tu vis.</span>
       </h1>
 
       <div className="hx-welcome-chips">

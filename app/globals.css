@@ -1589,13 +1589,42 @@ transition: all 0.35s ease;
   to   { opacity: 1;    transform: translate(-50%, -50%) scale(1.1); }
 }
 
+/* ── Welcome feed: fills height, centers hero vertically on desktop ── */
+.hx-welcome-feed {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 100%;
+  max-width: none;
+  padding-bottom: 12px;
+}
+
+.hx-welcome-feed-center {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Bottom bar welcome variant: softer background ── */
+.hx-app-bottom--welcome {
+  background: linear-gradient(
+    to top,
+    rgba(5, 10, 18, 0.92) 44%,
+    rgba(5, 10, 18, 0.56) 70%,
+    transparent 100%
+  );
+}
+
 .hx-welcome-hero {
   position: relative;
   width: 100%;
   max-width: 840px;
   margin: 0 auto;
   text-align: center;
-  padding: 56px 18px 40px;
+  padding: 48px 20px 32px;
   animation: hxFadeUp 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -2675,13 +2704,13 @@ transition: all 0.35s ease;
 
 .hx-chat-mobile-sheet {
   position: absolute;
-  top: 12px;
-  bottom: 12px;
-  width: min(88vw, 340px);
+  top: 0;
+  bottom: 0;
+  width: min(80vw, 280px);
 }
 
 .hx-chat-mobile-sheet-left {
-  left: 12px;
+  left: 0;
 }
 
 
@@ -6807,11 +6836,27 @@ select {
     padding: 0 14px;
     gap: 10px;
   }
+  /* Welcome topbar: 3-column grid to center title with menu/lang on sides */
+  .hx-app-topbar--welcome {
+    display: grid;
+    grid-template-columns: 44px 1fr 44px;
+    align-items: center;
+  }
+  .hx-app-topbar--welcome > *:first-child {
+    justify-self: start;
+  }
+  .hx-app-topbar--welcome > *:last-child {
+    justify-self: end;
+  }
+  /* Override inner div centering to make title visually centered */
+  .hx-app-topbar--welcome .min-w-0 {
+    text-align: center;
+  }
   .hx-app-feed { padding: 10px 10px 4px; }
   .hx-app-feed-inner { max-width: 100%; padding: 0; }
   .hx-app-bottom {
-    padding: 6px 10px;
-    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    padding: 8px 12px;
+    padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
   }
   .hx-app-composer-wrap { gap: 4px; }
   .hx-app-disclaimer { font-size: 0.7rem; }
@@ -6819,33 +6864,57 @@ select {
 
 @media (max-width: 479px) {
   .hx-app-topbar { height: 48px; padding: 0 10px; }
+  .hx-app-topbar--welcome {
+    grid-template-columns: 40px 1fr 40px;
+  }
   .hx-app-feed { padding: 8px 8px 4px; }
   .hx-app-topbar .hx-mode-switch { display: none; }
 }
 
 /* ── Sidebar overlay ── */
+@keyframes hxSlideInLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+@keyframes hxOverlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 @media (max-width: 1099px) {
-  .hx-chat-mobile-sheet-left { width: 260px; max-width: 80vw; }
-  .hx-leftbar { height: 100%; width: 100%; }
   .hx-chat-overlay {
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: rgba(0, 0, 0, 0.55);
-    -webkit-backdrop-filter: blur(2px);
-    backdrop-filter: blur(2px);
+    background: rgba(0, 0, 0, 0.60);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    animation: hxOverlayFadeIn 200ms ease both;
   }
   .hx-chat-mobile-sheet {
     position: absolute;
     top: 0;
     bottom: 0;
     z-index: 101;
+    will-change: transform;
+    animation: hxSlideInLeft 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
-  .hx-chat-mobile-sheet-left { left: 0; }
+  .hx-chat-mobile-sheet-left {
+    left: 0;
+    width: 260px;
+    max-width: 80vw;
+    border-radius: 0 20px 20px 0;
+    background: rgba(4, 8, 14, 0.96);
+    -webkit-backdrop-filter: blur(28px) saturate(140%);
+    backdrop-filter: blur(28px) saturate(140%);
+    box-shadow: 6px 0 48px rgba(0, 0, 0, 0.6), 1px 0 0 rgba(255, 255, 255, 0.04);
+  }
+  .hx-leftbar { height: 100%; width: 100%; }
 }
 
 @media (max-width: 479px) {
-  .hx-leftbar { width: 100%; max-width: 280px; }
+  .hx-chat-mobile-sheet-left { width: min(78vw, 280px); border-radius: 0 16px 16px 0; }
   .hx-leftbar-new-btn { font-size: 0.85rem; padding: 10px 14px; }
   .hx-leftbar-item { padding: 10px 10px 10px 9px; font-size: 0.85rem; }
   .hx-leftbar-footer { padding: 10px 14px; }
@@ -6920,6 +6989,105 @@ select {
 @media (max-width: 479px) {
   .hx-welcome-title { font-size: clamp(1.5rem, 9.5vw, 1.9rem); }
   .hx-welcome-nav .hx-mode-switch { display: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   8b. CHAT PAGE — MOBILE-FIRST HERO + INPUT
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Tablet: hero scales down gracefully ── */
+@media (max-width: 900px) {
+  .hx-welcome-hero .hx-welcome-title {
+    font-size: clamp(1.75rem, 4.5vw, 2.6rem);
+  }
+}
+
+/* ── Mobile: compact hero + full-width chips ── */
+@media (max-width: 767px) {
+  .hx-welcome-feed {
+    justify-content: flex-start;
+    padding-top: 12px;
+  }
+  .hx-welcome-hero {
+    padding: 32px 18px 24px;
+  }
+  .hx-welcome-hero .hx-welcome-title {
+    font-size: clamp(1.65rem, 7.5vw, 2.5rem);
+    line-height: 1.42;
+    margin: 0 0 32px;
+    letter-spacing: -0.034em;
+  }
+  .hx-welcome-title-break { height: 0.42em; }
+  .hx-welcome-badge { margin-bottom: 22px; padding: 6px 14px; }
+  .hx-welcome-chips { gap: 8px; }
+  .hx-welcome-chip {
+    min-height: 46px;
+    padding: 12px 18px;
+    font-size: 0.875rem;
+  }
+  .hx-welcome-chip.is-primary {
+    min-height: 50px;
+    padding: 13px 22px;
+    font-size: 0.9rem;
+  }
+  /* Bottom bar welcome: tighter on mobile */
+  .hx-app-bottom--welcome {
+    padding: 10px 12px max(18px, env(safe-area-inset-bottom, 18px));
+  }
+  /* Composer box: slightly smaller radius on mobile */
+  .hx-app-bottom--welcome .hx-composer-box {
+    border-radius: 20px;
+  }
+}
+
+/* ── Small mobile: chips stack full-width ── */
+@media (max-width: 479px) {
+  .hx-welcome-hero {
+    padding: 24px 14px 20px;
+  }
+  .hx-welcome-hero .hx-welcome-title {
+    font-size: clamp(1.48rem, 8.5vw, 2rem);
+    letter-spacing: -0.026em;
+    line-height: 1.38;
+    margin: 0 0 28px;
+  }
+  .hx-welcome-title-break { height: 0.36em; }
+  .hx-welcome-badge {
+    margin-bottom: 18px;
+    font-size: 0.63rem;
+    padding: 5px 13px;
+    letter-spacing: 0.2em;
+  }
+  .hx-welcome-chips {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 7px;
+  }
+  .hx-welcome-chip {
+    width: 100%;
+    min-height: 50px;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+    font-size: 0.865rem;
+    border-radius: 16px;
+  }
+  .hx-welcome-chip.is-primary {
+    min-height: 54px;
+    font-size: 0.9rem;
+    border-radius: 18px;
+  }
+  .hx-app-bottom--welcome {
+    padding: 8px 10px max(16px, env(safe-area-inset-bottom, 16px));
+  }
+  .hx-app-bottom--welcome .hx-composer-box {
+    border-radius: 18px;
+    padding: 12px 12px;
+  }
+  .hx-app-bottom--welcome .hx-composer-textarea {
+    font-size: 16px; /* prevent iOS zoom */
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════

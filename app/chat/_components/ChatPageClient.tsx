@@ -2109,7 +2109,7 @@ export default function ChatPageClient() {
         {desktopLeft && <aside className="hx-app-sidebar">{sidebar}</aside>}
 
         <main className="hx-app-main">
-          <div className="hx-app-topbar">
+          <div className={`hx-app-topbar${isWelcome ? ' hx-app-topbar--welcome' : ''}`}>
             <div className="flex min-w-0 items-center gap-3">
               {!desktopLeft && (
                 <button
@@ -2132,11 +2132,10 @@ export default function ChatPageClient() {
           </div>
 
           <div className="hx-app-feed hx-scroll-soft">
-            <div className={`hx-app-feed-inner ${isWelcome ? 'flex min-h-full !max-w-[1120px] flex-col justify-center' : ''}`}>
+            <div className={`hx-app-feed-inner${isWelcome ? ' hx-welcome-feed' : ''}`}>
               {isWelcome ? (
-                <div className="mx-auto flex w-full max-w-4xl flex-col items-center justify-center">
+                <div className="hx-welcome-feed-center">
                   <WelcomeHero onPrompt={(value) => void handleSend(value)} />
-                  <div className="mt-2 w-full max-w-3xl">{composerSurface}</div>
                 </div>
               ) : (
                 <MessageList
@@ -2262,7 +2261,9 @@ export default function ChatPageClient() {
             </div>
           </div>
 
-          {!isWelcome && <div className="hx-app-bottom">{composerSurface}</div>}
+          <div className={`hx-app-bottom${isWelcome ? ' hx-app-bottom--welcome' : ''}`}>
+            {composerSurface}
+          </div>
         </main>
       </div>
     </div>
