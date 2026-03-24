@@ -315,36 +315,36 @@ textarea {
 
 .hx-bg-stars-1 {
   background-image:
-    radial-gradient(1px 1px at 24px 30px, rgba(255, 255, 255, 0.88), transparent),
-    radial-gradient(1px 1px at 90px 100px, rgba(255, 255, 255, 0.7), transparent),
-    radial-gradient(1px 1px at 210px 60px, rgba(255, 255, 255, 0.7), transparent),
-    radial-gradient(1px 1px at 340px 130px, rgba(255, 255, 255, 0.75), transparent),
-    radial-gradient(1px 1px at 440px 220px, rgba(255, 255, 255, 0.86), transparent),
-    radial-gradient(1px 1px at 130px 260px, rgba(255, 255, 255, 0.68), transparent);
+    radial-gradient(1px 1px at 24px 30px, rgba(255, 255, 255, 0.76), transparent),
+    radial-gradient(1px 1px at 90px 100px, rgba(255, 255, 255, 0.60), transparent),
+    radial-gradient(1px 1px at 210px 60px, rgba(255, 255, 255, 0.60), transparent),
+    radial-gradient(1px 1px at 340px 130px, rgba(255, 255, 255, 0.65), transparent),
+    radial-gradient(1px 1px at 440px 220px, rgba(255, 255, 255, 0.72), transparent),
+    radial-gradient(1px 1px at 130px 260px, rgba(255, 255, 255, 0.56), transparent);
   background-size: 460px 460px;
-  opacity: 0.64;
-  animation: hxStarsMoveFar 80s linear infinite;
+  opacity: 0.48;
+  animation: hxStarsMoveFar 130s linear infinite;
 }
 
 .hx-bg-stars-2 {
   background-image:
-    radial-gradient(2px 2px at 120px 80px, rgba(255, 255, 255, 0.9), transparent),
-    radial-gradient(2px 2px at 320px 180px, rgba(255, 255, 255, 0.84), transparent),
-    radial-gradient(2px 2px at 620px 120px, rgba(255, 255, 255, 0.78), transparent),
-    radial-gradient(2px 2px at 760px 240px, rgba(255, 255, 255, 0.74), transparent);
+    radial-gradient(2px 2px at 120px 80px, rgba(255, 255, 255, 0.78), transparent),
+    radial-gradient(2px 2px at 320px 180px, rgba(255, 255, 255, 0.72), transparent),
+    radial-gradient(2px 2px at 620px 120px, rgba(255, 255, 255, 0.66), transparent),
+    radial-gradient(2px 2px at 760px 240px, rgba(255, 255, 255, 0.62), transparent);
   background-size: 780px 780px;
-  opacity: 0.42;
-  animation: hxStarsMoveMid 110s linear infinite;
+  opacity: 0.32;
+  animation: hxStarsMoveMid 180s linear infinite;
 }
 
 .hx-bg-stars-3 {
   background-image:
-    radial-gradient(2.5px 2.5px at 180px 120px, rgba(255, 255, 255, 0.92), transparent),
-    radial-gradient(2.5px 2.5px at 560px 180px, rgba(255, 255, 255, 0.8), transparent),
-    radial-gradient(2.5px 2.5px at 1020px 220px, rgba(255, 255, 255, 0.84), transparent);
+    radial-gradient(2.5px 2.5px at 180px 120px, rgba(255, 255, 255, 0.80), transparent),
+    radial-gradient(2.5px 2.5px at 560px 180px, rgba(255, 255, 255, 0.68), transparent),
+    radial-gradient(2.5px 2.5px at 1020px 220px, rgba(255, 255, 255, 0.72), transparent);
   background-size: 1100px 1100px;
-  opacity: 0.24;
-  animation: hxStarsMoveNear 150s linear infinite;
+  opacity: 0.16;
+  animation: hxStarsMoveNear 240s linear infinite;
 }
 
 .hx-bg-signal {
@@ -368,7 +368,7 @@ textarea {
   inset: 0;
   z-index: 7;
   background:
-    radial-gradient(circle at center, transparent 28%, rgba(4, 10, 18, 0.22) 60%, rgba(4, 10, 18, 0.64) 100%);
+    radial-gradient(circle at center, transparent 22%, rgba(4, 10, 18, 0.28) 54%, rgba(4, 10, 18, 0.74) 100%);
 }
 
 @keyframes hxAuroraFloatA {
@@ -1602,15 +1602,15 @@ transition: all 0.35s ease;
 .hx-welcome-glow {
   position: absolute;
   left: 50%;
-  top: 36%;
-  width: 640px;
-  height: 420px;
+  top: 44%;
+  width: min(860px, 120vw);
+  height: min(560px, 70vw);
   transform: translate(-50%, -50%);
-  background: radial-gradient(ellipse 80% 70% at center, rgba(88, 226, 194, 0.16), transparent 70%);
-  filter: blur(40px);
+  background: radial-gradient(ellipse 76% 64% at center, rgba(88, 226, 194, 0.18) 0%, rgba(88, 226, 194, 0.06) 52%, transparent 74%);
+  filter: blur(48px);
   pointer-events: none;
   z-index: 0;
-  animation: hxGlowBreath 5s ease-in-out infinite alternate;
+  animation: hxGlowBreath 6s ease-in-out infinite alternate;
 }
 
 .hx-welcome-badge {
@@ -1646,28 +1646,45 @@ transition: all 0.35s ease;
 .hx-welcome-hero .hx-welcome-title {
   position: relative;
   z-index: 1;
-  font-size: clamp(1.8rem, 3.6vw, 3.0rem);
+  font-size: clamp(1.85rem, 3.7vw, 3.1rem);
   font-weight: 600;
   letter-spacing: -0.044em;
-  line-height: 1.28;
+  line-height: 1.48;
   color: #eef6f2;
-  margin: 0 0 40px;
+  margin: 0 0 44px;
   animation: hxFadeUp 600ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
 }
 
 /* Setup lines — softer, lighter weight */
 .hx-welcome-title-setup {
-  color: rgba(200, 228, 244, 0.64);
+  display: block;
+  color: rgba(200, 228, 244, 0.60);
   font-weight: 400;
+  line-height: 1.48;
 }
 
-/* Payoff line — brighter, slightly heavier */
+/* Invisible spacer between text groups — creates paragraph-like breathing */
+.hx-welcome-title-break {
+  display: block;
+  height: 0.55em;
+}
+
+/* Mid line — slightly brighter than setup, not as strong as em */
+.hx-welcome-title-mid {
+  display: block;
+  color: rgba(220, 240, 252, 0.82);
+  font-weight: 500;
+  line-height: 1.48;
+}
+
+/* Payoff line — brighter, stronger */
 .hx-welcome-hero .hx-welcome-title-em {
-  display: inline-block;
-  color: rgba(160, 246, 218, 0.95);
+  display: block;
+  color: rgba(160, 248, 220, 0.97);
   font-weight: 700;
-  font-size: 1.04em;
+  font-size: 1.05em;
   letter-spacing: -0.048em;
+  line-height: 1.48;
 }
 
 .hx-welcome-chips {
@@ -1684,27 +1701,27 @@ transition: all 0.35s ease;
 .hx-welcome-chip {
   padding: 11px 22px;
   border-radius: 999px;
-  border: 1px solid rgba(220, 232, 244, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(205, 228, 248, 0.74);
+  border: 1px solid rgba(220, 232, 244, 0.08);
+  background: rgba(255, 255, 255, 0.032);
+  color: rgba(205, 228, 248, 0.58);
   font-size: 0.9rem;
   font-weight: 400;
   cursor: pointer;
   white-space: nowrap;
   transition:
-    background 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    transform 160ms ease,
-    box-shadow 160ms ease;
+    background 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms ease;
 }
 
 .hx-welcome-chip:hover {
-  background: rgba(88, 226, 194, 0.09);
-  border-color: rgba(88, 226, 194, 0.26);
-  color: rgba(240, 254, 248, 0.96);
+  background: rgba(88, 226, 194, 0.07);
+  border-color: rgba(88, 226, 194, 0.22);
+  color: rgba(230, 248, 244, 0.88);
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px rgba(88, 226, 194, 0.09);
+  box-shadow: 0 8px 24px rgba(88, 226, 194, 0.08);
 }
 
 .hx-welcome-chip:active {
@@ -1712,31 +1729,36 @@ transition: all 0.35s ease;
   transition-duration: 60ms;
 }
 
-/* Primary chip — the first, prominent action */
+/* Primary chip — larger, brighter, more prominent */
 .hx-welcome-chip.is-primary {
+  padding: 13px 28px;
+  font-size: 0.95rem;
   background: linear-gradient(
     135deg,
-    rgba(88, 226, 194, 0.2) 0%,
-    rgba(88, 226, 194, 0.09) 100%
+    rgba(88, 226, 194, 0.22) 0%,
+    rgba(88, 226, 194, 0.10) 100%
   );
-  border-color: rgba(88, 226, 194, 0.32);
-  color: rgba(210, 252, 238, 0.96);
+  border-color: rgba(88, 226, 194, 0.34);
+  color: rgba(210, 252, 238, 0.97);
   font-weight: 500;
   box-shadow:
-    0 0 28px rgba(88, 226, 194, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 0 32px rgba(88, 226, 194, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
 
 .hx-welcome-chip.is-primary:hover {
   background: linear-gradient(
     135deg,
-    rgba(88, 226, 194, 0.28) 0%,
-    rgba(88, 226, 194, 0.14) 100%
+    rgba(88, 226, 194, 0.32) 0%,
+    rgba(88, 226, 194, 0.16) 100%
   );
-  border-color: rgba(88, 226, 194, 0.44);
+  border-color: rgba(88, 226, 194, 0.5);
+  color: rgba(230, 255, 245, 1);
   box-shadow:
-    0 10px 32px rgba(88, 226, 194, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 12px 36px rgba(88, 226, 194, 0.2),
+    0 0 60px rgba(88, 226, 194, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transform: translateY(-3px);
 }
 
 /* === Composer reassurance text === */
@@ -1771,11 +1793,24 @@ transition: all 0.35s ease;
   padding: 6px 0 32px;
 }
 
+@keyframes hxMsgIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .hx-message-row {
   display: flex;
   align-items: flex-start;
   padding: 6px 0;
   align-self: center;
+  will-change: opacity, transform;
+  animation: hxMsgIn 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .hx-message-row.is-user {
@@ -1950,30 +1985,31 @@ transition: all 0.35s ease;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
-  border-radius: 22px;
-  border: 1px solid rgba(220, 232, 244, 0.1);
-  background: linear-gradient(180deg, rgba(9, 16, 25, 0.88), rgba(7, 13, 20, 0.8));
+  padding: 14px 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(220, 232, 244, 0.11);
+  background: linear-gradient(175deg, rgba(10, 18, 28, 0.90) 0%, rgba(7, 12, 20, 0.84) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    0 20px 44px rgba(0, 0, 0, 0.28),
-    0 0 0 1px rgba(255, 255, 255, 0.02);
-  -webkit-backdrop-filter: blur(22px);
-  backdrop-filter: blur(22px);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 24px 52px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.025);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
   overflow: hidden;
-  transition: border-color 160ms ease, box-shadow 180ms ease, transform 180ms ease;
+  transition: border-color 180ms ease, box-shadow 220ms ease, transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .hx-composer-box::before {
   content: '';
   position: absolute;
-  inset: auto auto -36px -18px;
-  width: 180px;
-  height: 110px;
+  inset: auto auto -42px -22px;
+  width: 220px;
+  height: 130px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(88, 226, 194, 0.18), transparent 72%);
-  opacity: 0.72;
+  background: radial-gradient(circle, rgba(88, 226, 194, 0.20), transparent 70%);
+  opacity: 0.68;
   pointer-events: none;
+  transition: opacity 220ms ease;
 }
 
 .hx-composer-box::after {
@@ -1993,32 +2029,38 @@ transition: all 0.35s ease;
 }
 
 .hx-composer-box.is-focused {
-  border-color: rgba(113, 227, 212, 0.28);
+  border-color: rgba(113, 227, 212, 0.32);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 22px 48px rgba(0, 0, 0, 0.32),
-    0 0 40px rgba(88, 226, 194, 0.14),
-    0 0 80px rgba(88, 226, 194, 0.05);
-  transform: translateY(-1px);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 26px 56px rgba(0, 0, 0, 0.36),
+    0 0 48px rgba(88, 226, 194, 0.18),
+    0 0 100px rgba(88, 226, 194, 0.07);
+  transform: translateY(-2px);
+}
+
+/* Gradient border overlay on focus via pseudo-element */
+.hx-composer-box.is-focused::before {
+  opacity: 1;
 }
 
 .hx-composer-textarea {
-  min-height: 22px;
+  min-height: 26px;
   max-height: 120px;
   width: 100%;
   border: 0;
   outline: none;
   background: transparent;
   color: #f5f9ff;
-  font-size: 0.97rem;
-  line-height: 1.58;
+  font-size: 0.98rem;
+  line-height: 1.62;
   padding: 7px 0;
   align-self: center;
   letter-spacing: -0.01em;
 }
 
 .hx-composer-textarea::placeholder {
-  color: rgba(216, 229, 240, 0.46);
+  color: rgba(216, 229, 240, 0.40);
+  font-style: italic;
 }
 
 @media (max-width: 540px) {
@@ -2037,31 +2079,36 @@ transition: all 0.35s ease;
 }
 
 .hx-send-button {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 15px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
   border: 1px solid rgba(220, 232, 244, 0.08);
   background: rgba(255, 255, 255, 0.06);
-  color: rgba(247, 251, 255, 0.42);
+  color: rgba(247, 251, 255, 0.38);
   cursor: not-allowed;
-  transition: background 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: background 180ms ease, color 180ms ease, box-shadow 200ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .hx-send-button.is-active {
   cursor: pointer;
   background: var(--hx-gradient-button);
   color: #06201a;
-  border-color: rgba(88, 226, 194, 0.2);
+  border-color: rgba(88, 226, 194, 0.24);
   box-shadow:
-    0 14px 30px rgba(25, 199, 167, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.26);
+    0 16px 34px rgba(25, 199, 167, 0.24),
+    0 0 24px rgba(88, 226, 194, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .hx-send-button.is-active:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px) scale(1.04);
+  box-shadow:
+    0 20px 40px rgba(25, 199, 167, 0.3),
+    0 0 36px rgba(88, 226, 194, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
 
 .hx-composer-box.has-content {
@@ -2796,10 +2843,10 @@ transition: all 0.35s ease;
   width: 200px;
   flex-shrink: 0;
   height: 100vh;
-  background: rgba(5, 9, 16, 0.62);
-  border-right: 1px solid rgba(220, 232, 244, 0.04);
-  -webkit-backdrop-filter: blur(22px);
-  backdrop-filter: blur(22px);
+  background: rgba(4, 8, 14, 0.70);
+  border-right: 1px solid rgba(220, 232, 244, 0.05);
+  -webkit-backdrop-filter: blur(28px) saturate(120%);
+  backdrop-filter: blur(28px) saturate(120%);
   overflow: hidden;
 }
 
@@ -2819,10 +2866,11 @@ transition: all 0.35s ease;
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 70% 55% at 50% 42%, rgba(88, 226, 194, 0.08), transparent 66%),
-    radial-gradient(circle at 18% 10%, rgba(63, 177, 163, 0.06), transparent 22%),
-    radial-gradient(circle at 82% 0%, rgba(76, 132, 255, 0.05), transparent 18%),
-    radial-gradient(circle at 50% 100%, rgba(88, 226, 194, 0.07), transparent 26%);
+    radial-gradient(ellipse 68% 52% at 50% 46%, rgba(88, 226, 194, 0.11), transparent 64%),
+    radial-gradient(ellipse 40% 30% at 50% 36%, rgba(88, 226, 194, 0.06), transparent 72%),
+    radial-gradient(circle at 18% 10%, rgba(63, 177, 163, 0.05), transparent 20%),
+    radial-gradient(circle at 82% 0%, rgba(76, 132, 255, 0.04), transparent 16%),
+    radial-gradient(circle at 50% 100%, rgba(88, 226, 194, 0.06), transparent 24%);
   pointer-events: none;
   z-index: 0;
 }
@@ -2838,10 +2886,10 @@ transition: all 0.35s ease;
   gap: 16px;
   padding: 0 20px;
   border-bottom: 1px solid rgba(220, 232, 244, 0.04);
-  background: linear-gradient(180deg, rgba(6, 10, 18, 0.82), rgba(6, 10, 18, 0.52));
-  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.015);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
+  background: linear-gradient(180deg, rgba(5, 9, 17, 0.88), rgba(5, 9, 17, 0.48));
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.012);
+  -webkit-backdrop-filter: blur(22px) saturate(120%);
+  backdrop-filter: blur(22px) saturate(120%);
 }
 
 .hx-app-topbar-left {
@@ -2929,15 +2977,15 @@ transition: all 0.35s ease;
   flex-shrink: 0;
   position: relative;
   z-index: 1;
-  padding: 14px 20px 22px;
+  padding: 16px 20px 24px;
   background: linear-gradient(
     to top,
-    rgba(7, 12, 20, 0.94) 54%,
-    rgba(7, 12, 20, 0.72) 76%,
+    rgba(6, 11, 19, 0.96) 52%,
+    rgba(6, 11, 19, 0.74) 74%,
     transparent 100%
   );
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 
 .hx-inline-birth {
