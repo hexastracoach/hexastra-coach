@@ -9,6 +9,14 @@ function trimMessages(messages: ChatMessage[], max = 6): ChatMessage[] {
   return messages.slice(-max)
 }
 
+function trimAstroExactMessages(messages: ChatMessage[]): ChatMessage[] {
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'user' && message.content.trim())
+
+  return lastUserMessage ? [lastUserMessage] : trimMessages(messages, 1)
+}
+
 function buildKnowledgeHierarchyMessage(knowledgePacket?: Record<string, unknown> | null) {
   if (!knowledgePacket) return null
 
@@ -110,7 +118,9 @@ export function buildChatPayload({
 
   // ── Compact: only last 2 messages (last user turn sufficient) ────────────
   const maxHistory = isAstroExactCompact ? 2 : 6
-  const trimmed = trimMessages(messages, maxHistory)
+  const trimmed = isAstroExactCompact
+    ? trimAstroExactMessages(messages)
+    : trimMessages(messages, maxHistory)
 
   // ── Knowledge packets: skipped in compact mode ────────────────────────────
   const effectiveKnowledgeBlock = isAstroExactCompact ? null : knowledgeBlock

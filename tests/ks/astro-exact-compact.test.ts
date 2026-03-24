@@ -150,8 +150,9 @@ describe('buildChatPayload — isAstroExactCompact mode', () => {
     const payload = buildChatPayload({ ...baseArgs, isAstroExactCompact: true })
     // Count history messages (exclude system + compact context)
     const historyMsgs = payload.input.filter((m) => m.role === 'user' || m.role === 'assistant')
-    // 1 compactContext (user) + max 2 history = 3 max
-    expect(historyMsgs.length).toBeLessThanOrEqual(3)
+    // 1 compactContext (user) + only the last user turn = 2 max
+    expect(historyMsgs.length).toBeLessThanOrEqual(2)
+    expect(historyMsgs.some((m) => m.content === 'resp3')).toBe(false)
   })
 
   it('TC10 — mode compact: knowledgeBlock exclu du payload', () => {

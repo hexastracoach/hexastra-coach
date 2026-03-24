@@ -71,8 +71,9 @@ import {
   formatExactDataBlockCapped,
   buildExactDataAuditLog,
   buildCompactNatalReadingContext,
+  buildDeterministicAstroExactAnswer,
   buildValidatedAstroExactFallback,
-  validateAstroExactRender,
+  enforceAstroExactRender,
 } from '@/lib/hexastra/guards/exactDataGuard'
 import {
   buildExactDataUnavailableResponse,
@@ -1308,6 +1309,70 @@ export function resolveAstroFollowupRoutingState(params: {
     lockTrigger: null,
     forcedWithoutSubcategory: false,
     forcedWithUnknownRequestKind: false,
+  }
+}
+
+export function resolveFinalFlowPresentation(params: {
+  branch?: string | null
+  flowStep: FlowStep
+  effectiveRequestType: string
+  uiAction: UiAction
+  isAstroExact: boolean
+  exactDataResolved: boolean
+  specializedResultHasResult: boolean
+  science: string | null | undefined
+  isHumanDesignExact: boolean
+  hdHasUsableFields: boolean
+}): {
+  chosenFinalStep: FlowStep
+  menuVisible: boolean
+  astroExactMenuOverrideBlocked: boolean
+  birthUpdateMenuOverrideBlocked: boolean
+  hdExactAnalysisOverride: boolean
+} {
+  const menuVisibleCandidate =
+    params.effectiveRequestType === 'micro_month' ||
+    params.uiAction === 'open_menu' ||
+    params.uiAction === 'restart_flow' ||
+    params.flowStep === 'menu'
+
+  const astroExactResultLockedToAnalysis =
+    params.isAstroExact &&
+    params.exactDataResolved &&
+    params.specializedResultHasResult &&
+    params.science === 'astrology'
+
+  const astroExactMenuOverrideBlocked =
+    astroExactResultLockedToAnalysis && menuVisibleCandidate
+
+  const birthUpdateMenuOverrideBlocked =
+    astroExactMenuOverrideBlocked &&
+    (params.branch === 'birth_update' || params.uiAction === 'restart_flow')
+
+  if (astroExactResultLockedToAnalysis) {
+    return {
+      chosenFinalStep: 'analysis',
+      menuVisible: false,
+      astroExactMenuOverrideBlocked,
+      birthUpdateMenuOverrideBlocked,
+      hdExactAnalysisOverride: false,
+    }
+  }
+
+  const hdExactAnalysisOverride =
+    !menuVisibleCandidate &&
+    params.isHumanDesignExact &&
+    params.exactDataResolved &&
+    params.hdHasUsableFields
+
+  const finalFlowStep = hdExactAnalysisOverride ? 'analysis' : params.flowStep
+
+  return {
+    chosenFinalStep: menuVisibleCandidate ? 'menu' : finalFlowStep,
+    menuVisible: menuVisibleCandidate,
+    astroExactMenuOverrideBlocked: false,
+    birthUpdateMenuOverrideBlocked: false,
+    hdExactAnalysisOverride,
   }
 }
 
@@ -3055,10 +3120,11 @@ export async function runHexastraFlow(input: {
       }
     }
 
-    // Combine: core block first (pinned), then capped raw block
-    const exactDataBlockForPrompt = [coreAstroBlock, rawExactDataBlock]
-      .filter(Boolean)
-      .join('\n\n') || null
+    // Exact astro rendering uses only the compact validated block to avoid
+    // leaking rich/raw payloads that encourage the model to "complete" values.
+    const exactDataBlockForPrompt = isAstroExactCompact
+      ? astroCompactCtx?.compactDataBlock ?? coreAstroBlock ?? rawExactDataBlock
+      : [coreAstroBlock, rawExactDataBlock].filter(Boolean).join('\n\n') || null
 
     const horoscopeDataBlock = isHoroscopeRoute
       ? buildHoroscopeDataBlock(
@@ -3140,7 +3206,7 @@ export async function runHexastraFlow(input: {
         maxOutputTokens: payload.max_output_tokens,
         plan,
         isHumanDesignExactCompact,
-        hint: 'compact route: no knowledge packets, 2-msg history, compact system prompt',
+        hint: 'compact route: no knowledge packets, last user message only, compact system prompt',
       })
     }
 
@@ -3188,56 +3254,82 @@ export async function runHexastraFlow(input: {
     let usedLocalFallback = false
     let fallbackType: string | null = null
     let rawMessage: string
-    try {
-      rawMessage = await callOpenAIResponse({
-        ...payload,
-        max_output_tokens: effectiveMaxOutputTokens,
-        input: payload.input as { role: 'system' | 'user' | 'assistant'; content: string }[],
-        timeoutMs: openAiTimeoutMs,
+    const deterministicSimpleAstroAnswer =
+      isAstroExactCompact && astroCompactCtx
+        ? buildDeterministicAstroExactAnswer({
+            message: latestUserMessage,
+            ctx: astroCompactCtx,
+            language: userContext.language ?? fallbackLanguage,
+            subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory,
+            requestKind: universalClassif.requestKind,
+          })
+        : null
+    if (deterministicSimpleAstroAnswer) {
+      rawMessage = deterministicSimpleAstroAnswer
+      openAiEndMs = openAiStartMs
+      flowLog('info', 'ASTRO_EXACT_SIMPLE_FACT_LOCAL_RESPONSE', {
+        subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory,
+        requestKind: universalClassif.requestKind,
+        responseChars: rawMessage.length,
       })
-      openAiEndMs = Date.now()
-    } catch (openAiErr) {
-      openAiEndMs = Date.now()
-      const isTimeout = openAiErr instanceof Error && openAiErr.message.includes('timed out')
-      if (isTimeout && isAstroExactCompact && exactDataResolved && specializedResult?.raw) {
-        flowLog('warn', 'ASTRO_EXACT_LOCAL_FALLBACK_ACTIVATED', {
-          openAiMs: openAiEndMs - (openAiStartMs ?? openAiEndMs),
-          plan,
-          isAstroExactCompact,
-          reason: 'OpenAI timeout — Railway data available — serving local deterministic fallback',
-          hint: 'User sees calculated values + retry invitation instead of error',
+    } else {
+      try {
+        rawMessage = await callOpenAIResponse({
+          ...payload,
+          max_output_tokens: effectiveMaxOutputTokens,
+          input: payload.input as { role: 'system' | 'user' | 'assistant'; content: string }[],
+          timeoutMs: openAiTimeoutMs,
         })
-        usedLocalFallback = true
-        fallbackType = 'astro_exact_local'
-        rawMessage = astroCompactCtx
-          ? buildValidatedAstroExactFallback(
-              astroCompactCtx,
-              userContext.language ?? fallbackLanguage,
-              userContext.firstName ?? userContext.name ?? null,
-            )
-          : buildValidatedAstroExactFallback(
-              buildCompactNatalReadingContext(specializedResult.raw, exactDataMaxChars),
-              userContext.language ?? fallbackLanguage,
-              userContext.firstName ?? userContext.name ?? null,
-            )
-      } else {
-        throw openAiErr
+        openAiEndMs = Date.now()
+      } catch (openAiErr) {
+        openAiEndMs = Date.now()
+        const isTimeout = openAiErr instanceof Error && openAiErr.message.includes('timed out')
+        if (isTimeout && isAstroExactCompact && exactDataResolved && specializedResult?.raw) {
+          flowLog('warn', 'ASTRO_EXACT_LOCAL_FALLBACK_ACTIVATED', {
+            openAiMs: openAiEndMs - (openAiStartMs ?? openAiEndMs),
+            plan,
+            isAstroExactCompact,
+            reason: 'OpenAI timeout — Railway data available — serving local deterministic fallback',
+            hint: 'User sees calculated values + retry invitation instead of error',
+          })
+          usedLocalFallback = true
+          fallbackType = 'astro_exact_local'
+          rawMessage = astroCompactCtx
+            ? buildValidatedAstroExactFallback(
+                astroCompactCtx,
+                userContext.language ?? fallbackLanguage,
+                userContext.firstName ?? userContext.name ?? null,
+              )
+            : buildValidatedAstroExactFallback(
+                buildCompactNatalReadingContext(specializedResult.raw, exactDataMaxChars),
+                userContext.language ?? fallbackLanguage,
+                userContext.firstName ?? userContext.name ?? null,
+              )
+        } else {
+          throw openAiErr
+        }
       }
     }
 
     if (isAstroExactCompact && astroCompactCtx) {
-      const renderValidation = validateAstroExactRender(rawMessage, astroCompactCtx)
-      if (!renderValidation.valid) {
+      const enforcedAstroRender = enforceAstroExactRender({
+        message: rawMessage,
+        ctx: astroCompactCtx,
+        language: userContext.language ?? fallbackLanguage,
+        firstName: userContext.firstName ?? userContext.name ?? null,
+        latestUserMessage: latestUserMessage,
+        subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory,
+        requestKind: universalClassif.requestKind,
+      })
+      if (enforcedAstroRender.usedFallback) {
         flowLog('warn', 'ASTRO_EXACT_RENDER_GUARDRAIL_TRIGGERED', {
-          violations: renderValidation.violations,
+          violations: enforcedAstroRender.validation.violations,
           semanticContextType: semanticCtx.contextType,
-          fallbackType,
+          fallbackType: enforcedAstroRender.fallbackType,
         })
-        rawMessage = buildValidatedAstroExactFallback(
-          astroCompactCtx,
-          userContext.language ?? fallbackLanguage,
-          userContext.firstName ?? userContext.name ?? null,
-        )
+        usedLocalFallback = true
+        fallbackType = enforcedAstroRender.fallbackType
+        rawMessage = enforcedAstroRender.message
       }
     }
 
@@ -3334,11 +3426,24 @@ export async function runHexastraFlow(input: {
       message,
     })
 
-    const menuVisible =
-      effectiveRequestType === 'micro_month' ||
-      uiAction === 'open_menu' ||
-      uiAction === 'restart_flow' ||
-      flowStep === 'menu'
+    const hdHasUsableFields =
+      hdCompactCtx !== null &&
+      [hdCompactCtx.hdType, hdCompactCtx.hdProfile, hdCompactCtx.hdAuthority, hdCompactCtx.hdStrategy].some(Boolean)
+    const effectiveScienceForFinalStep =
+      astroFollowupRouting.science ?? universalClassif.science ?? null
+    const finalFlowPresentation = resolveFinalFlowPresentation({
+      branch: orchestrationDecision.branch,
+      flowStep,
+      effectiveRequestType,
+      uiAction,
+      isAstroExact,
+      exactDataResolved,
+      specializedResultHasResult: Boolean(specializedResult),
+      science: effectiveScienceForFinalStep,
+      isHumanDesignExact,
+      hdHasUsableFields,
+    })
+    const menuVisible = finalFlowPresentation.menuVisible
 
     const menuItemsReturned = menuItems
 
@@ -3422,29 +3527,35 @@ export async function runHexastraFlow(input: {
       }
     }
 
-    const menuVisibleReturn =
-      effectiveRequestType === 'micro_month' ||
-      uiAction === 'open_menu' ||
-      uiAction === 'restart_flow' ||
-      flowStep === 'menu'
+    const finalMessage = message
+    const finalStepLogMeta = {
+      branch: orchestrationDecision.branch,
+      uiAction,
+      science: effectiveScienceForFinalStep,
+      subcategory: universalClassif.subcategory ?? null,
+      exactDataResolved,
+      specializedResultHasResult: Boolean(specializedResult),
+      chosenFinalStep: finalFlowPresentation.chosenFinalStep,
+    }
 
-    const finalMessage = menuVisibleReturn
-      ? message
-      : message
+    if (finalFlowPresentation.astroExactMenuOverrideBlocked) {
+      flowLog('info', 'ASTRO_EXACT_RESULT_PREVENTED_MENU_OVERRIDE', {
+        ...finalStepLogMeta,
+        menuVisible: finalFlowPresentation.menuVisible,
+      })
+    }
+
+    if (finalFlowPresentation.birthUpdateMenuOverrideBlocked) {
+      flowLog('info', 'BIRTH_UPDATE_MENU_OVERRIDE_BLOCKED', {
+        ...finalStepLogMeta,
+        menuVisible: finalFlowPresentation.menuVisible,
+      })
+    }
 
     // Force flowState.step to 'analysis' when HD exact data is resolved with usable fields.
     // computeFlowStep() may return 'clarification' because it runs before exactDataResolved
     // is known — this override corrects the step at the final return point.
-    const hdExactAnalysisOverride =
-      !menuVisibleReturn &&
-      isHumanDesignExact &&
-      exactDataResolved &&
-      hdCompactCtx !== null &&
-      [hdCompactCtx.hdType, hdCompactCtx.hdProfile, hdCompactCtx.hdAuthority, hdCompactCtx.hdStrategy].some(Boolean)
-
-    const finalFlowStep = hdExactAnalysisOverride ? 'analysis' : flowStep
-
-    if (hdExactAnalysisOverride && flowStep !== 'analysis') {
+    if (finalFlowPresentation.hdExactAnalysisOverride && flowStep !== 'analysis') {
       flowLog('info', 'HD_EXACT_FLOW_STEP_OVERRIDE', {
         from: flowStep,
         to: 'analysis',
@@ -3455,50 +3566,50 @@ export async function runHexastraFlow(input: {
     }
 
     flowLog('info', 'flow step final', {
-      step: menuVisibleReturn ? 'menu' : finalFlowStep,
+      step: finalFlowPresentation.chosenFinalStep,
       finalMessageLength: finalMessage.length,
-      menuVisible: menuVisibleReturn,
+      menuVisible: finalFlowPresentation.menuVisible,
     })
 
-      return {
-        message: finalMessage,
-        reply: finalMessage,
-        mode,
-        plan,
-        conversationId,
+    return {
+      message: finalMessage,
+      reply: finalMessage,
+      mode,
+      plan,
+      conversationId,
+      usedLocalFallback,
+      fallbackType,
+      flowState: { step: finalFlowPresentation.chosenFinalStep, completed: true },
+      menu: { visible: finalFlowPresentation.menuVisible, items: menuItemsReturned },
+      suggestions: finalFlowPresentation.menuVisible
+        ? []
+        : [],
+      metadata: {
+        contextType: selectedContextType ?? sessionContext.contextType,
+        practitionerUsage: userContext.practitionerUsage ?? null,
+        shouldPersistMemory: !finalFlowPresentation.menuVisible,
+        selectedMenuKey: resolvedSelectedMenuKey,
+        selectedSubmenuKey: resolvedSelectedSubmenuKey,
+        contextFrame: selectedContextFrame,
+        clarificationQuestion: selectedClarificationQuestion,
+        sessionStep: finalFlowPresentation.chosenFinalStep,
+        emotionalState: sessionContext.emotionalState,
+        timing: sessionContext.timing,
+        journeyEnabled,
+        ksSummary: {
+          dominantSignal: ksSummary.dominantSignal,
+          primaryModule: ksSummary.primaryModule,
+          primaryFamily: ksSummary.primaryFamily,
+          sourceLayers: ksSummary.sourceLayers,
+          submodules: ksSummary.submodules,
+        },
+        readingSummary: normalizedReadingSummary,
+        orchestrationTrace,
         usedLocalFallback,
         fallbackType,
-        flowState: { step: menuVisibleReturn ? 'menu' : finalFlowStep, completed: true },
-        menu: { visible: menuVisibleReturn, items: menuItemsReturned },
-        suggestions: menuVisibleReturn
-          ? []
-          : [],
-        metadata: {
-          contextType: selectedContextType ?? sessionContext.contextType,
-          practitionerUsage: userContext.practitionerUsage ?? null,
-          shouldPersistMemory: !menuVisibleReturn,
-          selectedMenuKey: resolvedSelectedMenuKey,
-          selectedSubmenuKey: resolvedSelectedSubmenuKey,
-          contextFrame: selectedContextFrame,
-          clarificationQuestion: selectedClarificationQuestion,
-          sessionStep: menuVisibleReturn ? 'menu' : finalFlowStep,
-          emotionalState: sessionContext.emotionalState,
-          timing: sessionContext.timing,
-          journeyEnabled,
-          ksSummary: {
-            dominantSignal: ksSummary.dominantSignal,
-            primaryModule: ksSummary.primaryModule,
-            primaryFamily: ksSummary.primaryFamily,
-            sourceLayers: ksSummary.sourceLayers,
-            submodules: ksSummary.submodules,
-          },
-          readingSummary: normalizedReadingSummary,
-          orchestrationTrace,
-          usedLocalFallback,
-          fallbackType,
-        },
-        updatedEvolutionProfile: input.evolutionProfile ?? null,
-      } as HexastraApiResponse;
+      },
+      updatedEvolutionProfile: input.evolutionProfile ?? null,
+    } as HexastraApiResponse
     } catch (error) {
       logger.error('[runHexastraFlow] fatal error', { error })
       flowLog('error', 'flow step final', {

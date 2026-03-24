@@ -156,6 +156,13 @@ export type AstroExactRenderValidation = {
   violations: string[]
 }
 
+export type AstroExactRenderEnforcementResult = {
+  message: string
+  validation: AstroExactRenderValidation
+  usedFallback: boolean
+  fallbackType: 'astro_exact_local' | 'astro_exact_simple_local' | null
+}
+
 function extractStr(obj: Record<string, unknown>, ...keys: string[]): string | null {
   for (const key of keys) {
     const value = obj[key]
@@ -206,6 +213,176 @@ function buildPlacementLine(label: string, sign: string | null, degree: number |
 
 function normalizeRenderedSignToken(raw: string): string | null {
   return normalizeAstroSign(raw)
+}
+
+function normalizeAstroValidationText(raw: string): string {
+  return (raw || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function escapeRegExp(raw: string): string {
+  return raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+type AstroPlanetKey =
+  | 'sun'
+  | 'moon'
+  | 'ascendant'
+  | 'mercury'
+  | 'venus'
+  | 'mars'
+  | 'jupiter'
+  | 'saturn'
+
+const ASTRO_PLANET_REFERENCES: Array<{ key: AstroPlanetKey; tokens: string[] }> = [
+  { key: 'sun', tokens: ['soleil', 'sun', 'signe solaire', 'sun sign'] },
+  { key: 'moon', tokens: ['lune', 'moon', 'signe lunaire', 'moon sign'] },
+  { key: 'ascendant', tokens: ['ascendant', 'rising', 'rising sign'] },
+  { key: 'mercury', tokens: ['mercure', 'mercury'] },
+  { key: 'venus', tokens: ['venus'] },
+  { key: 'mars', tokens: ['mars'] },
+  { key: 'jupiter', tokens: ['jupiter'] },
+  { key: 'saturn', tokens: ['saturne', 'saturn'] },
+]
+
+const ASTRO_ASPECT_REFERENCES: Array<{ key: string; tokens: string[] }> = [
+  { key: 'conjunction', tokens: ['conjunction', 'conjonction', 'conjunct'] },
+  { key: 'opposition', tokens: ['opposition', 'oppose'] },
+  { key: 'trine', tokens: ['trine', 'trigone'] },
+  { key: 'square', tokens: ['square', 'carre'] },
+  { key: 'sextile', tokens: ['sextile'] },
+  { key: 'quincunx', tokens: ['quincunx', 'quinconce'] },
+]
+
+function containsToken(text: string, token: string): boolean {
+  const pattern = token
+    .split(/\s+/)
+    .map((part) => escapeRegExp(part))
+    .join('\\s+')
+  return new RegExp(`\\b${pattern}\\b`, 'i').test(text)
+}
+
+function extractAspectToken(raw: string): string | null {
+  const text = normalizeAstroValidationText(raw)
+  const aspect = ASTRO_ASPECT_REFERENCES.find((entry) =>
+    entry.tokens.some((token) => containsToken(text, token)),
+  )?.key
+
+  const planets = ASTRO_PLANET_REFERENCES
+    .filter((entry) => entry.tokens.some((token) => containsToken(text, token)))
+    .map((entry) => entry.key)
+  const uniquePlanets = Array.from(new Set(planets)).sort()
+
+  if (!aspect || uniquePlanets.length < 2) return null
+
+  return `${aspect}:${uniquePlanets[0]}:${uniquePlanets[1]}`
+}
+
+function buildPlanetValueMap(ctx: CompactNatalContext): Record<AstroPlanetKey, string | null> {
+  return {
+    sun: ctx.sunSign,
+    moon: ctx.moonSign,
+    ascendant: ctx.risingSign,
+    mercury: ctx.mercurySign,
+    venus: ctx.venusSign,
+    mars: ctx.marsSign,
+    jupiter: ctx.jupiterSign,
+    saturn: ctx.saturnSign,
+  }
+}
+
+export function isSimpleAstroFactQuestion(params: {
+  message: string
+  subcategory?: string | null
+  requestKind?: string | null
+}): boolean {
+  const text = normalizeAstroValidationText(params.message)
+  const isLongReading =
+    /(analyse|lecture|portrait|bilan|theme natal|theme astral|transit|aspect|maison|interpret|explique|pourquoi|comment)/.test(
+      text,
+    )
+
+  if (isLongReading) return false
+
+  const asksSun =
+    /(quel est mon signe|je suis quel signe|c est quoi mon signe|cest quoi mon signe|mon signe astro|signe solaire|signe du soleil|sun sign|my sun sign)/.test(
+      text,
+    ) || params.subcategory === 'signe_solaire'
+  const asksMoon =
+    /(signe lunaire|moon sign|my moon sign|quelle est ma lune|ma lune est)/.test(text) ||
+    params.subcategory === 'signe_lunaire'
+  const asksRising =
+    /(quel est mon ascendant|mon ascendant|rising sign|my rising)/.test(text) ||
+    params.subcategory === 'ascendant'
+  const isQuestionLike =
+    /(\?|quel|quelle|quels|quelles|what is|tell me|give me|c est quoi|cest quoi|je suis quel)/.test(
+      text,
+    ) || params.requestKind === 'exact_fact'
+
+  return isQuestionLike && [asksSun, asksMoon, asksRising].filter(Boolean).length === 1
+}
+
+export function buildDeterministicAstroExactAnswer(params: {
+  message: string
+  ctx: CompactNatalContext
+  language: string
+  subcategory?: string | null
+  requestKind?: string | null
+}): string | null {
+  if (!isSimpleAstroFactQuestion(params)) return null
+
+  const text = normalizeAstroValidationText(params.message)
+  const isEn = (params.language || 'fr').slice(0, 2).toLowerCase() === 'en'
+  const target: AstroPlanetKey =
+    /(signe lunaire|moon sign|my moon sign|quelle est ma lune|ma lune est)/.test(text) ||
+    params.subcategory === 'signe_lunaire'
+      ? 'moon'
+      : /(quel est mon ascendant|mon ascendant|rising sign|my rising)/.test(text) ||
+          params.subcategory === 'ascendant'
+        ? 'ascendant'
+        : 'sun'
+
+  const values = buildPlanetValueMap(params.ctx)
+  const sign = values[target]
+
+  if (isEn) {
+    if (target === 'moon') {
+      return sign
+        ? `Your moon sign is ${sign}.`
+        : 'Your moon sign is unavailable in the validated exact data.'
+    }
+
+    if (target === 'ascendant') {
+      return sign
+        ? `Your rising sign is ${sign}.`
+        : 'Your rising sign is unavailable in the validated exact data.'
+    }
+
+    return sign
+      ? `Your sun sign is ${sign}.`
+      : 'Your sun sign is unavailable in the validated exact data.'
+  }
+
+  if (target === 'moon') {
+    return sign
+      ? `Ton signe lunaire est ${sign}.`
+      : 'Ton signe lunaire est indisponible dans les donnees exactes validees.'
+  }
+
+  if (target === 'ascendant') {
+    return sign
+      ? `Ton ascendant est ${sign}.`
+      : 'Ton ascendant est indisponible dans les donnees exactes validees.'
+  }
+
+  return sign
+    ? `Ton signe solaire est ${sign}.`
+    : 'Ton signe solaire est indisponible dans les donnees exactes validees.'
 }
 
 /**
@@ -294,7 +471,7 @@ export function buildCompactNatalReadingContext(
   ]))
 
   const blockLines = [
-    'DONNEES THEME NATAL VALIDEES (source tropicale exacte - citer exactement et ne rien inventer) :',
+    'PLACEMENTS ASTRO EXACTS VALIDES (source de verite absolue - utiliser uniquement ces donnees) :',
   ]
   appendCompactLine(blockLines, buildPlacementLine('SOLEIL', sunSign, sunDegree), maxChars)
   appendCompactLine(blockLines, buildPlacementLine('LUNE', moonSign, moonDegree), maxChars)
@@ -304,7 +481,11 @@ export function buildCompactNatalReadingContext(
   appendCompactLine(blockLines, buildPlacementLine('MARS', marsSign, null), maxChars)
   appendCompactLine(blockLines, buildPlacementLine('JUPITER', jupiterSign, null), maxChars)
   appendCompactLine(blockLines, buildPlacementLine('SATURNE', saturnSign, null), maxChars)
-  appendCompactLine(blockLines, `- ASPECTS CLES: ${keyAspects.length ? keyAspects.join(' | ') : 'indisponible'}`, maxChars)
+  appendCompactLine(
+    blockLines,
+    `- ASPECTS CLES VALIDES: ${keyAspects.length ? keyAspects.join(' | ') : 'indisponible'}`,
+    maxChars,
+  )
   appendCompactLine(blockLines, `- MAISONS DOMINANTES: ${dominantHouses.length ? dominantHouses.join(' | ') : 'indisponible'}`, maxChars)
   appendCompactLine(blockLines, `- SIGNES DOMINANTS: ${dominantSigns.length ? dominantSigns.join(', ') : 'indisponible'}`, maxChars)
 
@@ -372,7 +553,7 @@ export function buildValidatedAstroExactFallback(
   return lines.join('\n')
 }
 
-export function validateAstroExactRender(
+function validateAstroExactRenderLegacy(
   message: string,
   ctx: CompactNatalContext,
 ): AstroExactRenderValidation {
@@ -429,9 +610,142 @@ export function validateAstroExactRender(
     }
   }
 
+  const uniqueViolations = Array.from(new Set(violations))
+
   return {
-    valid: violations.length === 0,
-    violations,
+    valid: uniqueViolations.length === 0,
+    violations: uniqueViolations,
+  }
+}
+
+export function validateAstroExactRender(
+  message: string,
+  ctx: CompactNatalContext,
+): AstroExactRenderValidation {
+  const checks = [
+    {
+      label: 'sun',
+      expected: ctx.sunSign,
+      patterns: [/\b(?:soleil|signe solaire)\s*(?:(?:est\s+en|est|en)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi, /\b(?:sun|sun sign)\s*(?:(?:is\s+in|is|in)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi],
+    },
+    {
+      label: 'moon',
+      expected: ctx.moonSign,
+      patterns: [/\b(?:lune|signe lunaire)\s*(?:(?:est\s+en|est|en)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi, /\b(?:moon|moon sign)\s*(?:(?:is\s+in|is|in)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi],
+    },
+    {
+      label: 'ascendant',
+      expected: ctx.risingSign,
+      patterns: [/\b(?:ascendant)\s*(?:(?:est\s+en|est|en)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi, /\b(?:rising|rising sign|ascendant)\s*(?:(?:is\s+in|is|in)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi],
+    },
+    {
+      label: 'mercury',
+      expected: ctx.mercurySign,
+      patterns: [/\b(?:mercure)\s*(?:(?:est\s+en|est|en)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi, /\b(?:mercury)\s*(?:(?:is\s+in|is|in)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi],
+    },
+    {
+      label: 'venus',
+      expected: ctx.venusSign,
+      patterns: [/\b(?:venus|vénus)\s*(?:(?:est\s+en|est|en)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi, /\b(?:venus)\s*(?:(?:is\s+in|is|in)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi],
+    },
+    {
+      label: 'mars',
+      expected: ctx.marsSign,
+      patterns: [/\b(?:mars)\s*(?:(?:est\s+en|est|en)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi, /\b(?:mars)\s*(?:(?:is\s+in|is|in)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi],
+    },
+    {
+      label: 'jupiter',
+      expected: ctx.jupiterSign,
+      patterns: [/\b(?:jupiter)\s*(?:(?:est\s+en|est|en)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi, /\b(?:jupiter)\s*(?:(?:is\s+in|is|in)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi],
+    },
+    {
+      label: 'saturn',
+      expected: ctx.saturnSign,
+      patterns: [/\b(?:saturne|saturn)\s*(?:(?:est\s+en|est|en)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi, /\b(?:saturn)\s*(?:(?:is\s+in|is|in)\s*|:\s*)([A-Za-zÀ-ÿ-]+)/gi],
+    },
+  ]
+
+  const legacyValidation = validateAstroExactRenderLegacy(message, ctx)
+  const violations = [...legacyValidation.violations]
+
+  for (const check of checks) {
+    for (const pattern of check.patterns) {
+      const matches = Array.from((message || '').matchAll(pattern))
+      for (const match of matches) {
+        const renderedSign = normalizeRenderedSignToken(match[1] ?? '')
+        if (!renderedSign) continue
+
+        if (!check.expected) {
+          violations.push(`${check.label}:rendered_without_validated_source:${renderedSign}`)
+          continue
+        }
+
+        if (renderedSign !== check.expected) {
+          violations.push(`${check.label}:expected_${check.expected}:received_${renderedSign}`)
+        }
+      }
+    }
+  }
+
+  const allowedAspectTokens = new Set(
+    ctx.keyAspects.map((aspect) => extractAspectToken(aspect)).filter(Boolean) as string[],
+  )
+  const renderedAspectTokens = (message || '')
+    .split(/[\n.!?;]+/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => extractAspectToken(part))
+    .filter(Boolean) as string[]
+
+  for (const renderedAspectToken of renderedAspectTokens) {
+    if (allowedAspectTokens.size === 0 || !allowedAspectTokens.has(renderedAspectToken)) {
+      violations.push(`aspect:rendered_without_validated_source:${renderedAspectToken}`)
+    }
+  }
+
+  const uniqueViolations = Array.from(new Set(violations))
+
+  return {
+    valid: uniqueViolations.length === 0,
+    violations: uniqueViolations,
+  }
+}
+
+export function enforceAstroExactRender(params: {
+  message: string
+  ctx: CompactNatalContext
+  language: string
+  firstName: string | null
+  latestUserMessage: string
+  subcategory?: string | null
+  requestKind?: string | null
+}): AstroExactRenderEnforcementResult {
+  const validation = validateAstroExactRender(params.message, params.ctx)
+
+  if (validation.valid) {
+    return {
+      message: params.message,
+      validation,
+      usedFallback: false,
+      fallbackType: null,
+    }
+  }
+
+  const simpleAnswer = buildDeterministicAstroExactAnswer({
+    message: params.latestUserMessage,
+    ctx: params.ctx,
+    language: params.language,
+    subcategory: params.subcategory,
+    requestKind: params.requestKind,
+  })
+
+  return {
+    message:
+      simpleAnswer ??
+      buildValidatedAstroExactFallback(params.ctx, params.language, params.firstName),
+    validation,
+    usedFallback: true,
+    fallbackType: simpleAnswer ? 'astro_exact_simple_local' : 'astro_exact_local',
   }
 }
 

@@ -1,5 +1,6 @@
 import { PLAN_MODE_MAP } from '@/lib/hexastra/config/planModeMap'
 import { applySafetySuffix } from '@/lib/hexastra/guards/safety'
+import { isSimpleAstroFactQuestion } from '@/lib/hexastra/guards/exactDataGuard'
 import { buildEvolutionContext } from '@/lib/evolution/evolutionContextBuilder'
 import { buildInsightContext } from '@/lib/hexastra/memory/insightEngine'
 import { buildHoroscopeSystemPrompt } from '@/lib/hexastra/prompts/horoscopePrompt'
@@ -658,9 +659,24 @@ function buildCompactAstroExactPrompt(input: BuildPromptInput): string {
   // Use 12-sphere structure when user asks for natal + transits combined exploration
   const lastMsg = (input.messages?.[input.messages?.length - 1]?.content ?? '')
   const isNatal12Spheres = detectNatal12SpheresRequest(lastMsg)
+  const isSimpleAstroFact = isSimpleAstroFactQuestion({ message: lastMsg })
 
   const readingDirective = isNatal12Spheres
     ? buildNatal12SpheresDirective(isFr)
+    : isSimpleAstroFact
+    ? isFr
+      ? `
+REPONSE COURTE OBLIGATOIRE :
+- Si la demande porte sur le signe solaire, lunaire ou l'ascendant, repondre en 1 phrase directe a partir du bloc exact.
+- Format attendu : "Ton signe solaire est Verseau.", "Ton signe lunaire est Capricorne.", "Ton ascendant est Gemeaux."
+- Ne pas ajouter d'interpretation longue, de theorie generale, d'aspect non fourni ou de menu.
+`.trim()
+      : `
+SHORT DIRECT ANSWER REQUIRED:
+- If the user asks for the sun sign, moon sign or rising sign, answer in 1 direct sentence from the exact block.
+- Expected format: "Your sun sign is Aquarius.", "Your moon sign is Capricorn.", "Your rising sign is Gemini."
+- Do not add a long interpretation, general theory, unsupported aspects or a menu.
+`.trim()
     : isFr
     ? `
 LECTURE THÈME NATAL — STRUCTURE ATTENDUE (8 blocs maximum, visibles ou invisibles) :
@@ -717,7 +733,25 @@ ABSOLUTE RULES:
 - Do not open a menu or clarification — go directly to the reading.
 `.trim()
 
-  const parts = [roleBlock, identity, readingDirective]
+  const dataFidelityRules = isFr
+    ? `
+FIDELITE AUX DONNEES EXACTES :
+- Utiliser uniquement les placements et aspects presents dans le bloc exact.
+- Ne jamais inventer, corriger ou remplacer un signe.
+- Ne jamais inventer un aspect absent du bloc exact.
+- Si une donnee manque, ecrire explicitement qu'elle est indisponible.
+- Si la demande est large, interpreter uniquement a partir des donnees fournies.
+`.trim()
+    : `
+EXACT DATA FIDELITY:
+- Use only the placements and aspects present in the exact block.
+- Never invent, correct or replace a sign.
+- Never invent an aspect that is absent from the exact block.
+- If a datum is missing, say it is unavailable.
+- If the request is broader, interpret only from the provided data.
+`.trim()
+
+  const parts = [roleBlock, identity, readingDirective, dataFidelityRules]
   if (input.exactDataBlock) {
     parts.push(input.exactDataBlock)
   }

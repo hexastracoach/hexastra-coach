@@ -4,6 +4,8 @@ import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassific
 import { resolveAstroFollowupRoutingState } from '@/lib/hexastra/orchestrator/runHexastraFlow'
 import {
   buildCompactNatalReadingContext,
+  buildDeterministicAstroExactAnswer,
+  enforceAstroExactRender,
   buildValidatedAstroExactFallback,
   validateAstroExactRender,
   type CompactNatalContext,
@@ -152,5 +154,181 @@ describe('astro exact guardrails', () => {
     expect(validation.violations.some((violation) => violation.includes('sun'))).toBe(true)
     expect(fallback).toContain('Soleil: indisponible')
     expect(fallback).not.toContain('Soleil en Capricorne')
+  })
+
+  it('rejects a rendered moon sign that contradicts the exact source', () => {
+    const ctx: CompactNatalContext = {
+      sunSign: 'Verseau',
+      sunDegree: 4.1,
+      moonSign: 'Capricorne',
+      moonDegree: 12.6,
+      risingSign: 'Gemeaux',
+      risingDegree: 18.4,
+      mercurySign: null,
+      venusSign: null,
+      marsSign: null,
+      jupiterSign: null,
+      saturnSign: null,
+      dominantSigns: [],
+      dominantElements: [],
+      dominantModalities: [],
+      stelliums: [],
+      keyAspects: [],
+      dominantHouses: [],
+      chartShape: null,
+      natalSummarySeeds: [],
+      fieldSources: {},
+      missingFields: [],
+      compactDataBlock: 'SOLEIL: Verseau\nLUNE: Capricorne\nASCENDANT: Gemeaux',
+    }
+
+    const validation = validateAstroExactRender('Ta Lune est en Scorpion.', ctx)
+
+    expect(validation.valid).toBe(false)
+    expect(validation.violations).toContain('moon:expected_Capricorne:received_Scorpion')
+  })
+
+  it('rejects a rendered sun sign that contradicts the exact source', () => {
+    const ctx: CompactNatalContext = {
+      sunSign: 'Verseau',
+      sunDegree: 4.1,
+      moonSign: 'Capricorne',
+      moonDegree: 12.6,
+      risingSign: null,
+      risingDegree: null,
+      mercurySign: null,
+      venusSign: null,
+      marsSign: null,
+      jupiterSign: null,
+      saturnSign: null,
+      dominantSigns: [],
+      dominantElements: [],
+      dominantModalities: [],
+      stelliums: [],
+      keyAspects: [],
+      dominantHouses: [],
+      chartShape: null,
+      natalSummarySeeds: [],
+      fieldSources: {},
+      missingFields: [],
+      compactDataBlock: 'SOLEIL: Verseau\nLUNE: Capricorne',
+    }
+
+    const validation = validateAstroExactRender('Ton signe solaire est Capricorne.', ctx)
+
+    expect(validation.valid).toBe(false)
+    expect(validation.violations).toContain('sun:expected_Verseau:received_Capricorne')
+  })
+
+  it('builds a short deterministic answer for simple sun-sign questions', () => {
+    const ctx: CompactNatalContext = {
+      sunSign: 'Verseau',
+      sunDegree: 4.1,
+      moonSign: 'Capricorne',
+      moonDegree: 12.6,
+      risingSign: 'Gemeaux',
+      risingDegree: 18.4,
+      mercurySign: null,
+      venusSign: null,
+      marsSign: null,
+      jupiterSign: null,
+      saturnSign: null,
+      dominantSigns: [],
+      dominantElements: [],
+      dominantModalities: [],
+      stelliums: [],
+      keyAspects: ['Soleil trigone Lune'],
+      dominantHouses: [],
+      chartShape: null,
+      natalSummarySeeds: [],
+      fieldSources: {},
+      missingFields: [],
+      compactDataBlock: 'SOLEIL: Verseau\nLUNE: Capricorne\nASCENDANT: Gemeaux',
+    }
+
+    const answer = buildDeterministicAstroExactAnswer({
+      message: 'je suis quel signe',
+      ctx,
+      language: 'fr',
+      subcategory: 'signe_solaire',
+      requestKind: 'exact_fact',
+    })
+
+    expect(answer).toBe('Ton signe solaire est Verseau.')
+  })
+
+  it('falls back to a deterministic exact answer instead of returning a wrong rendered sign', () => {
+    const ctx: CompactNatalContext = {
+      sunSign: 'Verseau',
+      sunDegree: 4.1,
+      moonSign: 'Capricorne',
+      moonDegree: 12.6,
+      risingSign: 'Gemeaux',
+      risingDegree: 18.4,
+      mercurySign: null,
+      venusSign: null,
+      marsSign: null,
+      jupiterSign: null,
+      saturnSign: null,
+      dominantSigns: [],
+      dominantElements: [],
+      dominantModalities: [],
+      stelliums: [],
+      keyAspects: ['Soleil trigone Lune'],
+      dominantHouses: [],
+      chartShape: null,
+      natalSummarySeeds: [],
+      fieldSources: {},
+      missingFields: [],
+      compactDataBlock: 'SOLEIL: Verseau\nLUNE: Capricorne\nASCENDANT: Gemeaux',
+    }
+
+    const enforced = enforceAstroExactRender({
+      message: 'Ton signe solaire est Capricorne. Ta Lune est en Scorpion.',
+      ctx,
+      language: 'fr',
+      firstName: null,
+      latestUserMessage: 'c est quoi mon signe solaire',
+      subcategory: 'signe_solaire',
+      requestKind: 'exact_fact',
+    })
+
+    expect(enforced.usedFallback).toBe(true)
+    expect(enforced.fallbackType).toBe('astro_exact_simple_local')
+    expect(enforced.message).toBe('Ton signe solaire est Verseau.')
+    expect(enforced.message).not.toContain('Capricorne')
+    expect(enforced.validation.violations).toContain('sun:expected_Verseau:received_Capricorne')
+  })
+
+  it('rejects aspects that are absent from the validated exact block', () => {
+    const ctx: CompactNatalContext = {
+      sunSign: 'Verseau',
+      sunDegree: 4.1,
+      moonSign: 'Capricorne',
+      moonDegree: 12.6,
+      risingSign: null,
+      risingDegree: null,
+      mercurySign: null,
+      venusSign: null,
+      marsSign: 'Belier',
+      jupiterSign: null,
+      saturnSign: null,
+      dominantSigns: [],
+      dominantElements: [],
+      dominantModalities: [],
+      stelliums: [],
+      keyAspects: ['Soleil trigone Lune'],
+      dominantHouses: [],
+      chartShape: null,
+      natalSummarySeeds: [],
+      fieldSources: {},
+      missingFields: [],
+      compactDataBlock: 'SOLEIL: Verseau\nLUNE: Capricorne\nMARS: Belier\nASPECTS CLES: Soleil trigone Lune',
+    }
+
+    const validation = validateAstroExactRender('Soleil carre Mars.', ctx)
+
+    expect(validation.valid).toBe(false)
+    expect(validation.violations).toContain('aspect:rendered_without_validated_source:square:mars:sun')
   })
 })
