@@ -166,12 +166,12 @@ export default function Composer({
 
   const canSend = value.trim().length > 0 && !disabled && !transcribing
   const placeholder = transcribing
-    ? lang.startsWith('en')
-      ? 'Transcribing your message...'
-      : 'Je transcris votre message...'
-    : lang.startsWith('en')
-      ? 'What is blocking you or making you hesitate right now?'
-      : "Qu’est-ce qui te bloque ou te fait hésiter en ce moment ?"
+    ? lang.startsWith(‘en’)
+      ? ‘Transcribing your message...’
+      : ‘Je transcris votre message...’
+    : lang.startsWith(‘en’)
+      ? ‘Ask your question’
+      : ‘Pose ta question’
   const statusLabel = getStatusLabel({
     lang,
     focused,
@@ -231,26 +231,7 @@ export default function Composer({
         </div>
       )}
 
-      {!recording && !transcribing && (
-        <p className="hx-composer-reassurance">
-          {lang.startsWith('en') ? 'Direct. Calm. Clear.' : 'Direct. Calme. Clair.'}
-        </p>
-      )}
-
       <div className="hx-composer-shell">
-        {(focused || recording || transcribing || Boolean(attachedFileName)) && (
-          <div className="hx-composer-meta">
-            <div className="hx-composer-status">
-              <span
-                className={`hx-composer-status-dot${focused || canSend || recording || transcribing ? ' is-active' : ''}${recording ? ' is-recording' : ''}${transcribing ? ' is-transcribing' : ''}`}
-                aria-hidden="true"
-              />
-              <span>{statusLabel}</span>
-            </div>
-            <p className="hx-composer-helper">{helperLabel}</p>
-          </div>
-        )}
-
         <div className={`hx-composer-box${focused ? ' is-focused' : ''}${canSend ? ' has-content' : ''}${disabled && !canSend ? ' is-busy' : ''}`}>
           <div className="hx-composer-actions-left">
             <button
@@ -271,7 +252,7 @@ export default function Composer({
               aria-label="Joindre un fichier"
               disabled={disabled}
             >
-              <AttachIcon />
+              <PlusIcon />
             </button>
             <input
               ref={fileInputRef}
@@ -282,17 +263,6 @@ export default function Composer({
               className="hx-sr-only"
               onChange={handleFileChange}
             />
-
-            <button
-              type="button"
-              className={`hx-composer-action-btn${recording ? ' is-recording' : ''}${transcribing ? ' is-loading' : ''}`}
-              onClick={recording ? stopRecording : startRecording}
-              title={recording ? "Arrêter l'enregistrement" : 'Enregistrer un audio'}
-              aria-label={recording ? "Arrêter l'enregistrement" : 'Enregistrer un audio'}
-              disabled={disabled || transcribing}
-            >
-              {recording ? <WaveformIcon /> : <MicIcon />}
-            </button>
           </div>
 
           <textarea
@@ -311,40 +281,45 @@ export default function Composer({
             }}
             placeholder={placeholder}
             disabled={disabled || transcribing}
-            aria-label={lang.startsWith('en') ? 'Describe your situation' : 'Décrivez votre situation'}
+            aria-label={lang.startsWith('en') ? 'Ask your question' : 'Pose ta question'}
           />
 
-          <button
-            type="button"
-            className={`hx-send-button${canSend ? ' is-active' : ''}`}
-            onClick={onSend}
-            disabled={!canSend}
-            aria-label={lang.startsWith('en') ? 'Send' : 'Envoyer'}
-          >
-            <svg
-              className={`hx-send-icon${canSend ? ' is-active' : ''}`}
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </button>
+          <div className="hx-composer-actions-right">
+            {recording ? (
+              <button
+                type="button"
+                className="hx-composer-right-btn is-recording"
+                onClick={stopRecording}
+                title="Arrêter l'enregistrement"
+                aria-label="Arrêter l'enregistrement"
+              >
+                <WaveformIcon />
+              </button>
+            ) : canSend ? (
+              <button
+                type="button"
+                className="hx-composer-right-btn is-send"
+                onClick={onSend}
+                disabled={!canSend}
+                aria-label={lang.startsWith('en') ? 'Send' : 'Envoyer'}
+              >
+                <SendArrowIcon />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={`hx-composer-right-btn${transcribing ? ' is-loading' : ''}`}
+                onClick={startRecording}
+                title="Enregistrer un audio"
+                aria-label="Enregistrer un audio"
+                disabled={disabled || transcribing}
+              >
+                <MicIcon />
+              </button>
+            )}
+          </div>
         </div>
       </div>
-
-      {!recording && !transcribing && !focused && !canSend && (
-        <p className="hx-composer-hint">
-          {lang.startsWith('en') ? 'You can start simply.' : 'Tu peux commencer simplement.'}
-        </p>
-      )}
     </div>
   )
 }
@@ -415,6 +390,43 @@ function WaveformIcon() {
       <rect className="hx-wf-bar hx-wf-b3" x="8" y="0" width="2.5" height="16" rx="1.25" />
       <rect className="hx-wf-bar hx-wf-b4" x="12" y="3" width="2.5" height="10" rx="1.25" />
       <rect className="hx-wf-bar hx-wf-b5" x="16" y="6" width="2.5" height="4" rx="1.25" />
+    </svg>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  )
+}
+
+function SendArrowIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="12" y1="19" x2="12" y2="5" />
+      <polyline points="5 12 12 5 19 12" />
     </svg>
   )
 }

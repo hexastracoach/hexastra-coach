@@ -2032,6 +2032,14 @@ export default function ChatPageClient() {
 
       {showInlineBirthForm && (
         <div className="hx-inline-birth">
+          <button
+            type="button"
+            className="hx-inline-birth-close"
+            onClick={() => setShowInlineBirthForm(false)}
+            aria-label="Fermer le formulaire"
+          >
+            ×
+          </button>
           <BirthDataInlineForm
             data={birthData}
             partnerData={partnerBirthData}
@@ -2054,10 +2062,6 @@ export default function ChatPageClient() {
         ) : (
           <Composer {...composerProps} />
         ))}
-
-      {shouldShowReturnNote && !bootstrapOverlay && !isWelcome && (
-        <p className="hx-app-return-note">{returnNote}</p>
-      )}
 
       {!isLimitReached && !bootstrapOverlay && (
         <p className="hx-app-disclaimer">{t('chat.disclaimer')}</p>

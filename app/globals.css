@@ -3021,6 +3021,7 @@ transition: all 0.35s ease;
 }
 
 .hx-inline-birth {
+  position: relative;
   width: 100%;
   max-width: 760px;
   margin: 0 auto 10px;
@@ -3040,6 +3041,30 @@ transition: all 0.35s ease;
 
 .hx-inline-birth .hx-birth-inline-form {
   width: 100%;
+}
+
+.hx-inline-birth-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(220, 232, 244, 0.10);
+  color: rgba(216, 229, 240, 0.50);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+  z-index: 1;
+}
+
+.hx-inline-birth-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(216, 229, 240, 0.90);
 }
 
 .hx-app-composer-wrap {
@@ -4281,6 +4306,61 @@ transition: all 0.35s ease;
 
 .hx-send-icon.is-active {
   transform: scale(1);
+}
+
+/* ── Right-side mic / send toggle button ── */
+
+.hx-composer-actions-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.hx-composer-right-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(220, 232, 244, 0.10);
+  color: rgba(216, 229, 240, 0.60);
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.hx-composer-right-btn:not(:disabled):hover {
+  transform: scale(1.06);
+  background: rgba(255, 255, 255, 0.11);
+  color: rgba(216, 229, 240, 0.88);
+}
+
+.hx-composer-right-btn.is-send {
+  background: rgba(88, 226, 194, 0.92);
+  border-color: transparent;
+  color: #031a12;
+}
+
+.hx-composer-right-btn.is-send:hover {
+  background: rgba(88, 226, 194, 1);
+  transform: scale(1.06);
+}
+
+.hx-composer-right-btn.is-recording {
+  background: rgba(248, 113, 113, 0.10);
+  border-color: rgba(248, 113, 113, 0.22);
+  color: #f87171;
+}
+
+.hx-composer-right-btn.is-loading {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.hx-composer-right-btn:disabled {
+  opacity: 0.40;
+  cursor: not-allowed;
 }
 
 .hx-composer-attach-row {
