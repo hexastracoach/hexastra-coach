@@ -65,7 +65,13 @@ import {
   type MicroReadings,
   type PractitionerUsage,
 } from '@/lib/chat/bootstrapTypes'
-import type { AnalysisMode, RenderMode, ScienceKey } from '@/lib/hexastra/sciences/scienceTaxonomy'
+import type { AnalysisMode, RenderMode } from '@/lib/hexastra/sciences/scienceTaxonomy'
+import {
+  SIDEBAR_INTENTS,
+  getIntentConfig,
+  resolveContextTypeFromIntent,
+  type UserIntentKey,
+} from '@/lib/hexastra/config/intentContextMap'
 import { FUSION_ONLY_ANALYSIS_MODE } from '@/lib/hexastra/fusionOnly'
 import {
   resolveClientSendPolicy,
@@ -409,7 +415,7 @@ export default function ChatPageClient() {
   const [menuItems, setMenuItems] = useState<HexastraMenuItem[]>([])
   const [isMenuDockOpen, setIsMenuDockOpen] = useState(false)
   const [openMenuParentKey, setOpenMenuParentKey] = useState<string | null>(null)
-  const [sidebarScienceKey, setSidebarScienceKey] = useState<ScienceKey>('fusion_hexastra')
+  const [sidebarIntentKey, setSidebarIntentKey] = useState<UserIntentKey>('understand_situation')
   const [activeContextType, setActiveContextType] = useState<ContextType>('general')
   const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null)
   const [selectedSubmenuKey, setSelectedSubmenuKey] = useState<string | null>(null)
@@ -1478,33 +1484,11 @@ export default function ChatPageClient() {
     } catch {}
   }, [])
 
-  const SCIENCE_TO_MENU_KEY: Partial<Record<ScienceKey, string>> = {
-    astrologie: 'science_astrologie',
-    numerologie: 'science_numerologie',
-    human_design: 'science_human_design',
-    enneagramme: 'science_enneagramme',
-    kua: 'science_kua',
-  }
-
-  const SCIENCE_READING_LABEL: Record<ScienceKey, string> = {
-    fusion_hexastra: 'Hexastra Fusion',
-    astrologie: 'Astrologie',
-    numerologie: 'Numerologie',
-    human_design: 'Human Design',
-    enneagramme: 'Enneagramme',
-    kua: 'Kua',
-  }
-
-  const handleScienceSelect = useCallback((key: ScienceKey) => {
-    setSidebarScienceKey(key)
+  const handleIntentSelect = useCallback((key: UserIntentKey) => {
+    setSidebarIntentKey(key)
     setSelectedMenuKey(null)
     setSelectedSubmenuKey(null)
   }, [])
-
-  const effectiveScienceMenuKey =
-    sidebarScienceKey !== 'fusion_hexastra'
-      ? (SCIENCE_TO_MENU_KEY[sidebarScienceKey] ?? null)
-      : null
 
   const persistReadings = useCallback((next: Reading[]) => {
     setReadings(next)
@@ -1523,10 +1507,11 @@ export default function ChatPageClient() {
 
       if (!lastAssistant || !firstUser) return
 
+      const intentLabel = getIntentConfig(sidebarIntentKey)?.[(chatLanguage ?? '').startsWith('en') ? 'labelEn' : 'label'] ?? 'Comprendre une situation'
       const reading: Reading = {
         id: `${Date.now()}`,
         title: makeReadingTitle(firstUser.content),
-        science: SCIENCE_READING_LABEL[sidebarScienceKey] ?? 'Hexastra Fusion',
+        science: intentLabel,
         date: new Date().toISOString(),
         preview: lastAssistant.content.slice(0, 220),
         fullContent: lastAssistant.content,
@@ -1534,7 +1519,7 @@ export default function ChatPageClient() {
 
       persistReadings([reading, ...readings].slice(0, 80))
     },
-    [sidebarScienceKey, persistReadings, readings]
+    [sidebarIntentKey, lang, persistReadings, readings]
   )
 
   async function triggerMicroReading(requestType: RequestType) {
@@ -1569,12 +1554,13 @@ export default function ChatPageClient() {
       conversationId,
       messages: historyMsgs,
       contextType: activeContextType,
-      selectedMenuKey: selectedMenuKey ?? effectiveScienceMenuKey,
+      selectedMenuKey,
       selectedSubmenuKey,
       uiAction: 'send_message',
       journeyEnabled,
       analysisMode,
       renderMode,
+      userIntentKey: sidebarIntentKey,
     })
 
     try {
@@ -1842,12 +1828,13 @@ export default function ChatPageClient() {
         messages: historyMsgs,
         evolutionProfile,
         contextType: activeContextType,
-        selectedMenuKey: selectedMenuKey ?? effectiveScienceMenuKey,
+        selectedMenuKey,
         selectedSubmenuKey,
         uiAction: 'send_message',
         journeyEnabled,
         analysisMode,
         renderMode,
+        userIntentKey: sidebarIntentKey,
       })
       const requestSeq = ++requestSequenceRef.current
 
@@ -1995,16 +1982,13 @@ export default function ChatPageClient() {
 
   const sidebar = (
     <LeftSidebar
-      projects={projects}
       readings={readings}
       userInitials={userInitials}
       userPlan={userPlan}
       onNewReading={handleNewReading}
-      onCreateProject={handleCreateProject}
       onOpenReading={handleOpenReading}
-      onAssignReadingToProject={handleAssignReadingToProject}
-      activeScienceKey={sidebarScienceKey}
-      onScienceSelect={handleScienceSelect}
+      activeIntentKey={sidebarIntentKey}
+      onIntentSelect={handleIntentSelect}
     />
   )
 

@@ -7,6 +7,7 @@ import { getEntitlements } from './entitlements'
 import type { PractitionerUsage } from './bootstrapTypes'
 import type { AnalysisMode, RenderMode } from '@/lib/hexastra/sciences/scienceTaxonomy'
 import { FUSION_ONLY_ANALYSIS_MODE } from '@/lib/hexastra/fusionOnly'
+import type { UserIntentKey } from '@/lib/hexastra/config/intentContextMap'
 
 export type RequestType = 'micro_profile' | 'micro_year' | 'micro_month' | 'chat'
 
@@ -132,6 +133,7 @@ export type ChatPayload = {
   journeyEnabled?: boolean
   analysisMode?: AnalysisMode | null
   renderMode?: RenderMode | null
+  userIntentKey?: UserIntentKey | null
 }
 
 export function buildChatPayload({
@@ -151,6 +153,7 @@ export function buildChatPayload({
   journeyEnabled = false,
   analysisMode = FUSION_ONLY_ANALYSIS_MODE,
   renderMode = null,
+  userIntentKey = null,
 }: {
   requestType: RequestType
   plan: PlanKey
@@ -168,6 +171,7 @@ export function buildChatPayload({
   journeyEnabled?: boolean
   analysisMode?: AnalysisMode | null
   renderMode?: RenderMode | null
+  userIntentKey?: UserIntentKey | null
 }): ChatPayload {
   const planCtx = buildPlanApiContext(plan)
   const ents = getEntitlements(plan)
@@ -203,5 +207,6 @@ export function buildChatPayload({
     journeyEnabled,
     analysisMode,
     renderMode,
+    userIntentKey,
   }
 }

@@ -1393,6 +1393,7 @@ export async function runHexastraFlow(input: {
   journeyEnabled?: boolean
   analysisMode?: 'science_by_science' | 'hexastra_fusion' | null
   renderMode?: 'simple' | 'approfondie' | 'praticien' | null
+  userIntentKey?: string | null
 }): Promise<HexastraApiResponse> {
   flowLog('info', 'enter runHexastraFlow', {
     plan: input.plan,
@@ -1410,7 +1411,20 @@ export async function runHexastraFlow(input: {
 
     // Central input normalization to keep the flow crash-proof
     const normalizedMessages = safeArray<ChatMessage>(input.messages)
-    const normalizedContextType: ContextType = input.contextType ?? 'general'
+    // Resolve contextType: intent sidebar takes precedence over generic 'general'
+    const intentContextType: ContextType | null = (() => {
+      const k = input.userIntentKey
+      if (!k) return null
+      const map: Record<string, ContextType> = {
+        understand_situation: 'general',
+        make_decision: 'decision',
+        relationships: 'relationship',
+        money_work: 'career',
+        inner_state: 'energy',
+      }
+      return map[k] ?? null
+    })()
+    const normalizedContextType: ContextType = intentContextType ?? input.contextType ?? 'general'
     const normalizedBirthData = normalizeBirthData(input.birthData)
     const normalizedPractitionerUsage = input.practitionerUsage ?? null
     const normalizedSelectedMenuKey = sanitizeFusionOnlySelectionKey(input.selectedMenuKey ?? null)
@@ -1456,6 +1470,8 @@ export async function runHexastraFlow(input: {
       selectedMenuKey: normalizedSelectedMenuKey,
       selectedSubmenuKey: normalizedSelectedSubmenuKey,
       journeyEnabled: normalizedJourneyToggle,
+      userIntentKey: input.userIntentKey ?? null,
+      resolvedContextType: normalizedContextType,
     })
 
     if (!VECTOR_STORE_ID) {
@@ -3219,6 +3235,7 @@ export async function runHexastraFlow(input: {
       renderMode: input.renderMode ?? null,
       selectedScience: selectedScienceForPrompt,
       selectedSubcategory: universalClassif.subcategory,
+      userIntentKey: input.userIntentKey ?? null,
       exactDataBlock: exactDataBlockForPrompt,
       requiresExactData: exactDataNeeded,
       hdProfileBlock,

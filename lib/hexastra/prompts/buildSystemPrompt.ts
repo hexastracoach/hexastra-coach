@@ -1,4 +1,5 @@
 import { PLAN_MODE_MAP } from '@/lib/hexastra/config/planModeMap'
+import { getIntentConfig } from '@/lib/hexastra/config/intentContextMap'
 import { applySafetySuffix } from '@/lib/hexastra/guards/safety'
 import { isSimpleAstroFactQuestion } from '@/lib/hexastra/guards/exactDataGuard'
 import { buildEvolutionContext } from '@/lib/evolution/evolutionContextBuilder'
@@ -145,6 +146,37 @@ function requestDirective(input: BuildPromptInput): string {
     return 'Genere uniquement la micro-lecture mois en 2 a 4 lignes, directe et utile, puis ajoute exactement: "Ton profil, ton annee et ton contexte actuel sont maintenant poses." puis "Que souhaites-tu explorer ?". Ne pose aucune question.'
   }
   return 'Reponds selon le step de session: menu -> orienter avec souplesse ; clarification -> affiner ; decision -> trancher avec prudence ; sensitive_support -> simplifier ; analysis/deep_reading -> analyser et orienter.'
+}
+
+/**
+ * Directive based on the sidebar intent context selected by the user.
+ * Injected only when userIntentKey is set and no explicit science overrides it.
+ * Sciences remain invisible in the output — only context framing is exposed.
+ */
+function intentContextDirective(input: BuildPromptInput): string {
+  const intentKey = input.userIntentKey
+  if (!intentKey) return ''
+
+  // If an explicit science is already selected, intent becomes secondary
+  // (explicit science has higher priority, no need to override)
+  const isFr = (input.language ?? 'fr').slice(0, 2).toLowerCase() !== 'en'
+
+  const config = getIntentConfig(intentKey as Parameters<typeof getIntentConfig>[0])
+  if (!config) return ''
+
+  const framing = isFr ? config.promptFraming.fr : config.promptFraming.en
+  const label = isFr ? config.label : config.labelEn
+
+  const primaryLabels = config.primarySciences
+    .filter((s) => s !== 'hexastra_fusion')
+    .join(', ')
+
+  return `
+Contexte utilisateur actif: ${label}
+${framing}
+Sciences prioritaires pour ce contexte (usage interne uniquement, ne jamais les nommer publiquement sauf si l'utilisateur les demande explicitement): ${primaryLabels}.
+La réponse doit répondre au besoin humain concret exprimé par ce contexte, pas exposer les sciences sous-jacentes.
+`.trim()
 }
 
 /**
@@ -1085,6 +1117,7 @@ ${stepDirective(input)}
 ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}
 ${analysisModeDirective(input)}
+${intentContextDirective(input)}
 ${exactScienceIsolationDirective(input)}
 ${practitionerContextDirective(input)}
 ${hdProfileDirective(input)}

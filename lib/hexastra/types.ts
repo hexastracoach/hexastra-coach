@@ -274,6 +274,8 @@ export type BuildPromptInput = {
   selectedScience?: string | null
   /** Sous-categorie ou sous-angle detecte dans la science active */
   selectedSubcategory?: string | null
+  /** Contexte intention utilisateur sélectionné dans la sidebar (5 intentions humaines) */
+  userIntentKey?: string | null
   /** Contexte praticien: self = perso, client = pour un client, duo = lecture croisée 2 personnes */
   practitionerContext?: 'self' | 'client' | 'duo' | null
   /**

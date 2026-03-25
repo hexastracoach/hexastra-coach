@@ -1,123 +1,20 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo } from 'react'
-import type { Project, Reading } from '../_lib/chat'
+import type { Reading } from '../_lib/chat'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import type { PlanKey } from '@/lib/plans'
 import HexastraLogo from '@/app/components/HexastraLogo'
-import type { ScienceKey } from '@/lib/hexastra/sciences/scienceTaxonomy'
-
-type ScienceEntry = {
-  key: ScienceKey
-  label: string
-  colorClass: string
-  Icon: () => JSX.Element
-}
-
-const SIDEBAR_SCIENCES: ScienceEntry[] = [
-  {
-    key: 'fusion_hexastra',
-    label: 'Hexastra Fusion',
-    colorClass: 'text-emerald-400',
-    Icon: () => (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-        <polygon points="8,1 9.6,5.8 14.5,5.8 10.5,8.8 12.1,13.6 8,10.6 3.9,13.6 5.5,8.8 1.5,5.8 6.4,5.8" />
-      </svg>
-    ),
-  },
-  {
-    key: 'astrologie',
-    label: 'Astrologie',
-    colorClass: 'text-blue-400',
-    Icon: () => (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-        <circle cx="8" cy="8" r="3" />
-        <ellipse cx="8" cy="8" rx="7" ry="2.8" transform="rotate(-30 8 8)" />
-      </svg>
-    ),
-  },
-  {
-    key: 'numerologie',
-    label: 'Numérologie',
-    colorClass: 'text-amber-400',
-    Icon: () => (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
-        <line x1="5.5" y1="3" x2="4.5" y2="13" />
-        <line x1="11.5" y1="3" x2="10.5" y2="13" />
-        <line x1="3" y1="6" x2="13" y2="6" />
-        <line x1="3" y1="10" x2="13" y2="10" />
-      </svg>
-    ),
-  },
-  {
-    key: 'human_design',
-    label: 'Human Design',
-    colorClass: 'text-violet-400',
-    Icon: () => (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-        <circle cx="8" cy="3.5" r="1.5" />
-        <rect x="5.5" y="6" width="5" height="4" rx="1" />
-        <line x1="8" y1="5" x2="8" y2="6" />
-        <line x1="5.5" y1="8" x2="3" y2="9.5" />
-        <line x1="10.5" y1="8" x2="13" y2="9.5" />
-        <line x1="8" y1="10" x2="8" y2="13" />
-      </svg>
-    ),
-  },
-  {
-    key: 'enneagramme',
-    label: 'Ennéagramme',
-    colorClass: 'text-rose-400',
-    Icon: () => (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
-        <circle cx="8" cy="8" r="6.5" />
-        <circle cx="8" cy="1.5" r="1" fill="currentColor" stroke="none" />
-        <circle cx="13.2" cy="4.8" r="1" fill="currentColor" stroke="none" />
-        <circle cx="13.2" cy="11.2" r="1" fill="currentColor" stroke="none" />
-        <circle cx="8" cy="14.5" r="1" fill="currentColor" stroke="none" />
-        <circle cx="2.8" cy="11.2" r="1" fill="currentColor" stroke="none" />
-        <circle cx="2.8" cy="4.8" r="1" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-  },
-  {
-    key: 'kua',
-    label: 'Kua',
-    colorClass: 'text-cyan-400',
-    Icon: () => (
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
-        <circle cx="8" cy="8" r="6.5" />
-        <line x1="8" y1="1.5" x2="8" y2="4" />
-        <line x1="8" y1="12" x2="8" y2="14.5" />
-        <line x1="1.5" y1="8" x2="4" y2="8" />
-        <line x1="12" y1="8" x2="14.5" y2="8" />
-        <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-  },
-]
-
-const SCIENCE_READING_LABEL: Record<ScienceKey, string> = {
-  fusion_hexastra: 'Hexastra Fusion',
-  astrologie: 'Astrologie',
-  numerologie: 'Numerologie',
-  human_design: 'Human Design',
-  enneagramme: 'Enneagramme',
-  kua: 'Kua',
-}
+import { SIDEBAR_INTENTS, type UserIntentKey } from '@/lib/hexastra/config/intentContextMap'
 
 type Props = {
-  projects: Project[]
   readings: Reading[]
   userInitials?: string
   userPlan?: PlanKey
   onNewReading?: () => void
-  onCreateProject?: (name: string) => void
   onOpenReading?: (reading: Reading) => void
-  onAssignReadingToProject?: (readingId: string, projectId: string) => void
-  activeScienceKey?: ScienceKey
-  onScienceSelect?: (key: ScienceKey) => void
+  activeIntentKey?: UserIntentKey
+  onIntentSelect?: (key: UserIntentKey) => void
 }
 
 function formatReadingDate(value?: string) {
@@ -129,15 +26,81 @@ function formatReadingDate(value?: string) {
 
 function planLabel(plan?: PlanKey) {
   switch (plan) {
-    case 'essential':
-      return 'Essential'
-    case 'premium':
-      return 'Premium'
-    case 'practitioner':
-      return 'Practitioner'
-    default:
-      return 'Free'
+    case 'essential': return 'Essential'
+    case 'premium': return 'Premium'
+    case 'practitioner': return 'Practitioner'
+    default: return 'Free'
   }
+}
+
+// SVG icons per intent
+function IconUnderstand() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.5" />
+      <line x1="8" y1="5" x2="8" y2="8.5" />
+      <circle cx="8" cy="10.5" r="0.7" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function IconDecision() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M8 2v5" />
+      <path d="M5.5 7H8l2.5 3" />
+      <path d="M8 7l-2.5 3" />
+      <circle cx="8" cy="2" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="10.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
+      <circle cx="5.5" cy="10" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function IconRelationships() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+      <circle cx="5.5" cy="5.5" r="2.5" />
+      <circle cx="10.5" cy="5.5" r="2.5" />
+      <path d="M2 13.5c0-2 1.6-3.5 3.5-3.5s3.5 1.5 3.5 3.5" strokeLinecap="round" />
+      <path d="M7 13.5c0-2 1.6-3.5 3.5-3.5s3.5 1.5 3.5 3.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconMoneyWork() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+      <rect x="1.5" y="4" width="13" height="9" rx="1.5" />
+      <path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+      <circle cx="8" cy="8.5" r="1.8" />
+    </svg>
+  )
+}
+
+function IconInnerState() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+      <path d="M8 2.5C5 2.5 2.5 5 2.5 8s2.5 5.5 5.5 5.5 5.5-2.5 5.5-5.5S11 2.5 8 2.5Z" />
+      <path d="M8 5v3l2 1.5" />
+    </svg>
+  )
+}
+
+const INTENT_ICONS: Record<UserIntentKey, () => JSX.Element> = {
+  understand_situation: IconUnderstand,
+  make_decision: IconDecision,
+  relationships: IconRelationships,
+  money_work: IconMoneyWork,
+  inner_state: IconInnerState,
+}
+
+const INTENT_COLORS: Record<UserIntentKey, string> = {
+  understand_situation: 'text-emerald-400',
+  make_decision: 'text-blue-400',
+  relationships: 'text-rose-400',
+  money_work: 'text-amber-400',
+  inner_state: 'text-violet-400',
 }
 
 export default function LeftSidebar({
@@ -146,18 +109,18 @@ export default function LeftSidebar({
   userPlan = 'free',
   onNewReading,
   onOpenReading,
-  activeScienceKey = 'fusion_hexastra',
-  onScienceSelect,
+  activeIntentKey = 'understand_situation',
+  onIntentSelect,
 }: Props) {
   const { lang } = useTranslation()
   const isEnglish = lang.startsWith('en')
 
-  const filteredReadings = useMemo(() => {
+  const filteredReadings = (() => {
     const all = [...(readings ?? [])].filter((r) => Boolean(r?.id && r?.title))
-    if (activeScienceKey === 'fusion_hexastra') return all.slice(0, 20)
-    const label = SCIENCE_READING_LABEL[activeScienceKey]
-    return all.filter((r) => r.science === label).slice(0, 20)
-  }, [readings, activeScienceKey])
+    const activeLabel = SIDEBAR_INTENTS.find((i) => i.key === activeIntentKey)?.[isEnglish ? 'labelEn' : 'label']
+    if (!activeLabel) return all.slice(0, 20)
+    return all.filter((r) => r.science === activeLabel).slice(0, 20)
+  })()
 
   return (
     <div className="flex h-full flex-col border-r border-white/[0.06] bg-[#040d16]/75 text-slate-100 backdrop-blur-2xl">
@@ -183,19 +146,21 @@ export default function LeftSidebar({
 
       <div className="mx-4 h-px bg-white/[0.05]" />
 
-      {/* Sciences */}
+      {/* Intent navigation */}
       <div className="px-3 py-3">
         <p className="mb-2 px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          {isEnglish ? 'Reading angle' : 'Angle de lecture'}
+          {isEnglish ? 'What do you need?' : 'Qu\'avez-vous besoin ?'}
         </p>
         <div className="space-y-0.5">
-          {SIDEBAR_SCIENCES.map(({ key, label, colorClass, Icon }) => {
-            const isActive = activeScienceKey === key
+          {SIDEBAR_INTENTS.map((intent) => {
+            const isActive = activeIntentKey === intent.key
+            const Icon = INTENT_ICONS[intent.key]
+            const colorClass = INTENT_COLORS[intent.key]
             return (
               <button
-                key={key}
+                key={intent.key}
                 type="button"
-                onClick={() => onScienceSelect?.(key)}
+                onClick={() => onIntentSelect?.(intent.key)}
                 className={`group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left transition-all duration-150 ${
                   isActive
                     ? 'bg-white/[0.06]'
@@ -206,7 +171,7 @@ export default function LeftSidebar({
                   <Icon />
                 </span>
                 <span className={`truncate text-[12.5px] font-medium transition-colors ${isActive ? 'text-slate-100' : 'text-slate-500 group-hover:text-slate-300'}`}>
-                  {label}
+                  {isEnglish ? intent.labelEn : intent.label}
                 </span>
                 {isActive && (
                   <span className={`ml-auto h-1.5 w-1.5 shrink-0 rounded-full ${colorClass.replace('text-', 'bg-')}`} />
@@ -219,7 +184,7 @@ export default function LeftSidebar({
 
       <div className="mx-4 h-px bg-white/[0.05]" />
 
-      {/* Readings filtered by science */}
+      {/* Readings filtered by intent */}
       <div className="flex-1 overflow-y-auto px-3 py-3">
         <p className="mb-2 px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
           {isEnglish ? 'Readings' : 'Lectures'}
@@ -228,8 +193,8 @@ export default function LeftSidebar({
         {filteredReadings.length === 0 ? (
           <p className="px-1.5 py-2 text-[12px] leading-5 text-slate-600">
             {isEnglish
-              ? 'No readings for this angle yet.'
-              : 'Aucune lecture pour cet angle.'}
+              ? 'No readings for this context yet.'
+              : 'Aucune lecture pour ce contexte.'}
           </p>
         ) : (
           <div className="space-y-0.5">

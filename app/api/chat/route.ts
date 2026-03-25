@@ -803,6 +803,11 @@ export async function POST(req: NextRequest) {
     const requestedSelectedSubmenuKey = sanitizeFusionOnlySelectionKey(
       typeof bodyRecord.selectedSubmenuKey === 'string' ? (bodyRecord.selectedSubmenuKey as string) : null,
     )
+    const VALID_INTENT_KEYS = ['understand_situation', 'make_decision', 'relationships', 'money_work', 'inner_state']
+    const requestedUserIntentKey =
+      typeof bodyRecord.userIntentKey === 'string' && VALID_INTENT_KEYS.includes(bodyRecord.userIntentKey as string)
+        ? (bodyRecord.userIntentKey as string)
+        : null
 
     failureContext = {
       requestType,
@@ -860,6 +865,8 @@ export async function POST(req: NextRequest) {
     )
     log('info', 'intent detected', { intentLocal })
 
+    log('info', 'intent context', { userIntentKey: requestedUserIntentKey })
+
     const sharedFlowInput = {
       plan: effectivePlan,
       responseDepth,
@@ -873,6 +880,7 @@ export async function POST(req: NextRequest) {
       journeyEnabled,
       analysisMode: requestedAnalysisMode,
       renderMode: requestedRenderMode,
+      userIntentKey: requestedUserIntentKey,
     }
 
     failureStage = 'pre_quota_orchestration'
