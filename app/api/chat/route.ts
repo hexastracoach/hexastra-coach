@@ -809,6 +809,20 @@ export async function POST(req: NextRequest) {
         ? (bodyRecord.userIntentKey as string)
         : null
 
+    // Map each sidebar intent to the primary calculation science key so that
+    // runHexastraFlow triggers the right KS module (astrology API, HD, numerology…)
+    // and populates exactDataBlock with real profile data.
+    const INTENT_CALCULATION_KEY: Record<string, string> = {
+      understand_situation: 'science_astrologie',
+      make_decision: 'science_human_design',
+      relationships: 'science_enneagramme',
+      money_work: 'science_numerologie',
+      inner_state: 'science_human_design',
+    }
+    const effectiveSelectedMenuKey =
+      requestedSelectedMenuKey ??
+      (requestedUserIntentKey ? (INTENT_CALCULATION_KEY[requestedUserIntentKey] ?? null) : null)
+
     failureContext = {
       requestType,
       conversationId: requestedConversationId,
@@ -1028,7 +1042,7 @@ export async function POST(req: NextRequest) {
           ...sharedFlowInput,
           requestType,
           contextType: normalizedContextType,
-          selectedMenuKey: requestedSelectedMenuKey,
+          selectedMenuKey: effectiveSelectedMenuKey,
           selectedSubmenuKey: requestedSelectedSubmenuKey,
           uiAction: normalizedUiAction,
         })
@@ -1195,7 +1209,7 @@ export async function POST(req: NextRequest) {
           ...sharedFlowInput,
           requestType,
           contextType: normalizedContextType,
-          selectedMenuKey: requestedSelectedMenuKey,
+          selectedMenuKey: effectiveSelectedMenuKey,
           selectedSubmenuKey: requestedSelectedSubmenuKey,
           uiAction: normalizedUiAction,
         })
