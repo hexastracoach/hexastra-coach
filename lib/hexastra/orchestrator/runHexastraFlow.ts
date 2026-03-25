@@ -3047,6 +3047,40 @@ export async function runHexastraFlow(input: {
             : scienceCompactBlock ?? formatExactDataBlockCapped(specializedResult.raw, exactDataMaxChars))
         : null
 
+    // ── Intent-driven profile block ────────────────────────────────────────────
+    // When userIntentKey is set and Railway data resolved but exactDataNeeded=false
+    // (message classifier returned 'unknown'), inject a compact science block so
+    // the AI grounds its reading in the user's actual energetic profile.
+    const INTENT_SCIENCE_FOR_BLOCK: Record<string, string> = {
+      understand_situation: 'astrology',
+      make_decision: 'human_design',
+      relationships: 'enneagram',
+      money_work: 'numerology',
+      inner_state: 'human_design',
+    }
+    const intentScienceForBlock = input.userIntentKey
+      ? (INTENT_SCIENCE_FOR_BLOCK[input.userIntentKey] ?? null)
+      : null
+    let intentCompactBlock: string | null = null
+    if (!exactDataNeeded && intentScienceForBlock && exactDataResolved && specializedResult?.raw) {
+      const intentRaw = specializedResult.raw as Record<string, unknown>
+      if (intentScienceForBlock === 'astrology') {
+        intentCompactBlock = buildCompactNatalReadingContext(intentRaw, 2000).compactDataBlock || null
+      } else if (intentScienceForBlock === 'human_design') {
+        intentCompactBlock = buildCompactHumanDesignContext(intentRaw)?.compactDataBlock ?? null
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        intentCompactBlock = buildCompactExactScienceBlock({ science: intentScienceForBlock as any, raw: intentRaw, maxChars: 2000 })
+      }
+      if (intentCompactBlock) {
+        flowLog('info', 'INTENT_PROFILE_BLOCK_INJECTED', {
+          userIntentKey: input.userIntentKey,
+          scienceUsed: intentScienceForBlock,
+          blockChars: intentCompactBlock.length,
+        })
+      }
+    }
+
     // ── Deterministic core placements block (Bug 3) ──────────────────────────
     // When the user explicitly asks for sun/moon/rising, extract these values
     // deterministically from raw data and pin them ABOVE the capped block.
@@ -3179,7 +3213,7 @@ export async function runHexastraFlow(input: {
     // leaking rich/raw payloads that encourage the model to "complete" values.
     const exactDataBlockForPrompt = isAstroExactCompact
       ? astroCompactCtx?.compactDataBlock ?? coreAstroBlock ?? rawExactDataBlock
-      : [coreAstroBlock, rawExactDataBlock].filter(Boolean).join('\n\n') || null
+      : [coreAstroBlock, rawExactDataBlock ?? intentCompactBlock].filter(Boolean).join('\n\n') || null
 
     const horoscopeDataBlock = isHoroscopeRoute
       ? buildHoroscopeDataBlock(
