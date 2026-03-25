@@ -170,9 +170,7 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
 
   const renderContent = () => {
     if (!readingSections) {
-      return isUser
-        ? <div className="hx-bubble-text">{message.content}</div>
-        : renderBlocks(message.content)
+      return renderBlocks(message.content)
     }
 
     return (

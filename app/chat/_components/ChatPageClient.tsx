@@ -1872,19 +1872,7 @@ export default function ChatPageClient() {
           isReading,
         }
 
-        const reminderMsg: Msg | null =
-          nextUserMessageCount === 2 && noBirthData
-            ? {
-                id: `${Date.now()}-reminder`,
-                role: 'assistant',
-                content:
-                  'Avec tes données de naissance,\nje peux affiner beaucoup plus précisément\nce qui se joue pour toi.',
-                created_at: new Date().toISOString(),
-              }
-            : null
-        const final = reminderMsg
-          ? [...nextConversation, assistantMessage, reminderMsg]
-          : [...nextConversation, assistantMessage]
+        const final = [...nextConversation, assistantMessage]
         setMessages(final)
         setIsTyping(false)
 
