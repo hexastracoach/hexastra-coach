@@ -911,6 +911,8 @@ EXACT DATA FIDELITY:
  * Skipped for: praticien renderMode, micro requestTypes, horoscope route, astro_exact_compact.
  */
 function hexastraCoreSixBlockDirective(input: BuildPromptInput): string {
+  // Skip for fusion_answer mode — it has its own locked 4-block template
+  if (input.responseModeDirective?.startsWith('# FUSION_ANSWER_MODE')) return ''
   // Skip for praticien render mode — it has its own 7-section structure
   if (input.renderMode === 'praticien') return ''
   // Skip for micro reads — these have their own tight format

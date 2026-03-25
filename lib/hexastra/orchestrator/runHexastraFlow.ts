@@ -102,6 +102,7 @@ import {
 import { buildCompactHumanDesignContext, type CompactHDContext } from '@/lib/humandesign/compactContext'
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
 import { classifyUserIntent, isFusionIntent } from '@/lib/hexastra/orchestration/intentClassifier'
+import { buildFusionProfileBlock } from '@/lib/hexastra/orchestrator/buildFusionProfileBlock'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
@@ -1629,6 +1630,8 @@ export async function runHexastraFlow(input: {
         confidence: universalClassif.confidence,
         domainRoute: universalClassif.domainRoute,
         explicitScienceIntent: explicitScienceIntent?.science ?? null,
+        userIntent,
+        isIntentFusion,
       })
 
       const shouldForceScienceAngleDirectRead =
@@ -3076,36 +3079,54 @@ export async function runHexastraFlow(input: {
         : null
 
     // ── Intent-driven profile block ────────────────────────────────────────────
-    // When userIntentKey is set and Railway data resolved but exactDataNeeded=false
-    // (message classifier returned 'unknown'), inject a compact science block so
-    // the AI grounds its reading in the user's actual energetic profile.
-    const INTENT_SCIENCE_FOR_BLOCK: Record<string, string> = {
-      understand_situation: 'astrology',
-      make_decision: 'human_design',
-      relationships: 'enneagram',
-      money_work: 'numerology',
-      inner_state: 'human_design',
-    }
-    const intentScienceForBlock = input.userIntentKey
-      ? (INTENT_SCIENCE_FOR_BLOCK[input.userIntentKey] ?? null)
-      : null
+    // For fusion intents: inject the full multi-science fusion profile block so
+    // the AI grounds its 4-block reading in the complete energetic profile.
+    // For single sidebar intents: inject a compact single-science block.
     let intentCompactBlock: string | null = null
-    if (!exactDataNeeded && intentScienceForBlock && exactDataResolved && specializedResult?.raw) {
+    if (!exactDataNeeded && exactDataResolved && specializedResult?.raw) {
       const intentRaw = specializedResult.raw as Record<string, unknown>
-      if (intentScienceForBlock === 'astrology') {
-        intentCompactBlock = buildCompactNatalReadingContext(intentRaw, 2000).compactDataBlock || null
-      } else if (intentScienceForBlock === 'human_design') {
-        intentCompactBlock = buildCompactHumanDesignContext(intentRaw)?.compactDataBlock ?? null
+      if (isIntentFusion) {
+        const fusionBlock = buildFusionProfileBlock(
+          intentRaw,
+          userContext.language ?? 'fr',
+          userContext.firstName ?? userContext.name ?? null,
+        )
+        intentCompactBlock = fusionBlock.fullBlock || null
+        if (intentCompactBlock) {
+          flowLog('info', 'FUSION_PROFILE_BLOCK_INJECTED', {
+            sciences: fusionBlock.sciences,
+            blockChars: intentCompactBlock.length,
+            userIntent,
+          })
+        }
       } else {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        intentCompactBlock = buildCompactExactScienceBlock({ science: intentScienceForBlock as any, raw: intentRaw, maxChars: 2000 })
-      }
-      if (intentCompactBlock) {
-        flowLog('info', 'INTENT_PROFILE_BLOCK_INJECTED', {
-          userIntentKey: input.userIntentKey,
-          scienceUsed: intentScienceForBlock,
-          blockChars: intentCompactBlock.length,
-        })
+        const INTENT_SCIENCE_FOR_BLOCK: Record<string, string> = {
+          understand_situation: 'astrology',
+          make_decision: 'human_design',
+          relationships: 'enneagram',
+          money_work: 'numerology',
+          inner_state: 'human_design',
+        }
+        const intentScienceForBlock = input.userIntentKey
+          ? (INTENT_SCIENCE_FOR_BLOCK[input.userIntentKey] ?? null)
+          : null
+        if (intentScienceForBlock) {
+          if (intentScienceForBlock === 'astrology') {
+            intentCompactBlock = buildCompactNatalReadingContext(intentRaw, 2000).compactDataBlock || null
+          } else if (intentScienceForBlock === 'human_design') {
+            intentCompactBlock = buildCompactHumanDesignContext(intentRaw)?.compactDataBlock ?? null
+          } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            intentCompactBlock = buildCompactExactScienceBlock({ science: intentScienceForBlock as any, raw: intentRaw, maxChars: 2000 })
+          }
+          if (intentCompactBlock) {
+            flowLog('info', 'INTENT_PROFILE_BLOCK_INJECTED', {
+              userIntentKey: input.userIntentKey,
+              scienceUsed: intentScienceForBlock,
+              blockChars: intentCompactBlock.length,
+            })
+          }
+        }
       }
     }
 
