@@ -166,12 +166,12 @@ export default function Composer({
 
   const canSend = value.trim().length > 0 && !disabled && !transcribing
   const placeholder = transcribing
-    ? lang.startsWith(‘en’)
-      ? ‘Transcribing your message...’
-      : ‘Je transcris votre message...’
-    : lang.startsWith(‘en’)
-      ? ‘Ask your question’
-      : ‘Pose ta question’
+    ? lang.startsWith('en')
+      ? 'Transcribing your message...'
+      : 'Je transcris votre message...'
+    : lang.startsWith('en')
+      ? 'Ask your question'
+      : 'Pose ta question'
   const statusLabel = getStatusLabel({
     lang,
     focused,
