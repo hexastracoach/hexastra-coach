@@ -101,6 +101,7 @@ import {
 } from '@/lib/humandesign/profile'
 import { buildCompactHumanDesignContext, type CompactHDContext } from '@/lib/humandesign/compactContext'
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
+import { classifyUserIntent, isFusionIntent } from '@/lib/hexastra/orchestration/intentClassifier'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
@@ -1598,6 +1599,20 @@ export async function runHexastraFlow(input: {
 
       // Universal classification: intent + science + subcategory + requestKind in one call
       const universalClassif = classifyMessage(latestUserMessage, limitedMessages)
+
+      // ── Intent-first routing (INTENT > ROUTE > DATA > RENDER) ────────────────
+      const userIntent = classifyUserIntent(
+        latestUserMessage,
+        input.userIntentKey ?? null,
+      )
+      const isIntentFusion = isFusionIntent(userIntent)
+      flowLog('info', 'INTENT_CLASSIFIED', {
+        userIntent,
+        isIntentFusion,
+        sidebarIntentKey: input.userIntentKey ?? null,
+        messagePreview: latestUserMessage.slice(0, 60),
+      })
+
       const explicitScienceIntent = detectExplicitScienceIntent({
         message: latestUserMessage,
         scienceHint: universalClassif.science,
@@ -1692,6 +1707,9 @@ export async function runHexastraFlow(input: {
       }
 
       const blockMicroProfile =
+        // Always block micro_profile when intent is a fusion question or sidebar intent is set
+        isIntentFusion ||
+        Boolean(input.userIntentKey) ||
         isAstroExact ||
         isHumanDesignExact ||
         isHoroscopeRoute ||
@@ -1743,6 +1761,12 @@ export async function runHexastraFlow(input: {
 
       const flowStep = isHoroscopeRoute
         ? 'analysis'
+        // Fusion intent or sidebar intent always forces analysis (never micro_profile)
+        : (isIntentFusion || Boolean(input.userIntentKey)) &&
+            computedFlowStep !== 'sensitive_support' &&
+            computedFlowStep !== 'birthdata' &&
+            computedFlowStep !== 'practitioner_usage'
+          ? 'analysis'
         : isDirectRequest &&
             computedFlowStep !== 'sensitive_support' &&
             computedFlowStep !== 'birthdata' &&
@@ -2411,19 +2435,22 @@ export async function runHexastraFlow(input: {
       requiresExactData(orchestrationExecution.detectedSubcategory)
 
     // Effective domain for API: prefer orchestration route over legacy 'general' fallback.
-    // When orchestration detected 'science' or 'fusion' but legacy classifyQuery returned 'general'
-    // (e.g. accent mismatch, unlisted pattern), use the orchestration result.
+    // INTENT OVERRIDE: fusion intent always uses 'fusion' domain — never timing/general.
     const effectiveDomainForApi: DomainRoute =
       semanticCtx.contextType === 'astro_followup'
         ? astroFollowupRouting.effectiveDomainForApi
-        : orchestrationExecution.route !== 'general'
-          ? orchestrationExecution.route
-          : domainRoute
+        : isIntentFusion
+          ? 'fusion'
+          : orchestrationExecution.route !== 'general'
+            ? orchestrationExecution.route
+            : domainRoute
 
     const domainConfigForApi = getKsDomainConfig(effectiveDomainForApi)
 
-    // Force API call for astro/HD exact requests and any subcategory requiring deterministic data
+    // Force API call for astro/HD exact requests and any subcategory requiring deterministic data.
+    // INTENT OVERRIDE: fusion intent + birth data → always call Railway for profile data.
     const shouldUseApiBackbone =
+      (isIntentFusion && hasBirthData) ||
       astroFollowupRouting.shouldUseApiBackbone ||
       isAstroExact ||
       isHumanDesignExact ||
@@ -2691,6 +2718,7 @@ export async function runHexastraFlow(input: {
       exactDataResolved,
       exactDataReliable: effectiveReliable,
       isPedagogical: universalClassif.requestKind === 'clarification',
+      isFusionIntent: isIntentFusion,
     })
     // Enneagram always uses interpretive_reading — prose, not structured output
     const effectiveResponseMode =

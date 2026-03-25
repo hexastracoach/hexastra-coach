@@ -16,6 +16,7 @@ export type ResponseMode =
   | 'interpretive_reading'
   | 'guided_exploration'
   | 'pedagogical_explanation'
+  | 'fusion_answer'
 
 export type ResponseModeInput = {
   requestKind: RequestKind
@@ -25,6 +26,8 @@ export type ResponseModeInput = {
   exactDataResolved?: boolean
   exactDataReliable?: boolean
   isPedagogical?: boolean
+  /** When set and is a fusion intent, returns fusion_answer */
+  isFusionIntent?: boolean
 }
 
 /**
@@ -39,10 +42,15 @@ export type ResponseModeInput = {
  * 8. Fallback: resolved+reliable -> calculated_reading, else guided_exploration
  */
 export function selectResponseMode(input: ResponseModeInput): ResponseMode {
-  const { requestKind, isTimeoutRisk, exactDataResolved, exactDataReliable, isPedagogical } = input
+  const { requestKind, isTimeoutRisk, exactDataResolved, exactDataReliable, isPedagogical, isFusionIntent } = input
 
   if (isPedagogical || requestKind === 'clarification') {
     return 'pedagogical_explanation'
+  }
+
+  // Fusion intent with data resolved → fusion_answer (4-block template)
+  if (isFusionIntent && exactDataResolved) {
+    return 'fusion_answer'
   }
 
   if (isTimeoutRisk) {
@@ -108,6 +116,29 @@ export function buildResponseModeDirective(mode: ResponseMode): string {
         "- Explique le concept clairement, sans reference aux donnees personnelles de l utilisateur.",
         '- Ton: accessible, direct, sans jargon inutile.',
         "- N invente pas de donnees personnelles. Reponds a la question conceptuelle uniquement.",
+      ].join('\n')
+
+    case 'fusion_answer':
+      return [
+        'MODE DE REPONSE: LECTURE FUSIONNEE PERSONNALISEE',
+        "- L utilisateur pose une question personnelle. Toute reponse DOIT etre ancree sur son profil energetique reel.",
+        "- NE JAMAIS repondre avec des conseils generiques. Si le profil est present, utilise-le.",
+        '- Structure obligatoire (4 blocs, chacun precede d une ligne vide):',
+        '',
+        '→ Ce qui se passe',
+        '  Analyse claire et directe de la situation en lien avec le profil (signe, type HD, chemin de vie…)',
+        '',
+        '→ Pourquoi ca bloque',
+        '  Lien avec le fonctionnement interne de la personne (tendances, freins, patterns visibles dans le profil)',
+        '',
+        '→ Ce que tu peux faire',
+        '  Action concrete, adaptee au profil — une seule, applicable maintenant',
+        '',
+        '→ Cle a retenir',
+        '  Phrase courte et impactante qui resonne avec l essence du profil',
+        '',
+        "- Ton: direct, chaleureux, ancre dans la realite energetique de la personne.",
+        "- Interdit: conseils de coach generiques, formules creuses, listes a puces sans contexte profil.",
       ].join('\n')
   }
 }

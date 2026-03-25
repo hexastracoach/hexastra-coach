@@ -39,5 +39,18 @@ export function classifyQuery(message: string): DomainRoute {
     return 'wellbeing'
   }
 
+  // Personal/existential questions without explicit science → fusion (never leave as 'general')
+  // RULE: pourquoi / comment / je ressens / je bloque / les gens / dois-je → fusion
+  if (
+    /(^pourquoi\b|^comment\b|\bpourquoi\b|\bcomment\b)/i.test(text) ||
+    /\bje (ressens|sens|vis|traverse|n arrive pas|bloque|souffre|manque|cherche|ne comprends|ne sais|ne peux|ne vois)\b/i.test(text) ||
+    /\bqu est.?ce qui (se passe|m empeche|bloque)\b/i.test(text) ||
+    /\b(ma vie|ma situation|mon fonctionnement|mon comportement|mon rapport a|mon blocage)\b/i.test(text) ||
+    /\b(les gens ne|les gens m|personne ne)\b/i.test(text) ||
+    /\b(dois.?je|devrais.?je|faut.?il que)\b/i.test(text)
+  ) {
+    return 'fusion'
+  }
+
   return 'general'
 }
