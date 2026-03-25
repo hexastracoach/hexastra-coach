@@ -1016,23 +1016,34 @@ ${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
 
 /**
  * OUTPUT SENTINEL — injected LAST in the prompt for concise_fusion_answer mode.
- * Overrides all prior format instructions. Acts as the final rendering contract.
+ * Enforces the 4-block developed structure. Overrides all prior format instructions.
  */
 function outputSentinel(input: BuildPromptInput): string {
   if (!input.responseModeDirective?.startsWith('# CONCISE_FUSION_ANSWER_MODE')) return ''
   return `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-OUTPUT SENTINEL — CETTE RÈGLE EST LA DERNIÈRE ET GAGNE SUR TOUT :
+OUTPUT SENTINEL — STRUCTURE FINALE OBLIGATOIRE :
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-La réponse finale doit contenir EXACTEMENT 3 blocs. Rien de plus.
+La réponse doit contenir EXACTEMENT ces 4 blocs dans cet ordre. Rien d'autre.
 
-→ Ce qui se passe :
-→ Le nœud :
-→ Action :
+→ Ce qui se passe
+[3 à 6 phrases — situation réelle, ancrée dans le profil, sans diagnostic flou]
 
-Chaque bloc = 1 phrase. Pas d'introduction. Pas de conclusion. Pas de 4e bloc.
-Si l'analyse interne produit plus : compresser jusqu'à ne garder que la dominante.
-La sortie publique doit être plus courte que l'analyse interne.
+→ Pourquoi
+[4 à 7 phrases — mécanisme interne précis, décalage interne/externe, cause réelle]
+
+→ Ce que ça crée
+[2 à 4 phrases — conséquences concrètes dans la vie réelle]
+
+→ Ce que tu peux faire
+[2 à 4 phrases — actions applicables, adaptées au profil, pas de générique]
+
+CONTRÔLE FINAL avant envoi :
+- Supprimer toute répétition entre les blocs
+- Supprimer toute phrase applicable à n'importe qui
+- Supprimer toute mention d'un système ou science interne
+- Supprimer toute introduction ou conclusion hors structure
+- Vérifier que chaque phrase apporte une information nouvelle
 `.trim()
 }
 
