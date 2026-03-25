@@ -1507,7 +1507,7 @@ export default function ChatPageClient() {
 
       if (!lastAssistant || !firstUser) return
 
-      const intentLabel = getIntentConfig(sidebarIntentKey)?.[(chatLanguage ?? '').startsWith('en') ? 'labelEn' : 'label'] ?? 'Comprendre une situation'
+      const intentLabel = getIntentConfig(sidebarIntentKey)?.[(chatLanguage ?? 'fr').startsWith('en') ? 'labelEn' : 'label'] ?? 'Comprendre une situation'
       const reading: Reading = {
         id: `${Date.now()}`,
         title: makeReadingTitle(firstUser.content),
@@ -1519,7 +1519,7 @@ export default function ChatPageClient() {
 
       persistReadings([reading, ...readings].slice(0, 80))
     },
-    [sidebarIntentKey, lang, persistReadings, readings]
+    [sidebarIntentKey, chatLanguage, persistReadings, readings]
   )
 
   async function triggerMicroReading(requestType: RequestType) {
