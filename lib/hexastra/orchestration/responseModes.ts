@@ -17,6 +17,7 @@ export type ResponseMode =
   | 'guided_exploration'
   | 'pedagogical_explanation'
   | 'fusion_answer'
+  | 'concise_fusion_answer'
 
 export type ResponseModeInput = {
   requestKind: RequestKind
@@ -48,9 +49,9 @@ export function selectResponseMode(input: ResponseModeInput): ResponseMode {
     return 'pedagogical_explanation'
   }
 
-  // Fusion intent with data resolved → fusion_answer (4-block template)
-  if (isFusionIntent && exactDataResolved) {
-    return 'fusion_answer'
+  // Fusion intent → concise_fusion_answer (3-block template, always, data or not)
+  if (isFusionIntent) {
+    return 'concise_fusion_answer'
   }
 
   if (isTimeoutRisk) {
@@ -116,6 +117,45 @@ export function buildResponseModeDirective(mode: ResponseMode): string {
         "- Explique le concept clairement, sans reference aux donnees personnelles de l utilisateur.",
         '- Ton: accessible, direct, sans jargon inutile.',
         "- N invente pas de donnees personnelles. Reponds a la question conceptuelle uniquement.",
+      ].join('\n')
+
+    case 'concise_fusion_answer':
+      return [
+        '# CONCISE_FUSION_ANSWER_MODE — LOI DE SORTIE VERROUILLÉE',
+        '',
+        'Cette règle annule et remplace TOUTES les autres instructions de format.',
+        'La réponse publique doit respecter EXACTEMENT ce format — ni plus, ni moins :',
+        '',
+        '→ Ce qui se passe :',
+        '[1 phrase maximum. Ce qui se passe réellement pour cette personne. Ancré dans son profil énergétique fusionné. Pas de diagnostic flou.]',
+        '',
+        '→ Le nœud :',
+        '[1 phrase maximum. Le vrai mécanisme bloquant — pas le symptôme. Lié au fonctionnement interne de cette personne spécifiquement.]',
+        '',
+        '→ Action :',
+        '[1 phrase maximum. Une seule action directement applicable. Adaptée au profil. Pas un conseil générique.]',
+        '',
+        'INTERDICTIONS ABSOLUES (violations = réponse invalide) :',
+        '- AUCUNE introduction avant → Ce qui se passe',
+        '- AUCUNE conclusion après → Action',
+        '- AUCUN 4e bloc, aucune section supplémentaire',
+        '- JAMAIS plus de 1 phrase par bloc (sauf urgence émotionnelle critique)',
+        '- JAMAIS de conseil générique applicable à n\'importe qui',
+        '- JAMAIS de nom de science, module ou système interne',
+        '- JAMAIS de formule molle : "tu ressens peut-être", "il est important de", "cela peut signifier que"',
+        '- JAMAIS de paraphrase ou répétition entre les blocs',
+        '',
+        'RÈGLE D\'ARBITRAGE INTERNE (invisible — ne jamais afficher) :',
+        'Avant d\'écrire, identifier silencieusement :',
+        '1. signal dominant du profil fusionné',
+        '2. zone de vie active',
+        '3. décalage interne/externe principal',
+        '4. action la plus directement applicable',
+        'Jeter tout signal secondaire. Ne construire la réponse que sur la dominante.',
+        '',
+        'RÈGLE DE VALIDATION :',
+        'La réponse est valide si et seulement si l\'utilisateur peut se dire immédiatement : "il a compris direct ce que je vis."',
+        'Si non : réécrire plus précis, plus court, plus incarné.',
       ].join('\n')
 
     case 'fusion_answer':

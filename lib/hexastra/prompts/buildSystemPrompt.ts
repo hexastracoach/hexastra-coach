@@ -911,6 +911,8 @@ EXACT DATA FIDELITY:
  * Skipped for: praticien renderMode, micro requestTypes, horoscope route, astro_exact_compact.
  */
 function hexastraCoreSixBlockDirective(input: BuildPromptInput): string {
+  // Skip for concise_fusion_answer — it has its own locked 3-block sentinel
+  if (input.responseModeDirective?.startsWith('# CONCISE_FUSION_ANSWER_MODE')) return ''
   // Skip for fusion_answer mode — it has its own locked 4-block template
   if (input.responseModeDirective?.startsWith('# FUSION_ANSWER_MODE')) return ''
   // Skip for praticien render mode — it has its own 7-section structure
@@ -1010,6 +1012,28 @@ This separator is MANDATORY in all analysis, decision and deep_reading responses
 The separator is exactly: ──────────  (10 long dashes ─, nothing else on the line).
 Never omit this separator, never replace it with asterisks, short dashes or any other character.
 ${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
+}
+
+/**
+ * OUTPUT SENTINEL — injected LAST in the prompt for concise_fusion_answer mode.
+ * Overrides all prior format instructions. Acts as the final rendering contract.
+ */
+function outputSentinel(input: BuildPromptInput): string {
+  if (!input.responseModeDirective?.startsWith('# CONCISE_FUSION_ANSWER_MODE')) return ''
+  return `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+OUTPUT SENTINEL — CETTE RÈGLE EST LA DERNIÈRE ET GAGNE SUR TOUT :
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+La réponse finale doit contenir EXACTEMENT 3 blocs. Rien de plus.
+
+→ Ce qui se passe :
+→ Le nœud :
+→ Action :
+
+Chaque bloc = 1 phrase. Pas d'introduction. Pas de conclusion. Pas de 4e bloc.
+Si l'analyse interne produit plus : compresser jusqu'à ne garder que la dominante.
+La sortie publique doit être plus courte que l'analyse interne.
+`.trim()
 }
 
 export function buildSystemPrompt(input: BuildPromptInput): string {
@@ -1142,5 +1166,7 @@ ${scopeDirective(input)}
     .filter(Boolean)
     .join('\n')
 
-  return applySafetySuffix(memorySection ? `${base}\n${memorySection}` : base)
+  const sentinel = outputSentinel(input)
+  const full = memorySection ? `${base}\n${memorySection}` : base
+  return applySafetySuffix(sentinel ? `${full}\n\n${sentinel}` : full)
 }
