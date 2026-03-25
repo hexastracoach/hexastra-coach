@@ -1735,21 +1735,8 @@ export default function ChatPageClient() {
       const nextConversation = [...baseMessages, userMessage]
 
       const noBirthData = !isBirthDataComplete(currentBirthData)
-      const onboardingMsg: Msg | null =
-        nextUserMessageCount === 1 && noBirthData
-          ? {
-              id: `${Date.now()}-onboarding`,
-              role: 'assistant',
-              content:
-                'Tu es là.\n\nDonc il y a quelque chose\nqui mérite d\'être clarifié.\n\nJe peux t\'aider à y voir clair.\n\n---\n\nSi tu veux une lecture vraiment précise,\ntu peux ajouter tes données de naissance\ndirectement dans la barre de chat.\n\nSinon, commence simplement\navec ce que tu vis.',
-              created_at: new Date().toISOString(),
-            }
-          : null
-      const conversationWithOnboarding = onboardingMsg
-        ? [...nextConversation, onboardingMsg]
-        : nextConversation
 
-      setMessages(conversationWithOnboarding)
+      setMessages(nextConversation)
       setInput('')
       setAttachedFile(null)
       setIsTyping(true)
@@ -1785,7 +1772,7 @@ export default function ChatPageClient() {
         }
 
         setTimeout(() => {
-          const final = [...conversationWithOnboarding, assistantMessage]
+          const final = [...nextConversation, assistantMessage]
           setMessages(final)
           setIsTyping(false)
           saveReading(final)
@@ -1857,8 +1844,8 @@ export default function ChatPageClient() {
               }
             : null
         const final = reminderMsg
-          ? [...conversationWithOnboarding, assistantMessage, reminderMsg]
-          : [...conversationWithOnboarding, assistantMessage]
+          ? [...nextConversation, assistantMessage, reminderMsg]
+          : [...nextConversation, assistantMessage]
         setMessages(final)
         setIsTyping(false)
 
@@ -1874,7 +1861,7 @@ export default function ChatPageClient() {
         }
 
         setMessages([
-          ...conversationWithOnboarding,
+          ...nextConversation,
           {
             id: `${Date.now()}-error`,
             role: 'assistant',
@@ -2190,6 +2177,7 @@ export default function ChatPageClient() {
                     <div className="hx-premium-lock-text">{premiumLock.text}</div>
 
                     <button
+                      type="button"
                       className="hx-premium-lock-btn"
                       onClick={() => {
                         const targetPlan = premiumLock.targetPlan as 'essential' | 'premium' | 'practitioner'
