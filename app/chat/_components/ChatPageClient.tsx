@@ -1734,7 +1734,22 @@ export default function ChatPageClient() {
       const baseMessages = isWelcome ? [] : messages
       const nextConversation = [...baseMessages, userMessage]
 
-      setMessages(nextConversation)
+      const noBirthData = !isBirthDataComplete(currentBirthData)
+      const onboardingMsg: Msg | null =
+        nextUserMessageCount === 1 && noBirthData
+          ? {
+              id: `${Date.now()}-onboarding`,
+              role: 'assistant',
+              content:
+                'Tu es là.\n\nDonc il y a quelque chose\nqui mérite d\'être clarifié.\n\nJe peux t\'aider à y voir clair.\n\n---\n\nSi tu veux une lecture vraiment précise,\ntu peux ajouter tes données de naissance\ndirectement dans la barre de chat.\n\nSinon, commence simplement\navec ce que tu vis.',
+              created_at: new Date().toISOString(),
+            }
+          : null
+      const conversationWithOnboarding = onboardingMsg
+        ? [...nextConversation, onboardingMsg]
+        : nextConversation
+
+      setMessages(conversationWithOnboarding)
       setInput('')
       setAttachedFile(null)
       setIsTyping(true)
@@ -1770,7 +1785,7 @@ export default function ChatPageClient() {
         }
 
         setTimeout(() => {
-          const final = [...nextConversation, assistantMessage]
+          const final = [...conversationWithOnboarding, assistantMessage]
           setMessages(final)
           setIsTyping(false)
           saveReading(final)
@@ -1831,7 +1846,19 @@ export default function ChatPageClient() {
           isReading,
         }
 
-        const final = [...nextConversation, assistantMessage]
+        const reminderMsg: Msg | null =
+          nextUserMessageCount === 2 && noBirthData
+            ? {
+                id: `${Date.now()}-reminder`,
+                role: 'assistant',
+                content:
+                  'Avec tes données de naissance,\nje peux affiner beaucoup plus précisément\nce qui se joue pour toi.',
+                created_at: new Date().toISOString(),
+              }
+            : null
+        const final = reminderMsg
+          ? [...conversationWithOnboarding, assistantMessage, reminderMsg]
+          : [...conversationWithOnboarding, assistantMessage]
         setMessages(final)
         setIsTyping(false)
 
@@ -1847,7 +1874,7 @@ export default function ChatPageClient() {
         }
 
         setMessages([
-          ...nextConversation,
+          ...conversationWithOnboarding,
           {
             id: `${Date.now()}-error`,
             role: 'assistant',
@@ -1998,7 +2025,7 @@ export default function ChatPageClient() {
     attachedFileName: attachedFile?.name,
     onRemoveAttach: () => setAttachedFile(null),
     onBirthFormOpen: () => setShowInlineBirthForm((v) => !v),
-    highlightBirth: isWelcome && !isBirthDataComplete(birthData),
+    highlightBirth: !isBirthDataComplete(birthData) && userMessages.length <= 1,
     disabled: !bootstrapUi.chatReady || isMicroBootstrapPending || isLimitReached || isTyping,
     // Suggestions contextuelles dynamiques (masquées sur l'écran d'accueil)
     suggestions: bootstrapUi.chatReady && !isLimitReached && !isWelcome ? contextualSuggestions : [],

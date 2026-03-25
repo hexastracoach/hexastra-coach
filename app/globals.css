@@ -4227,13 +4227,25 @@ transition: all 0.35s ease;
 
 .hx-composer-action-btn.is-highlight {
   color: var(--hx-emerald);
-  animation: hx-birth-pulse 2s ease-in-out infinite;
-  will-change: box-shadow;
+  background: rgba(88, 226, 194, 0.07);
+  position: relative;
+}
+
+.hx-composer-action-btn.is-highlight::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 14px;
+  background: radial-gradient(circle, rgba(88, 226, 194, 0.30) 0%, rgba(88, 226, 194, 0) 72%);
+  animation: hx-birth-pulse 2.6s ease-in-out infinite;
+  will-change: opacity;
+  pointer-events: none;
 }
 
 @keyframes hx-birth-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(88, 226, 194, 0.5); }
-  50%       { box-shadow: 0 0 0 7px rgba(88, 226, 194, 0); }
+  0%, 100% { opacity: 0; }
+  45%       { opacity: 1; }
+  75%       { opacity: 0; }
 }
 
 .hx-composer-action-btn.is-recording .hx-wf-bar {
