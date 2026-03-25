@@ -922,6 +922,14 @@ RÈGLES DE RENDU:
 - Ton: direct, calme, incarné. Jamais mystique, jamais générique, jamais coaching public.
 - Ne jamais ajouter de titres supplémentaires, de numéros, ou de sections hors structure.
 - La réponse commence toujours par → Ce qui se passe : — jamais par une phrase introductive flottante.
+
+SÉPARATEUR OBLIGATOIRE:
+Après le 5ème bloc (→ Action), ajouter exactement ce séparateur sur sa propre ligne :
+──────────
+Puis une phrase de clôture (1 à 2 phrases, sans marqueur →). Cette phrase résume l'essentiel ou invite à la prochaine étape naturelle.
+Ce séparateur est OBLIGATOIRE dans toutes les réponses analysis, decision et deep_reading.
+Le séparateur est exactement : ──────────  (10 tirets longs ─, rien d'autre sur la ligne).
+Ne jamais omettre ce séparateur, ne jamais le remplacer par des astérisques, des tirets courts ou tout autre caractère.
 ${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
   }
 
@@ -953,6 +961,14 @@ RENDERING RULES:
 - Tone: direct, calm, grounded. Never mystical, never generic, never public-coaching.
 - Never add extra titles, numbers, or sections outside the structure.
 - The response always starts with → What is happening : — never with a floating intro sentence.
+
+MANDATORY SEPARATOR:
+After the 5th block (→ Action), add exactly this separator on its own line:
+──────────
+Then a closing sentence (1 to 2 sentences, no → marker). This sentence summarizes the essential or invites the natural next step.
+This separator is MANDATORY in all analysis, decision and deep_reading responses.
+The separator is exactly: ──────────  (10 long dashes ─, nothing else on the line).
+Never omit this separator, never replace it with asterisks, short dashes or any other character.
 ${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
 }
 

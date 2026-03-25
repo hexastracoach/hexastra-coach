@@ -143,16 +143,43 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
     if (onRetry) onRetry(lastUserMessage)
   }
 
+  const renderBlocks = (text: string) => {
+    const blocks = text.split(/\n{2,}/).filter((b) => b.trim())
+    if (blocks.length <= 1) {
+      return <div className="hx-bubble-text">{text}</div>
+    }
+    return (
+      <div className="hx-bubble-blocks">
+        {blocks.map((block, i) => {
+          const trimmed = block.trim()
+          const lines = trimmed.split('\n')
+          return (
+            <p key={i} className="hx-bubble-block">
+              {lines.map((line, j) => (
+                <span key={j} className={line.startsWith('\u2192 ') ? 'hx-bubble-arrow-label' : ''}>
+                  {j > 0 && <br />}
+                  {line}
+                </span>
+              ))}
+            </p>
+          )
+        })}
+      </div>
+    )
+  }
+
   const renderContent = () => {
     if (!readingSections) {
-      return <div className="hx-bubble-text">{message.content}</div>
+      return isUser
+        ? <div className="hx-bubble-text">{message.content}</div>
+        : renderBlocks(message.content)
     }
 
     return (
       <div className="hx-bubble-sections">
-        <div className="hx-bubble-text">{readingSections.main}</div>
+        {renderBlocks(readingSections.main)}
         <div className="hx-bubble-divider" />
-        <div className="hx-bubble-text hx-bubble-closure">{readingSections.closure}</div>
+        <div className="hx-bubble-closure">{readingSections.closure}</div>
         {readingSections.suggestions && (
           <>
             <div className="hx-bubble-divider" />

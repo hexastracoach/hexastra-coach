@@ -65,7 +65,7 @@ import {
   type MicroReadings,
   type PractitionerUsage,
 } from '@/lib/chat/bootstrapTypes'
-import type { AnalysisMode, RenderMode } from '@/lib/hexastra/sciences/scienceTaxonomy'
+import type { AnalysisMode, RenderMode, ScienceKey } from '@/lib/hexastra/sciences/scienceTaxonomy'
 import { FUSION_ONLY_ANALYSIS_MODE } from '@/lib/hexastra/fusionOnly'
 import {
   resolveClientSendPolicy,
@@ -409,6 +409,7 @@ export default function ChatPageClient() {
   const [menuItems, setMenuItems] = useState<HexastraMenuItem[]>([])
   const [isMenuDockOpen, setIsMenuDockOpen] = useState(false)
   const [openMenuParentKey, setOpenMenuParentKey] = useState<string | null>(null)
+  const [sidebarScienceKey, setSidebarScienceKey] = useState<ScienceKey>('fusion_hexastra')
   const [activeContextType, setActiveContextType] = useState<ContextType>('general')
   const [selectedMenuKey, setSelectedMenuKey] = useState<string | null>(null)
   const [selectedSubmenuKey, setSelectedSubmenuKey] = useState<string | null>(null)
@@ -445,6 +446,7 @@ export default function ChatPageClient() {
   const [birthAutoIntroCompleted, setBirthAutoIntroCompleted] = useState(false)
   const [autoBirthIntroPending, setAutoBirthIntroPending] = useState(false)
   const [showInlineBirthForm, setShowInlineBirthForm] = useState(false)
+  const [limitDismissed, setLimitDismissed] = useState(false)
 
   const [evolutionProfile, setEvolutionProfile] = useState<UserEvolutionProfile | null>(null)
 
@@ -1476,6 +1478,34 @@ export default function ChatPageClient() {
     } catch {}
   }, [])
 
+  const SCIENCE_TO_MENU_KEY: Partial<Record<ScienceKey, string>> = {
+    astrologie: 'science_astrologie',
+    numerologie: 'science_numerologie',
+    human_design: 'science_human_design',
+    enneagramme: 'science_enneagramme',
+    kua: 'science_kua',
+  }
+
+  const SCIENCE_READING_LABEL: Record<ScienceKey, string> = {
+    fusion_hexastra: 'Hexastra Fusion',
+    astrologie: 'Astrologie',
+    numerologie: 'Numerologie',
+    human_design: 'Human Design',
+    enneagramme: 'Enneagramme',
+    kua: 'Kua',
+  }
+
+  const handleScienceSelect = useCallback((key: ScienceKey) => {
+    setSidebarScienceKey(key)
+    setSelectedMenuKey(null)
+    setSelectedSubmenuKey(null)
+  }, [])
+
+  const effectiveScienceMenuKey =
+    sidebarScienceKey !== 'fusion_hexastra'
+      ? (SCIENCE_TO_MENU_KEY[sidebarScienceKey] ?? null)
+      : null
+
   const persistReadings = useCallback((next: Reading[]) => {
     setReadings(next)
     writeScopedStorage(window.localStorage, STORAGE_KEYS.readings, JSON.stringify(next), storageScope)
@@ -1496,12 +1526,7 @@ export default function ChatPageClient() {
       const reading: Reading = {
         id: `${Date.now()}`,
         title: makeReadingTitle(firstUser.content),
-        science:
-          mode === 'essentiel'
-            ? 'Mode Essentiel'
-            : mode === 'premium'
-              ? 'Mode Premium'
-              : 'Mode Praticien',
+        science: SCIENCE_READING_LABEL[sidebarScienceKey] ?? 'Hexastra Fusion',
         date: new Date().toISOString(),
         preview: lastAssistant.content.slice(0, 220),
         fullContent: lastAssistant.content,
@@ -1509,7 +1534,7 @@ export default function ChatPageClient() {
 
       persistReadings([reading, ...readings].slice(0, 80))
     },
-    [mode, persistReadings, readings]
+    [sidebarScienceKey, persistReadings, readings]
   )
 
   async function triggerMicroReading(requestType: RequestType) {
@@ -1544,7 +1569,7 @@ export default function ChatPageClient() {
       conversationId,
       messages: historyMsgs,
       contextType: activeContextType,
-      selectedMenuKey,
+      selectedMenuKey: selectedMenuKey ?? effectiveScienceMenuKey,
       selectedSubmenuKey,
       uiAction: 'send_message',
       journeyEnabled,
@@ -1767,7 +1792,7 @@ export default function ChatPageClient() {
       const cachedReply = cacheRef.current.get(cacheKey)
       if (cachedReply) {
         const cachedIsReading =
-          cachedReply.includes('â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€') ||
+          cachedReply.includes('──────────') ||
           cachedReply.toLowerCase().includes('pour aller plus loin')
         const depthLevel = detectUserDepthLevel(baseContent, messages, userPlan)
         const composedCached = formatAssistantReply(cachedReply, {
@@ -1817,7 +1842,7 @@ export default function ChatPageClient() {
         messages: historyMsgs,
         evolutionProfile,
         contextType: activeContextType,
-        selectedMenuKey,
+        selectedMenuKey: selectedMenuKey ?? effectiveScienceMenuKey,
         selectedSubmenuKey,
         uiAction: 'send_message',
         journeyEnabled,
@@ -1990,6 +2015,8 @@ export default function ChatPageClient() {
       onCreateProject={handleCreateProject}
       onOpenReading={handleOpenReading}
       onAssignReadingToProject={handleAssignReadingToProject}
+      activeScienceKey={sidebarScienceKey}
+      onScienceSelect={handleScienceSelect}
     />
   )
 
@@ -2067,12 +2094,15 @@ export default function ChatPageClient() {
       )}
 
       {bootstrapOverlay ??
-        (isLimitReached ? (
+        (isLimitReached && !limitDismissed ? (
           <PaywallBanner
             plan={userPlan}
             resetAt={quotaResetAt}
             isAuthenticated={Boolean(authUserId)}
+            onDismiss={() => setLimitDismissed(true)}
           />
+        ) : isLimitReached && limitDismissed ? (
+          <p className="hx-limit-note">Tu pourras reprendre dans 24h.</p>
         ) : (
           <Composer {...composerProps} />
         ))}

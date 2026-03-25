@@ -1,69 +1,48 @@
 'use client'
 
 import { trackHexastraFunnel } from '@/lib/analytics/hexastraFunnel'
-import { useTranslation } from '@/lib/i18n/useTranslation'
-import {
-  getPlanCheckoutAuthHref,
-  getPlanCheckoutHref,
-  getUpgradeTarget,
-  type PlanKey,
-} from '@/lib/plans'
+import { type PlanKey } from '@/lib/plans'
 
 type Props = {
   plan: PlanKey
   resetAt: Date | null
   isAuthenticated?: boolean
+  onDismiss: () => void
 }
 
-export default function PaywallBanner({ plan, resetAt, isAuthenticated = false }: Props) {
-  const { t, lang } = useTranslation()
-  const upgrade = getUpgradeTarget(plan)
-  const upgradeLabel = t(upgrade.labelKey)
-  const resetLabel = resetAt
-    ? resetAt.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })
-    : null
-  const resetDateLabel = resetAt
-    ? resetAt.toLocaleDateString(lang, { day: 'numeric', month: 'long' })
-    : null
-  const upgradeHref = isAuthenticated
-    ? getPlanCheckoutHref(upgrade.plan)
-    : getPlanCheckoutAuthHref(upgrade.plan)
-
+export default function PaywallBanner({ plan, onDismiss }: Props) {
   return (
-    <div className="hx-paywall-banner">
-      <div className="hx-paywall-inner">
-        <div className="hx-paywall-icon" aria-hidden="true">
-          *
-        </div>
-        <p className="hx-paywall-title">{t('chat.paywallTitle')}</p>
-        <p className="hx-paywall-text">
-          {resetLabel
-            ? t('chat.paywallResetText')
-                .replace('{date}', resetDateLabel ?? '')
-                .replace('{time}', resetLabel)
-                .replace('{label}', upgradeLabel)
-            : t('chat.paywallUnlimitedText').replace('{label}', upgradeLabel)}
-        </p>
+    <div className="hx-limit-card">
+      <p className="hx-limit-main">
+        Tu as atteint la limite du plan gratuit pour aujourd&apos;hui.
+      </p>
+      <p className="hx-limit-sub">Tu pourras reprendre dans 24h.</p>
+      <div className="hx-limit-divider" aria-hidden="true" />
+      <p className="hx-limit-pitch">
+        Si tu veux continuer sans limite,<br />
+        les versions superiures sont disponibles.
+      </p>
+      <div className="hx-limit-actions">
         <a
-          href={upgradeHref}
-          className="hx-paywall-cta"
+          href="/pricing"
+          className="hx-limit-cta"
           onClick={() => {
             trackHexastraFunnel('chat_upgrade_clicked', {
-              location: 'paywall_banner',
+              location: 'limit_card',
               plan,
-              targetPlan: upgrade.plan,
-              reason: 'quota_limit',
-            })
-            trackHexastraFunnel('upgradeClicked', {
-              location: 'paywall_banner',
-              plan,
-              targetPlan: upgrade.plan,
               reason: 'quota_limit',
             })
           }}
         >
-          {t('chat.paywallCta').replace('{label}', upgradeLabel)}
+          Voir les abonnements
         </a>
+        <button
+          type="button"
+          className="hx-limit-dismiss"
+          onClick={onDismiss}
+        >
+          Revenir plus tard
+        </button>
       </div>
     </div>
   )
