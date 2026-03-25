@@ -94,7 +94,6 @@ import {
   type UserMemory,
 } from '@/lib/chat/userMemoryEngine'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
-import MenuDock from './MenuDock'
 import { buildContextualSuggestions } from '@/lib/chat/suggestions'
 import { buildUserInsights } from '@/lib/hexastra/memory/insightEngine'
 import MemoryHint from './MemoryHint'
@@ -219,9 +218,6 @@ function buildMenuSelectionRequest(item: HexastraMenuItem, parent?: HexastraMenu
   return `Contexte choisi : ${contextLabel}. N ouvre pas encore de lecture. Garde simplement cet angle comme cadre, puis demande-moi ma vraie question avant d analyser.`
 }
 
-function buildMenuSelectionDisplay(item: HexastraMenuItem, parent?: HexastraMenuItem) {
-  return parent ? `${parent.label} -> ${item.label}` : item.label
-}
 
 function buildStoredBirthDataRequest(value: string, birthData: BirthData) {
   if (!isBirthDataComplete(birthData)) return value
@@ -570,13 +566,6 @@ export default function ChatPageClient() {
     : birthAutoIntroCompleted
       ? 'Enregistrer ces données pour mes prochaines lectures ->'
       : "Enregistrer et lancer ma lecture d'accueil ->"
-  const shouldShowMenuDock =
-    chatStep === 'conversation_ready' &&
-    menuItems.length > 0 &&
-    !isTyping &&
-    !isMicroBootstrapPending &&
-    isMenuDockOpen
-
   const desktopLeft = viewportWidth >= 1100
   const userInitials = getInitials(userEmail)
   const isEnglishChat = chatLanguage.startsWith('en')
@@ -692,10 +681,7 @@ export default function ChatPageClient() {
 
     if (responsePolicy.conversationId) setConversationId(responsePolicy.conversationId)
 
-    if (responsePolicy.menu.action === 'open') {
-      setMenuItems(responsePolicy.menu.items)
-      setIsMenuDockOpen(true)
-    } else if (responsePolicy.menu.action === 'close') {
+    if (responsePolicy.menu.action === 'close') {
       setIsMenuDockOpen(false)
     }
 
@@ -1656,44 +1642,20 @@ export default function ChatPageClient() {
       })
 
       if (localDecision.kind === 'open_menu') {
-        const baseMessages = isWelcome ? [] : messages
-        const userMsg: Msg = {
-          id: `${Date.now()}-user`,
-          role: 'user',
-          content,
-          created_at: new Date().toISOString(),
-        }
-        setMessages([...baseMessages, userMsg])
-        setInput('')
-        setAttachedFile(null)
-        setMenuItems((prev) => (prev.length ? prev : getMenuForMode(getModeForPlan(userPlan))))
         setActiveContextType('general')
         setSelectedMenuKey(null)
         setSelectedSubmenuKey(null)
         setOpenMenuParentKey(null)
-        setIsMenuDockOpen(true)
-        return
+        // Falls through to API call below
       }
 
       if (localDecision.kind === 'open_parent') {
-        const baseMessages = isWelcome ? [] : messages
-        const userMsg: Msg = {
-          id: `${Date.now()}-user`,
-          role: 'user',
-          content,
-          created_at: new Date().toISOString(),
-        }
         const selectionContext = resolveSelectionContext(localDecision.selection)
-
-        setMessages([...baseMessages, userMsg])
-        setInput('')
-        setAttachedFile(null)
         setActiveContextType(selectionContext.contextType)
         setSelectedMenuKey(selectionContext.menuKey)
         setSelectedSubmenuKey(selectionContext.submenuKey)
         setOpenMenuParentKey(localDecision.selection.item.key)
-        setIsMenuDockOpen(true)
-        return
+        // Falls through to API call below
       }
 
       if (localDecision.kind === 'select_context') {
@@ -2230,34 +2192,6 @@ export default function ChatPageClient() {
                 </div>
               )}
 
-              {shouldShowMenuDock && (
-                <MenuDock
-                  items={menuItems}
-                  title="Explorer votre situation"
-                  subtitle="Choisis le cadre le plus utile pour lancer ton analyse Hexastra."
-                  userPlan={userPlan}
-                  lastUserMessage={lastUserMessage}
-                  openParentKey={openMenuParentKey}
-                  onOpenParentChange={setOpenMenuParentKey}
-                  onSelect={(item, parent) => {
-                    const context = item.contextType ?? parent?.contextType ?? 'general'
-                    setActiveContextType(context)
-                    setSelectedMenuKey(parent?.key ?? item.key)
-                    setSelectedSubmenuKey(parent ? item.key : null)
-                    setOpenMenuParentKey(parent?.key ?? null)
-                    setIsMenuDockOpen(false)
-
-                    void sendStructuredAction({
-                      message: buildMenuSelectionRequest(item, parent),
-                      displayMessage: buildMenuSelectionDisplay(item, parent),
-                      contextType: context,
-                      menuKey: parent?.key ?? item.key,
-                      submenuKey: parent ? item.key : null,
-                      uiAction: parent ? 'select_submenu_item' : 'select_menu_item',
-                    })
-                  }}
-                />
-              )}
             </div>
           </div>
 
