@@ -144,26 +144,40 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
   }
 
   const renderBlocks = (text: string) => {
-    const blocks = text.split(/\n{2,}/).filter((b) => b.trim())
-    if (blocks.length <= 1) {
+    const lines = text.split('\n')
+
+    // Group consecutive non-empty lines as paragraphs; empty lines = separator
+    const paragraphs: string[][] = []
+    let current: string[] = []
+    for (const line of lines) {
+      if (line.trim() === '') {
+        if (current.length > 0) { paragraphs.push(current); current = [] }
+      } else {
+        current.push(line)
+      }
+    }
+    if (current.length > 0) paragraphs.push(current)
+
+    // If no paragraph separation found, treat each line as its own block
+    const blocks: string[][] =
+      paragraphs.length > 1 ? paragraphs : lines.filter((l) => l.trim()).map((l) => [l])
+
+    if (blocks.length <= 1 && blocks[0]?.length <= 1) {
       return <div className="hx-bubble-text">{text}</div>
     }
+
     return (
       <div className="hx-bubble-blocks">
-        {blocks.map((block, i) => {
-          const trimmed = block.trim()
-          const lines = trimmed.split('\n')
-          return (
-            <p key={i} className="hx-bubble-block">
-              {lines.map((line, j) => (
-                <span key={j} className={line.startsWith('\u2192 ') ? 'hx-bubble-arrow-label' : ''}>
-                  {j > 0 && <br />}
-                  {line}
-                </span>
-              ))}
-            </p>
-          )
-        })}
+        {blocks.map((block, i) => (
+          <p key={i} className="hx-bubble-block">
+            {block.map((line, j) => (
+              <span key={j} className={line.trimStart().startsWith('\u2192 ') ? 'hx-bubble-arrow-label' : ''}>
+                {j > 0 && <br />}
+                {line}
+              </span>
+            ))}
+          </p>
+        ))}
       </div>
     )
   }
