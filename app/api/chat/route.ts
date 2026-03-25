@@ -1303,7 +1303,14 @@ export async function POST(req: NextRequest) {
           { status: finalStatus }
         )
       },
-    } as const)[postQuotaDecision.branch]
+    // When the user has selected a sidebar intent, any 'conversation' branch
+    // must be upgraded to 'analysis' so runHexastraFlow is called with the
+    // full KS context and the user's energetic profile.
+    } as const)[
+      requestedUserIntentKey && postQuotaDecision.branch === 'conversation'
+        ? 'analysis'
+        : postQuotaDecision.branch
+    ]
 
     if (postQuotaHandler) {
       const postQuotaResponse = await postQuotaHandler()
