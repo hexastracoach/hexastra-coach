@@ -50,7 +50,7 @@ import { arbiter } from '@/lib/hexastra/fusion/arbiter'
 import { applySentinel } from '@/lib/hexastra/security/sentinel'
 import { buildKsLeadSummary } from '@/lib/hexastra/orchestrator/ksOutputComposer'
 import { generateHexastraReading } from '@/lib/hexastra/reading/hexastraReadingEngine'
-import { computeFlowStep } from '@/lib/hexastra/session/sessionBrain'
+import { computeFlowStep, detectPrecision } from '@/lib/hexastra/session/sessionBrain'
 import { buildRetrievalPlan } from '@/lib/hexastra/vector/retrievalPlanner'
 import { logger } from '@/lib/utils/logger'
 import { getOpenAIClient } from '@/lib/openai/client'
@@ -1709,19 +1709,9 @@ export async function runHexastraFlow(input: {
         })
       }
 
-      const blockMicroProfile =
-        // Always block micro_profile when intent is a fusion question or sidebar intent is set
-        isIntentFusion ||
-        Boolean(input.userIntentKey) ||
-        isAstroExact ||
-        isHumanDesignExact ||
-        isHoroscopeRoute ||
-        ((universalClassif.requestKind === 'exact_fact' || universalClassif.requestKind === 'exact_profile') &&
-          universalClassif.science !== 'general' &&
-          universalClassif.science !== 'fusion') ||
-        (semanticCtx.contextType !== 'profile' &&
-          semanticCtx.contextType !== 'unknown' &&
-          semanticCtx.confidence >= 0.8)
+      // micro_profile is blocked for ALL chat requests. It only runs via explicit
+      // requestType === 'micro_profile' (first birth form submission). No exceptions.
+      const blockMicroProfile = input.requestType === 'chat'
 
       flowLog('debug', 'semantic_context_detected', {
         contextDetected: semanticCtx.contextType,
@@ -1752,7 +1742,7 @@ export async function runHexastraFlow(input: {
         selectedSubmenuKey,
         emotionalState: 'neutral',
         timing: 'exploration',
-        precision: 'medium',
+        precision: detectPrecision(latestUserMessage),
         blockMicroProfile,
       } as Parameters<typeof computeFlowStep>[0])
 

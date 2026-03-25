@@ -32,7 +32,9 @@ export function computeFlowStep(args: {
 
   if (args.uiAction === 'open_menu' || args.uiAction === 'restart_flow') return 'menu'
 
-  if (args.hasBirthData && !args.hasShownMicroReadings && !args.blockMicroProfile) return 'micro_profile'
+  // micro_profile is ONLY triggered by explicit requestType === 'micro_profile' (lines 29-31 above).
+  // It must NEVER auto-fire based on hasShownMicroReadings — this caused micro_profile to appear
+  // on every new session regardless of what the user was asking.
 
   if (args.emotionalState === 'surcharge' || args.timing === 'high_tension') {
     return 'sensitive_support'

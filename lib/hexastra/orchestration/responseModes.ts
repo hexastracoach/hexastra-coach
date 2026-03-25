@@ -43,41 +43,31 @@ export type ResponseModeInput = {
  * 8. Fallback: resolved+reliable -> calculated_reading, else guided_exploration
  */
 export function selectResponseMode(input: ResponseModeInput): ResponseMode {
-  const { requestKind, isTimeoutRisk, exactDataResolved, exactDataReliable, isPedagogical, isFusionIntent } = input
+  const { requestKind, exactDataResolved, exactDataReliable, isPedagogical, isFusionIntent } = input
 
+  // Conceptual question — never inject personal data
   if (isPedagogical || requestKind === 'clarification') {
     return 'pedagogical_explanation'
   }
 
-  // Fusion intent → concise_fusion_answer (3-block template, always, data or not)
+  // Fusion intents (relational, emotional, decisional, situational) → 3-block concise
   if (isFusionIntent) {
     return 'concise_fusion_answer'
   }
 
-  if (isTimeoutRisk) {
-    return 'guided_exploration'
-  }
-
-  if (requestKind === 'exact_fact' || requestKind === 'exact_profile') {
-    if (exactDataResolved && exactDataReliable !== false) return 'calculated_reading'
-    if (exactDataResolved && exactDataReliable === false) return 'guided_exploration'
-    return 'guided_exploration'
-  }
-
+  // Exact fact with reliable calculated data → show the number/value directly
   if (
-    requestKind === 'synthesis' ||
-    requestKind === 'interpretation' ||
-    requestKind === 'mixed'
+    (requestKind === 'exact_fact' || requestKind === 'exact_profile') &&
+    exactDataResolved &&
+    exactDataReliable !== false
   ) {
-    return 'interpretive_reading'
+    return 'calculated_reading'
   }
 
-  if (requestKind === 'guidance') {
-    return 'guided_exploration'
-  }
-
-  if (exactDataResolved && exactDataReliable !== false) return 'calculated_reading'
-  return 'guided_exploration'
+  // Everything else → concise 3-block fusion answer.
+  // interpretive_reading and guided_exploration are both removed as defaults
+  // because they produce long, diluted output. The sentinel enforces 3 blocks.
+  return 'concise_fusion_answer'
 }
 
 export function buildResponseModeDirective(mode: ResponseMode): string {
