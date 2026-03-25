@@ -1010,6 +1010,20 @@ export default function ChatPageClient() {
   }, [])
 
   useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      document.documentElement.style.setProperty('--vvh', `${vv.height}px`)
+    }
+    vv.addEventListener('resize', update)
+    update()
+    return () => {
+      vv.removeEventListener('resize', update)
+      document.documentElement.style.removeProperty('--vvh')
+    }
+  }, [])
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem('hexastra.journey_enabled')
       if (stored !== null) setJourneyEnabled(stored === '1')
