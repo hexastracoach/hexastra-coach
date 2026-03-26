@@ -109,6 +109,7 @@ import { normalizeSignals } from '@/lib/hexastra/orchestrator/normalizeSignals'
 import { detectFusionPhase } from '@/lib/hexastra/orchestrator/detectFusionPhase'
 import { detectDominantZone } from '@/lib/hexastra/orchestrator/detectDominantZone'
 import { qaFusionCheck } from '@/lib/hexastra/orchestrator/qaFusionCheck'
+import { getReadingAdaptation, applyPlanSuffix } from '@/lib/hexastra/orchestrator/adaptReadingByPlan'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
@@ -3085,6 +3086,7 @@ export async function runHexastraFlow(input: {
         const lang = userContext.language ?? 'fr'
         const firstName = userContext.firstName ?? (userContext as any).name ?? null
         const isFr = lang.slice(0, 2).toLowerCase() !== 'en'
+        const readingAdaptation = getReadingAdaptation(plan)
 
         // 1. Mapping intent → champs API
         const fusionCtx = buildFusionContext(userIntent, intentRaw, lang)
@@ -3204,16 +3206,29 @@ export async function runHexastraFlow(input: {
           phase: phaseResult.phase,
         })
 
-        // 9. Construction du bloc orienté (remplace buildFusionProfileBlock)
+        // 9. Construction du bloc orienté (profondeur selon plan)
         const orientedBlock = buildOrientedFusionBlock(
           fusionCtx,
           arbitration,
           firstName,
           isFr,
-          phaseResult,
-          zoneResult,
+          readingAdaptation.showPhase ? phaseResult : null,
+          readingAdaptation.showZone ? zoneResult : null,
         )
-        intentCompactBlock = orientedBlock || null
+
+        // Injection du suffixe d'instruction plan-dépendant
+        const adaptedBlock = applyPlanSuffix(orientedBlock, readingAdaptation)
+        intentCompactBlock = adaptedBlock || null
+
+        flowLog('info', 'HEXASTRA_PLAN_ADAPTATION', {
+          plan: readingAdaptation.plan,
+          showZone: readingAdaptation.showZone,
+          showPhase: readingAdaptation.showPhase,
+          showReliability: readingAdaptation.showReliability,
+          signalDepth: readingAdaptation.signalDepth,
+          blockCharsBeforeSuffix: orientedBlock.length,
+          blockCharsAfterSuffix: intentCompactBlock?.length ?? 0,
+        })
 
         flowLog('info', 'HEXASTRA_READING_PROMPT_READY', {
           intent: userIntent,
@@ -3226,6 +3241,7 @@ export async function runHexastraFlow(input: {
           zone: zoneResult.zone,
           coherenceScore: qaResult.coherenceScore,
           qaWarnings: qaResult.warnings.length,
+          plan: readingAdaptation.plan,
         })
       } else {
         const INTENT_SCIENCE_FOR_BLOCK: Record<string, string> = {

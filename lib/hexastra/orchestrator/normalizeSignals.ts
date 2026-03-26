@@ -13,7 +13,17 @@ import type { IntentModule } from './intentFieldMapping'
 
 export type SignalDirection = 'expansif' | 'contractif' | 'neutre'
 export type PhaseHint = 'activation' | 'stabilisation' | 'transition' | null
-export type ZoneHint = 'émotionnel' | 'décisionnel' | 'relationnel' | 'identitaire' | 'cyclique'
+
+/**
+ * Taxonomie canonique des zones de vie Hexastra.
+ * securite  — ancrage émotionnel, sécurité, stabilité intérieure
+ * relation  — liens affectifs, communication, amour, famille
+ * identite  — qui je suis, expression, fonctionnement naturel
+ * direction — choix, stratégie, cap, passage à l'action
+ * expansion — croissance, cycles, nouveau départ, développement
+ * sens      — mission de vie, peur centrale, désir profond, spiritualité
+ */
+export type ZoneHint = 'securite' | 'relation' | 'identite' | 'direction' | 'expansion' | 'sens'
 
 export type NormalizedSignal = {
   /** Module source du signal */
@@ -121,7 +131,7 @@ function extractAstroSignals(ctx: FusionContext): NormalizedSignal[] {
       confidence: conf,
       direction: signDirection(moonSign),
       phase_hint: null,
-      zone_hint: 'émotionnel',
+      zone_hint: 'securite',
       risk_flag: isWater,
       opportunity_flag: conf > 0.7,
     })
@@ -136,7 +146,7 @@ function extractAstroSignals(ctx: FusionContext): NormalizedSignal[] {
       confidence: conf,
       direction: signDirection(sunSign),
       phase_hint: null,
-      zone_hint: 'identitaire',
+      zone_hint: 'identite',
       risk_flag: false,
       opportunity_flag: conf > 0.7,
     })
@@ -151,7 +161,7 @@ function extractAstroSignals(ctx: FusionContext): NormalizedSignal[] {
       confidence: conf * 0.85,
       direction: signDirection(venusSign),
       phase_hint: null,
-      zone_hint: 'relationnel',
+      zone_hint: 'relation',
       risk_flag: false,
       opportunity_flag: false,
     })
@@ -166,7 +176,7 @@ function extractAstroSignals(ctx: FusionContext): NormalizedSignal[] {
       confidence: conf * 0.80,
       direction: signDirection(marsSign),
       phase_hint: null,
-      zone_hint: 'décisionnel',
+      zone_hint: 'direction',
       risk_flag: false,
       opportunity_flag: conf > 0.75,
     })
@@ -189,7 +199,7 @@ function extractAstroSignals(ctx: FusionContext): NormalizedSignal[] {
       confidence: conf * 0.75,
       direction: 'contractif',
       phase_hint: isTransitionSign ? 'transition' : 'stabilisation',
-      zone_hint: 'décisionnel',
+      zone_hint: 'direction',
       risk_flag: isTransitionSign,
       opportunity_flag: false,
     })
@@ -209,7 +219,7 @@ function extractAstroSignals(ctx: FusionContext): NormalizedSignal[] {
       confidence: conf * 0.75,
       direction: dir,
       phase_hint: hasFireAir ? 'activation' : hasEarthWater ? 'stabilisation' : null,
-      zone_hint: 'identitaire',
+      zone_hint: hasFireAir ? 'expansion' : 'securite',
       risk_flag: false,
       opportunity_flag: false,
     })
@@ -246,7 +256,7 @@ function extractHDSignals(ctx: FusionContext): NormalizedSignal[] {
       confidence: conf,
       direction: hdTypeDirection(hdType),
       phase_hint: null,
-      zone_hint: 'identitaire',
+      zone_hint: 'identite',
       risk_flag: false,
       opportunity_flag: conf > 0.8,
     })
@@ -261,7 +271,7 @@ function extractHDSignals(ctx: FusionContext): NormalizedSignal[] {
       confidence: conf,
       direction: 'neutre',
       phase_hint: null,
-      zone_hint: 'décisionnel',
+      zone_hint: 'direction',
       risk_flag: false,
       opportunity_flag: true,
     })
@@ -295,7 +305,7 @@ function extractNumerologySignals(ctx: FusionContext): NormalizedSignal[] {
         confidence: conf,
         direction: isExpansif ? 'expansif' : isContractif ? 'contractif' : 'neutre',
         phase_hint: null,
-        zone_hint: 'identitaire',
+        zone_hint: 'sens',
         risk_flag: false,
         opportunity_flag: isMaster,
       })
@@ -316,7 +326,7 @@ function extractNumerologySignals(ctx: FusionContext): NormalizedSignal[] {
         confidence: conf,
         direction: isExpansif ? 'expansif' : isContractif ? 'contractif' : 'neutre',
         phase_hint: phaseHint,
-        zone_hint: 'cyclique',
+        zone_hint: 'expansion',
         risk_flag: yearNum === 9,
         opportunity_flag: yearNum === 1 || yearNum === 8,
       })
@@ -334,7 +344,7 @@ function extractNumerologySignals(ctx: FusionContext): NormalizedSignal[] {
         confidence: conf * 0.75,
         direction: 'neutre',
         phase_hint: PERSONAL_YEAR_PHASE[monthNum] ?? null,
-        zone_hint: 'cyclique',
+        zone_hint: 'expansion',
         risk_flag: false,
         opportunity_flag: false,
       })
@@ -370,7 +380,7 @@ function extractEnneagramSignals(ctx: FusionContext): NormalizedSignal[] {
         confidence: conf,
         direction: isExpansif ? 'expansif' : isContractif ? 'contractif' : 'neutre',
         phase_hint: null,
-        zone_hint: 'identitaire',
+        zone_hint: 'sens',
         risk_flag: isHeuristic,
         opportunity_flag: !isHeuristic && conf > 0.5,
       })
@@ -397,7 +407,7 @@ function extractKuaSignals(ctx: FusionContext): NormalizedSignal[] {
       confidence: conf,
       direction: 'neutre',
       phase_hint: null,
-      zone_hint: 'décisionnel',
+      zone_hint: 'direction',
       risk_flag: false,
       opportunity_flag: conf > 0.3,
     })

@@ -3,12 +3,13 @@
  *
  * Identifie la zone de vie dominante impactée par la question de l'utilisateur.
  *
- * Zones détectables :
- *   - relationnel  : liens, amour, communication, famille
- *   - décisionnel  : choix, stratégie, passage à l'action
- *   - émotionnel   : état intérieur, ressenti, humeur, bien-être
- *   - identitaire  : qui je suis, mission, sens, identité profonde
- *   - cyclique     : timing, moment du cycle, synchronicité temporelle
+ * Taxonomie canonique Hexastra :
+ *   - securite  : ancrage émotionnel, sécurité, stabilité intérieure
+ *   - relation  : liens affectifs, communication, amour, famille
+ *   - identite  : qui je suis, expression, fonctionnement naturel
+ *   - direction : choix, stratégie, cap, passage à l'action
+ *   - expansion : croissance, cycles, nouveau départ, développement
+ *   - sens      : mission de vie, peur centrale, désir profond, spiritualité
  *
  * Sources :
  * - Intent classifié (prime fort sur la zone)
@@ -37,20 +38,20 @@ export type DominantZone = {
 // ── Mapping intent → zone prime ────────────────────────────────────────────────
 
 const INTENT_ZONE_PRIME: Record<string, ZoneHint> = {
-  relationship: 'relationnel',
-  decision: 'décisionnel',
-  inner_state: 'émotionnel',
-  fusion_general_question: 'identitaire',
-  exact_profile: 'identitaire',
+  relationship: 'relation',
+  decision: 'direction',
+  inner_state: 'securite',
+  fusion_general_question: 'identite',
+  exact_profile: 'identite',
 }
 
 // Biais de zone selon le module dominant (renforce sans écraser)
 const MODULE_ZONE_BIAS: Partial<Record<string, ZoneHint>> = {
-  astrology: 'émotionnel',
-  human_design: 'identitaire',
-  numerology: 'cyclique',
-  enneagram: 'identitaire',
-  kua: 'décisionnel',
+  astrology: 'securite',
+  human_design: 'identite',
+  numerology: 'expansion',
+  enneagram: 'sens',
+  kua: 'direction',
 }
 
 // ── Détection ──────────────────────────────────────────────────────────────────
@@ -66,13 +67,14 @@ export function detectDominantZone(
   ctx: FusionContext,
   signals: NormalizedSignal[],
 ): DominantZone {
-  const ALL_ZONES: ZoneHint[] = ['émotionnel', 'décisionnel', 'relationnel', 'identitaire', 'cyclique']
+  const ALL_ZONES: ZoneHint[] = ['securite', 'relation', 'identite', 'direction', 'expansion', 'sens']
   const tally: Record<ZoneHint, number> = {
-    émotionnel: 0,
-    décisionnel: 0,
-    relationnel: 0,
-    identitaire: 0,
-    cyclique: 0,
+    securite: 0,
+    relation: 0,
+    identite: 0,
+    direction: 0,
+    expansion: 0,
+    sens: 0,
   }
   const reasons: string[] = []
 
