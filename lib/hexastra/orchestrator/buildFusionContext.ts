@@ -58,6 +58,10 @@ export type FusionContext = {
   }
   /** 0–1 : proportion des champs attendus qui ont été trouvés */
   completeness: number
+  /** 0–1 : confiance globale dans la lecture (poids × couverture champs × pénalités) */
+  fusionConfidence: number
+  /** Confiance par module (0–1), uniquement pour les modules actifs */
+  confidenceBreakdown: Partial<Record<IntentModule, number>>
   warnings: string[]
   mapping: IntentFieldMap
 }
@@ -297,6 +301,45 @@ export function buildFusionContext(
     return false
   })
 
+  // Confiance globale et par module
+  // HD et astro ont plus de poids que les autres sciences
+  const MODULE_CONFIDENCE_BOOST: Record<IntentModule, number> = {
+    astrology: 1.10,
+    human_design: 1.20,
+    numerology: 1.00,
+    enneagram: 1.00,
+    kua: 0.80,
+  }
+  const foundPerModule: Record<IntentModule, number> = {
+    astrology: Object.keys(astroFields).length,
+    human_design: Object.keys(hdFields).length,
+    numerology: Object.keys(numeFields).length,
+    enneagram: Object.keys(ennData).length,
+    kua: Object.keys(kuaFields).length,
+  }
+
+  const confidenceBreakdown: Partial<Record<IntentModule, number>> = {}
+  let weightedConfSum = 0
+  let baseWeightSum = 0
+
+  for (const m of ['astrology', 'human_design', 'numerology', 'enneagram', 'kua'] as IntentModule[]) {
+    const baseW = mapping.moduleWeights[m]
+    if (baseW === 0) continue
+    const effectiveW = effectiveWeights[m]
+    const expectedCount = mapping.priorityFields[m].length
+    const fieldRatio = expectedCount > 0 ? Math.min(1, foundPerModule[m] / expectedCount) : 0
+    const boost = MODULE_CONFIDENCE_BOOST[m]
+    const moduleConf = Math.min(1, effectiveW * fieldRatio * boost)
+    confidenceBreakdown[m] = Math.round(moduleConf * 100) / 100
+    weightedConfSum += moduleConf * baseW
+    baseWeightSum += baseW
+  }
+
+  const fusionConfidence =
+    baseWeightSum > 0
+      ? Math.round(Math.min(1, (weightedConfSum / baseWeightSum) * completeness) * 100) / 100
+      : 0
+
   return {
     intent,
     readingAngle,
@@ -332,6 +375,8 @@ export function buildFusionContext(
       },
     },
     completeness,
+    fusionConfidence,
+    confidenceBreakdown,
     warnings,
     mapping,
   }
@@ -354,6 +399,7 @@ export function buildOrientedFusionBlock(
   arbitration: FusionArbitration,
   firstName?: string | null,
   isFr = true,
+  phaseData?: { phase: string; phaseConfidence: number } | null,
 ): string {
   const nameTag = firstName ? ` — ${firstName.toUpperCase()}` : ''
   const lines: string[] = []
@@ -370,6 +416,32 @@ export function buildOrientedFusionBlock(
     isFr
       ? `QUESTION TRAITÉE: ${ctx.readingQuestion}`
       : `QUESTION ADDRESSED: ${ctx.readingQuestion}`,
+  )
+
+  if (phaseData) {
+    const phaseLabel = isFr
+      ? phaseData.phase === 'activation'
+        ? 'ACTIVATION (élan, nouveau cycle)'
+        : phaseData.phase === 'transition'
+          ? 'TRANSITION (passage, lâcher-prise)'
+          : 'STABILISATION (ancrage, consolidation)'
+      : phaseData.phase === 'activation'
+        ? 'ACTIVATION (momentum, new cycle)'
+        : phaseData.phase === 'transition'
+          ? 'TRANSITION (letting go, passage)'
+          : 'STABILISATION (grounding, consolidation)'
+    lines.push(
+      isFr
+        ? `PHASE ACTUELLE: ${phaseLabel} (confiance: ${Math.round(phaseData.phaseConfidence * 100)}%)`
+        : `CURRENT PHASE: ${phaseLabel} (confidence: ${Math.round(phaseData.phaseConfidence * 100)}%)`,
+    )
+  }
+
+  const confPct = Math.round(ctx.fusionConfidence * 100)
+  lines.push(
+    isFr
+      ? `FIABILITÉ LECTURE: ${confPct}% (données: ${Math.round(ctx.completeness * 100)}% complètes)`
+      : `READING RELIABILITY: ${confPct}% (data: ${Math.round(ctx.completeness * 100)}% complete)`,
   )
   lines.push('')
 

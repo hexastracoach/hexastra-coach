@@ -105,6 +105,8 @@ import { classifyUserIntent, isFusionIntent } from '@/lib/hexastra/orchestration
 import { buildFusionProfileBlock } from '@/lib/hexastra/orchestrator/buildFusionProfileBlock'
 import { buildFusionContext, buildOrientedFusionBlock } from '@/lib/hexastra/orchestrator/buildFusionContext'
 import { arbitrateFusionSignals } from '@/lib/hexastra/orchestrator/arbitrateFusionSignals'
+import { normalizeSignals } from '@/lib/hexastra/orchestrator/normalizeSignals'
+import { detectFusionPhase } from '@/lib/hexastra/orchestrator/detectFusionPhase'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
@@ -3109,7 +3111,53 @@ export async function runHexastraFlow(input: {
           enneagramIsHeuristic: fusionCtx.modules.enneagram.isHeuristic ?? false,
         })
 
-        // 2. Arbitrage des signaux
+        // 2. Confiance globale de fusion
+        flowLog('info', 'HEXASTRA_FUSION_CONFIDENCE', {
+          fusionConfidence: fusionCtx.fusionConfidence,
+          completeness: fusionCtx.completeness,
+          confidenceBreakdown: fusionCtx.confidenceBreakdown,
+        })
+
+        // 3. Normalisation des signaux
+        const normalizedSignals = normalizeSignals(fusionCtx)
+
+        flowLog('info', 'HEXASTRA_SIGNALS_NORMALIZED', {
+          totalSignals: normalizedSignals.length,
+          bySource: Object.fromEntries(
+            (['astrology', 'human_design', 'numerology', 'enneagram', 'kua'] as const).map((m) => [
+              m,
+              normalizedSignals.filter((s) => s.source === m).length,
+            ])
+          ),
+          topTags: normalizedSignals.slice(0, 5).map((s) => s.tag),
+          riskFlags: normalizedSignals.filter((s) => s.risk_flag).map((s) => s.tag),
+          opportunityFlags: normalizedSignals.filter((s) => s.opportunity_flag).map((s) => s.tag),
+        })
+
+        // 4. Détection de phase
+        const phaseResult = detectFusionPhase(fusionCtx, normalizedSignals)
+
+        flowLog('info', 'HEXASTRA_PHASE_DETECTED', {
+          phase: phaseResult.phase,
+          phaseConfidence: phaseResult.phaseConfidence,
+          phaseReasoning: phaseResult.phaseReasoning,
+        })
+
+        // 5. Résumé signal (snapshot avant arbitrage)
+        flowLog('info', 'HEXASTRA_SIGNAL_SUMMARY', {
+          intent: userIntent,
+          fusionConfidence: fusionCtx.fusionConfidence,
+          phase: phaseResult.phase,
+          phaseConfidence: phaseResult.phaseConfidence,
+          dominantSignalTag: normalizedSignals[0]?.tag ?? null,
+          directions: {
+            expansif: normalizedSignals.filter((s) => s.direction === 'expansif').length,
+            contractif: normalizedSignals.filter((s) => s.direction === 'contractif').length,
+            neutre: normalizedSignals.filter((s) => s.direction === 'neutre').length,
+          },
+        })
+
+        // 6. Arbitrage des signaux
         const arbitration = arbitrateFusionSignals(fusionCtx, lang)
 
         flowLog('info', 'HEXASTRA_DOMINANT_SIGNAL', {
@@ -3122,8 +3170,8 @@ export async function runHexastraFlow(input: {
           signalConfidence: arbitration.signalConfidence,
         })
 
-        // 3. Construction du bloc orienté (remplace buildFusionProfileBlock)
-        const orientedBlock = buildOrientedFusionBlock(fusionCtx, arbitration, firstName, isFr)
+        // 7. Construction du bloc orienté (remplace buildFusionProfileBlock)
+        const orientedBlock = buildOrientedFusionBlock(fusionCtx, arbitration, firstName, isFr, phaseResult)
         intentCompactBlock = orientedBlock || null
 
         flowLog('info', 'HEXASTRA_READING_PROMPT_READY', {
@@ -3132,6 +3180,8 @@ export async function runHexastraFlow(input: {
           dominantModule: arbitration.dominantModule,
           signalConfidence: arbitration.signalConfidence,
           readingAngle: fusionCtx.readingAngle,
+          fusionConfidence: fusionCtx.fusionConfidence,
+          phase: phaseResult.phase,
         })
       } else {
         const INTENT_SCIENCE_FOR_BLOCK: Record<string, string> = {
