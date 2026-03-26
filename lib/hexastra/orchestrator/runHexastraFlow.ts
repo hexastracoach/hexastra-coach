@@ -103,6 +103,8 @@ import { buildCompactHumanDesignContext, type CompactHDContext } from '@/lib/hum
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
 import { classifyUserIntent, isFusionIntent } from '@/lib/hexastra/orchestration/intentClassifier'
 import { buildFusionProfileBlock } from '@/lib/hexastra/orchestrator/buildFusionProfileBlock'
+import { buildFusionContext, buildOrientedFusionBlock } from '@/lib/hexastra/orchestrator/buildFusionContext'
+import { arbitrateFusionSignals } from '@/lib/hexastra/orchestrator/arbitrateFusionSignals'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
@@ -3076,19 +3078,61 @@ export async function runHexastraFlow(input: {
     if (!exactDataNeeded && exactDataResolved && specializedResult?.raw) {
       const intentRaw = specializedResult.raw as Record<string, unknown>
       if (isIntentFusion) {
-        const fusionBlock = buildFusionProfileBlock(
-          intentRaw,
-          userContext.language ?? 'fr',
-          userContext.firstName ?? userContext.name ?? null,
-        )
-        intentCompactBlock = fusionBlock.fullBlock || null
-        if (intentCompactBlock) {
-          flowLog('info', 'FUSION_PROFILE_BLOCK_INJECTED', {
-            sciences: fusionBlock.sciences,
-            blockChars: intentCompactBlock.length,
-            userIntent,
-          })
-        }
+        const lang = userContext.language ?? 'fr'
+        const firstName = userContext.firstName ?? (userContext as any).name ?? null
+        const isFr = lang.slice(0, 2).toLowerCase() !== 'en'
+
+        // 1. Mapping intent → champs API
+        const fusionCtx = buildFusionContext(userIntent, intentRaw, lang)
+
+        flowLog('info', 'HEXASTRA_INTENT_MAPPING_SELECTED', {
+          intent: userIntent,
+          readingAngle: fusionCtx.readingAngle,
+          dominantModule: fusionCtx.mapping.dominantModule,
+          activeModules: fusionCtx.modulesActivated,
+        })
+
+        flowLog('info', 'HEXASTRA_FUSION_CONTEXT_BUILT', {
+          intent: userIntent,
+          modulesActivated: fusionCtx.modulesActivated,
+          completeness: fusionCtx.completeness,
+          warnings: fusionCtx.warnings,
+          fieldsFound: Object.fromEntries(
+            fusionCtx.modulesActivated.map((m) => [m, Object.keys(fusionCtx.modules[m].fields).length])
+          ),
+        })
+
+        flowLog('info', 'HEXASTRA_WEIGHTED_SIGNALS', {
+          weights: Object.fromEntries(
+            fusionCtx.modulesActivated.map((m) => [m, fusionCtx.modules[m].weight])
+          ),
+          enneagramIsHeuristic: fusionCtx.modules.enneagram.isHeuristic ?? false,
+        })
+
+        // 2. Arbitrage des signaux
+        const arbitration = arbitrateFusionSignals(fusionCtx, lang)
+
+        flowLog('info', 'HEXASTRA_DOMINANT_SIGNAL', {
+          dominantDynamic: arbitration.dominantDynamic,
+          dominantModule: arbitration.dominantModule,
+          mainBlock: arbitration.mainBlock.slice(0, 120),
+          innerOuterGap: arbitration.innerOuterGap.slice(0, 100),
+          priorityAction: arbitration.priorityAction,
+          supportPointsCount: arbitration.supportPoints.length,
+          signalConfidence: arbitration.signalConfidence,
+        })
+
+        // 3. Construction du bloc orienté (remplace buildFusionProfileBlock)
+        const orientedBlock = buildOrientedFusionBlock(fusionCtx, arbitration, firstName, isFr)
+        intentCompactBlock = orientedBlock || null
+
+        flowLog('info', 'HEXASTRA_READING_PROMPT_READY', {
+          intent: userIntent,
+          blockChars: intentCompactBlock?.length ?? 0,
+          dominantModule: arbitration.dominantModule,
+          signalConfidence: arbitration.signalConfidence,
+          readingAngle: fusionCtx.readingAngle,
+        })
       } else {
         const INTENT_SCIENCE_FOR_BLOCK: Record<string, string> = {
           understand_situation: 'astrology',
