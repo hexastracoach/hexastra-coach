@@ -103,10 +103,7 @@ export async function getDefaultSubject(userId: string): Promise<ResolvedSubject
     .maybeSingle<ReadingSubjectRow>()
 
   if (error) {
-    logger.error('[readingSubjectService] getDefaultSubject error', {
-      userId,
-      error: error.message,
-    })
+    logger.error('SUBJECT_READ_ERROR', { source: 'reading_subjects', err: error.message })
     return null
   }
 
@@ -193,6 +190,7 @@ export async function resolveProximate(
 
   // Mode éphémère : retour direct sans stockage
   if (!options.saveSubject) {
+    logger.info('SUBJECT_EPHEMERAL', { firstName: input.firstName, reason: 'saveSubject=false' })
     return {
       source: 'ephemeral',
       subjectId: null,
@@ -230,10 +228,10 @@ export async function resolveProximate(
     .maybeSingle<ReadingSubjectRow>()
 
   if (error || !inserted) {
-    logger.warn('[readingSubjectService] resolveProximate upsert failed, returning ephemeral', {
-      userId,
+    logger.warn('SUBJECT_EPHEMERAL', {
       firstName: input.firstName,
-      error: error?.message,
+      reason: 'upsert_failed',
+      err: error?.message,
     })
     return {
       source: 'ephemeral',
@@ -245,6 +243,12 @@ export async function resolveProximate(
       fusionParams,
     }
   }
+
+  logger.info('SUBJECT_SAVED', {
+    subjectId: inserted.id,
+    firstName: inserted.first_name,
+    relation: inserted.relation_type ?? 'none',
+  })
 
   return {
     source: 'reading_subject',
@@ -302,10 +306,7 @@ export async function listReadingSubjects(userId: string): Promise<ReadingSubjec
     .order('created_at', { ascending: true })
 
   if (error) {
-    logger.error('[readingSubjectService] listReadingSubjects error', {
-      userId,
-      error: error.message,
-    })
+    logger.error('SUBJECT_LIST_ERROR', { err: error.message })
     return []
   }
 

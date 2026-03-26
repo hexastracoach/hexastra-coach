@@ -169,7 +169,7 @@ async function readFromCache(hash: string): Promise<Record<string, unknown> | nu
     .maybeSingle<Pick<ChartCacheRow, 'api_data'>>()
 
   if (error) {
-    logger.error('[chartCacheService] read error', { hash, error: error.message })
+    logger.error('CACHE_READ_ERROR', { h: hash.slice(0, 8), err: error.message })
     throw new ChartCacheError(
       `Erreur lecture cache : ${error.message}`,
       'CACHE_READ_ERROR',
@@ -216,7 +216,7 @@ async function writeToCache(
   )
 
   if (error) {
-    logger.error('[chartCacheService] write error', { hash, error: error.message })
+    logger.error('CACHE_WRITE_ERROR', { h: hash.slice(0, 8), err: error.message })
     throw new ChartCacheError(
       `Erreur écriture cache : ${error.message}`,
       'CACHE_WRITE_ERROR',
@@ -254,6 +254,7 @@ async function callFusionApi(
     practitioner_usage: params.practitionerUsage ?? false,
   }
 
+  logger.info('FUSION_API_CALLED', { date: params.birthDate, place: params.birthPlace })
   const result = await callRailway('/chart/fusion', payload)
 
   if (!result || typeof result !== 'object') {
@@ -298,24 +299,19 @@ export async function getOrFetchChartData(
   try {
     cached = await readFromCache(subjectHash)
   } catch (err) {
-    // Cache inaccessible → on continue sans cache (dégradé non-bloquant)
-    logger.warn('[chartCacheService] cache read failed, proceeding without cache', {
-      subjectHash,
+    logger.warn('CACHE_READ_FAIL', {
+      h: subjectHash.slice(0, 8),
       err: err instanceof Error ? err.message : String(err),
     })
   }
 
   if (cached) {
-    logger.info('[chartCacheService] HIT', { subjectHash, birthDate: params.birthDate })
+    logger.info('CACHE_HIT', { h: subjectHash.slice(0, 8), date: params.birthDate })
     return { data: cached, fromCache: true, subjectHash }
   }
 
   // 4. Appel API
-  logger.info('[chartCacheService] MISS — calling /chart/fusion', {
-    subjectHash,
-    birthDate: params.birthDate,
-    birthPlace: params.birthPlace,
-  })
+  logger.info('CACHE_MISS', { h: subjectHash.slice(0, 8), date: params.birthDate, place: params.birthPlace })
 
   let apiData: Record<string, unknown>
   try {
@@ -331,10 +327,10 @@ export async function getOrFetchChartData(
   // 5. Écriture cache (non-bloquante sur erreur)
   try {
     await writeToCache(subjectHash, params, apiData, apiVersion)
-    logger.info('[chartCacheService] STORED', { subjectHash })
+    logger.info('CACHE_WRITE', { h: subjectHash.slice(0, 8), date: params.birthDate })
   } catch (err) {
-    logger.warn('[chartCacheService] cache write failed, data returned anyway', {
-      subjectHash,
+    logger.warn('CACHE_WRITE_FAIL', {
+      h: subjectHash.slice(0, 8),
       err: err instanceof Error ? err.message : String(err),
     })
   }
@@ -357,6 +353,6 @@ export async function invalidateChartCache(subjectHash: string): Promise<void> {
     .eq('subject_hash', subjectHash)
 
   if (error) {
-    logger.error('[chartCacheService] invalidation error', { subjectHash, error: error.message })
+    logger.error('CACHE_INVALIDATION_ERROR', { h: subjectHash.slice(0, 8), err: error.message })
   }
 }
