@@ -400,6 +400,7 @@ export function buildOrientedFusionBlock(
   firstName?: string | null,
   isFr = true,
   phaseData?: { phase: string; phaseConfidence: number } | null,
+  zoneData?: { zone: string; zoneScore: number; subZones: string[] } | null,
 ): string {
   const nameTag = firstName ? ` — ${firstName.toUpperCase()}` : ''
   const lines: string[] = []
@@ -434,6 +435,15 @@ export function buildOrientedFusionBlock(
       isFr
         ? `PHASE ACTUELLE: ${phaseLabel} (confiance: ${Math.round(phaseData.phaseConfidence * 100)}%)`
         : `CURRENT PHASE: ${phaseLabel} (confidence: ${Math.round(phaseData.phaseConfidence * 100)}%)`,
+    )
+  }
+
+  if (zoneData) {
+    const zoneSubs = zoneData.subZones.length > 0 ? ` (${zoneData.subZones.slice(0, 2).join(', ')})` : ''
+    lines.push(
+      isFr
+        ? `ZONE DE VIE: ${zoneData.zone.toUpperCase()} — force ${Math.round(zoneData.zoneScore * 100)}%${zoneSubs}`
+        : `LIFE ZONE: ${zoneData.zone.toUpperCase()} — strength ${Math.round(zoneData.zoneScore * 100)}%${zoneSubs}`,
     )
   }
 

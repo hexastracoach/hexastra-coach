@@ -107,6 +107,8 @@ import { buildFusionContext, buildOrientedFusionBlock } from '@/lib/hexastra/orc
 import { arbitrateFusionSignals } from '@/lib/hexastra/orchestrator/arbitrateFusionSignals'
 import { normalizeSignals } from '@/lib/hexastra/orchestrator/normalizeSignals'
 import { detectFusionPhase } from '@/lib/hexastra/orchestrator/detectFusionPhase'
+import { detectDominantZone } from '@/lib/hexastra/orchestrator/detectDominantZone'
+import { qaFusionCheck } from '@/lib/hexastra/orchestrator/qaFusionCheck'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
@@ -3143,12 +3145,24 @@ export async function runHexastraFlow(input: {
           phaseReasoning: phaseResult.phaseReasoning,
         })
 
-        // 5. Résumé signal (snapshot avant arbitrage)
+        // 5. Détection de la zone de vie dominante
+        const zoneResult = detectDominantZone(fusionCtx, normalizedSignals)
+
+        flowLog('info', 'HEXASTRA_ZONE_DETECTED', {
+          zone: zoneResult.zone,
+          zoneScore: zoneResult.zoneScore,
+          subZones: zoneResult.subZones,
+          zoneReasoning: zoneResult.zoneReasoning,
+        })
+
+        // 6. Résumé signal (snapshot avant arbitrage)
         flowLog('info', 'HEXASTRA_SIGNAL_SUMMARY', {
           intent: userIntent,
           fusionConfidence: fusionCtx.fusionConfidence,
           phase: phaseResult.phase,
           phaseConfidence: phaseResult.phaseConfidence,
+          zone: zoneResult.zone,
+          zoneScore: zoneResult.zoneScore,
           dominantSignalTag: normalizedSignals[0]?.tag ?? null,
           directions: {
             expansif: normalizedSignals.filter((s) => s.direction === 'expansif').length,
@@ -3157,7 +3171,7 @@ export async function runHexastraFlow(input: {
           },
         })
 
-        // 6. Arbitrage des signaux
+        // 7. Arbitrage des signaux
         const arbitration = arbitrateFusionSignals(fusionCtx, lang)
 
         flowLog('info', 'HEXASTRA_DOMINANT_SIGNAL', {
@@ -3170,8 +3184,35 @@ export async function runHexastraFlow(input: {
           signalConfidence: arbitration.signalConfidence,
         })
 
-        // 7. Construction du bloc orienté (remplace buildFusionProfileBlock)
-        const orientedBlock = buildOrientedFusionBlock(fusionCtx, arbitration, firstName, isFr, phaseResult)
+        // 8. QA — vérification de cohérence avant génération
+        const qaResult = qaFusionCheck(fusionCtx, normalizedSignals, arbitration, phaseResult, zoneResult)
+
+        flowLog('info', 'HEXASTRA_QA_CHECK', {
+          passed: qaResult.passed,
+          coherenceScore: qaResult.coherenceScore,
+          failedChecks: qaResult.checks.filter((c) => !c.passed).map((c) => c.name),
+          warnings: qaResult.warnings,
+          blockers: qaResult.blockers,
+        })
+
+        flowLog('info', 'HEXASTRA_COHERENCE_SCORE', {
+          coherenceScore: qaResult.coherenceScore,
+          breakdown: Object.fromEntries(qaResult.checks.map((c) => [c.name, c.score])),
+          passed: qaResult.passed,
+          intent: userIntent,
+          zone: zoneResult.zone,
+          phase: phaseResult.phase,
+        })
+
+        // 9. Construction du bloc orienté (remplace buildFusionProfileBlock)
+        const orientedBlock = buildOrientedFusionBlock(
+          fusionCtx,
+          arbitration,
+          firstName,
+          isFr,
+          phaseResult,
+          zoneResult,
+        )
         intentCompactBlock = orientedBlock || null
 
         flowLog('info', 'HEXASTRA_READING_PROMPT_READY', {
@@ -3182,6 +3223,9 @@ export async function runHexastraFlow(input: {
           readingAngle: fusionCtx.readingAngle,
           fusionConfidence: fusionCtx.fusionConfidence,
           phase: phaseResult.phase,
+          zone: zoneResult.zone,
+          coherenceScore: qaResult.coherenceScore,
+          qaWarnings: qaResult.warnings.length,
         })
       } else {
         const INTENT_SCIENCE_FOR_BLOCK: Record<string, string> = {
