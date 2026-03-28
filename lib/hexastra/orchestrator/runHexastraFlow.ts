@@ -105,6 +105,7 @@ import { classifyUserIntent, isFusionIntent } from '@/lib/hexastra/orchestration
 import { buildFusionProfileBlock } from '@/lib/hexastra/orchestrator/buildFusionProfileBlock'
 import { buildFusionContext, buildOrientedFusionBlock } from '@/lib/hexastra/orchestrator/buildFusionContext'
 import { runFusionArbiter } from '@/lib/hexastra/orchestrator/fusionArbiter'
+import { buildCompactReadingCore } from '@/lib/hexastra/orchestrator/compactReadingCore'
 import { normalizeSignals } from '@/lib/hexastra/orchestrator/normalizeSignals'
 import { detectFusionPhase } from '@/lib/hexastra/orchestrator/detectFusionPhase'
 import { detectDominantZone } from '@/lib/hexastra/orchestrator/detectDominantZone'
@@ -3202,6 +3203,17 @@ export async function runHexastraFlow(input: {
 
         // 7. Arbitrage des signaux — façade Mission 4 (QUESTION_TYPE_RESOLVED → IGNORED_FIELDS_TRACE)
         const arbitration = runFusionArbiter({ raw: intentRaw, intent: userIntent, lang })
+
+        // 7b. Compact Reading Core — enrichissement avec tone solaire + toneHint Lune/Ennéagramme
+        const compactCore = buildCompactReadingCore(arbitration, fusionCtx, lang)
+
+        flowLog('info', 'HEXASTRA_COMPACT_CORE_BUILT', {
+          questionType:    compactCore.questionType,
+          signalConfidence: compactCore.signalConfidence,
+          toneHint:        compactCore.toneHint.slice(0, 80),
+          solarToneHint:   compactCore.solarToneHint.slice(0, 80),
+          rightMovement:   compactCore.rightMovement.slice(0, 100),
+        })
 
         flowLog('info', 'HEXASTRA_DOMINANT_SIGNAL', {
           dominantDynamic: arbitration.dominantDynamic,

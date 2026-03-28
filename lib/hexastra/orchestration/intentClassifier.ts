@@ -118,6 +118,21 @@ const BLOCAGE_PATTERNS: RegExp[] = [
   /\bje (suis|me sens) frein[eé]|je me sens (retenu[e]?|stopp[eé][e]?|coinc[eé][e]?)\b/i,
 ]
 
+/**
+ * Patterns → blocage en contexte pro (priorité sur work_money)
+ *
+ * Règle : si la formulation exprime un blocage interne dans un contexte professionnel,
+ * `blocage` gagne sur `work_money`. La présence de "bloque" ou "freiné" + un mot pro
+ * signifie que la question est sur le mécanisme interne, pas sur la stratégie pro.
+ */
+const BLOCAGE_PRO_PATTERNS: RegExp[] = [
+  // bloque/freiné/stagne + contexte pro (dans les 40 chars)
+  /\b(bloque[reée]?|bloqu[eé]e?|frein[eé]e?|stagne?|n[''']avance (plus|pas))\b.{0,40}\b(activit[eé][s]?|travail|boulot|business|projet[s]?|carri[eè]re)\b/i,
+  /\b(activit[eé][s]?|travail|boulot|business|projet[s]?|carri[eè]re)\b.{0,40}\b(bloque[reée]?|bloqu[eé]e?|frein[eé]e?|stagne?|n[''']avance (plus|pas))\b/i,
+  // "pourquoi je bloque" seul (sans contexte pro mais général)
+  /\bpourquoi (je|j[''']) bloque[sz]?\b/i,
+]
+
 /** Patterns → timing (quand agir, moment juste, cycles) */
 const TIMING_PATTERNS: RegExp[] = [
   /\b(quand (agir|partir|commencer|me lancer|est.?ce le bon moment|dois.?je))\b/i,
@@ -128,9 +143,12 @@ const TIMING_PATTERNS: RegExp[] = [
 
 /** Patterns → identity (qui je suis vraiment, nature profonde) */
 const IDENTITY_PATTERNS: RegExp[] = [
-  /\b(qui suis.?je (vraiment|r[eé]ellement|au fond)?|ma vraie nature|ma nature (profonde|r[eé]elle|essentielle))\b/i,
+  /\b(qui (suis.?je|je suis) (vraiment|r[eé]ellement|au fond)?|ma vraie nature|ma nature (profonde|r[eé]elle|essentielle))\b/i,
   /\b(mon fonctionnement naturel|comment je suis (vraiment|fait|câbl[eé])|ma nature (int[eé]rieure|profonde))\b/i,
   /\b(mon identit[eé] (profonde|essentielle|r[eé]elle)|comprendre qui je suis|conna[iî]tre ma nature)\b/i,
+  /\b(comment (je|tu) fonctionn[eo][sz]?( r[eé]ellement| vraiment)?|mon fonctionnement( r[eé]el| naturel)?)\b/i,
+  /\b(comment (je suis|tu es) (fait[e]?|constru[iy]t[e]?|cabl[eé]e?)|ma mani[eè]re (naturell[e]? |vrai[e]? |propre )?(d['''][êe]tre|de fonctionner))\b/i,
+  /\b(comment (je|tu) (r[eé]agi[st]? naturellement|march[eé][sz]?)|mon vrai (moi|fonctionnement|[êe]tre))\b/i,
 ]
 
 /** Patterns → life_period (transition, passage, période de vie) */
@@ -234,6 +252,8 @@ export function classifyUserIntent(
   if (IDENTITY_PATTERNS.some((p) => p.test(normalized))) return 'identity'
   // timing avant decision
   if (TIMING_PATTERNS.some((p) => p.test(normalized))) return 'timing'
+  // blocage_pro avant work_money (bloque/freiné + contexte pro = blocage interne)
+  if (BLOCAGE_PRO_PATTERNS.some((p) => p.test(normalized))) return 'blocage'
   // work_money avant decision
   if (WORK_MONEY_PATTERNS.some((p) => p.test(normalized))) return 'work_money'
   // blocage avant inner_state

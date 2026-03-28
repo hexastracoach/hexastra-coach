@@ -14,6 +14,7 @@
  */
 
 import type { FusionContext, FusionArbitration } from './buildFusionContext'
+import { getContextualAction } from './contextualActionWording'
 
 export type { FusionArbitration }
 
@@ -212,9 +213,11 @@ function buildDecisionStyle(
   isFr: boolean,
 ): string {
   if (hdAuthority) {
+    // Éviter le doublon "Autorité Autorité Émotionnelle" si hdAuthority commence déjà par "Autorité"
+    const stripped = hdAuthority.replace(/^(Autorit[eé]\s+|Authority\s+)/i, '').trim()
     return isFr
-      ? `Autorité ${hdAuthority}: décision via ${hdAuthority.toLowerCase()}, pas via la rationalisation mentale`
-      : `Authority ${hdAuthority}: decide through ${hdAuthority.toLowerCase()}, not mental rationalization`
+      ? `Autorité ${stripped}: décision via ${stripped.toLowerCase()}, pas via la rationalisation mentale`
+      : `Authority ${stripped}: decide through ${stripped.toLowerCase()}, not mental rationalization`
   }
   if (hdStrategy) {
     return isFr
@@ -305,12 +308,10 @@ function arbitrateRelationship(ctx: FusionContext, isFr: boolean): FusionArbitra
     ? (isFr ? hdDynamic.gap : hdDynamic.gap)
     : (isFr ? 'Décalage entre fonctionnement intérieur et réception extérieure' : 'Gap between inner functioning and external reception')
 
-  // Action prioritaire
-  const priorityAction = hdStrategy
-    ? (isFr ? `Stratégie: ${hdStrategy}` : `Strategy: ${hdStrategy}`)
-    : hdDynamic
-      ? (isFr ? hdDynamic.action : hdDynamic.action)
-      : (isFr ? 'Identifier le mécanisme de communication adapté à ton profil' : 'Identify the communication mechanism adapted to your profile')
+  // Action prioritaire — contextualisée par intent
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : (isFr ? 'Identifier le mécanisme de communication adapté à ton profil' : 'Identify the communication mechanism adapted to your profile'))
 
   // Mécanisme central
   const mainBlock = isFr
@@ -384,16 +385,12 @@ function arbitrateDecision(ctx: FusionContext, isFr: boolean): FusionArbitration
     ? `Tendance à décider avec la tête (logique externe, pression sociale) plutôt qu'avec l'autorité HD interne (${hdAuthority ?? 'corps et instinct'})`
     : `Tendency to decide with the mind (external logic, social pressure) rather than the HD internal authority (${hdAuthority ?? 'body and instinct'})`
 
-  // Action prioritaire
-  const priorityAction = hdStrategy
-    ? isFr
-      ? `Stratégie HD: ${hdStrategy} — respecter ce mécanisme avant de trancher`
-      : `HD Strategy: ${hdStrategy} — follow this mechanism before deciding`
-    : hdDynamic
-      ? isFr ? hdDynamic.action : hdDynamic.action
+  // Action prioritaire — contextualisée par intent
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
       : isFr
         ? "Revenir à l'intelligence corporelle avant de prendre la décision"
-        : "Return to body intelligence before making the decision"
+        : "Return to body intelligence before making the decision")
 
   // Mécanisme central
   const cyclePart = personalYear
@@ -446,6 +443,9 @@ function arbitrateInnerState(ctx: FusionContext, isFr: boolean): FusionArbitrati
   const dominantElements = astro['dominantElements'] as string[] | null
   const hdType = hd['hdType'] as string | null
   const hdDefinedCenters = hd['hdDefinedCenters'] as string | null
+  const hdAuthority = hd['hdAuthority'] as string | null
+  const hdStrategy = hd['hdStrategy'] as string | null
+  const hdProfile = hd['hdProfile'] as string | null
   const ennType = enn['enneagramType']
   const ennWeight = ctx.modules.enneagram.weight
   const personalMonth = nume['personalMonth']
@@ -476,12 +476,12 @@ function arbitrateInnerState(ctx: FusionContext, isFr: boolean): FusionArbitrati
     ? `Ce que tu ressens intérieurement (${moonSign ? `Lune ${moonSign}` : 'ancrage émotionnel'}) vs. ce que ton énergie projette (${hdType ?? 'type HD'})`
     : `What you feel internally (${moonSign ? `Moon ${moonSign}` : 'emotional anchor'}) vs. what your energy projects (${hdType ?? 'HD type'})`
 
-  // Action prioritaire
-  const priorityAction = hdDynamic
-    ? isFr ? hdDynamic.action : hdDynamic.action
-    : isFr
-      ? "Identifier la source du décalage énergétique et respecter ton rythme naturel"
-      : "Identify the source of the energetic gap and respect your natural rhythm"
+  // Action prioritaire — contextualisée par intent
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr
+        ? "Identifier la source du décalage énergétique et respecter ton rythme naturel"
+        : "Identify the source of the energetic gap and respect your natural rhythm")
 
   // Mécanisme central
   const ennNote = ennPattern && ennWeight > 0.3
@@ -514,9 +514,6 @@ function arbitrateInnerState(ctx: FusionContext, isFr: boolean): FusionArbitrati
     : lpPattern
       ? isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`
       : ''
-  const hdAuthority = (ctx.modules.human_design.fields['hdAuthority'] as string | null)
-  const hdStrategy = (ctx.modules.human_design.fields['hdStrategy'] as string | null)
-  const hdProfile = (ctx.modules.human_design.fields['hdProfile'] as string | null)
   const venusSign = (ctx.modules.astrology.fields['venusSign'] as string | null)
   const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
   const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
@@ -572,12 +569,12 @@ function arbitrateFusionGeneral(ctx: FusionContext, isFr: boolean): FusionArbitr
       ? 'Décalage entre nature intérieure profonde et réception extérieure'
       : 'Gap between deep inner nature and external reception'
 
-  // Action prioritaire
-  const priorityAction = hdDynamic
-    ? isFr ? hdDynamic.action : hdDynamic.action
-    : isFr
-      ? 'Identifier le mécanisme central qui génère la situation'
-      : 'Identify the central mechanism generating the situation'
+  // Action prioritaire — contextualisée par intent
+  const priorityAction = getContextualAction(hdType, hdStrategy ?? null, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr
+        ? 'Identifier le mécanisme central qui génère la situation'
+        : 'Identify the central mechanism generating the situation')
 
   // Mécanisme central
   const mainBlock = isFr
@@ -665,9 +662,9 @@ function arbitrateLove(ctx: FusionContext, isFr: boolean): FusionArbitration {
     ? `Ce que tu cherches en amour (${venusSign ? `Vénus ${venusSign}` : 'mode Vénus'}) vs. ce que tu vis en réalité (${moonSign ? `Lune ${moonSign}` : 'ancrage Lune'})`
     : `What you seek in love (${venusSign ? `Venus ${venusSign}` : 'Venus mode'}) vs. what you experience (${moonSign ? `Moon ${moonSign}` : 'Moon anchor'})`
 
-  const priorityAction = hdDynamic
-    ? isFr ? hdDynamic.action : hdDynamic.action
-    : isFr ? 'Comprendre ton mode d\'attraction naturel avant d\'agir en relation' : 'Understand your natural attraction mode before acting in relationship'
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr ? "Comprendre ton mode d'attraction naturel avant d'agir en relation" : 'Understand your natural attraction mode before acting in relationship')
 
   const mainBlock = isFr
     ? `En amour, tu attires selon ${venusSign ? `Vénus ${venusSign}` : 'ton mode Vénus'} et tu as besoin de ${moonSign ? `Lune ${moonSign} (${moonPattern ?? 'ancrage émotionnel'})` : 'ancrage lunaire'}. Ton mécanisme relationnel HD ${hdType ?? '?'} conditionne la manière dont l'autre peut réellement t'atteindre.`
@@ -733,10 +730,9 @@ function arbitrateWorkMoney(ctx: FusionContext, isFr: boolean): FusionArbitratio
       ? 'Fonctionnement naturel vs. attentes extérieures professionnelles'
       : 'Natural functioning vs. external professional expectations'
 
-  const priorityAction = hdStrategy
-    ? isFr ? `HD: ${hdStrategy} — utiliser cette stratégie dans le travail` : `HD: ${hdStrategy} — apply this strategy at work`
-    : hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
-      : isFr ? "Aligner la stratégie de travail sur l'autorité HD" : 'Align work strategy with HD authority'
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr ? "Aligner la stratégie de travail sur l'autorité HD" : 'Align work strategy with HD authority')
 
   const cyclePart = personalYear
     ? isFr ? ` — année personnelle ${personalYear} (contexte cyclique actuel)` : ` — personal year ${personalYear} (current cycle)`
@@ -805,9 +801,9 @@ function arbitrateBlocage(ctx: FusionContext, isFr: boolean): FusionArbitration 
     ? isFr ? hdDynamic.gap : hdDynamic.gap
     : isFr ? 'Décalage entre énergie intérieure et réalité extérieure' : 'Gap between inner energy and outer reality'
 
-  const priorityAction = hdDynamic
-    ? isFr ? hdDynamic.action : hdDynamic.action
-    : isFr ? 'Identifier la source du pattern et respecter le mécanisme HD' : 'Identify pattern source and follow HD mechanism'
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr ? 'Identifier la source du pattern et respecter le mécanisme HD' : 'Identify pattern source and follow HD mechanism')
 
   const centersNote = hdDefinedCenters
     ? isFr ? ` Centres définis (${hdDefinedCenters}): zones de conditionnement potentiel.` : ` Defined centers (${hdDefinedCenters}): potential conditioning zones.`
@@ -878,12 +874,9 @@ function arbitrateTiming(ctx: FusionContext, isFr: boolean): FusionArbitration {
     ? `Pression externe d'agir maintenant vs. intelligence cyclique interne (${personalYear ? `année ${personalYear}` : 'autorité HD'})`
     : `External pressure to act now vs. internal cyclical intelligence (${personalYear ? `year ${personalYear}` : 'HD authority'})`
 
-  const priorityAction = hdStrategy
-    ? isFr
-      ? `Stratégie HD: ${hdStrategy} — laisser le timing venir de l'autorité interne, pas de la pression mentale`
-      : `HD Strategy: ${hdStrategy} — let timing emerge from inner authority, not mental pressure`
-    : hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
-      : isFr ? "Laisser l'intelligence cyclique guider le moment d'agir" : 'Let cyclical intelligence guide the moment to act'
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr ? "Laisser l'intelligence cyclique guider le moment d'agir" : 'Let cyclical intelligence guide the moment to act')
 
   const mainBlock = isFr
     ? `Le timing juste émerge de l'intersection entre ${personalYear ? `l'année personnelle ${personalYear}` : 'le cycle actuel'} et l'autorité HD ${hdAuthority ?? hdType ?? '?'}. La question n'est pas "puis-je ?" mais "est-ce que mon système intérieur dit oui ?"`
@@ -948,9 +941,9 @@ function arbitrateIdentity(ctx: FusionContext, isFr: boolean): FusionArbitration
     ? isFr ? hdDynamic.gap : hdDynamic.gap
     : isFr ? 'Décalage entre nature profonde et expression extérieure' : 'Gap between deep nature and outer expression'
 
-  const priorityAction = hdDynamic
-    ? isFr ? hdDynamic.action : hdDynamic.action
-    : isFr ? 'Honorer le mécanisme naturel plutôt que de se conformer aux attentes' : 'Honor the natural mechanism rather than conforming to expectations'
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr ? 'Honorer le mécanisme naturel plutôt que de se conformer aux attentes' : 'Honor the natural mechanism rather than conforming to expectations')
 
   const crossNote = hdIncarnationCross ? ` Croix d'incarnation ${hdIncarnationCross}: direction de vie.` : ''
   const mainBlock = isFr
@@ -1017,9 +1010,9 @@ function arbitrateLifePeriod(ctx: FusionContext, isFr: boolean): FusionArbitrati
     ? isFr ? hdDynamic.gap : hdDynamic.gap
     : isFr ? 'Transition intérieure vs. rythme imposé par l\'extérieur' : 'Inner transition vs. externally imposed pace'
 
-  const priorityAction = hdDynamic
-    ? isFr ? hdDynamic.action : hdDynamic.action
-    : isFr ? 'Honorer le rythme naturel de cette période plutôt que de le forcer' : 'Honor the natural rhythm of this period rather than forcing it'
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr ? 'Honorer le rythme naturel de cette période plutôt que de le forcer' : 'Honor the natural rhythm of this period rather than forcing it')
 
   const cyclePart = personalYear
     ? isFr ? ` L'année personnelle ${personalYear} indique: ${personalYear == 1 ? 'nouveau départ' : personalYear == 9 ? 'clôture' : personalYear == 5 ? 'changement' : personalYear == 4 ? 'construction' : 'progression'}.` : ` Personal year ${personalYear} indicates: ${personalYear == 1 ? 'new start' : personalYear == 9 ? 'closure' : personalYear == 5 ? 'change' : personalYear == 4 ? 'building' : 'progression'}.`
