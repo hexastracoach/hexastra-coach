@@ -107,6 +107,8 @@ import { buildFusionContext, buildOrientedFusionBlock } from '@/lib/hexastra/orc
 import { runFusionArbiter } from '@/lib/hexastra/orchestrator/fusionArbiter'
 import { buildCompactReadingCore } from '@/lib/hexastra/orchestrator/compactReadingCore'
 import { renderPremiumReading } from '@/lib/hexastra/renderer/renderPremiumReading'
+import { mapCompactCoreToSpheres } from '@/lib/hexastra/reading/mapCompactCoreToSpheres'
+import { renderPlanReading } from '@/lib/hexastra/reading/renderPlanReading'
 import { resolveReadingLevel } from '@/lib/hexastra/context/readingLevel'
 import { detectUserPhase } from '@/lib/hexastra/context/userPhase'
 import { detectLifeZone } from '@/lib/hexastra/context/lifeZone'
@@ -3278,11 +3280,24 @@ export async function runHexastraFlow(input: {
         // Injection du suffixe d'instruction plan-dépendant
         const adaptedBlock = applyPlanSuffix(orientedBlock, readingAdaptation)
 
-        // Rendu premium — transforme le CompactReadingCore en lecture structurée (5 blocs)
-        // Remplace l'orientedBlock comme contexte principal pour le LLM.
-        // Fallback safe : si renderPremiumReading retourne vide, on repasse à adaptedBlock.
+        // Rendu 12 sphères — pipeline Priorité 6 :
+        // CompactReadingCore → mapCompactCoreToSpheres → renderPlanReading (par plan)
+        // Remplace renderPremiumReading comme contexte principal pour le LLM.
+        // Fallback safe : si planBlock vide, on tente renderPremiumReading, puis adaptedBlock.
         const sunSignForRender = fusionCtx.modules.astrology.fields['sunSign'] as string | null | undefined
-        const premiumBlock = renderPremiumReading({
+
+        const hexastraSpheres = mapCompactCoreToSpheres(compactCore, { intent: userIntent, lang })
+        const planBlock = renderPlanReading({
+          compactCore,
+          spheres: hexastraSpheres,
+          plan,
+          intent: userIntent,
+          firstName,
+          lang,
+        })
+
+        // Fallback : ancienne couche renderPremiumReading si planBlock vide (ne doit pas arriver)
+        const premiumBlock = planBlock || renderPremiumReading({
           core: compactCore,
           firstName,
           lang,
@@ -3304,12 +3319,14 @@ export async function runHexastraFlow(input: {
         })
         intentCompactBlock = premiumBlock || adaptedBlock || null
 
-        flowLog('info', 'HEXASTRA_PREMIUM_READING_BUILT', {
+        flowLog('info', 'HEXASTRA_TWELVE_SPHERES_BUILT', {
           intent:           userIntent,
-          toneLevel:        premiumBlock ? 'active' : 'fallback',
+          plan,
+          sphereCount:      hexastraSpheres.spheres.length,
+          summaryChars:     hexastraSpheres.summary.length,
+          planBlockChars:   planBlock.length,
+          fallbackUsed:     !planBlock,
           sunSign:          sunSignForRender ?? null,
-          blockChars:       premiumBlock?.length ?? 0,
-          fallbackUsed:     !premiumBlock,
         })
 
         flowLog('info', 'HEXASTRA_PLAN_ADAPTATION', {
