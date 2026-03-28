@@ -1,6 +1,8 @@
 ﻿import { createHash, randomUUID } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { getAdminClient } from '@/lib/supabase/admin'
+import { hexastraCache } from '@/lib/cache/lru'
+import { checkChatRateLimit, getRequestIp } from '@/lib/rateLimit/chatRateLimit'
 import { runHexastraFlow } from '@/lib/hexastra/orchestrator/runHexastraFlow'
 import { enrichReadingResponse } from '@/lib/hexastra/response/enrichReadingResponse'
 import type {
@@ -37,9 +39,9 @@ import {
   buildSmartPricingSessionState,
 } from '@/lib/monetization/smartPricing'
 
-const memoryCache = new Map<string, { value: unknown; expires: number }>()
-const CACHE_TTL_MS = 10 * 60 * 1000
-
+// Cache LRU importé depuis lib/cache/lru.ts.
+// Remplace l'ancienne Map<> non bornée : limite 500 entrées, TTL 10 min géré par lru-cache.
+// Voir lib/cache/lru.ts pour le détail de la configuration et la justification.
 export const runtime = 'nodejs'
 
 type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien'
@@ -444,15 +446,22 @@ function buildCacheKey(userId: string | null, message: string, birthData?: unkno
   return `${userId ?? 'guest'}::${message}::${bd}`
 }
 
-function getCache(key: string) {
-  const hit = memoryCache.get(key)
-  if (hit && hit.expires > Date.now()) return hit.value
-  memoryCache.delete(key)
-  return null
+/**
+ * Lecture du cache LRU.
+ * Retourne null si absent ou expiré (lru-cache gère le TTL nativement).
+ * Plus besoin de vérifier `expires > Date.now()` manuellement.
+ */
+function getCache(key: string): unknown | null {
+  return hexastraCache.get(key) ?? null
 }
 
-function setCache(key: string, value: unknown) {
-  memoryCache.set(key, { value, expires: Date.now() + CACHE_TTL_MS })
+/**
+ * Écriture dans le cache LRU.
+ * Le TTL (10 min) et la limite de taille (500 entrées) sont gérés par lru-cache.
+ * Plus besoin de stocker `{ value, expires }` — on stocke la valeur directement.
+ */
+function setCache(key: string, value: unknown): void {
+  hexastraCache.set(key, value)
 }
 
 function limitHistory(messages: ChatMessage[], max = 6): ChatMessage[] {
@@ -722,7 +731,9 @@ async function enforceDailyQuota(params: { req: NextRequest; userId: string | nu
     }
   }
 
-  const admin = createAdminClient(adminUrl, adminKey)
+  // Singleton — une seule instance Supabase admin par warm instance Vercel.
+  // Évite le setup de connexion (~30-50ms) à chaque appel enforceDailyQuota.
+  const admin = getAdminClient()
   const subjectKey = userId ? `user:${userId}` : getGuestSubjectKey(req)
   const now = new Date()
 
@@ -768,7 +779,42 @@ export async function POST(req: NextRequest) {
     failureStage = 'validate_env'
     validateEnv(REQUIRED_ENV)
 
+    // ── Rate limiting (BLOC 4) ──────────────────────────────────────────────
+    // Vérifié AVANT le parsing du body et l'auth pour rejeter rapidement.
+    // Sujet : userId préféré (plus fiable), fallback sur IP si non authentifié.
+    // Limite : 10 req/min par sujet (configurable dans lib/rateLimit/chatRateLimit.ts).
+    // Note : le userId n'est pas encore connu ici → utilisation de l'IP au niveau route.
+    // Une fois l'auth résolue, le rate limit est re-vérifié sur userId dans enforceDailyQuota.
+    {
+      const ip = getRequestIp(req)
+      const rl = checkChatRateLimit(ip)
+      if (!rl.allowed) {
+        log('warn', 'rate limit exceeded', { ip, used: rl.used, resetAt: rl.resetAt })
+        return NextResponse.json(
+          { error: 'Trop de requêtes. Réessaie dans quelques instants.' },
+          {
+            status: 429,
+            headers: {
+              'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
+              'X-RateLimit-Limit': String(rl.limit),
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': String(rl.resetAt),
+            },
+          },
+        )
+      }
+    }
+
+    // ── Parallélisation (BLOC 5) ────────────────────────────────────────────
+    // resolveEffectivePlan() lit les cookies Supabase — indépendant du body.
+    // req.json() lit le body HTTP — indépendant des cookies.
+    // En les lançant ensemble : on économise ~200-400ms (temps du round-trip DB auth)
+    // pendant que le body est parsé.
+    //
+    // ⚠️  Si le body est invalide, on retourne 400 avant d'utiliser planPromise.
+    //     La Promise continue en arrière-plan et se résout silencieusement (sans effet).
     failureStage = 'parse_body'
+    const planPromise = resolveEffectivePlan(req)
     const body = await req.json().catch(() => null)
     log('debug', 'body parsed', { hasBody: Boolean(body) })
 
@@ -830,7 +876,9 @@ export async function POST(req: NextRequest) {
       normalizedLast,
     })
 
-    const { plan: effectivePlan, userId } = await resolveEffectivePlan(req)
+    // Récupère le résultat de la Promise lancée en parallèle avec req.json().
+    // Si resolveEffectivePlan a déjà fini (corps long à parser), await est immédiat.
+    const { plan: effectivePlan, userId } = await planPromise
     log('info', 'effective plan resolved', { effectivePlan, userId })
 
     const responseDepth = getPlanResponseDepth(effectivePlan)

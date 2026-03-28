@@ -20,7 +20,7 @@
  */
 
 import type { CompactReadingCore } from '@/lib/hexastra/orchestrator/compactReadingCore'
-import { areTooSimilar } from '@/lib/hexastra/reading/sphereVariation'
+import { areTooSimilar, jaccardSimilarity } from '@/lib/hexastra/reading/sphereVariation'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -164,8 +164,20 @@ function buildS4(core: CompactReadingCore, isFr: boolean): string {
 // Angle : "Ce que tu vis émotionnellement — l'expérience intérieure concrète"
 // Source : visibleEffect + intent (pour adapter le ton)
 // Transformation : reframe visibleEffect en expérience émotionnelle vécue
+//
+// RÈGLE D'EXTRACTION :
+// 1. Si visibleEffect contient " — " → utiliser le texte complet (les deux parties)
+// 2. Sinon → extractFirstClause
+// 3. Si résultat < 30 chars → fallback visibleEffect complet
+function extractRichEffect(visibleEffect: string): string {
+  const full = visibleEffect.trim()
+  if (full.includes(' — ')) return full
+  const clause = extractFirstClause(full)
+  return clause.length >= 30 ? clause : full
+}
+
 function buildS5(core: CompactReadingCore, intent: string | null | undefined, isFr: boolean): string {
-  const effect = extractFirstClause(core.visibleEffect)
+  const effect = extractRichEffect(core.visibleEffect)
   const normalizedIntent = (intent ?? '').toLowerCase()
 
   if (/blocage|block/i.test(normalizedIntent)) {
@@ -270,12 +282,19 @@ function buildS10(core: CompactReadingCore, isFr: boolean): string {
 // Angle : "L'action prioritaire + comment décider de l'enclencher"
 // Source : rightMovement + decisionSignal (première clause)
 // Transformation : combiner action + processus de décision
+//
+// SEUIL DE SIMILARITÉ : 0.40 (abaissé depuis 0.65)
+// Détecte les répétitions subtiles : quand les deux champs partagent
+// la même idée (ex: autorité mentale → rightMovement ≈ decisionSignal)
+// → S11 reste l'action seule, sans redondance visuelle.
+const S11_SIMILARITY_THRESHOLD = 0.40
+
 function buildS11(core: CompactReadingCore, isFr: boolean): string {
   const action = core.rightMovement
   const decisionClause = extractFirstClause(core.decisionSignal)
 
   // Éviter la répétition si rightMovement et decisionSignal se ressemblent
-  if (areTooSimilar(action, decisionClause)) {
+  if (jaccardSimilarity(action, decisionClause) > S11_SIMILARITY_THRESHOLD) {
     return isFr
       ? `Le mouvement juste maintenant : ${action}`
       : `The right movement now: ${action}`
