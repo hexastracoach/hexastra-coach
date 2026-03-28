@@ -5,6 +5,7 @@ import { isSimpleAstroFactQuestion } from '@/lib/hexastra/guards/exactDataGuard'
 import { buildEvolutionContext } from '@/lib/evolution/evolutionContextBuilder'
 import { buildInsightContext } from '@/lib/hexastra/memory/insightEngine'
 import { buildHoroscopeSystemPrompt } from '@/lib/hexastra/prompts/horoscopePrompt'
+import { buildFullHexastraCoachingDirective } from '@/lib/hexastra/prompts/hexastraCoachingPrompt'
 import type { PublicScience } from '@/lib/hexastra/fusionOnly'
 import type { UserEvolutionProfile } from '@/types/evolution'
 import type { BuildPromptInput } from '@/lib/hexastra/types'
@@ -1075,6 +1076,27 @@ export function buildSystemPrompt(input: BuildPromptInput): string {
 - Si l'utilisateur demande un angle tres specifique ou un vocabulaire technique, absorber cet angle dans une reponse HexAstra unifiee sans nommer les disciplines internes.
 - Plans free / essential / premium: garder la lecture lisible et pedagogique, sans exposer publiquement les disciplines sous-jacentes.`
 
+  const isFr = (input.language ?? 'fr').slice(0, 2).toLowerCase() !== 'en'
+
+  /**
+   * Lectures fusion/coaching : la directive 12-sphères coaching remplace le 6-block.
+   * Actif quand :
+   * - fusionOnlyExperience = true (route fusion arbitrée)
+   * - pas d'angle science explicite (la fusion reste le cadre principal)
+   * - pas de mode praticien natif (le praticien a sa propre structure dans buildPractitionerOutputDirective)
+   * - pas de micro-lecture (profil/année/mois ont leur propre format)
+   * - pas de step menu/clarification
+   */
+  const isFusionCoachingReading =
+    Boolean(input.fusionOnlyExperience) &&
+    !resolveRequestedScience(input.selectedScience) &&
+    input.renderMode !== 'praticien' &&
+    input.requestType !== 'micro_profile' &&
+    input.requestType !== 'micro_year' &&
+    input.requestType !== 'micro_month' &&
+    input.flowStep !== 'menu' &&
+    input.flowStep !== 'clarification'
+
   const userNameDirective = input.firstName
     ? `Adresse-toi a l'utilisateur en utilisant son prenom: ${input.firstName}. Ne mentionne jamais son email.`
     : "Si le prenom n'est pas fourni, reste neutre et ne mentionne pas l'email."
@@ -1146,7 +1168,7 @@ ${modeDirective(input.mode)}
 ${planDirective(input.plan)}
 ${technicalLanguageDirective(input)}
 ${requestDirective(input)}
-${hexastraCoreSixBlockDirective(input)}
+${isFusionCoachingReading ? buildFullHexastraCoachingDirective(input.plan, isFr) : hexastraCoreSixBlockDirective(input)}
 ${detailedReadingDirective(input)}
 ${responseStrategyDirective(input)}
 ${input.responseModeDirective ? input.responseModeDirective : ''}

@@ -16,6 +16,7 @@ import { getSolarToneProfile, getSolarToneHint } from '@/lib/hexastra/orchestrat
 import { buildCompactReadingCore } from '@/lib/hexastra/orchestrator/compactReadingCore'
 import { buildFusionContext } from '@/lib/hexastra/orchestrator/buildFusionContext'
 import { arbitrateFusionSignals } from '@/lib/hexastra/orchestrator/arbitrateFusionSignals'
+import { renderPremiumReading } from '@/lib/hexastra/renderer/renderPremiumReading'
 
 // ── Mock payload ──────────────────────────────────────────────────────────────
 
@@ -324,5 +325,237 @@ describe('M6 — DecisionStyle sans doublon "Autorité Autorité"', () => {
     const arb = arbitrateFusionSignals(ctx, 'fr')
 
     expect(arb.decisionStyle.toLowerCase()).toContain('émotionnelle')
+  })
+})
+
+// ── M7 — Renderer Premium ─────────────────────────────────────────────────────
+
+describe('M7 — renderPremiumReading (structure + style + jargon)', () => {
+  // Helper : construit un core réel depuis le pipeline
+  function buildCore(intent: string) {
+    const ctx = buildFusionContext(intent, MOCK_RAW, 'fr')
+    const arb = arbitrateFusionSignals(ctx, 'fr')
+    return buildCompactReadingCore(arb, ctx, 'fr')
+  }
+
+  // ── Structure ────────────────────────────────────────────────────────────────
+
+  it('contient toujours les 5 sections obligatoires (FR)', () => {
+    const core = buildCore('blocage')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+    expect(output).toContain('CE QUI SE PASSE')
+    expect(output).toContain('POURQUOI ÇA SE JOUE')
+    expect(output).toContain('CE QUE ÇA PRODUIT DANS TA VIE')
+    expect(output).toContain('CE QUE TU DOIS FAIRE MAINTENANT')
+    expect(output).toContain('CLÉ À RETENIR')
+  })
+
+  it('contient toujours les 5 sections obligatoires (EN)', () => {
+    const ctx = buildFusionContext('blocage', MOCK_RAW, 'en')
+    const arb = arbitrateFusionSignals(ctx, 'en')
+    const core = buildCompactReadingCore(arb, ctx, 'en')
+    const output = renderPremiumReading({ core, lang: 'en', sunSign: 'Scorpio' })
+
+    expect(output).toContain('WHAT IS HAPPENING')
+    expect(output).toContain('WHY IT PLAYS OUT THIS WAY')
+    expect(output).toContain('WHAT IT PRODUCES IN YOUR LIFE')
+    expect(output).toContain('WHAT YOU NEED TO DO NOW')
+    expect(output).toContain('KEY TO REMEMBER')
+  })
+
+  it('les 5 sections sont présentes pour chaque intent principal', () => {
+    const intents = ['love', 'work_money', 'blocage', 'timing', 'identity', 'inner_state', 'life_period']
+    const REQUIRED_SECTIONS_FR = [
+      'CE QUI SE PASSE',
+      'POURQUOI ÇA SE JOUE',
+      'CE QUE ÇA PRODUIT DANS TA VIE',
+      'CE QUE TU DOIS FAIRE MAINTENANT',
+      'CLÉ À RETENIR',
+    ]
+
+    for (const intent of intents) {
+      const core = buildCore(intent)
+      const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+      for (const section of REQUIRED_SECTIONS_FR) {
+        expect(output, `Section "${section}" absente pour intent "${intent}"`).toContain(section)
+      }
+    }
+  })
+
+  // ── Zéro jargon technique ────────────────────────────────────────────────────
+
+  it('ne contient pas "Human Design" dans la sortie', () => {
+    const core = buildCore('identity')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+    expect(output).not.toContain('Human Design')
+  })
+
+  it('ne contient pas "Ennéagramme" dans la sortie', () => {
+    const core = buildCore('inner_state')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+    expect(output).not.toMatch(/[Ee]nn[eé]agramme/)
+  })
+
+  it('ne contient pas "Autorité Émotionnelle" dans la sortie (humanisé)', () => {
+    const core = buildCore('decision')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+    expect(output).not.toContain('Autorité Émotionnelle')
+  })
+
+  it('ne contient pas "Projecteur" dans la sortie (humanisé)', () => {
+    // Les types HD doivent être traduits en langage humain
+    const core = buildCore('fusion_general_question')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+    // "Projecteur" peut rester si la phrase entière est déjà humaine,
+    // mais "Projecteur 2/4" (jargon brut) ne doit pas apparaître
+    expect(output).not.toMatch(/Projecteur\s+\d\/\d/)
+  })
+
+  // ── Adaptation au ton solaire ─────────────────────────────────────────────────
+
+  it('Scorpion → méta-ton présent dans la sortie (directivité high)', () => {
+    const core = buildCore('blocage')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+    // Le bloc méta-ton doit être présent pour un signe reconnu
+    expect(output).toContain('[TON SOLAIRE:')
+    expect(output).toContain('high')
+  })
+
+  it('Cancer → méta-ton directivité low', () => {
+    const core = buildCore('love')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Cancer' })
+
+    expect(output).toContain('[TON SOLAIRE:')
+    expect(output).toContain('low')
+  })
+
+  it('signe inconnu → pas de méta-ton, structure toujours présente', () => {
+    const core = buildCore('timing')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Pluton' })
+
+    // Pas de méta-ton pour un signe inconnu
+    expect(output).not.toContain('[TON SOLAIRE:')
+    // Mais les 5 sections sont toujours là
+    expect(output).toContain('CE QUI SE PASSE')
+    expect(output).toContain('CLÉ À RETENIR')
+  })
+
+  it('sans signe solaire → pas de méta-ton, structure intacte', () => {
+    const core = buildCore('work_money')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: null })
+
+    expect(output).not.toContain('[TON SOLAIRE:')
+    expect(output).toContain('CE QUI SE PASSE')
+  })
+
+  // ── Prénom et personnalisation ────────────────────────────────────────────────
+
+  it('avec prénom → section 1 commence par le prénom', () => {
+    const core = buildCore('blocage')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion', firstName: 'Marie' })
+
+    // La section 1 (après le label) doit commencer par "Marie, ..."
+    const s1Start = output.indexOf('CE QUI SE PASSE\n') + 'CE QUI SE PASSE\n'.length
+    const s1Content = output.slice(s1Start, s1Start + 10)
+    expect(s1Content).toMatch(/^Marie,/)
+  })
+
+  it('sans prénom → section 1 commence directement par le contenu', () => {
+    const core = buildCore('blocage')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion', firstName: null })
+
+    const s1Start = output.indexOf('CE QUI SE PASSE\n') + 'CE QUI SE PASSE\n'.length
+    const s1Content = output.slice(s1Start, s1Start + 6)
+    // Ne commence pas par une virgule
+    expect(s1Content).not.toMatch(/^,/)
+  })
+
+  // ── Clé mémorable (mantra) ────────────────────────────────────────────────────
+
+  it('CLÉ À RETENIR se termine par un point', () => {
+    const core = buildCore('relation')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+    const keyIndex = output.indexOf('CLÉ À RETENIR\n') + 'CLÉ À RETENIR\n'.length
+    const keyContent = output.slice(keyIndex).split('\n\n')[0]?.trim() ?? ''
+    expect(keyContent).toMatch(/\.$/)
+  })
+
+  it('CLÉ À RETENIR est ≤ 90 caractères', () => {
+    const intents = ['blocage', 'timing', 'love', 'identity']
+    for (const intent of intents) {
+      const core = buildCore(intent)
+      const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+      const keyIndex = output.indexOf('CLÉ À RETENIR\n') + 'CLÉ À RETENIR\n'.length
+      const keyContent = output.slice(keyIndex).split('\n\n')[0]?.trim() ?? ''
+      expect(keyContent.length, `Mantra trop long pour intent "${intent}"`).toBeLessThanOrEqual(90)
+    }
+  })
+
+  // ── Fiabilité ─────────────────────────────────────────────────────────────────
+
+  it('note de fiabilité absente si signalConfidence ≥ 0.6', () => {
+    const core = buildCore('exact_profile')
+    // Le profil complet a une haute confiance — pas de note d'avertissement
+    if (core.signalConfidence >= 0.6) {
+      const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+      expect(output).not.toContain('⚠')
+    }
+  })
+
+  it('note de fiabilité présente si signalConfidence < 0.6', () => {
+    const core = buildCore('timing')
+    // Injecter une confiance artificellement basse
+    const lowConfCore = { ...core, signalConfidence: 0.4 }
+    const output = renderPremiumReading({ core: lowConfCore, lang: 'fr', sunSign: 'Scorpion' })
+
+    expect(output).toContain('⚠')
+    expect(output).toContain('Données partielles')
+  })
+
+  // ── Comparaison avant/après — 3 cas ──────────────────────────────────────────
+
+  it('[EXEMPLE 1 — RELATION] output est structuré et sans jargon', () => {
+    const core = buildCore('love')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+    // Structure présente
+    expect(output).toContain('CE QUI SE PASSE')
+    expect(output).toContain('CLÉ À RETENIR')
+    // Sans jargon
+    expect(output).not.toContain('Human Design')
+    // Contenu non vide
+    expect(output.length).toBeGreaterThan(200)
+  })
+
+  it('[EXEMPLE 2 — BLOCAGE] output actionnable (rightMovement present)', () => {
+    const core = buildCore('blocage')
+    const output = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+
+    // La section action doit contenir du contenu (pas vide)
+    const actionIndex = output.indexOf('CE QUE TU DOIS FAIRE MAINTENANT\n') + 'CE QUE TU DOIS FAIRE MAINTENANT\n'.length
+    const actionContent = output.slice(actionIndex).split('\n\n')[0]?.trim() ?? ''
+    expect(actionContent.length).toBeGreaterThan(10)
+  })
+
+  it('[EXEMPLE 3 — TIMING] output différent avec signe Cancer vs Scorpion', () => {
+    const core = buildCore('timing')
+
+    const outputScorpion = renderPremiumReading({ core, lang: 'fr', sunSign: 'Scorpion' })
+    const outputCancer   = renderPremiumReading({ core, lang: 'fr', sunSign: 'Cancer' })
+
+    // Les méta-tons doivent être différents (directivité différente)
+    expect(outputScorpion).not.toEqual(outputCancer)
+    // Mais les 5 sections sont toujours présentes pour les deux
+    expect(outputCancer).toContain('CE QUI SE PASSE')
+    expect(outputCancer).toContain('CLÉ À RETENIR')
   })
 })

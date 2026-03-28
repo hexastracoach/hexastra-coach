@@ -328,6 +328,13 @@ export type BuildPromptInput = {
   /** 'daily' (15 blocs) or 'weekly' (7 × 10 blocs + synthèse). Defaults to 'daily'. */
   horoscopeVariant?: 'daily' | 'weekly' | null
   /**
+   * Indique que cette lecture passe par le pipeline Fusion Arbiter (Priorité 2+).
+   * Quand true, la directive de sortie LLM utilise la structure coaching 12-sphères
+   * (buildHexastraCoachingPrompt) au lieu du 6-block générique.
+   * Source: runHexastraFlow → `fusionOnlyExperience: true` dans la réponse metadata.
+   */
+  fusionOnlyExperience?: boolean
+  /**
    * Personalized data block for the horoscope (current date, sun sign, birth date, etc.).
    * Built by buildHoroscopeDataBlock() from birthData + optional Railway raw data.
    */

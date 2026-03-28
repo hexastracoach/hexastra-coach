@@ -106,6 +106,11 @@ import { buildFusionProfileBlock } from '@/lib/hexastra/orchestrator/buildFusion
 import { buildFusionContext, buildOrientedFusionBlock } from '@/lib/hexastra/orchestrator/buildFusionContext'
 import { runFusionArbiter } from '@/lib/hexastra/orchestrator/fusionArbiter'
 import { buildCompactReadingCore } from '@/lib/hexastra/orchestrator/compactReadingCore'
+import { renderPremiumReading } from '@/lib/hexastra/renderer/renderPremiumReading'
+import { resolveReadingLevel } from '@/lib/hexastra/context/readingLevel'
+import { detectUserPhase } from '@/lib/hexastra/context/userPhase'
+import { detectLifeZone } from '@/lib/hexastra/context/lifeZone'
+import { getSoftMessage } from '@/lib/hexastra/ui/softMessaging'
 import { normalizeSignals } from '@/lib/hexastra/orchestrator/normalizeSignals'
 import { detectFusionPhase } from '@/lib/hexastra/orchestrator/detectFusionPhase'
 import { detectDominantZone } from '@/lib/hexastra/orchestrator/detectDominantZone'
@@ -3108,6 +3113,7 @@ export async function runHexastraFlow(input: {
     // the AI grounds its 4-block reading in the complete energetic profile.
     // For single sidebar intents: inject a compact single-science block.
     let intentCompactBlock: string | null = null
+    let softMessage: string | null = null
     if (!exactDataNeeded && exactDataResolved && specializedResult?.raw) {
       const intentRaw = specializedResult.raw as Record<string, unknown>
       if (isIntentFusion) {
@@ -3215,6 +3221,20 @@ export async function runHexastraFlow(input: {
           rightMovement:   compactCore.rightMovement.slice(0, 100),
         })
 
+        // 7c. Couche d'intelligence contextuelle (Priorité 4)
+        const readingLevel  = resolveReadingLevel({ plan, userMessage: latestUserMessage })
+        const userPhase     = detectUserPhase(compactCore)
+        const lifeZone      = detectLifeZone(userIntent)
+        const sessionDepth  = limitedMessages.filter((m) => m.role === 'user').length
+
+        flowLog('info', 'HEXASTRA_ADAPTIVE_CONTEXT', {
+          readingLevel,
+          userPhase,
+          lifeZone,
+          plan,
+          intentOverride: readingLevel !== (plan === 'free' ? 'short' : plan === 'practitioner' ? 'deep' : 'standard'),
+        })
+
         flowLog('info', 'HEXASTRA_DOMINANT_SIGNAL', {
           dominantDynamic: arbitration.dominantDynamic,
           dominantModule: arbitration.dominantModule,
@@ -3257,7 +3277,40 @@ export async function runHexastraFlow(input: {
 
         // Injection du suffixe d'instruction plan-dépendant
         const adaptedBlock = applyPlanSuffix(orientedBlock, readingAdaptation)
-        intentCompactBlock = adaptedBlock || null
+
+        // Rendu premium — transforme le CompactReadingCore en lecture structurée (5 blocs)
+        // Remplace l'orientedBlock comme contexte principal pour le LLM.
+        // Fallback safe : si renderPremiumReading retourne vide, on repasse à adaptedBlock.
+        const sunSignForRender = fusionCtx.modules.astrology.fields['sunSign'] as string | null | undefined
+        const premiumBlock = renderPremiumReading({
+          core: compactCore,
+          firstName,
+          lang,
+          intent: userIntent,
+          sunSign: sunSignForRender ?? null,
+          readingLevel,
+          userPhase,
+          lifeZone,
+          sessionDepth,
+        })
+
+        // Soft message (Priorité 5) — couche légère post-lecture, jamais avant
+        softMessage = getSoftMessage({
+          intent: userIntent,
+          lifeZone,
+          userPhase,
+          sessionDepth,
+          lang,
+        })
+        intentCompactBlock = premiumBlock || adaptedBlock || null
+
+        flowLog('info', 'HEXASTRA_PREMIUM_READING_BUILT', {
+          intent:           userIntent,
+          toneLevel:        premiumBlock ? 'active' : 'fallback',
+          sunSign:          sunSignForRender ?? null,
+          blockChars:       premiumBlock?.length ?? 0,
+          fallbackUsed:     !premiumBlock,
+        })
 
         flowLog('info', 'HEXASTRA_PLAN_ADAPTATION', {
           plan: readingAdaptation.plan,
@@ -3515,6 +3568,8 @@ export async function runHexastraFlow(input: {
       isHoroscopeRoute: isHoroscopeRoute || undefined,
       horoscopeVariant: horoscopeVariant ?? undefined,
       horoscopeDataBlock: horoscopeDataBlock ?? undefined,
+      // Active la directive 12-sphères coaching dans le system prompt
+      fusionOnlyExperience: true,
     })
 
     const messagesForLLM = limitedMessages.length
@@ -3964,6 +4019,7 @@ export async function runHexastraFlow(input: {
         upgradeShown: smartUpgradeDecision.shouldShow,
         upgradeReason: smartUpgradeDecision.reason,
         upgradeText: smartUpgradeDecision.message,
+        softMessage: softMessage ?? null,
         upgradeTargetPlan: smartUpgradeDecision.targetPlan ?? undefined,
         upgradeCtaLabel: smartUpgradeDecision.ctaLabel ?? undefined,
         pricingSessionState,

@@ -246,7 +246,7 @@ export function buildSmartUpgradeDecision(
     reason: 'engagement',
     targetPlan,
     message:
-      "On peut aller plus loin si tu veux.\nJe peux t'aider a clarifier encore plus cette situation.",
+      "On peut aller encore plus loin ensemble si tu veux.",
     ctaLabel: getDefaultUpgradeLabel(targetPlan),
   }
 }
@@ -266,8 +266,8 @@ export function buildQuotaUpgradeDecision(plan: PlanKey): SmartUpgradeDecision {
     reason: 'quota_limit',
     targetPlan,
     message:
-      "Tu peux continuer.\nDebloque l'acces complet pour aller plus loin dans ta comprehension.",
-    ctaLabel: getDefaultUpgradeLabel(targetPlan),
+      "Tu as utilisé tes lectures du jour.\nReviens dans 24h ou continue si tu veux aller plus loin.",
+    ctaLabel: "Voir les options",
   }
 }
 
