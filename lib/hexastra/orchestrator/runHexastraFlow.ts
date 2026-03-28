@@ -104,12 +104,13 @@ import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassific
 import { classifyUserIntent, isFusionIntent } from '@/lib/hexastra/orchestration/intentClassifier'
 import { buildFusionProfileBlock } from '@/lib/hexastra/orchestrator/buildFusionProfileBlock'
 import { buildFusionContext, buildOrientedFusionBlock } from '@/lib/hexastra/orchestrator/buildFusionContext'
-import { arbitrateFusionSignals } from '@/lib/hexastra/orchestrator/arbitrateFusionSignals'
+import { runFusionArbiter } from '@/lib/hexastra/orchestrator/fusionArbiter'
 import { normalizeSignals } from '@/lib/hexastra/orchestrator/normalizeSignals'
 import { detectFusionPhase } from '@/lib/hexastra/orchestrator/detectFusionPhase'
 import { detectDominantZone } from '@/lib/hexastra/orchestrator/detectDominantZone'
 import { qaFusionCheck } from '@/lib/hexastra/orchestrator/qaFusionCheck'
 import { getReadingAdaptation, applyPlanSuffix } from '@/lib/hexastra/orchestrator/adaptReadingByPlan'
+import { detectDirectTopic, buildDirectKnowledgeBlock } from '@/lib/hexastra/orchestrator/buildDirectKnowledgeBlock'
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
@@ -2565,9 +2566,11 @@ export async function runHexastraFlow(input: {
           : detectedSubcategoryForGuard
             ? [detectedSubcategoryForGuard]
             : []
+    const isDirectKnowledge = userIntent === 'direct_knowledge_query'
     const exactDataNeeded =
       semanticCtx.contextType === 'astro_followup' ||
-      requiresExactData(detectedSubcategoryForGuard)
+      requiresExactData(detectedSubcategoryForGuard) ||
+      isDirectKnowledge   // requête factuelle directe → toujours appeler Railway
     const rawExactDataResolved = hasResolvedExactData(specializedResult)
 
     // Universal reliability check — validates field completeness per science
@@ -2720,13 +2723,15 @@ export async function runHexastraFlow(input: {
       isPedagogical: universalClassif.requestKind === 'clarification',
       isFusionIntent: isIntentFusion,
     })
-    // Enneagram always uses interpretive_reading — prose, not structured output
-    const effectiveResponseMode =
-      semanticCtx.contextType === 'astro_followup' && exactDataResolved
-        ? 'calculated_reading'
-        : universalClassif.science === 'enneagram' && responseMode === 'calculated_reading'
-          ? 'interpretive_reading'
-          : responseMode
+    // direct_knowledge_query: réponse factuelle directe — priorité absolue sur tout autre mode
+    const effectiveResponseMode: typeof responseMode =
+      isDirectKnowledge
+        ? 'direct_answer'
+        : semanticCtx.contextType === 'astro_followup' && exactDataResolved
+          ? 'calculated_reading'
+          : universalClassif.science === 'enneagram' && responseMode === 'calculated_reading'
+            ? 'interpretive_reading'
+            : responseMode
     if (effectiveResponseMode !== responseMode) {
       flowLog('info', 'ENNEAGRAM_MODE_OVERRIDE', {
         from: responseMode,
@@ -3075,6 +3080,28 @@ export async function runHexastraFlow(input: {
             : scienceCompactBlock ?? formatExactDataBlockCapped(specializedResult.raw, exactDataMaxChars))
         : null
 
+    // ── Bloc direct factuel (direct_knowledge_query) ───────────────────────────
+    // Construit à partir des données brutes Railway — bypasse le pipeline fusion.
+    // Injecté en priorité sur rawExactDataBlock pour ce mode.
+    let directKnowledgeBlock: string | null = null
+    if (isDirectKnowledge && exactDataResolved && specializedResult?.raw) {
+      const directLang = userContext.language ?? 'fr'
+      const directFirstName = userContext.firstName ?? (userContext as any).name ?? null
+      const directTopic = detectDirectTopic(latestUserMessage)
+      directKnowledgeBlock = buildDirectKnowledgeBlock(
+        specializedResult.raw as Record<string, unknown>,
+        directTopic,
+        directFirstName,
+        directLang,
+      )
+      flowLog('info', 'HEXASTRA_DIRECT_KNOWLEDGE', {
+        intent: 'direct_knowledge_query',
+        topic: directTopic,
+        blockChars: directKnowledgeBlock.length,
+        firstName: directFirstName ?? null,
+      })
+    }
+
     // ── Intent-driven profile block ────────────────────────────────────────────
     // For fusion intents: inject the full multi-science fusion profile block so
     // the AI grounds its 4-block reading in the complete energetic profile.
@@ -3173,8 +3200,8 @@ export async function runHexastraFlow(input: {
           },
         })
 
-        // 7. Arbitrage des signaux
-        const arbitration = arbitrateFusionSignals(fusionCtx, lang)
+        // 7. Arbitrage des signaux — façade Mission 4 (QUESTION_TYPE_RESOLVED → IGNORED_FIELDS_TRACE)
+        const arbitration = runFusionArbiter({ raw: intentRaw, intent: userIntent, lang })
 
         flowLog('info', 'HEXASTRA_DOMINANT_SIGNAL', {
           dominantDynamic: arbitration.dominantDynamic,
@@ -3404,9 +3431,12 @@ export async function runHexastraFlow(input: {
 
     // Exact astro rendering uses only the compact validated block to avoid
     // leaking rich/raw payloads that encourage the model to "complete" values.
-    const exactDataBlockForPrompt = isAstroExactCompact
-      ? astroCompactCtx?.compactDataBlock ?? coreAstroBlock ?? rawExactDataBlock
-      : [coreAstroBlock, rawExactDataBlock ?? intentCompactBlock].filter(Boolean).join('\n\n') || null
+    // direct_knowledge_query : injecte directement le bloc factuel formaté.
+    const exactDataBlockForPrompt = isDirectKnowledge && directKnowledgeBlock
+      ? directKnowledgeBlock
+      : isAstroExactCompact
+        ? astroCompactCtx?.compactDataBlock ?? coreAstroBlock ?? rawExactDataBlock
+        : [coreAstroBlock, rawExactDataBlock ?? intentCompactBlock].filter(Boolean).join('\n\n') || null
 
     const horoscopeDataBlock = isHoroscopeRoute
       ? buildHoroscopeDataBlock(

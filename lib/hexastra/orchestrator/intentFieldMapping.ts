@@ -96,6 +96,56 @@ const WEIGHTS_COMPLETE: IntentModuleWeights = {
   kua: 0.45,
 }
 
+// ── Nouveaux presets ─────────────────────────────────────────────────────────
+
+const WEIGHTS_LOVE: IntentModuleWeights = {
+  astrology: 0.92,    // Vénus + Lune = signaux relationnels prioritaires
+  human_design: 0.82,
+  numerology: 0.48,
+  enneagram: 0.72,
+  kua: 0.25,
+}
+
+const WEIGHTS_WORK_MONEY: IntentModuleWeights = {
+  astrology: 0.78,    // Saturne + Mars
+  human_design: 0.90, // stratégie de vie
+  numerology: 0.85,   // chemin de vie + année = contexte de mission
+  enneagram: 0.50,
+  kua: 0.38,          // directions favorables = support contextuel
+}
+
+const WEIGHTS_BLOCAGE: IntentModuleWeights = {
+  astrology: 0.85,    // Lune + Saturne = mécanismes bloquants
+  human_design: 0.92, // centres définis/ouverts = patterns répétitifs
+  numerology: 0.62,
+  enneagram: 0.75,    // peur centrale = source du blocage
+  kua: 0.20,
+}
+
+const WEIGHTS_TIMING: IntentModuleWeights = {
+  astrology: 0.80,    // cycles planétaires
+  human_design: 0.72, // autorité = quand décider
+  numerology: 0.92,   // année + mois personnel = contexte cyclique dominant
+  enneagram: 0.30,
+  kua: 0.55,          // directions temporelles
+}
+
+const WEIGHTS_IDENTITY: IntentModuleWeights = {
+  astrology: 0.82,    // Soleil + Ascendant
+  human_design: 0.95, // mécanisme le plus précis sur l'identité
+  numerology: 0.82,   // chemin de vie + expression
+  enneagram: 0.70,    // peur centrale = identité profonde
+  kua: 0.30,
+}
+
+const WEIGHTS_LIFE_PERIOD: IntentModuleWeights = {
+  astrology: 0.80,    // Saturne + dominantes
+  human_design: 0.78, // définition + stratégie = flux énergétique
+  numerology: 0.88,   // cycle dominant
+  enneagram: 0.62,
+  kua: 0.40,
+}
+
 // ── Mappings par intent ────────────────────────────────────────────────────────
 
 export const INTENT_FIELD_MAPS: Record<string, IntentFieldMap> = {
@@ -218,6 +268,146 @@ export const INTENT_FIELD_MAPS: Record<string, IntentFieldMap> = {
     secondaryModules: ['astrology', 'numerology', 'enneagram'],
     depth: 'complete',
     readingQuestion: 'Qui suis-je vraiment selon toutes mes dimensions ?',
+  },
+
+  /**
+   * LOVE — amour, attirance, vie sentimentale
+   * Distinct de relationship (liens en général) : ciblé romantique/intime
+   * Dominant : Vénus + Lune (mode d'attraction et besoins émotionnels)
+   */
+  love: {
+    intent: 'love',
+    readingAngleFr: "Vie amoureuse — comment tu attires et vis l'intimité",
+    readingAngleEn: 'Love life — how you attract and experience intimacy',
+    activeModules: ['astrology', 'human_design', 'enneagram', 'numerology', 'kua'],
+    moduleWeights: WEIGHTS_LOVE,
+    priorityFields: {
+      astrology: ['venusSign', 'moonSign', 'sunSign', 'risingSign', 'marsSign'],
+      human_design: ['hdType', 'hdProfile', 'hdAuthority', 'hdStrategy'],
+      numerology: ['lifePath', 'expression'],
+      enneagram: ['enneagramType', 'enneagramWing', 'instinct'],
+      kua: ['kua', 'element'],
+    },
+    dominantModule: 'astrology',
+    secondaryModules: ['human_design', 'enneagram'],
+    depth: 'focused',
+    readingQuestion: 'Pourquoi j\'attire ce que j\'attire en amour, et comment changer ça ?',
+  },
+
+  /**
+   * WORK_MONEY — travail, carrière, argent, mission
+   * Dominant : HD (stratégie de vie) + numérologie (mission de fond)
+   */
+  work_money: {
+    intent: 'work_money',
+    readingAngleFr: 'Travail et argent — ta stratégie naturelle pour réussir',
+    readingAngleEn: 'Work and money — your natural strategy for success',
+    activeModules: ['human_design', 'numerology', 'astrology', 'enneagram', 'kua'],
+    moduleWeights: WEIGHTS_WORK_MONEY,
+    priorityFields: {
+      astrology: ['saturnSign', 'marsSign', 'sunSign', 'dominantElements', 'dominantModalities'],
+      human_design: ['hdType', 'hdAuthority', 'hdStrategy', 'hdProfile', 'hdDefinition'],
+      numerology: ['lifePath', 'personalYear', 'expression'],
+      enneagram: ['enneagramType'],
+      kua: ['directions', 'element', 'kua'],
+    },
+    dominantModule: 'human_design',
+    secondaryModules: ['numerology', 'astrology'],
+    depth: 'focused',
+    readingQuestion: 'Quelle est ma stratégie naturelle pour avancer dans ma vie professionnelle ?',
+  },
+
+  /**
+   * BLOCAGE — blocage, confusion, obstacle interne, pattern répétitif
+   * Dominant : HD centres (schémas conditionnés) + peur ennéagramme
+   */
+  blocage: {
+    intent: 'blocage',
+    readingAngleFr: 'Blocage intérieur — comprendre et défaire le pattern qui répète',
+    readingAngleEn: 'Inner block — understanding and undoing the repeating pattern',
+    activeModules: ['human_design', 'astrology', 'enneagram', 'numerology', 'kua'],
+    moduleWeights: WEIGHTS_BLOCAGE,
+    priorityFields: {
+      astrology: ['moonSign', 'saturnSign', 'dominantElements', 'dominantModalities'],
+      human_design: ['hdType', 'hdDefinedCenters', 'hdAuthority', 'hdStrategy'],
+      numerology: ['personalYear', 'personalMonth', 'lifePath'],
+      enneagram: ['enneagramType', 'enneagramWing', 'instinct'],
+      kua: ['element'],
+    },
+    dominantModule: 'human_design',
+    secondaryModules: ['enneagram', 'astrology'],
+    depth: 'focused',
+    readingQuestion: 'D\'où vient ce pattern qui se répète, et comment en sortir durablement ?',
+  },
+
+  /**
+   * TIMING — quand agir, moment juste, cycles
+   * Dominant : numérologie (cycles année/mois) + HD autorité (décision timing)
+   */
+  timing: {
+    intent: 'timing',
+    readingAngleFr: 'Timing — est-ce le bon moment pour agir ?',
+    readingAngleEn: 'Timing — is this the right moment to act?',
+    activeModules: ['numerology', 'astrology', 'human_design', 'kua', 'enneagram'],
+    moduleWeights: WEIGHTS_TIMING,
+    priorityFields: {
+      astrology: ['saturnSign', 'marsSign', 'dominantElements'],
+      human_design: ['hdAuthority', 'hdStrategy', 'hdType'],
+      numerology: ['personalYear', 'personalMonth', 'lifePath'],
+      enneagram: ['enneagramType'],
+      kua: ['directions', 'element'],
+    },
+    dominantModule: 'numerology',
+    secondaryModules: ['astrology', 'human_design'],
+    depth: 'focused',
+    readingQuestion: 'Est-ce le bon moment, et comment savoir quand agir selon mon profil ?',
+  },
+
+  /**
+   * IDENTITY — qui je suis vraiment, fonctionnement naturel, nature profonde
+   * Distinct de exact_profile (plus introspectif que descriptif)
+   * Dominant : HD (mécanisme le plus précis) + chemin de vie
+   */
+  identity: {
+    intent: 'identity',
+    readingAngleFr: 'Identité — qui tu es vraiment et comment tu fonctionnes naturellement',
+    readingAngleEn: 'Identity — who you truly are and how you naturally operate',
+    activeModules: ['human_design', 'numerology', 'astrology', 'enneagram', 'kua'],
+    moduleWeights: WEIGHTS_IDENTITY,
+    priorityFields: {
+      astrology: ['sunSign', 'risingSign', 'moonSign', 'dominantElements'],
+      human_design: ['hdType', 'hdProfile', 'hdAuthority', 'hdStrategy', 'hdDefinition', 'hdIncarnationCross'],
+      numerology: ['lifePath', 'expression'],
+      enneagram: ['enneagramType', 'enneagramWing'],
+      kua: ['element'],
+    },
+    dominantModule: 'human_design',
+    secondaryModules: ['numerology', 'astrology', 'enneagram'],
+    depth: 'balanced',
+    readingQuestion: 'Qui suis-je vraiment, selon mon fonctionnement naturel et ma nature profonde ?',
+  },
+
+  /**
+   * LIFE_PERIOD — période de vie, transition, dynamique globale
+   * Dominant : numérologie cycles + HD définition (flux énergétique)
+   */
+  life_period: {
+    intent: 'life_period',
+    readingAngleFr: 'Période de vie — comprendre le passage que tu traverses',
+    readingAngleEn: 'Life period — understanding the transition you are going through',
+    activeModules: ['numerology', 'astrology', 'human_design', 'enneagram', 'kua'],
+    moduleWeights: WEIGHTS_LIFE_PERIOD,
+    priorityFields: {
+      astrology: ['sunSign', 'saturnSign', 'dominantElements', 'dominantModalities'],
+      human_design: ['hdType', 'hdDefinition', 'hdProfile', 'hdStrategy'],
+      numerology: ['personalYear', 'personalMonth', 'lifePath', 'expression'],
+      enneagram: ['enneagramType'],
+      kua: ['element', 'kua'],
+    },
+    dominantModule: 'numerology',
+    secondaryModules: ['astrology', 'human_design'],
+    depth: 'balanced',
+    readingQuestion: 'Quelle est la dynamique de cette période, et comment la traverser avec clarté ?',
   },
 }
 

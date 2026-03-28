@@ -12,6 +12,7 @@
 import type { RequestKind } from './requestKinds'
 
 export type ResponseMode =
+  | 'direct_answer'            // réponse factuelle immédiate — données brutes, liste, aucun refus
   | 'calculated_reading'
   | 'interpretive_reading'
   | 'guided_exploration'
@@ -72,6 +73,22 @@ export function selectResponseMode(input: ResponseModeInput): ResponseMode {
 
 export function buildResponseModeDirective(mode: ResponseMode): string {
   switch (mode) {
+    case 'direct_answer':
+      return [
+        'MODE: RÉPONSE DIRECTE FACTUELLE',
+        "- Les données ci-dessous sont calculées et vérifiées. Utilise-les comme source de vérité absolue.",
+        "- Commence DIRECTEMENT par les valeurs. Aucune introduction, aucun préambule.",
+        '- Format obligatoire : liste à puces "●" pour chaque valeur.',
+        "- Si une valeur est présente dans les données : l'afficher exactement, telle quelle.",
+        "- Si une valeur est absente : écrire \"non disponible\".",
+        "- Une courte explication (1-2 phrases max) est permise UNIQUEMENT après avoir affiché toutes les valeurs.",
+        "INTERDICTIONS ABSOLUES :",
+        '- "je ne peux pas", "il m\'est difficile de", "en tant qu\'IA", "je n\'ai pas accès"',
+        '- Toute réponse vague, contournement ou reformulation évasive',
+        '- Introduction narrative avant les données',
+        '- Inventer ou estimer une valeur absente',
+      ].join('\n')
+
     case 'calculated_reading':
       return [
         'MODE DE REPONSE: LECTURE CALCULEE',

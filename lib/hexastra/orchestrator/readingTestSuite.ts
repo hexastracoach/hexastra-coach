@@ -106,12 +106,21 @@ function makeMockFusionContext(
 function makeArbitration(overrides?: Partial<FusionArbitration>): FusionArbitration {
   return {
     dominantDynamic: 'Test dynamic',
+    secondaryDynamic: '',
     mainBlock: 'Test main block description',
     innerOuterGap: 'Test inner outer gap',
     priorityAction: 'Test priority action',
     supportPoints: ['support 1'],
+    decisionStyle: '',
+    relationalPattern: '',
+    energyPattern: '',
     dominantModule: 'human_design',
     signalConfidence: 0.75,
+    questionType: 'fusion_general_question',
+    usedFields: [],
+    ignoredFields: [],
+    weightsApplied: {},
+    reliabilitySummary: {},
     ...overrides,
   }
 }

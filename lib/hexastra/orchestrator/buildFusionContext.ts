@@ -24,13 +24,40 @@ import { getIntentFieldMap, type IntentFieldMap, type IntentModule } from './int
  * Défini ici pour éviter la dépendance circulaire avec arbitrateFusionSignals.ts.
  */
 export type FusionArbitration = {
+  // ── Dynamiques ──────────────────────────────────────────────────────────────
+  /** Dynamique principale — le signal le plus fort pour cet intent */
   dominantDynamic: string
+  /** Dynamique secondaire — second signal significatif */
+  secondaryDynamic: string
+  /** Mécanisme central — le pourquoi de la dynamique */
   mainBlock: string
+  /** Décalage intérieur/extérieur — tension principale */
   innerOuterGap: string
+  /** Action prioritaire adaptée au profil */
   priorityAction: string
+  /** Signaux de support (max 3) */
   supportPoints: string[]
+  // ── Patterns contextuels ────────────────────────────────────────────────────
+  /** Comment cette personne décide (HD authority + logique) */
+  decisionStyle: string
+  /** Pattern relationnel dominant (HD type + Vénus/Lune) */
+  relationalPattern: string
+  /** Dynamique énergétique (HD type + dominantes astro) */
+  energyPattern: string
+  // ── Meta ────────────────────────────────────────────────────────────────────
   dominantModule: string
   signalConfidence: number
+  /** Intent/type de question qui a généré cet arbitrage */
+  questionType: string
+  // ── Traçabilité ─────────────────────────────────────────────────────────────
+  /** Champs API effectivement utilisés (module.field) */
+  usedFields: string[]
+  /** Champs présents dans le mapping mais absents du payload */
+  ignoredFields: string[]
+  /** Poids effectifs appliqués par module */
+  weightsApplied: Partial<Record<string, number>>
+  /** Fiabilité par module (true = disponible et pondéré) */
+  reliabilitySummary: Partial<Record<string, boolean>>
 }
 
 export type FusionModuleData = {

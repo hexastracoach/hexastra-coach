@@ -170,6 +170,99 @@ function getEnneagramPattern(type: string | number | string[] | null | undefined
   return isNaN(num) ? null : (ENE_TYPE_PATTERNS[num] ?? null)
 }
 
+// ── Helpers traçabilité et patterns contextuels ───────────────────────────────
+
+import type { FusionModuleData } from './buildFusionContext'
+
+/**
+ * Calcule la traçabilité complète des champs utilisés/ignorés et des poids.
+ */
+function buildTraceability(ctx: FusionContext): {
+  usedFields: string[]
+  ignoredFields: string[]
+  weightsApplied: Partial<Record<string, number>>
+  reliabilitySummary: Partial<Record<string, boolean>>
+} {
+  const usedFields: string[] = []
+  const ignoredFields: string[] = []
+  const weightsApplied: Partial<Record<string, number>> = {}
+  const reliabilitySummary: Partial<Record<string, boolean>> = {}
+
+  for (const [module, data] of Object.entries(ctx.modules) as [string, FusionModuleData][]) {
+    weightsApplied[module] = data.weight
+    reliabilitySummary[module] = data.available && data.weight > 0
+    for (const [field, value] of Object.entries(data.fields)) {
+      if (value !== null && value !== undefined) {
+        usedFields.push(`${module}.${field}`)
+      } else {
+        ignoredFields.push(`${module}.${field}`)
+      }
+    }
+  }
+
+  return { usedFields, ignoredFields, weightsApplied, reliabilitySummary }
+}
+
+/**
+ * Détermine le style de décision basé sur l'autorité HD.
+ */
+function buildDecisionStyle(
+  hdAuthority: string | null,
+  hdStrategy: string | null,
+  isFr: boolean,
+): string {
+  if (hdAuthority) {
+    return isFr
+      ? `Autorité ${hdAuthority}: décision via ${hdAuthority.toLowerCase()}, pas via la rationalisation mentale`
+      : `Authority ${hdAuthority}: decide through ${hdAuthority.toLowerCase()}, not mental rationalization`
+  }
+  if (hdStrategy) {
+    return isFr
+      ? `Stratégie ${hdStrategy}: respecter ce mécanisme avant de trancher`
+      : `Strategy ${hdStrategy}: follow this mechanism before deciding`
+  }
+  return isFr
+    ? "Consulter l'intelligence corporelle et émotionnelle avant de décider"
+    : 'Consult body and emotional intelligence before deciding'
+}
+
+/**
+ * Détermine le pattern relationnel (HD type + Vénus/Lune).
+ */
+function buildRelationalPattern(
+  hdType: string | null,
+  hdProfile: string | null,
+  venusSign: string | null,
+  moonSign: string | null,
+  isFr: boolean,
+): string {
+  const parts: string[] = []
+  if (hdType) parts.push(isFr ? `${hdType} (stratégie relationnelle propre)` : `${hdType} (specific relational strategy)`)
+  if (venusSign) parts.push(isFr ? `Vénus ${venusSign} (mode d'attraction)` : `Venus ${venusSign} (attraction mode)`)
+  if (moonSign) parts.push(isFr ? `Lune ${moonSign} (besoins émotionnels)` : `Moon ${moonSign} (emotional needs)`)
+  return parts.length
+    ? parts.join(' + ')
+    : isFr ? 'Pattern relationnel basé sur le profil multi-dimensionnel' : 'Relational pattern from multi-dimensional profile'
+}
+
+/**
+ * Détermine la dynamique énergétique (HD type + lune + éléments).
+ */
+function buildEnergyPattern(
+  hdType: string | null,
+  moonSign: string | null,
+  dominantElements: string[] | null,
+  isFr: boolean,
+): string {
+  const parts: string[] = []
+  if (hdType) parts.push(hdType)
+  if (moonSign) parts.push(isFr ? `Lune ${moonSign}` : `Moon ${moonSign}`)
+  if (dominantElements?.length) parts.push(isFr ? `Éléments: ${dominantElements.join('/')}` : `Elements: ${dominantElements.join('/')}`)
+  return parts.length
+    ? parts.join(' · ')
+    : isFr ? 'Dynamique énergétique multi-dimensionnelle' : 'Multi-dimensional energy dynamic'
+}
+
 // ── Arbitrage par intent ───────────────────────────────────────────────────────
 
 function arbitrateRelationship(ctx: FusionContext, isFr: boolean): FusionArbitration {
@@ -241,8 +334,22 @@ function arbitrateRelationship(ctx: FusionContext, isFr: boolean): FusionArbitra
   }
 
   const signalConfidence = (ctx.modules.human_design.weight + ctx.modules.astrology.weight) / 2
+  const secondaryDynamic = ennPattern && ennWeight > 0.3
+    ? isFr ? `Type ${ennType} Ennéagramme: ${ennPattern.pattern}` : `Enneagram ${ennType}: ${ennPattern.pattern}`
+    : venusSign
+      ? isFr ? `Vénus ${venusSign}: mode d'attraction et connexion` : `Venus ${venusSign}: attraction and connection`
+      : lpPattern ?? ''
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, venusSign as string | null, moonSign, isFr)
+  const energyPattern = buildEnergyPattern(hdType, moonSign, null, isFr)
 
-  return { dominantDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints, dominantModule: 'human_design', signalConfidence }
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'human_design', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
 }
 
 function arbitrateDecision(ctx: FusionContext, isFr: boolean): FusionArbitration {
@@ -310,8 +417,22 @@ function arbitrateDecision(ctx: FusionContext, isFr: boolean): FusionArbitration
   }
 
   const signalConfidence = ctx.modules.human_design.weight
+  const secondaryDynamic = lpPattern
+    ? isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`
+    : saturnSign
+      ? isFr ? `Saturne ${saturnSign}: structure et discipline` : `Saturn ${saturnSign}: structure and discipline`
+      : ''
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, null, null, isFr)
+  const energyPattern = buildEnergyPattern(hdType, null, null, isFr)
 
-  return { dominantDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints, dominantModule: 'human_design', signalConfidence }
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'human_design', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
 }
 
 function arbitrateInnerState(ctx: FusionContext, isFr: boolean): FusionArbitration {
@@ -388,8 +509,26 @@ function arbitrateInnerState(ctx: FusionContext, isFr: boolean): FusionArbitrati
   }
 
   const signalConfidence = (ctx.modules.astrology.weight + ctx.modules.human_design.weight) / 2
+  const secondaryDynamic = ennPattern && ennWeight > 0.3
+    ? isFr ? `Type ${ennType} Ennéagramme: peur de ${ennPattern.fear}` : `Enneagram ${ennType}: fear of ${ennPattern.fear}`
+    : lpPattern
+      ? isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`
+      : ''
+  const hdAuthority = (ctx.modules.human_design.fields['hdAuthority'] as string | null)
+  const hdStrategy = (ctx.modules.human_design.fields['hdStrategy'] as string | null)
+  const hdProfile = (ctx.modules.human_design.fields['hdProfile'] as string | null)
+  const venusSign = (ctx.modules.astrology.fields['venusSign'] as string | null)
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, venusSign, moonSign, isFr)
+  const energyPattern = buildEnergyPattern(hdType, moonSign, dominantElements, isFr)
 
-  return { dominantDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints, dominantModule: 'astrology', signalConfidence }
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'astrology', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
 }
 
 function arbitrateFusionGeneral(ctx: FusionContext, isFr: boolean): FusionArbitration {
@@ -401,6 +540,7 @@ function arbitrateFusionGeneral(ctx: FusionContext, isFr: boolean): FusionArbitr
   const hdType = hd['hdType'] as string | null
   const hdProfile = hd['hdProfile'] as string | null
   const hdAuthority = hd['hdAuthority'] as string | null
+  const hdStrategy = hd['hdStrategy'] as string | null
   const sunSign = astro['sunSign'] as string | null
   const moonSign = astro['moonSign'] as string | null
   const lifePath = nume['lifePath']
@@ -466,8 +606,445 @@ function arbitrateFusionGeneral(ctx: FusionContext, isFr: boolean): FusionArbitr
   }
 
   const signalConfidence = (ctx.modules.human_design.weight + ctx.modules.astrology.weight) / 2
+  const secondaryDynamic = moonPattern
+    ? isFr ? `Lune ${moonSign}: ${moonPattern}` : `Moon ${moonSign}: ${moonPattern}`
+    : lpPattern
+      ? isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`
+      : ''
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy ?? null, isFr)
+  const venusSign = (ctx.modules.astrology.fields['venusSign'] as string | null)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, venusSign, moonSign, isFr)
+  const energyPattern = buildEnergyPattern(hdType, moonSign, null, isFr)
 
-  return { dominantDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints, dominantModule: 'human_design', signalConfidence }
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'human_design', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
+}
+
+// ── Arbitrage par intent — nouveaux intents ────────────────────────────────────
+
+function arbitrateLove(ctx: FusionContext, isFr: boolean): FusionArbitration {
+  // love = relationship avec priorité Vénus/Lune sur HD type
+  const astro = ctx.modules.astrology.fields
+  const hd = ctx.modules.human_design.fields
+  const enn = ctx.modules.enneagram.fields
+
+  const venusSign = astro['venusSign'] as string | null
+  const moonSign = astro['moonSign'] as string | null
+  const hdType = hd['hdType'] as string | null
+  const hdAuthority = hd['hdAuthority'] as string | null
+  const hdStrategy = hd['hdStrategy'] as string | null
+  const hdProfile = hd['hdProfile'] as string | null
+  const ennType = enn['enneagramType']
+  const ennWeight = ctx.modules.enneagram.weight
+  const ennPattern = getEnneagramPattern(ennType)
+  const moonPattern = getMoonPattern(moonSign)
+  const hdDynamic = getHDTypeDynamic(hdType)
+
+  const dominantDynamic = venusSign && moonSign
+    ? isFr
+      ? `Vénus ${venusSign} (mode d'attraction) + Lune ${moonSign} (${moonPattern ?? 'besoins émotionnels'})`
+      : `Venus ${venusSign} (attraction mode) + Moon ${moonSign} (${moonPattern ?? 'emotional needs'})`
+    : venusSign
+      ? isFr ? `Vénus ${venusSign}: mode d'attraction et d'amour` : `Venus ${venusSign}: attraction and love mode`
+      : moonPattern
+        ? isFr ? `Lune ${moonSign}: ${moonPattern}` : `Moon ${moonSign}: ${moonPattern}`
+        : isFr ? 'Profil amoureux multi-dimensionnel' : 'Multi-dimensional love profile'
+
+  const secondaryDynamic = hdType && hdDynamic
+    ? isFr ? `${hdType} (${hdDynamic.pattern})` : `${hdType} (${hdDynamic.pattern})`
+    : ennPattern && ennWeight > 0.3
+      ? isFr ? `Type ${ennType} Ennéagramme: ${ennPattern.pattern}` : `Enneagram ${ennType}: ${ennPattern.pattern}`
+      : ''
+
+  const innerOuterGap = isFr
+    ? `Ce que tu cherches en amour (${venusSign ? `Vénus ${venusSign}` : 'mode Vénus'}) vs. ce que tu vis en réalité (${moonSign ? `Lune ${moonSign}` : 'ancrage Lune'})`
+    : `What you seek in love (${venusSign ? `Venus ${venusSign}` : 'Venus mode'}) vs. what you experience (${moonSign ? `Moon ${moonSign}` : 'Moon anchor'})`
+
+  const priorityAction = hdDynamic
+    ? isFr ? hdDynamic.action : hdDynamic.action
+    : isFr ? 'Comprendre ton mode d\'attraction naturel avant d\'agir en relation' : 'Understand your natural attraction mode before acting in relationship'
+
+  const mainBlock = isFr
+    ? `En amour, tu attires selon ${venusSign ? `Vénus ${venusSign}` : 'ton mode Vénus'} et tu as besoin de ${moonSign ? `Lune ${moonSign} (${moonPattern ?? 'ancrage émotionnel'})` : 'ancrage lunaire'}. Ton mécanisme relationnel HD ${hdType ?? '?'} conditionne la manière dont l'autre peut réellement t'atteindre.`
+    : `In love, you attract through ${venusSign ? `Venus ${venusSign}` : 'your Venus mode'} and need ${moonSign ? `Moon ${moonSign} (${moonPattern ?? 'emotional anchor'})` : 'lunar anchor'}. Your HD ${hdType ?? '?'} relational mechanism shapes how others can truly reach you.`
+
+  const supportPoints: string[] = []
+  if (ennPattern && ennWeight > 0.3) {
+    supportPoints.push(isFr ? `Type ${ennType}: peur de ${ennPattern.fear} — schéma dans les liens` : `Type ${ennType}: fear of ${ennPattern.fear} — relational pattern`)
+  }
+  if (hdProfile) supportPoints.push(isFr ? `Profil HD ${hdProfile}: mode de présence relationnelle` : `HD Profile ${hdProfile}: relational presence mode`)
+
+  const signalConfidence = (ctx.modules.astrology.weight + ctx.modules.human_design.weight) / 2
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, venusSign, moonSign, isFr)
+  const energyPattern = buildEnergyPattern(hdType, moonSign, null, isFr)
+
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'astrology', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
+}
+
+function arbitrateWorkMoney(ctx: FusionContext, isFr: boolean): FusionArbitration {
+  const hd = ctx.modules.human_design.fields
+  const astro = ctx.modules.astrology.fields
+  const nume = ctx.modules.numerology.fields
+
+  const hdType = hd['hdType'] as string | null
+  const hdAuthority = hd['hdAuthority'] as string | null
+  const hdStrategy = hd['hdStrategy'] as string | null
+  const hdProfile = hd['hdProfile'] as string | null
+  const saturnSign = astro['saturnSign'] as string | null
+  const marsSign = astro['marsSign'] as string | null
+  const lifePath = nume['lifePath']
+  const personalYear = nume['personalYear']
+  const expression = nume['expression']
+
+  const hdDynamic = getHDTypeDynamic(hdType)
+  const lpPattern = getLifePathPattern(lifePath)
+
+  const dominantDynamic = hdType && hdDynamic
+    ? isFr
+      ? `${hdType} (${hdDynamic.pattern}) — stratégie naturelle pour avancer`
+      : `${hdType} (${hdDynamic.pattern}) — natural strategy to move forward`
+    : lpPattern
+      ? isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`
+      : isFr ? 'Profil de mission multi-dimensionnel' : 'Multi-dimensional mission profile'
+
+  const secondaryDynamic = lpPattern
+    ? isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`
+    : saturnSign
+      ? isFr ? `Saturne ${saturnSign}: structure et discipline au service du succès` : `Saturn ${saturnSign}: structure and discipline for success`
+      : ''
+
+  const innerOuterGap = hdDynamic
+    ? isFr
+      ? `Stratégie HD (${hdDynamic.action}) vs. pression de l'environnement à agir différemment`
+      : `HD strategy (${hdDynamic.action}) vs. environmental pressure to act differently`
+    : isFr
+      ? 'Fonctionnement naturel vs. attentes extérieures professionnelles'
+      : 'Natural functioning vs. external professional expectations'
+
+  const priorityAction = hdStrategy
+    ? isFr ? `HD: ${hdStrategy} — utiliser cette stratégie dans le travail` : `HD: ${hdStrategy} — apply this strategy at work`
+    : hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr ? "Aligner la stratégie de travail sur l'autorité HD" : 'Align work strategy with HD authority'
+
+  const cyclePart = personalYear
+    ? isFr ? ` — année personnelle ${personalYear} (contexte cyclique actuel)` : ` — personal year ${personalYear} (current cycle)`
+    : ''
+  const mainBlock = isFr
+    ? `La stratégie naturelle de travail est définie par ${hdType ?? 'HD'} (${hdDynamic ? hdDynamic.pattern : 'mécanisme propre'}) + Chemin de vie ${lifePath ?? '?'} (${lpPattern ?? 'moteur de fond'})${cyclePart}.`
+    : `Natural work strategy is defined by ${hdType ?? 'HD'} (${hdDynamic ? hdDynamic.pattern : 'own mechanism'}) + Life path ${lifePath ?? '?'} (${lpPattern ?? 'background driver'})${cyclePart}.`
+
+  const supportPoints: string[] = []
+  if (saturnSign) supportPoints.push(isFr ? `Saturne ${saturnSign}: discipline, structure et timing pro` : `Saturn ${saturnSign}: discipline, structure and professional timing`)
+  if (marsSign) supportPoints.push(isFr ? `Mars ${marsSign}: élan et mode d'action` : `Mars ${marsSign}: drive and action mode`)
+  if (expression) supportPoints.push(isFr ? `Nombre expression ${expression}: mode d'expression dans le travail` : `Expression number ${expression}: expression in work`)
+
+  const signalConfidence = (ctx.modules.human_design.weight + ctx.modules.numerology.weight) / 2
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, null, null, isFr)
+  const energyPattern = buildEnergyPattern(hdType, null, null, isFr)
+
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'human_design', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
+}
+
+function arbitrateBlocage(ctx: FusionContext, isFr: boolean): FusionArbitration {
+  // blocage = centres HD définis/ouverts + peur ennéagramme
+  const hd = ctx.modules.human_design.fields
+  const astro = ctx.modules.astrology.fields
+  const enn = ctx.modules.enneagram.fields
+  const nume = ctx.modules.numerology.fields
+
+  const hdType = hd['hdType'] as string | null
+  const hdAuthority = hd['hdAuthority'] as string | null
+  const hdStrategy = hd['hdStrategy'] as string | null
+  const hdDefinedCenters = hd['hdDefinedCenters'] as string | null
+  const moonSign = astro['moonSign'] as string | null
+  const saturnSign = astro['saturnSign'] as string | null
+  const ennType = enn['enneagramType']
+  const ennWeight = ctx.modules.enneagram.weight
+  const personalYear = nume['personalYear']
+  const lifePath = nume['lifePath']
+
+  const hdDynamic = getHDTypeDynamic(hdType)
+  const moonPattern = getMoonPattern(moonSign)
+  const ennPattern = getEnneagramPattern(ennType)
+  const lpPattern = getLifePathPattern(lifePath)
+
+  const dominantDynamic = hdType && hdDynamic
+    ? isFr
+      ? `${hdType} (${hdDynamic.gap}) — source du pattern bloquant`
+      : `${hdType} (${hdDynamic.gap}) — source of blocking pattern`
+    : moonPattern
+      ? isFr ? `Lune ${moonSign}: ${moonPattern}` : `Moon ${moonSign}: ${moonPattern}`
+      : isFr ? 'Pattern de blocage multi-dimensionnel' : 'Multi-dimensional blocking pattern'
+
+  const secondaryDynamic = ennPattern && ennWeight > 0.3
+    ? isFr ? `Type ${ennType} Ennéagramme: ${ennPattern.pattern}` : `Enneagram ${ennType}: ${ennPattern.pattern}`
+    : saturnSign
+      ? isFr ? `Saturne ${saturnSign}: contraintes structurelles` : `Saturn ${saturnSign}: structural constraints`
+      : ''
+
+  const innerOuterGap = hdDynamic
+    ? isFr ? hdDynamic.gap : hdDynamic.gap
+    : isFr ? 'Décalage entre énergie intérieure et réalité extérieure' : 'Gap between inner energy and outer reality'
+
+  const priorityAction = hdDynamic
+    ? isFr ? hdDynamic.action : hdDynamic.action
+    : isFr ? 'Identifier la source du pattern et respecter le mécanisme HD' : 'Identify pattern source and follow HD mechanism'
+
+  const centersNote = hdDefinedCenters
+    ? isFr ? ` Centres définis (${hdDefinedCenters}): zones de conditionnement potentiel.` : ` Defined centers (${hdDefinedCenters}): potential conditioning zones.`
+    : ''
+  const ennNote = ennPattern && ennWeight > 0.3
+    ? isFr ? ` La peur centrale type ${ennType} (${ennPattern.fear}) amplifie le blocage.` : ` Core type ${ennType} fear (${ennPattern.fear}) amplifies the block.`
+    : ''
+  const mainBlock = isFr
+    ? `Le blocage vient du décalage ${hdType ?? 'HD'}: ${hdDynamic ? hdDynamic.gap : 'fonctionnement non respecté'}.${centersNote}${ennNote}`
+    : `The block comes from ${hdType ?? 'HD'} gap: ${hdDynamic ? hdDynamic.gap : 'mechanism not followed'}.${centersNote}${ennNote}`
+
+  const supportPoints: string[] = []
+  if (moonPattern) supportPoints.push(isFr ? `Lune ${moonSign}: ${moonPattern}` : `Moon ${moonSign}: ${moonPattern}`)
+  if (lpPattern) supportPoints.push(isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`)
+  if (personalYear) supportPoints.push(isFr ? `Année perso ${personalYear}: contexte cyclique du blocage` : `Personal year ${personalYear}: cycle context of the block`)
+
+  const signalConfidence = (ctx.modules.human_design.weight + ctx.modules.enneagram.weight) / 2
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const hdProfile = hd['hdProfile'] as string | null
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, null, moonSign, isFr)
+  const energyPattern = buildEnergyPattern(hdType, moonSign, null, isFr)
+
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'human_design', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
+}
+
+function arbitrateTiming(ctx: FusionContext, isFr: boolean): FusionArbitration {
+  // timing = numérologie dominant + HD autorité
+  const hd = ctx.modules.human_design.fields
+  const astro = ctx.modules.astrology.fields
+  const nume = ctx.modules.numerology.fields
+
+  const hdType = hd['hdType'] as string | null
+  const hdAuthority = hd['hdAuthority'] as string | null
+  const hdStrategy = hd['hdStrategy'] as string | null
+  const hdProfile = hd['hdProfile'] as string | null
+  const personalYear = nume['personalYear'] as string | number | null
+  const personalMonth = nume['personalMonth'] as string | number | null
+  const lifePath = nume['lifePath']
+  const saturnSign = astro['saturnSign'] as string | null
+  const marsSign = astro['marsSign'] as string | null
+
+  const hdDynamic = getHDTypeDynamic(hdType)
+  const lpPattern = getLifePathPattern(lifePath)
+
+  const dominantDynamic = personalYear
+    ? isFr
+      ? `Année personnelle ${personalYear}${personalMonth ? ` / Mois ${personalMonth}` : ''}: contexte cyclique actuel`
+      : `Personal year ${personalYear}${personalMonth ? ` / Month ${personalMonth}` : ''}: current cyclical context`
+    : hdAuthority
+      ? isFr
+        ? `Autorité HD ${hdAuthority}: mécanisme de timing interne`
+        : `HD authority ${hdAuthority}: internal timing mechanism`
+      : isFr ? 'Timing basé sur le profil multi-dimensionnel' : 'Timing based on multi-dimensional profile'
+
+  const secondaryDynamic = hdAuthority
+    ? isFr ? `Autorité HD ${hdAuthority}: quand décider, comment savoir` : `HD Authority ${hdAuthority}: when to decide, how to know`
+    : saturnSign
+      ? isFr ? `Saturne ${saturnSign}: structure temporelle` : `Saturn ${saturnSign}: temporal structure`
+      : ''
+
+  const innerOuterGap = isFr
+    ? `Pression externe d'agir maintenant vs. intelligence cyclique interne (${personalYear ? `année ${personalYear}` : 'autorité HD'})`
+    : `External pressure to act now vs. internal cyclical intelligence (${personalYear ? `year ${personalYear}` : 'HD authority'})`
+
+  const priorityAction = hdStrategy
+    ? isFr
+      ? `Stratégie HD: ${hdStrategy} — laisser le timing venir de l'autorité interne, pas de la pression mentale`
+      : `HD Strategy: ${hdStrategy} — let timing emerge from inner authority, not mental pressure`
+    : hdDynamic ? (isFr ? hdDynamic.action : hdDynamic.action)
+      : isFr ? "Laisser l'intelligence cyclique guider le moment d'agir" : 'Let cyclical intelligence guide the moment to act'
+
+  const mainBlock = isFr
+    ? `Le timing juste émerge de l'intersection entre ${personalYear ? `l'année personnelle ${personalYear}` : 'le cycle actuel'} et l'autorité HD ${hdAuthority ?? hdType ?? '?'}. La question n'est pas "puis-je ?" mais "est-ce que mon système intérieur dit oui ?"`
+    : `Right timing emerges from the intersection of ${personalYear ? `personal year ${personalYear}` : 'current cycle'} and HD authority ${hdAuthority ?? hdType ?? '?'}. The question is not "can I?" but "does my inner system say yes?"`
+
+  const supportPoints: string[] = []
+  if (lpPattern) supportPoints.push(isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`)
+  if (saturnSign) supportPoints.push(isFr ? `Saturne ${saturnSign}: patience et structure temporelle` : `Saturn ${saturnSign}: patience and temporal structure`)
+  if (marsSign) supportPoints.push(isFr ? `Mars ${marsSign}: élan et momentum` : `Mars ${marsSign}: drive and momentum`)
+
+  const signalConfidence = (ctx.modules.numerology.weight + ctx.modules.human_design.weight) / 2
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, null, null, isFr)
+  const energyPattern = buildEnergyPattern(hdType, null, null, isFr)
+
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'numerology', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
+}
+
+function arbitrateIdentity(ctx: FusionContext, isFr: boolean): FusionArbitration {
+  // identity = HD + chemin de vie + soleil — qui je suis vraiment
+  const hd = ctx.modules.human_design.fields
+  const astro = ctx.modules.astrology.fields
+  const nume = ctx.modules.numerology.fields
+  const enn = ctx.modules.enneagram.fields
+
+  const hdType = hd['hdType'] as string | null
+  const hdProfile = hd['hdProfile'] as string | null
+  const hdAuthority = hd['hdAuthority'] as string | null
+  const hdStrategy = hd['hdStrategy'] as string | null
+  const hdIncarnationCross = hd['hdIncarnationCross'] as string | null
+  const sunSign = astro['sunSign'] as string | null
+  const risingSign = astro['risingSign'] as string | null
+  const lifePath = nume['lifePath']
+  const ennType = enn['enneagramType']
+  const ennWeight = ctx.modules.enneagram.weight
+
+  const hdDynamic = getHDTypeDynamic(hdType)
+  const lpPattern = getLifePathPattern(lifePath)
+  const ennPattern = getEnneagramPattern(ennType)
+
+  const dominantDynamic = hdType && hdDynamic
+    ? isFr
+      ? `${hdType}${hdProfile ? ` profil ${hdProfile}` : ''} — ${hdDynamic.pattern}`
+      : `${hdType}${hdProfile ? ` profile ${hdProfile}` : ''} — ${hdDynamic.pattern}`
+    : lpPattern
+      ? isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`
+      : isFr ? 'Identité multi-dimensionnelle' : 'Multi-dimensional identity'
+
+  const secondaryDynamic = lpPattern
+    ? isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`
+    : sunSign
+      ? isFr ? `Soleil ${sunSign}: expression solaire centrale` : `Sun ${sunSign}: central solar expression`
+      : ''
+
+  const innerOuterGap = hdDynamic
+    ? isFr ? hdDynamic.gap : hdDynamic.gap
+    : isFr ? 'Décalage entre nature profonde et expression extérieure' : 'Gap between deep nature and outer expression'
+
+  const priorityAction = hdDynamic
+    ? isFr ? hdDynamic.action : hdDynamic.action
+    : isFr ? 'Honorer le mécanisme naturel plutôt que de se conformer aux attentes' : 'Honor the natural mechanism rather than conforming to expectations'
+
+  const crossNote = hdIncarnationCross ? ` Croix d'incarnation ${hdIncarnationCross}: direction de vie.` : ''
+  const mainBlock = isFr
+    ? `L'identité profonde: ${hdType ?? 'HD'}${hdProfile ? ` (${hdProfile})` : ''} + Chemin de vie ${lifePath ?? '?'} + ${sunSign ? `Soleil ${sunSign}` : 'expression solaire'}.${crossNote} Ce n'est pas qui tu "essaies d'être", c'est qui tu es naturellement.`
+    : `Deep identity: ${hdType ?? 'HD'}${hdProfile ? ` (${hdProfile})` : ''} + Life path ${lifePath ?? '?'} + ${sunSign ? `Sun ${sunSign}` : 'solar expression'}.${crossNote} This is not who you "try to be", it is who you naturally are.`
+
+  const supportPoints: string[] = []
+  if (ennPattern && ennWeight > 0.3) {
+    supportPoints.push(isFr ? `Type ${ennType} Ennéagramme: ${ennPattern.pattern}` : `Enneagram ${ennType}: ${ennPattern.pattern}`)
+  }
+  if (risingSign) supportPoints.push(isFr ? `Ascendant ${risingSign}: masque social et première impression` : `Rising ${risingSign}: social mask and first impression`)
+  if (hdAuthority) supportPoints.push(isFr ? `Autorité ${hdAuthority}: mécanisme de décision authentique` : `Authority ${hdAuthority}: authentic decision mechanism`)
+
+  const signalConfidence = ctx.modules.human_design.weight
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const moonSign = (ctx.modules.astrology.fields['moonSign'] as string | null)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, null, moonSign, isFr)
+  const energyPattern = buildEnergyPattern(hdType, moonSign, null, isFr)
+
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'human_design', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
+}
+
+function arbitrateLifePeriod(ctx: FusionContext, isFr: boolean): FusionArbitration {
+  // life_period = numérologie cycles + HD définition
+  const hd = ctx.modules.human_design.fields
+  const astro = ctx.modules.astrology.fields
+  const nume = ctx.modules.numerology.fields
+
+  const hdType = hd['hdType'] as string | null
+  const hdAuthority = hd['hdAuthority'] as string | null
+  const hdStrategy = hd['hdStrategy'] as string | null
+  const hdProfile = hd['hdProfile'] as string | null
+  const hdDefinition = hd['hdDefinition'] as string | null
+  const sunSign = astro['sunSign'] as string | null
+  const saturnSign = astro['saturnSign'] as string | null
+  const personalYear = nume['personalYear'] as string | number | null
+  const personalMonth = nume['personalMonth'] as string | number | null
+  const lifePath = nume['lifePath']
+
+  const hdDynamic = getHDTypeDynamic(hdType)
+  const lpPattern = getLifePathPattern(lifePath)
+
+  const dominantDynamic = personalYear
+    ? isFr
+      ? `Année personnelle ${personalYear}${personalMonth ? ` (mois ${personalMonth})` : ''}: la dynamique de cette période`
+      : `Personal year ${personalYear}${personalMonth ? ` (month ${personalMonth})` : ''}: the dynamic of this period`
+    : hdDynamic
+      ? isFr ? `${hdType}: ${hdDynamic.pattern}` : `${hdType}: ${hdDynamic.pattern}`
+      : isFr ? 'Dynamique de période multi-dimensionnelle' : 'Multi-dimensional period dynamic'
+
+  const secondaryDynamic = hdDynamic && hdType
+    ? isFr ? `${hdType} (${hdDynamic.pattern}): mécanisme de transition` : `${hdType} (${hdDynamic.pattern}): transition mechanism`
+    : saturnSign
+      ? isFr ? `Saturne ${saturnSign}: structure de la période` : `Saturn ${saturnSign}: period structure`
+      : ''
+
+  const innerOuterGap = hdDynamic
+    ? isFr ? hdDynamic.gap : hdDynamic.gap
+    : isFr ? 'Transition intérieure vs. rythme imposé par l\'extérieur' : 'Inner transition vs. externally imposed pace'
+
+  const priorityAction = hdDynamic
+    ? isFr ? hdDynamic.action : hdDynamic.action
+    : isFr ? 'Honorer le rythme naturel de cette période plutôt que de le forcer' : 'Honor the natural rhythm of this period rather than forcing it'
+
+  const cyclePart = personalYear
+    ? isFr ? ` L'année personnelle ${personalYear} indique: ${personalYear == 1 ? 'nouveau départ' : personalYear == 9 ? 'clôture' : personalYear == 5 ? 'changement' : personalYear == 4 ? 'construction' : 'progression'}.` : ` Personal year ${personalYear} indicates: ${personalYear == 1 ? 'new start' : personalYear == 9 ? 'closure' : personalYear == 5 ? 'change' : personalYear == 4 ? 'building' : 'progression'}.`
+    : ''
+  const mainBlock = isFr
+    ? `Cette période est définie par ${personalYear ? `l'année personnelle ${personalYear}` : 'le cycle actuel'} + le mécanisme ${hdType ?? 'HD'}${hdDefinition ? ` (définition ${hdDefinition})` : ''}.${cyclePart} Comprendre ce cycle évite d'aller à contre-courant.`
+    : `This period is defined by ${personalYear ? `personal year ${personalYear}` : 'current cycle'} + ${hdType ?? 'HD'} mechanism${hdDefinition ? ` (definition ${hdDefinition})` : ''}.${cyclePart} Understanding this cycle prevents going against the current.`
+
+  const supportPoints: string[] = []
+  if (lpPattern) supportPoints.push(isFr ? `Chemin de vie ${lifePath}: ${lpPattern}` : `Life path ${lifePath}: ${lpPattern}`)
+  if (saturnSign) supportPoints.push(isFr ? `Saturne ${saturnSign}: leçons structurantes de la période` : `Saturn ${saturnSign}: structural lessons of the period`)
+  if (sunSign) supportPoints.push(isFr ? `Soleil ${sunSign}: expression centrale pendant cette période` : `Sun ${sunSign}: central expression during this period`)
+
+  const signalConfidence = (ctx.modules.numerology.weight + ctx.modules.human_design.weight) / 2
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, null, null, isFr)
+  const energyPattern = buildEnergyPattern(hdType, null, null, isFr)
+
+  return {
+    dominantDynamic, secondaryDynamic, mainBlock, innerOuterGap, priorityAction, supportPoints,
+    decisionStyle, relationalPattern, energyPattern,
+    dominantModule: 'numerology', signalConfidence, questionType: ctx.intent,
+    usedFields, ignoredFields, weightsApplied, reliabilitySummary,
+  }
 }
 
 // ── Arbitrage principal ────────────────────────────────────────────────────────
@@ -483,10 +1060,22 @@ export function arbitrateFusionSignals(ctx: FusionContext, lang = 'fr'): FusionA
   switch (ctx.intent) {
     case 'relationship':
       return arbitrateRelationship(ctx, isFr)
+    case 'love':
+      return arbitrateLove(ctx, isFr)
     case 'decision':
       return arbitrateDecision(ctx, isFr)
+    case 'work_money':
+      return arbitrateWorkMoney(ctx, isFr)
     case 'inner_state':
       return arbitrateInnerState(ctx, isFr)
+    case 'blocage':
+      return arbitrateBlocage(ctx, isFr)
+    case 'timing':
+      return arbitrateTiming(ctx, isFr)
+    case 'identity':
+      return arbitrateIdentity(ctx, isFr)
+    case 'life_period':
+      return arbitrateLifePeriod(ctx, isFr)
     case 'exact_profile':
     case 'fusion_general_question':
     default:
