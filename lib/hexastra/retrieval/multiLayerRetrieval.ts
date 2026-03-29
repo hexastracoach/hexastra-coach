@@ -1,5 +1,6 @@
 import { retrieveKnowledge } from '@/lib/vectorSearch'
 import type { DomainRoute } from '@/lib/hexastra/types'
+import { buildEnrichedRetrievalQuery } from '@/lib/hexastra/retrieval/scienceQueryBuilder'
 
 export type LayerResult = {
   source: string
@@ -42,14 +43,19 @@ export async function multiLayerRetrieval({
   vectorStoreId,
   apiKey,
   domainRoute,
+  intent,
 }: {
   query: string
   plan: string
   vectorStoreId: string
   apiKey: string
   domainRoute?: DomainRoute
+  intent?: string
 }) {
-  const normalizedQuery = query.trim() || 'lecture HexAstra'
+  const enrichedQuery = intent
+    ? buildEnrichedRetrievalQuery({ baseQuery: query.trim() || 'lecture HexAstra', intent })
+    : query.trim() || 'lecture HexAstra'
+  const normalizedQuery = enrichedQuery
   const layers: LayerResult[] = []
 
   const knowledge = await retrieveKnowledge({

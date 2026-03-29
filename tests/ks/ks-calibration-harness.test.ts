@@ -25,6 +25,7 @@ import { resolveFlowType } from '@/lib/hexastra/orchestration/queryRouter'
 import { runKsPipeline } from '@/lib/hexastra/orchestrator/ksPipeline'
 import {
   validateFinalOutputQuality,
+  validateTimingResponse,
   compareArbiterToFinalOutput,
   measureSentinelDrift,
 } from '@/lib/hexastra/orchestrator/outputValidator'
@@ -209,8 +210,9 @@ describe('Calibration A — timing_decision', () => {
     }, null, 2))
 
     expect(pipeline.arbiterDirective).toContain('KS.FUSION.V13')
-    expect(pipeline.arbiterDirective).toContain('RÈGLES ANTI-EXPANSION')
-    expect(pipeline.arbiterDirective).toContain('FOCUS NARRATIF UNIQUE')
+    // timing_strategic → directive spécialisée avec blocs et interdictions
+    expect(pipeline.arbiterDirective).toContain('BLOC 1 — LE MOMENT EXACT')
+    expect(pipeline.arbiterDirective).toContain('INTERDICTIONS ABSOLUES')
     expect(validation.checks.hasAction).toBe(true)
     expect(validation.checks.hasTimingMarker).toBe(true)
     expect(validation.checks.noVaguePhrases).toBe(true)
@@ -239,8 +241,9 @@ describe('Calibration A — timing_decision', () => {
     })
 
     expect(pipeline.arbiter.answerStrategy).toMatch(/^(action|prudence|observation|stabilisation)$/)
-    expect(pipeline.arbiterDirective).toContain('RÈGLE 2')
-    expect(pipeline.arbiterDirective).toContain('RÈGLE 4')
+    // timing_strategic → blocs obligatoires présents
+    expect(pipeline.arbiterDirective).toContain('BLOC 4 — L\'ACTION IMMÉDIATE')
+    expect(pipeline.arbiterDirective).toContain('INTERDIT')
 
     console.log('[CALIBRATION A2]', JSON.stringify({
       intent,
@@ -641,5 +644,163 @@ Il se peut que ce soit une période de questionnement normal.
     expect(result.aligned).toBe(false)
     expect(result.driftReasons.length).toBeGreaterThan(0)
     expect(result.suggestions.length).toBeGreaterThan(0)
+  })
+})
+
+// ── Étape 7 — Test de bout en bout : "je veux arrêter de fumer" ───────────────
+//
+// Input  : prompt canonique timing_decision
+// Checks : directive contient les données calculées, validateTimingResponse
+//          distingue réponse-outil vs réponse-coaching-générique
+
+describe('E — Narrative Composer timing_strategic (KS.FUSION.V13)', () => {
+  const FUMER_MESSAGE = 'je veux arrêter de fumer quel est le meilleur moment'
+
+  const FUMER_COMPACT: CompactReadingCore = {
+    dominantDynamic: 'Énergie de réponse — fonctionnement par saturation naturelle',
+    hiddenMechanism: 'La cigarette est une régulation du stress — pas une addiction chimique seule',
+    realTension: 'Décision mentale de volonté vs signal sacral de saturation — les deux ne se synchronisent pas',
+    visibleEffect: 'Rechute systématique après décision forcée par la tête',
+    rightMovement: 'Attendre la saturation naturelle — le corps sait quand il ne peut plus',
+    decisionSignal: 'Signal sacral — quand le dégoût arrive naturellement, pas quand la tête décide',
+    timingSignal: 'Année 5 numéro personnel — cycle de libération et de rupture avec les vieux patterns',
+    energyLeak: 'Énergie perdue à décider par volonté contre le signal du corps',
+    leveragePoint: 'Identifier les moments de dégoût naturel — ils sont le vrai signal de timing',
+    toneHint: 'Ton direct — pas de détours',
+    solarToneHint: 'Ton factuel',
+    questionType: 'timing_decision',
+    signalConfidence: 0.82,
+  }
+
+  it('E1 — directive timing contient les données calculées du pipeline', () => {
+    const intent   = classifyUserIntent(FUMER_MESSAGE)
+    const flowType = resolveFlowType(intent)
+
+    expect(intent).toBe('timing_decision')
+    expect(flowType).toBe('timing_strategic')
+
+    const pipeline = runKsPipeline({
+      userIntent:  intent,
+      userMessage: FUMER_MESSAGE,
+      compactCore: FUMER_COMPACT,
+      fusionCtx:   { ...makeFusionCtx('timing_decision'), readingQuestion: FUMER_MESSAGE },
+      flowType,
+      lang: 'fr',
+    })
+
+    const dir = pipeline.arbiterDirective
+
+    // Le Narrative Composer doit avoir injecté les données calculées
+    expect(dir).toContain('KS.Threshold.Timing')
+    expect(dir).toContain('KS.Fusion.Engine')
+    expect(dir).toContain('KS.Arbiter')
+    expect(dir).toContain(FUMER_COMPACT.timingSignal)
+    expect(dir).toContain(FUMER_COMPACT.rightMovement)
+    expect(dir).toContain(FUMER_COMPACT.decisionSignal)
+
+    // Structure 4 blocs obligatoires présente
+    expect(dir).toContain('BLOC 1 — LE MOMENT EXACT')
+    expect(dir).toContain('BLOC 2 — LES SIGNAUX OBSERVABLES')
+    expect(dir).toContain('BLOC 3 — LES MOMENTS À ÉVITER')
+    expect(dir).toContain('BLOC 4 — L\'ACTION IMMÉDIATE')
+
+    // Interdictions nommées explicitement
+    expect(dir).toContain('INTERDIT')
+    expect(dir).toContain('écoute-toi')
+    expect(dir).toContain('quand tu seras prêt')
+
+    console.log('[E1 — DIRECTIVE FUMER]\n', dir)
+  })
+
+  it('E2 — validateTimingResponse : réponse-outil → valide (score ≥ 70)', () => {
+    // Réponse construite comme un outil de décision — moment précis + signaux + éviter + action
+    const goodTimingOutput = `
+Le meilleur moment pour arrêter n'est pas quand tu décides — c'est quand ton corps n'en peut plus.
+
+Ton cycle actuel (année 5 — cycle de rupture) crée une fenêtre naturelle dans les prochaines semaines.
+La question n'est pas "si" — c'est "quand la saturation naturelle arrive".
+
+Signaux à observer : dégoût naturel à la première bouffée, fatigue accrue après avoir fumé,
+perte d'envie franche sans forçage, corps qui dit non sans que la tête l'ait décidé.
+Ces signaux ne sont pas une coïncidence — c'est le timing réel.
+
+Moments à éviter : ne décide pas sous ennui, vide émotionnel, ou pression externe d'un délai.
+Ne tranche pas par volonté pure — c'est le piège qui provoque la rechute.
+
+Action immédiate : ce soir, note sur une feuille l'heure exacte où tu as fumé
+et ce qui s'est passé dans les 20 minutes avant. Fais-le 7 jours.
+Les patterns de dégoût naturel vont apparaître — c'est la carte de ton timing réel.
+    `.trim()
+
+    const result = validateTimingResponse(goodTimingOutput)
+
+    console.log('[E2 — VALIDATE TIMING GOOD]', JSON.stringify(result, null, 2))
+
+    expect(result.checks.hasIdentifiableMoment).toBe(true)
+    expect(result.checks.hasObservableSignals).toBe(true)
+    expect(result.checks.hasMomentsToAvoid).toBe(true)
+    expect(result.checks.hasImmediateAction).toBe(true)
+    expect(result.checks.noVaguePhrases).toBe(true)
+    expect(result.score).toBeGreaterThanOrEqual(70)
+    expect(result.valid).toBe(true)
+    expect(result.issues).toHaveLength(0)
+  })
+
+  it('E3 — validateTimingResponse : réponse-coaching-générique → invalide', () => {
+    // Réponse générique style coach — sans moment précis, sans signaux, sans action
+    const genericOutput = `
+Arrêter de fumer est une belle décision qui demande du courage et de la persévérance.
+Écoute-toi et fais confiance à ton processus intérieur. Quand tu seras prêt, les choses se mettront en place.
+
+Prends soin de toi dans cette période de changement. Parfois, il suffit de décider vraiment.
+Suis ton instinct — tu sauras quand le bon moment sera là.
+    `.trim()
+
+    const result = validateTimingResponse(genericOutput)
+
+    console.log('[E3 — VALIDATE TIMING GENERIC]', JSON.stringify(result, null, 2))
+
+    expect(result.checks.hasIdentifiableMoment).toBe(false)
+    expect(result.checks.noVaguePhrases).toBe(false)
+    expect(result.valid).toBe(false)
+    expect(result.score).toBeLessThan(70)
+    expect(result.issues.length).toBeGreaterThan(0)
+  })
+
+  it('E4 — validateTimingResponse throwOnInvalid → lance une erreur en mode dev', () => {
+    const genericOutput = `
+Écoute-toi. Suis ton intuition. Quand tu seras prêt, tu sauras.
+    `.trim()
+
+    expect(() => {
+      validateTimingResponse(genericOutput, { throwOnInvalid: true })
+    }).toThrow('TIMING_RESPONSE_INVALID')
+  })
+
+  it('E5 — directive non-timing (standard) ne contient pas les blocs timing', () => {
+    const message  = 'j\'ai une tension avec mon collègue, comment la gérer ?'
+    const intent   = classifyUserIntent(message)
+    const flowType = resolveFlowType(intent)
+
+    const pipeline = runKsPipeline({
+      userIntent:  intent,
+      userMessage: message,
+      compactCore: BASE_COMPACT_CORE,
+      fusionCtx:   makeFusionCtx(intent),
+      flowType,
+      lang: 'fr',
+    })
+
+    // Flow standard → directive générique, pas de structure 4 blocs timing
+    expect(pipeline.arbiterDirective).not.toContain('BLOC 1 — LE MOMENT EXACT')
+    expect(pipeline.arbiterDirective).not.toContain('KS.Threshold.Timing')
+    // Mais la directive générique est bien présente
+    expect(pipeline.arbiterDirective).toContain('KS.FUSION.V13')
+
+    console.log('[E5 — STANDARD DIRECTIVE NO TIMING]', {
+      intent,
+      flowType,
+      directivePreview: pipeline.arbiterDirective.slice(0, 200),
+    })
   })
 })

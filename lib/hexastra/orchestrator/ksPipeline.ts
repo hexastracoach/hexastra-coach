@@ -41,6 +41,8 @@ export type KsPipelineInput = {
   fusionCtx: FusionContext
   flowType: FlowType
   lang?: string
+  /** Signaux additionnels issus du retrieval vectoriel (extractRetrievalSignals) */
+  additionalSignals?: KsSignal[]
 }
 
 export type KsPipelineOutput = {
@@ -229,13 +231,122 @@ function buildKsSignalsFromFusion(
   return signals
 }
 
-// ── Étape 9 : Narrative Composer ──────────────────────────────────────────────
+// ── Labels locaux phase / zone (FR) ───────────────────────────────────────────
+
+const ZONE_LABELS_FR: Record<string, string> = {
+  security:     'la sécurité et la stabilité',
+  relation:     'les dynamiques relationnelles',
+  identity:     'l\'identité et le fonctionnement interne',
+  direction:    'l\'orientation et la décision',
+  expansion:    'la croissance et l\'avancement',
+  meaning:      'le sens et la raison d\'être',
+}
+
+const PHASE_LABELS_FR: Record<string, string> = {
+  activation:    'activation (phase de lancement)',
+  stabilisation: 'stabilisation (phase de consolidation)',
+  transition:    'transition (phase de changement)',
+}
+
+// ── Étape 9a : Directive timing stratégique ────────────────────────────────────
+//
+// Utilisée UNIQUEMENT quand flowType === 'timing_strategic'.
+// Injecte directement les valeurs calculées (timingSignal, realTension, etc.)
+// pour forcer la réponse LLM à refléter le pipeline, pas un coaching générique.
+
+function buildTimingNarrativeDirective(
+  arbiter: KsArbiterResult,
+  fusionSummary: FusionSummary,
+  compactCore: CompactReadingCore,
+): string {
+  const zoneLabel  = ZONE_LABELS_FR[fusionSummary.dominantZone  ?? ''] ?? (fusionSummary.dominantZone  ?? 'non identifiée')
+  const phaseLabel = PHASE_LABELS_FR[fusionSummary.dominantPhase ?? ''] ?? (fusionSummary.dominantPhase ?? 'non identifiée')
+
+  return [
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    'KS.FUSION.V13 — DIRECTIVE TIMING STRATÉGIQUE',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    '── DONNÉES CALCULÉES — SOURCE DE VÉRITÉ ──',
+    `KS.Threshold.Timing   : ${compactCore.timingSignal}`,
+    `KS.Fusion.Engine.Phase: ${phaseLabel}`,
+    `KS.Fusion.Engine.Zone : ${zoneLabel}`,
+    `KS.Fusion.Engine.Signal: ${fusionSummary.dominantSignal}`,
+    `KS.Presence.Field     : ${compactCore.decisionSignal}`,
+    `KS.Porteum.Tension    : ${compactCore.realTension}`,
+    `KS.Porteum.Leak       : ${compactCore.energyLeak}`,
+    `KS.Arbiter.Movement   : ${compactCore.rightMovement}`,
+    '',
+    '── KS.ARBITER ─────────────────────────────',
+    `DYNAMIQUE   : ${arbiter.dominantDynamic}`,
+    arbiter.supportingDynamic ? `TENSION     : ${arbiter.supportingDynamic}` : null,
+    `STRATÉGIE   : ${arbiter.answerStrategy.toUpperCase()}`,
+    `FOCUS UNIQUE: ${arbiter.narrativeFocus}`,
+    '',
+    '── STRUCTURE OBLIGATOIRE — 4 BLOCS ────────',
+    '',
+    'BLOC 1 — LE MOMENT EXACT (obligatoire, non négociable)',
+    `  Source : "${compactCore.timingSignal}"`,
+    '  → Nommer UN moment précis et identifiable.',
+    '  → Exemples valides : "après saturation naturelle", "début de cycle X",',
+    '    "quand [signal observable] se déclenche", "en phase d\'activation du cycle".',
+    '  → INTERDIT : "quand tu seras prêt", "quand tu sentiras", vague temporel.',
+    '',
+    'BLOC 2 — LES SIGNAUX OBSERVABLES (obligatoire)',
+    `  Sources : "${compactCore.realTension}" + "${compactCore.energyLeak}"`,
+    '  → Lister 2 à 3 signaux physiques ou comportementaux concrets.',
+    '  → La personne doit pouvoir les reconnaître elle-même sans interprétation.',
+    '  → Exemples valides : dégoût naturel, fatigue persistante, perte d\'envie',
+    '    franche, tension corporelle forte, incapacité à continuer sans forçage.',
+    '',
+    'BLOC 3 — LES MOMENTS À ÉVITER (obligatoire)',
+    '  → Nommer les conditions précises où la décision échoue systématiquement.',
+    '  → Exemples valides : vide émotionnel, ennui, pression externe de délai,',
+    '    décision prise mentalement sans signal corporel, période de stress aigu.',
+    '',
+    'BLOC 4 — L\'ACTION IMMÉDIATE (obligatoire)',
+    `  Sources : "${compactCore.rightMovement}" + "${compactCore.decisionSignal}"`,
+    '  → UNE seule action. Verbe à l\'impératif + objet précis + contexte.',
+    '  → Faisable aujourd\'hui ou cette semaine.',
+    '  → INTERDIT : "réfléchis à", "envisage de", formulation ouverte sans objet.',
+    '',
+    '── INTERDICTIONS ABSOLUES ─────────────────',
+    '"écoute-toi"           → INTERDIT — remplacer par une condition observable',
+    '"quand tu seras prêt"  → INTERDIT — remplacer par un signal physique/comportemental',
+    '"suis ton intuition"   → INTERDIT — remplacer par le mécanisme de décision calculé',
+    '"suis ton instinct"    → INTERDIT — même règle',
+    'Sphères hors focus     → INTERDIT — pas de sphère émotionnelle, énergétique,',
+    '                          spirituelle, ou extérieure non liée au timing',
+    'Angles multiples       → INTERDIT — UN seul focus : TIMING STRATÉGIQUE',
+    '',
+    '── RÈGLE DE CLÔTURE ───────────────────────',
+    arbiter.answerStrategy === 'action'
+      ? 'Terminer OBLIGATOIREMENT sur le BLOC 4 (action immédiate). Pas de question ouverte.'
+      : arbiter.answerStrategy === 'prudence'
+      ? 'Terminer sur les conditions PRÉCISES à éviter + signal d\'alerte identifiable.'
+      : 'Terminer sur les signaux à observer avant d\'agir.',
+    '',
+    fusionSummary.sentinelStatus === 'degraded'
+      ? 'SENTINEL DÉGRADÉ — Signaux contradictoires détectés. Maintenir la posture d\'observation. Ne pas résoudre artificiellement.'
+      : null,
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+  ].filter((l): l is string => l !== null).join('\n')
+}
+
+// ── Étape 9b : Directive générique (non-timing) ────────────────────────────────
 
 function buildArbiterDirective(
   arbiter: KsArbiterResult,
   fusionSummary: FusionSummary,
   isFr: boolean,
+  flowType: FlowType,
+  compactCore: CompactReadingCore,
 ): string {
+  // Chemin timing_strategic : directive spécialisée avec données calculées injectées
+  if (flowType === 'timing_strategic') {
+    return buildTimingNarrativeDirective(arbiter, fusionSummary, compactCore)
+  }
+
   if (!isFr) {
     return [
       '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
@@ -298,7 +409,7 @@ function buildArbiterDirective(
  * Appelé depuis runHexastraFlow après que compactCore soit disponible.
  */
 export function runKsPipeline(input: KsPipelineInput): KsPipelineOutput {
-  const { userIntent, userMessage, compactCore, fusionCtx, flowType, lang = 'fr' } = input
+  const { userIntent, userMessage, compactCore, fusionCtx, flowType, lang = 'fr', additionalSignals } = input
   const isFr = !lang.startsWith('en')
 
   // Étape 3 — Module resolution
@@ -307,7 +418,12 @@ export function runKsPipeline(input: KsPipelineInput): KsPipelineOutput {
   const ksModules = resolveKsModules({ intent: userIntent, flowType, hasBirthData, hasExactData })
 
   // Étape 4 — Conversion en KsSignal[]
-  const signals = buildKsSignalsFromFusion(compactCore, fusionCtx, ksModules)
+  const coreSignals = buildKsSignalsFromFusion(compactCore, fusionCtx, ksModules)
+
+  // Merge signaux retrieval vectoriel (si présents) — enrichissent sans écraser
+  const signals = additionalSignals && additionalSignals.length > 0
+    ? [...coreSignals, ...additionalSignals]
+    : coreSignals
 
   // Étape 5 — Fusion Engine
   const fusionSummary = buildFusionSummary(signals)
@@ -331,7 +447,9 @@ export function runKsPipeline(input: KsPipelineInput): KsPipelineOutput {
   // degraded → signaux contradictoires trop nombreux, strategy = observation
 
   // Étape 9 — Narrative Composer
-  const arbiterDirective = buildArbiterDirective(arbiterResult, fusionSummary, isFr)
+  // timing_strategic → buildTimingNarrativeDirective (valeurs calculées injectées)
+  // standard / behavior → buildArbiterDirective générique
+  const arbiterDirective = buildArbiterDirective(arbiterResult, fusionSummary, isFr, flowType, compactCore)
 
   return {
     ksModules,

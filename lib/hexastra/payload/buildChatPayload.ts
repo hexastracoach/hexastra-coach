@@ -67,6 +67,7 @@ export function buildChatPayload({
   isAstroExactCompact,
   isHoroscopeRoute,
   horoscopeVariant,
+  vectorRetrievalSignalsBlock,
 }: {
   systemPrompt: string
   userContext: HexastraUserContext
@@ -81,6 +82,8 @@ export function buildChatPayload({
   /** When true: apply horoscope token budget (daily=2500, weekly=5000) */
   isHoroscopeRoute?: boolean
   horoscopeVariant?: 'daily' | 'weekly' | null
+  /** Bloc structuré par science issu du retrieval vectoriel — remplace le blob knowledgeBlock quand présent */
+  vectorRetrievalSignalsBlock?: string | null
 }) {
   // ── Astro Exact Compact: stripped-down context ────────────────────────────
   // Birth data is already injected in the system prompt via exactDataBlock.
@@ -123,7 +126,9 @@ export function buildChatPayload({
     : trimMessages(messages, maxHistory)
 
   // ── Knowledge packets: skipped in compact mode ────────────────────────────
-  const effectiveKnowledgeBlock = isAstroExactCompact ? null : knowledgeBlock
+  // vectorRetrievalSignalsBlock remplace le blob knowledgeBlock quand disponible
+  const resolvedKnowledgeBlock = vectorRetrievalSignalsBlock ?? knowledgeBlock
+  const effectiveKnowledgeBlock = isAstroExactCompact ? null : resolvedKnowledgeBlock
   const effectiveReadingPacket = isAstroExactCompact ? null : readingPacket
   const effectiveKnowledgePacket = isAstroExactCompact ? null : knowledgePacket
   const knowledgeHierarchyMessage = buildKnowledgeHierarchyMessage(effectiveKnowledgePacket)

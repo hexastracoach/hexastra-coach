@@ -22,6 +22,7 @@ import {
 } from '@/lib/hexastra/memory/sessionMemory'
 import { writeUserMemory } from '@/lib/hexastra/memory/userMemory'
 import { multiLayerRetrieval } from '@/lib/hexastra/retrieval/multiLayerRetrieval'
+import { extractRetrievalSignals } from '@/lib/hexastra/retrieval/retrievalSignalExtractor'
 
 import type {
   BirthProfile,
@@ -2408,6 +2409,7 @@ export async function runHexastraFlow(input: {
             vectorStoreId: VECTOR_STORE_ID,
             apiKey: process.env.OPENAI_API_KEY,
             domainRoute,
+            intent: userIntent,
           })
         : []
 
@@ -3037,6 +3039,17 @@ export async function runHexastraFlow(input: {
       selectedOutputStructure,
       latestUserMessage,
     })
+
+    // Extraction des signaux vectoriels structurés par science
+    // Alimente additionalSignals (ksPipeline) + vectorRetrievalSignalsBlock (buildChatPayload)
+    // flowType non disponible ici — passé séparément plus bas dans le pipeline KS
+    const retrievalSignalsResult =
+      knowledgePacket?.orderedSources && knowledgePacket.orderedSources.length > 0
+        ? extractRetrievalSignals({
+            orderedSources: knowledgePacket.orderedSources as Parameters<typeof extractRetrievalSignals>[0]['orderedSources'],
+            intent: userIntent,
+          })
+        : null
     const responseStrategy = chooseResponseStrategy({
       latestUserMessage,
       selectedMenu,
@@ -3284,6 +3297,7 @@ export async function runHexastraFlow(input: {
             fusionCtx,
             flowType,
             lang,
+            additionalSignals: retrievalSignalsResult?.signals,
           })
 
           flowLog('info', 'KS_FLOW_TYPE', {
@@ -3726,6 +3740,7 @@ export async function runHexastraFlow(input: {
       isAstroExactCompact: isAstroExactCompact || isHumanDesignExactCompact,
       isHoroscopeRoute: isHoroscopeRoute || undefined,
       horoscopeVariant: horoscopeVariant ?? undefined,
+      vectorRetrievalSignalsBlock: retrievalSignalsResult?.block ?? null,
     })
 
     if (isAstroExactCompact || isHumanDesignExactCompact) {

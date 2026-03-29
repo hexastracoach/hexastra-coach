@@ -193,6 +193,214 @@ function countActionVerbs(text: string, verbs: string[]): number {
 }
 
 // ---------------------------------------------------------------------------
+// validateTimingResponse — Validation stricte pour timing_strategic_response
+// ---------------------------------------------------------------------------
+
+export type TimingValidationResult = {
+  valid: boolean
+  score: number   // 0-100
+  checks: {
+    hasIdentifiableMoment: boolean
+    hasObservableSignals:  boolean
+    hasMomentsToAvoid:     boolean
+    hasImmediateAction:    boolean
+    noVaguePhrases:        boolean
+  }
+  issues: string[]
+}
+
+/**
+ * Valide qu'une réponse timing_strategic_response contient les 4 éléments
+ * obligatoires du Narrative Composer :
+ *   1. Un moment identifiable et précis
+ *   2. Des signaux observables
+ *   3. Des moments à éviter
+ *   4. Une action immédiate
+ *
+ * OPTIONS :
+ *   throwOnInvalid — true → lance une erreur si la réponse est invalide.
+ *   À réserver au mode développement / tests.  Ne jamais activer en production.
+ */
+export function validateTimingResponse(
+  output: string,
+  options?: { throwOnInvalid?: boolean },
+): TimingValidationResult {
+  const lower = output.toLowerCase()
+  const issues: string[] = []
+
+  // ── Check 1 : moment identifiable ─────────────────────────────────────────
+
+  const IDENTIFIABLE_MOMENT_PATTERNS = [
+    'après saturation',
+    'saturation naturelle',
+    'début de cycle',
+    'phase d\'activation',
+    'phase de transition',
+    'phase de stabilisation',
+    'en phase',
+    'dans les prochaine',
+    'dans les prochains',
+    'ce mois',
+    'cette semaine',
+    'dès que',
+    'fenêtre',
+    'cycle actuel',
+    'quand la saturation',
+    'quand le signal',
+    'quand tu ressens',
+    'quand tu ne peux plus',
+    'quand tu n\'arrives plus',
+    'à partir du',
+    'avant la fin',
+    'moment précis',
+    'rejet naturel',
+    'quand le dégoût',
+    'signal apparaît',
+  ]
+  const hasIdentifiableMoment = IDENTIFIABLE_MOMENT_PATTERNS.some(p => lower.includes(p))
+
+  // ── Check 2 : signaux observables ─────────────────────────────────────────
+
+  const OBSERVABLE_SIGNAL_MARKERS = [
+    'dégoût',
+    'fatigue',
+    'perte d\'envie',
+    'tension forte',
+    'saturation',
+    'incapacité',
+    'signal corporel',
+    'réponse corporelle',
+    'physiquement',
+    'corps dit',
+    'corps répond',
+    'corps répond',
+    'tu ressens',
+    'tu ne peux plus',
+    'tu n\'arrives plus',
+    'signe concret',
+    'naturellement',
+    'sans forçage',
+    'sans effort',
+    'nausée',
+    'épuisement',
+    'ras-le-bol',
+    'signal clair',
+  ]
+  const observableHits = OBSERVABLE_SIGNAL_MARKERS.filter(p => lower.includes(p))
+  const hasObservableSignals = observableHits.length >= 2
+
+  // ── Check 3 : moments à éviter ────────────────────────────────────────────
+
+  const MOMENTS_TO_AVOID_MARKERS = [
+    'à éviter',
+    'évite de décider',
+    'évite de trancher',
+    'ne décide pas',
+    'ne pas décider',
+    'ne fonce pas',
+    'pas dans',
+    'pas pendant',
+    'moment à éviter',
+    'ennui',
+    'vide',
+    'pression externe',
+    'décision mentale',
+    'sous pression',
+    'forçage',
+    'volonté pure',
+    'par volonté',
+    'ne jamais trancher',
+    'ne tranche pas',
+    'erreur fréquente',
+    'piège',
+  ]
+  const hasMomentsToAvoid = MOMENTS_TO_AVOID_MARKERS.some(p => lower.includes(p))
+
+  // ── Check 4 : action immédiate ────────────────────────────────────────────
+
+  const IMMEDIATE_ACTION_MARKERS = [
+    'note ',
+    'observe ',
+    'attends ',
+    'pose ',
+    'identifie ',
+    'commence par',
+    'fais ',
+    'prends ',
+    'arrête ',
+    'décide ',
+    'cette semaine',
+    "aujourd'hui",
+    "aujourd'hui",
+    'action concrète',
+    'à faire maintenant',
+    'ce soir',
+    'dès aujourd\'hui',
+    'action immédiate',
+    'maintenant :',
+    'maintenant,',
+    'concrètement :',
+    'concrètement,',
+  ]
+  const hasImmediateAction = IMMEDIATE_ACTION_MARKERS.some(p => lower.includes(p))
+
+  // ── Check 5 : pas de flou ─────────────────────────────────────────────────
+
+  const vagueFound = detectVagueOutput(output)
+  const noVaguePhrases = vagueFound.length === 0
+
+  // ── Score (0–100) ──────────────────────────────────────────────────────────
+
+  let score = 0
+  if (hasIdentifiableMoment) score += 25
+  if (hasObservableSignals)  score += 20
+  if (hasMomentsToAvoid)     score += 20
+  if (hasImmediateAction)    score += 20
+  if (noVaguePhrases)        score += 15
+
+  // ── Issues ────────────────────────────────────────────────────────────────
+
+  if (!hasIdentifiableMoment) {
+    issues.push('Aucun moment identifiable et précis — le "quand" est absent ou vague')
+  }
+  if (!hasObservableSignals) {
+    issues.push(`Signaux observables insuffisants (${observableHits.length}/2 requis) — nommer des signaux physiques/comportementaux`)
+  }
+  if (!hasMomentsToAvoid) {
+    issues.push('Aucune mention des moments à éviter — bloquer les conditions d\'échec de décision')
+  }
+  if (!hasImmediateAction) {
+    issues.push('Aucune action immédiate — le BLOC 4 est absent ou trop flou')
+  }
+  if (!noVaguePhrases) {
+    issues.push(`Phrases vagues détectées : ${vagueFound.join(', ')}`)
+  }
+
+  const result: TimingValidationResult = {
+    valid: score >= 70,
+    score,
+    checks: {
+      hasIdentifiableMoment,
+      hasObservableSignals,
+      hasMomentsToAvoid,
+      hasImmediateAction,
+      noVaguePhrases,
+    },
+    issues,
+  }
+
+  // ── Dev-mode throw ────────────────────────────────────────────────────────
+
+  if (options?.throwOnInvalid && !result.valid) {
+    throw new Error(
+      `TIMING_RESPONSE_INVALID — score ${result.score}/100 — ${result.issues.join(' | ')}`,
+    )
+  }
+
+  return result
+}
+
+// ---------------------------------------------------------------------------
 // validateFinalOutputQuality
 // ---------------------------------------------------------------------------
 
