@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import type { PlanKey } from '@/lib/plans'
+import { mapDbPlanToPlanKey, downgradeIfInactive } from '@/lib/permissions/plan'
 import LanguageSwitcher from '@/app/components/LanguageSwitcher'
 import HexastraLogo from '@/app/components/HexastraLogo'
 
@@ -29,10 +30,22 @@ export default function AccountPage() {
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) { router.replace('/auth'); return }
       setEmail(data.user.email ?? '')
-      setPlan((data.user.user_metadata?.plan as PlanKey) ?? 'free')
+
+      // Lire le plan depuis la table profiles (source de vérité)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('plan, stripe_subscription_status')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profile) {
+        const mapped = mapDbPlanToPlanKey(profile.plan)
+        setPlan(downgradeIfInactive(mapped, profile.stripe_subscription_status ?? null))
+      }
+
       setLoading(false)
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
