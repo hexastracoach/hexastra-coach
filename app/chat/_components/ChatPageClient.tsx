@@ -32,6 +32,7 @@ import {
   shouldPersistQuotaLocally,
   type PlanKey,
 } from '@/lib/plans'
+import { mapDbPlanToPlanKey, downgradeIfInactive } from '@/lib/permissions/plan'
 import {
   computeBootstrapStep,
   isBirthDataComplete,
@@ -967,36 +968,51 @@ export default function ChatPageClient() {
   useEffect(() => {
     let mounted = true
 
-    supabase.auth
-      .getUser()
-      .then(({ data, error }) => {
-        if (!mounted) return
+    async function loadUser() {
+      const { data, error } = await supabase.auth.getUser()
+      if (!mounted) return
 
-        setAuthUserId(data?.user?.id ?? null)
-        if (data?.user?.email) setUserEmail(data.user.email)
+      setAuthUserId(data?.user?.id ?? null)
+      if (data?.user?.email) setUserEmail(data.user.email)
 
-        const plan = (data?.user?.user_metadata?.plan as PlanKey) ?? 'free'
-        setUserPlan(plan)
-        setPlanLoaded(true)
-        setStorageScopeReady(true)
+      if (error) {
+        console.warn('[ChatPageClient] getUser error, fallback to free plan', error)
+      }
 
-        if (error) {
-          console.warn('[ChatPageClient] getUser error, fallback to free plan', error)
+      // Lire le plan depuis la table profiles (source de vérité)
+      const userId = data?.user?.id
+      let plan: PlanKey = 'free'
+      if (userId) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('plan, stripe_subscription_status')
+          .eq('id', userId)
+          .single()
+        if (profile && mounted) {
+          const mapped = mapDbPlanToPlanKey(profile.plan)
+          plan = downgradeIfInactive(mapped, profile.stripe_subscription_status ?? null)
         }
+      }
 
-        setEvolutionProfile((prev) => {
-          const updated = { ...(prev ?? {}), plan }
-          saveEvolutionProfile(updated, data?.user?.id ?? null)
-          return updated
-        })
+      if (!mounted) return
+      setUserPlan(plan)
+      setPlanLoaded(true)
+      setStorageScopeReady(true)
+
+      setEvolutionProfile((prev) => {
+        const updated = { ...(prev ?? {}), plan }
+        saveEvolutionProfile(updated, userId ?? null)
+        return updated
       })
-      .catch((err) => {
-        if (!mounted) return
-        console.error('[ChatPageClient] getUser failed', err)
-        setAuthUserId(null)
-        setPlanLoaded(true)
-        setStorageScopeReady(true)
-      })
+    }
+
+    loadUser().catch((err) => {
+      if (!mounted) return
+      console.error('[ChatPageClient] getUser failed', err)
+      setAuthUserId(null)
+      setPlanLoaded(true)
+      setStorageScopeReady(true)
+    })
 
     return () => {
       mounted = false
