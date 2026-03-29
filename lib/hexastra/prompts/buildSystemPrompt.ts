@@ -1171,7 +1171,8 @@ ${requestDirective(input)}
 ${isFusionCoachingReading ? buildFullHexastraCoachingDirective(input.plan, isFr) : hexastraCoreSixBlockDirective(input)}
 ${detailedReadingDirective(input)}
 ${responseStrategyDirective(input)}
-${(isFusionCoachingReading && input.plan !== 'free') ? '' : (input.responseModeDirective ?? '')}
+${(isFusionCoachingReading && input.plan !== 'free' && !input.questionShapeDirective) ? '' : (input.responseModeDirective ?? '')}
+${input.questionShapeDirective ?? ''}
 ${stepDirective(input)}
 ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}

@@ -124,6 +124,8 @@ import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexast
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
 import { selectResponseMode, buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
+import { detectQuestionShape } from '@/lib/hexastra/orchestrator/questionShape'
+import { buildQuestionShapeDirective } from '@/lib/hexastra/orchestrator/buildPersonalAnswer'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
 import { isReliableExactData } from '@/lib/exact-data/reliability'
 import { buildCompactExactScienceBlock } from '@/lib/exact-data/compactBlocks'
@@ -2759,6 +2761,24 @@ export async function runHexastraFlow(input: {
 
     const responseModeDirective = buildResponseModeDirective(effectiveResponseMode)
 
+    // Question shape detection — adapts response structure to HOW/WHY/WHO/WHEN intent
+    const questionShape = isIntentFusion ? detectQuestionShape(latestUserMessage) : null
+    const questionShapeDirective = questionShape
+      ? buildQuestionShapeDirective({
+          questionShape,
+          isFr: (userContext.language ?? fallbackLanguage) !== 'en',
+        })
+      : null
+
+    if (questionShape) {
+      flowLog('info', 'QUESTION_SHAPE_DETECTED', {
+        questionShape,
+        plan,
+        isFusionIntent: isIntentFusion,
+        message: latestUserMessage.slice(0, 80),
+      })
+    }
+
     // Anti-contradiction directive: inject when astro follow-up contradicts a value
     const antiContradictionActive = semanticCtx.contextType === 'astro_followup'
 
@@ -3581,6 +3601,7 @@ export async function runHexastraFlow(input: {
       hdProfileBlock,
       isAstroExactCompact: isAstroExactCompact || isHumanDesignExactCompact,
       responseModeDirective,
+      questionShapeDirective: questionShapeDirective ?? undefined,
       antiHallucinationRules: exactDataNeeded ? ANTI_HALLUCINATION_RULES : undefined,
       antiContradictionDirective: antiContradictionActive ? ANTI_CONTRADICTION_DIRECTIVE : undefined,
       isHoroscopeRoute: isHoroscopeRoute || undefined,

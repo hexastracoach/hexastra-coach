@@ -19,6 +19,10 @@ export type ResponseMode =
   | 'pedagogical_explanation'
   | 'fusion_answer'
   | 'concise_fusion_answer'
+  | 'action_guidance'          // question HOW → Comment agir / Ce qu'il faut éviter / Prochaine étape
+  | 'causal_reading'           // question WHY → Pourquoi ça se produit / Le mécanisme / Comment sortir
+  | 'relational_profile'       // question WHO → Dynamique / Projections / Perception / Ajustement
+  | 'timing_reading'           // question WHEN → Phase actuelle / Activations / Ce qui s'approche / Moment pour agir
 
 export type ResponseModeInput = {
   requestKind: RequestKind

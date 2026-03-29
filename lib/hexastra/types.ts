@@ -335,6 +335,13 @@ export type BuildPromptInput = {
    */
   fusionOnlyExperience?: boolean
   /**
+   * Directive de structure orientée par la forme de la question (how/why/who/when).
+   * Générée par buildQuestionShapeDirective() dans runHexastraFlow quand detectQuestionShape() retourne non-null.
+   * Injectée APRÈS la directive plan, non supprimée par isFusionCoachingReading.
+   * Remplace la structure par défaut par une structure adaptée à l'intention de lecture.
+   */
+  questionShapeDirective?: string | null
+  /**
    * Personalized data block for the horoscope (current date, sun sign, birth date, etc.).
    * Built by buildHoroscopeDataBlock() from birthData + optional Railway raw data.
    */
