@@ -1,4 +1,5 @@
 ﻿import { randomUUID } from 'crypto'
+import { getLoadTokenMultiplier, getLoadLevel } from '@/lib/system/loadMonitor'
 import { createClient as createSupabaseServer } from '@/lib/supabase/server'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import { buildSystemPrompt } from '@/lib/hexastra/prompts/buildSystemPrompt'
@@ -3638,13 +3639,39 @@ export async function runHexastraFlow(input: {
     // buildChatPayload already sets the right budget for horoscope (daily=2500, weekly=5000).
     // Compact + free plan: cap at 550 tokens (fast, cheap — planets list + brief reading).
     // Non-compact exact + free plan: cap at 700 tokens (larger data block needs more output).
-    const effectiveMaxOutputTokens = isHoroscopeRoute
+    const baseMaxOutputTokens = isHoroscopeRoute
       ? payload.max_output_tokens
       : isCompactRoute && plan === 'free'
         ? Math.min(payload.max_output_tokens ?? 950, 550)
         : (!isCompactRoute && plan === 'free' && (isAstroExact || isHumanDesignExact || isExactDataSubcategory))
           ? Math.min(payload.max_output_tokens ?? 950, 700)
           : payload.max_output_tokens
+
+    // ── Réduction dynamique selon la charge système ───────────────────────
+    // Quand l'instance est sous forte charge, réduire les tokens pour libérer
+    // du débit et éviter que les requêtes se cumulent jusqu'au timeout Vercel (30s).
+    //
+    // loadLevel NORMAL   → multiplicateur 1.00 (aucun changement)
+    // loadLevel HIGH     → multiplicateur 0.55 (~45% de réduction)
+    // loadLevel CRITICAL → multiplicateur 0.35 (~65% de réduction, synthèse minimaliste)
+    //
+    // Exception : horoscopes (daily/weekly) — budget fixe, pas de réduction car la
+    // structure à blocs multiples nécessite un minimum absolu de tokens.
+    const loadLevel = getLoadLevel()
+    const loadMultiplier = isHoroscopeRoute ? 1.0 : getLoadTokenMultiplier()
+    const effectiveMaxOutputTokens = baseMaxOutputTokens !== undefined
+      ? Math.max(200, Math.round(baseMaxOutputTokens * loadMultiplier))
+      : baseMaxOutputTokens
+
+    if (loadLevel !== 'normal' && !isHoroscopeRoute) {
+      flowLog('warn', 'LOAD_AWARE_TOKEN_REDUCTION', {
+        loadLevel,
+        loadMultiplier,
+        baseMaxOutputTokens,
+        effectiveMaxOutputTokens,
+        plan,
+      })
+    }
 
     if (isCompactRoute) {
       flowLog('info', 'TIMEOUT_SAFE_MODE_ENABLED', {

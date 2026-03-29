@@ -17,6 +17,7 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.99.1",
     "@tailwindcss/postcss": "^4.2.2",
+    "@upstash/redis": "^1.37.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.35.1",
     "lru-cache": "^11.2.7",

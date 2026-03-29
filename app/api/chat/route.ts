@@ -1,8 +1,17 @@
 ﻿import { createHash, randomUUID } from 'crypto'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/admin'
-import { hexastraCache } from '@/lib/cache/lru'
+import { getChatCache, getRateLimiter } from '@/lib/system/providerFactory'
 import { checkChatRateLimit, getRequestIp } from '@/lib/rateLimit/chatRateLimit'
+import { getRateLimitMessage } from '@/lib/rateLimit/simpleRateLimit'
+import { incrementLoad, decrementLoad, getCurrentLoad } from '@/lib/system/loadMonitor'
+import { isExtremeLoad, getModeSnapshot } from '@/lib/system/runtimeMode'
+import { withTimeout, TimeoutError } from '@/lib/system/withTimeout'
+import { getSystemTrafficMode, recordRequest, recordTimeout, recordError } from '@/lib/system/viralMode'
+import { decideChatExecutionStrategy, buildQueuedMessage } from '@/lib/queue/executionStrategy'
+import { getPlanPriority } from '@/lib/billing/priority'
+import { memoryChatQueue } from '@/lib/queue/memoryChatQueue'
+import { processNextQueuedJob } from '@/lib/queue/processChatJob'
 import { runHexastraFlow } from '@/lib/hexastra/orchestrator/runHexastraFlow'
 import { enrichReadingResponse } from '@/lib/hexastra/response/enrichReadingResponse'
 import type {
@@ -39,10 +48,14 @@ import {
   buildSmartPricingSessionState,
 } from '@/lib/monetization/smartPricing'
 
-// Cache LRU importé depuis lib/cache/lru.ts.
-// Remplace l'ancienne Map<> non bornée : limite 500 entrées, TTL 10 min géré par lru-cache.
-// Voir lib/cache/lru.ts pour le détail de la configuration et la justification.
+// Providers sélectionnés une fois par warm instance (lazy singletons via providerFactory).
+// Redis si UPSTASH_REDIS_REST_URL + TOKEN sont définis, sinon mémoire LRU locale.
+// Fallback automatique vers mémoire si Redis échoue au runtime.
+// Voir lib/system/providerFactory.ts pour la logique de sélection.
 export const runtime = 'nodejs'
+
+const _cache      = getChatCache()
+const _rateLimiter = getRateLimiter()
 
 type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien'
 type UsageFeature = 'chat_api'
@@ -441,27 +454,38 @@ function looksAlreadyStructured(text: string) {
   )
 }
 
-function buildCacheKey(userId: string | null, message: string, birthData?: unknown) {
-  const bd = birthData ? JSON.stringify(birthData) : ''
-  return `${userId ?? 'guest'}::${message}::${bd}`
+/**
+ * Clé de cache stable et sécurisée.
+ *
+ * SHA-256 au lieu de concaténation brute :
+ * - Longueur bornée (64 hex) quelle que soit la taille du message ou des données de naissance
+ * - Pas d'injection de séparateur :: dans les valeurs
+ * - Compatible avec les clés Redis (pas d'espace, pas de caractères spéciaux)
+ *
+ * La normalisation du message (lowercase + trim) assure que deux messages
+ * identiques à la casse près partagent le même slot de cache.
+ */
+function buildCacheKey(userId: string | null, message: string, birthData?: unknown): string {
+  const uid = userId ?? 'guest'
+  const msg = message.trim().toLowerCase()
+  const bd  = birthData ? JSON.stringify(birthData) : ''
+  return createHash('sha256').update(`${uid}::${msg}::${bd}`).digest('hex')
 }
 
 /**
- * Lecture du cache LRU.
- * Retourne null si absent ou expiré (lru-cache gère le TTL nativement).
- * Plus besoin de vérifier `expires > Date.now()` manuellement.
+ * Lecture du cache via le provider actif (Redis ou mémoire selon config).
+ * Retourne null si absent ou expiré — jamais de stale data.
  */
-function getCache(key: string): unknown | null {
-  return hexastraCache.get(key) ?? null
+async function getCache(key: string): Promise<unknown | null> {
+  return _cache.get<unknown>(key)
 }
 
 /**
- * Écriture dans le cache LRU.
- * Le TTL (10 min) et la limite de taille (500 entrées) sont gérés par lru-cache.
- * Plus besoin de stocker `{ value, expires }` — on stocke la valeur directement.
+ * Écriture dans le cache via le provider actif (Redis ou mémoire selon config).
+ * TTL et taille gérés par l'implémentation.
  */
-function setCache(key: string, value: unknown): void {
-  hexastraCache.set(key, value)
+async function setCache(key: string, value: unknown): Promise<void> {
+  return _cache.set(key, value)
 }
 
 function limitHistory(messages: ChatMessage[], max = 6): ChatMessage[] {
@@ -562,6 +586,115 @@ function buildSafeErrorResponse() {
       menu: DEFAULT_EMPTY_MENU,
     }
   )
+}
+
+/**
+ * Réponse de fallback pour la branche 'analysis' quand runHexastraFlow timeout ou échoue.
+ *
+ * PHILOSOPHIE : ne jamais laisser l'utilisateur face à une page blanche ou une erreur 500.
+ * Le fallback offre une réponse partielle exploitable plutôt qu'un échec complet.
+ *
+ * Contenu :
+ * - CE QUI SE PASSE : synthèse directe à partir de la question (sans calcul IA)
+ * - UNE ACTION CONCRÈTE : conseil universel mais pertinent
+ * - MESSAGE HONNÊTE : indiquer que la lecture complète est en cours / a pris du retard
+ */
+function buildAnalysisFallbackResponse(params: {
+  plan: PlanKey
+  conversationId: string | null
+  userMessage: string
+  lang?: string
+}) {
+  const { plan, conversationId, userMessage, lang = 'fr' } = params
+  const isFr = lang.slice(0, 2).toLowerCase() !== 'en'
+
+  const shortQuestion = userMessage.slice(0, 80).trim()
+
+  const message = isFr
+    ? `Je lis ta question : "${shortQuestion}${userMessage.length > 80 ? '…' : ''}"\n\n` +
+      `La lecture complète prend un peu plus de temps que prévu ce soir — ` +
+      `le système est sollicité. Reformule ta question dans quelques instants ` +
+      `et je t'apporterai une analyse complète.\n\n` +
+      `En attendant : la clarté vient rarement en cherchant une réponse immédiate. ` +
+      `Pose la question différemment si tu peux — et reviens dans 30 secondes.`
+    : `I see your question: "${shortQuestion}${userMessage.length > 80 ? '…' : ''}"\n\n` +
+      `The full reading is taking longer than expected — the system is under heavy load. ` +
+      `Please try again in a few moments for a complete analysis.\n\n` +
+      `In the meantime: clarity rarely comes from seeking an immediate answer. ` +
+      `Rephrase your question if you can — and come back in 30 seconds.`
+
+  return buildConsistentResponse(
+    {
+      message,
+      plan,
+      mode: plan,
+      type: 'analysis',
+      flowState: { step: 'analysis', completed: false },
+      conversationId: conversationId ?? randomUUID(),
+      metadata: {
+        shouldPersistMemory: false,
+        fallback: true,
+        fallbackReason: 'flow_timeout_or_error',
+      },
+    },
+    {
+      type: 'analysis',
+      plan,
+      mode: plan,
+      flowState: { step: 'analysis', completed: false },
+      menu: DEFAULT_EMPTY_MENU,
+    }
+  )
+}
+
+/**
+ * Lance runHexastraFlow avec un timeout de sécurité supplémentaire côté route.
+ *
+ * runHexastraFlow a déjà un global timeout de 29s en interne, mais il peut
+ * rester bloqué si un sous-processus ne répond pas correctement.
+ * Ce wrapper ajoute une couche route-level via `withTimeout` (lib/system/withTimeout.ts) :
+ * si la Promise ne se résout pas avant ROUTE_FLOW_TIMEOUT_MS, on retourne le fallback proprement.
+ *
+ * `withTimeout` est préféré à `Promise.race` inline car :
+ * - nettoie le timer si la Promise résout avant le timeout (pas de fuite de timer)
+ * - lève `TimeoutError` nommé — distinguable dans le catch
+ * - centralise le pattern pour tous les call-sites
+ */
+const ROUTE_FLOW_TIMEOUT_MS = 28_000  // 2s avant la limite Vercel 30s
+
+async function runFlowWithFallback(params: {
+  flowInput: Parameters<typeof runHexastraFlow>[0]
+  plan: PlanKey
+  conversationId: string | null
+  userMessage: string
+  lang: string
+  logFn: (level: 'info' | 'warn' | 'error', msg: string, meta?: Record<string, unknown>) => void
+}): Promise<{ result: Awaited<ReturnType<typeof runHexastraFlow>>; usedFallback: false }
+          | { result: ReturnType<typeof buildAnalysisFallbackResponse>; usedFallback: true }> {
+  const { flowInput, plan, conversationId, userMessage, lang, logFn } = params
+
+  try {
+    const result = await withTimeout(
+      runHexastraFlow(flowInput),
+      ROUTE_FLOW_TIMEOUT_MS,
+      'runHexastraFlow'
+    )
+    return { result, usedFallback: false }
+  } catch (err) {
+    const isTimeout = err instanceof TimeoutError
+    // Alimenter le tracker viralMode pour détecter les dégradations systémiques
+    if (isTimeout) recordTimeout()
+    else            recordError()
+    logFn(isTimeout ? 'warn' : 'error', 'flow_fallback_activated', {
+      reason: err instanceof Error ? err.message : String(err),
+      isTimeout,
+      plan,
+    })
+    return {
+      result: buildAnalysisFallbackResponse({ plan, conversationId, userMessage, lang }),
+      usedFallback: true,
+    }
+  }
 }
 
 function buildQuotaErrorResponse(params: {
@@ -773,7 +906,19 @@ export async function POST(req: NextRequest) {
   let failureStage = 'request_received'
   let failureContext: Record<string, unknown> = {}
 
-  log('info', 'POST hit')
+  // ── Suivi de charge (LOAD MONITOR) ─────────────────────────────────────────
+  // incrementLoad() AVANT tout await. decrementLoad() dans le bloc `finally`
+  // ci-dessous — garanti même en cas d'exception ou de return anticipé.
+  incrementLoad()
+  recordRequest()
+
+  // ── Drain opportuniste de la queue ─────────────────────────────────────────
+  // after() exécute la callback APRÈS l'envoi de la réponse au client.
+  // Chaque requête sync trigger ainsi le traitement d'un job en attente.
+  // Garanti de ne jamais bloquer ou crasher la requête courante.
+  after(() => processNextQueuedJob().catch(() => {}))
+
+  log('info', 'POST hit', { load: getModeSnapshot() })
 
   try {
     failureStage = 'validate_env'
@@ -881,6 +1026,139 @@ export async function POST(req: NextRequest) {
     const { plan: effectivePlan, userId } = await planPromise
     log('info', 'effective plan resolved', { effectivePlan, userId })
 
+    // ── PROTECTION EXTRÊME (BLOC 7 — dernier recours) ─────────────────────
+    // Atteint uniquement si isExtremeLoad() est vrai ET que la queue elle-même
+    // est saturée (queuedJobs > seuil viral).
+    // Dans ce cas, la queue ne peut pas absorber plus — on refuse poliment.
+    if (isExtremeLoad()) {
+      log('warn', 'system_extreme_overload', {
+        ...getModeSnapshot(),
+        userId: userId ?? null,
+        plan: effectivePlan,
+      })
+      return NextResponse.json(
+        {
+          status: 'overloaded',
+          type: 'queued',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          message: 'Forte demande exceptionnelle. Réessaie dans 30 secondes.',
+          flowState: { step: 'queued', completed: false },
+          menu: DEFAULT_EMPTY_MENU,
+          metadata: { queued: false, retryAfterSeconds: 30 },
+        },
+        { status: 503, headers: { 'Retry-After': '30' } }
+      )
+    }
+
+    // ── RATE LIMIT PAR PLAN (BLOC 2 étendu) ───────────────────────────────
+    // Deuxième couche de protection post-auth :
+    // applique un cooldown minimum entre deux requêtes consécutives du même utilisateur,
+    // calibré selon le plan (free=10s, essential=5s, premium=3s, practitioner=2s).
+    // La première couche (checkChatRateLimit sur IP) a déjà été vérifiée plus haut.
+    {
+      const ip = getRequestIp(req)
+      const userRl = await _rateLimiter.check({ userId, ip, plan: effectivePlan })
+      if (!userRl.allowed) {
+        const retryAfterSec = Math.ceil(userRl.retryAfterMs / 1000)
+        log('warn', 'user_rate_limit_exceeded', {
+          reason: userRl.reason,
+          plan: effectivePlan,
+          userId: userId ?? null,
+          retryAfterMs: userRl.retryAfterMs,
+        })
+        return NextResponse.json(
+          { error: getRateLimitMessage(userRl.reason, effectivePlan) },
+          {
+            status: 429,
+            headers: {
+              'Retry-After': String(retryAfterSec),
+              'X-RateLimit-Reason': userRl.reason ?? 'unknown',
+            },
+          }
+        )
+      }
+    }
+
+    // ── MODE VIRAL + STRATÉGIE D'EXÉCUTION ────────────────────────────────
+    // Calcul du mode de trafic système (normal / high / critical / viral).
+    // Basé sur : requêtes actives + jobs en queue + taux d'erreur/timeout récents.
+    //
+    // Décision de stratégie :
+    //   sync         → traitement synchrone normal
+    //   degraded-sync → synchrone avec tokens réduits
+    //   queue         → job mis en attente, client reçoit jobId pour polling
+    //
+    // Les plans premium/praticien conservent toujours l'accès synchrone.
+    // Les utilisateurs free sont mis en queue en mode viral.
+    {
+      const queuedJobs    = await memoryChatQueue.getQueueSize()
+      const activeReqs    = getCurrentLoad()
+      const trafficMode   = getSystemTrafficMode({ queuedJobs })
+      const execStrategy  = decideChatExecutionStrategy({
+        mode:           trafficMode,
+        plan:           effectivePlan,
+        activeRequests: activeReqs,
+        queuedJobs,
+      })
+
+      log('info', 'traffic_mode_and_strategy', {
+        trafficMode,
+        execStrategy,
+        activeRequests: activeReqs,
+        queuedJobs,
+        plan: effectivePlan,
+      })
+
+      if (execStrategy === 'queue') {
+        const ip        = getRequestIp(req)
+        const jobResult = await memoryChatQueue.enqueue({
+          requestId,
+          userId,
+          plan:      effectivePlan,
+          ip,
+          priority:  getPlanPriority(effectivePlan),
+          createdAt: Date.now(),
+          body,
+        })
+
+        const lang = typeof (body as Record<string, unknown>).language === 'string'
+          ? ((body as Record<string, unknown>).language as string)
+          : 'fr'
+
+        log('info', 'request_queued', {
+          jobId:             jobResult.jobId,
+          position:          jobResult.position,
+          estimatedWaitSec:  jobResult.estimatedWaitSec,
+          plan:              effectivePlan,
+          trafficMode,
+        })
+
+        return NextResponse.json(
+          {
+            status:            'queued',
+            type:              'queued',
+            jobId:             jobResult.jobId,
+            position:          jobResult.position,
+            estimatedWaitSec:  jobResult.estimatedWaitSec,
+            plan:              effectivePlan,
+            mode:              effectivePlan,
+            message:           buildQueuedMessage(effectivePlan, lang),
+            flowState:         { step: 'queued', completed: false },
+            menu:              DEFAULT_EMPTY_MENU,
+            metadata: {
+              queued:              true,
+              trafficMode,
+              retryAfterSeconds:   jobResult.estimatedWaitSec,
+              statusUrl:           `/api/chat/status/${jobResult.jobId}`,
+            },
+          },
+          { status: 202 }
+        )
+      }
+      // degraded-sync : continuer normalement — costControl réduit les tokens dans runHexastraFlow
+    }
+
     const responseDepth = getPlanResponseDepth(effectivePlan)
     const journeyEnabled =
       typeof (body as Record<string, unknown>).journeyEnabled === 'boolean'
@@ -974,7 +1252,7 @@ export async function POST(req: NextRequest) {
     })
 
     const cacheKey = buildCacheKey(userId, lastUserMessage, normalizedBirthData)
-    const cached = getCache(cacheKey)
+    const cached = await getCache(cacheKey)
     if (cached) {
       const cachedResponse = buildConsistentResponse(withTrace(cached as ChatResponsePayload, preQuotaTrace), {
         plan: effectivePlan,
@@ -1038,7 +1316,7 @@ export async function POST(req: NextRequest) {
             menu: DEFAULT_EMPTY_MENU,
           }
         )
-        setCache(cacheKey, normalizedMenuResponse)
+        await setCache(cacheKey, normalizedMenuResponse)
         log('info', 'response normalized', {
           branch: 'menu',
           ...getNormalizationDiagnostics(menuResponse as ChatResponsePayload),
@@ -1067,7 +1345,7 @@ export async function POST(req: NextRequest) {
             menu: DEFAULT_EMPTY_MENU,
           }
         )
-        setCache(cacheKey, normalizedBirthResponse)
+        await setCache(cacheKey, normalizedBirthResponse)
         log('info', 'response normalized', {
           branch: 'birth_update',
           ...getNormalizationDiagnostics(birthResponse as ChatResponsePayload),
@@ -1095,7 +1373,7 @@ export async function POST(req: NextRequest) {
             menu: DEFAULT_EMPTY_MENU,
           }
         )
-        setCache(cacheKey, normalizedClarificationResponse)
+        await setCache(cacheKey, normalizedClarificationResponse)
         log('info', 'response normalized', {
           branch: 'clarification',
           ...getNormalizationDiagnostics(clarificationResponse as ChatResponsePayload),
@@ -1207,7 +1485,7 @@ export async function POST(req: NextRequest) {
               menu: DEFAULT_EMPTY_MENU,
             }
           )
-          setCache(cacheKey, convResponse)
+          await setCache(cacheKey, convResponse)
           log('info', 'response normalized', {
             branch: 'conversation',
             ...getNormalizationDiagnostics({ content }),
@@ -1242,16 +1520,45 @@ export async function POST(req: NextRequest) {
         }
       },
       analysis: async () => {
-        log('info', 'branch chosen', { branch: 'analysis' })
+        log('info', 'branch chosen', { branch: 'analysis', load: getModeSnapshot() })
         failureStage = 'analysis_run_flow'
-        const response = await runHexastraFlow({
-          ...sharedFlowInput,
-          requestType,
-          contextType: normalizedContextType,
-          selectedMenuKey: effectiveSelectedMenuKey,
-          selectedSubmenuKey: requestedSelectedSubmenuKey,
-          uiAction: normalizedUiAction,
+
+        // ── Fallback intelligent (BLOC 5) ────────────────────────────────
+        // runFlowWithFallback ajoute un timeout route-level (28s) en plus du
+        // timeout global interne à runHexastraFlow (29s).
+        // Si runHexastraFlow timeout ou lève une exception non catchée,
+        // on retourne une réponse partielle exploitable plutôt qu'un 500.
+        const { result: response, usedFallback } = await runFlowWithFallback({
+          flowInput: {
+            ...sharedFlowInput,
+            requestType,
+            contextType: normalizedContextType,
+            selectedMenuKey: effectiveSelectedMenuKey,
+            selectedSubmenuKey: requestedSelectedSubmenuKey,
+            uiAction: normalizedUiAction,
+          },
+          plan: effectivePlan,
+          conversationId: requestedConversationId,
+          userMessage: lastUserMessage,
+          lang: requestedLanguage ?? 'fr',
+          logFn: log,
         })
+
+        // Si le fallback a été utilisé, retourner directement (pas d'enrichissement)
+        if (usedFallback) {
+          log('warn', 'analysis_fallback_used', {
+            plan: effectivePlan,
+            load: getModeSnapshot(),
+          })
+          return NextResponse.json(
+            buildConsistentResponse(
+              withTrace(response as ChatResponsePayload, postQuotaTrace),
+              { type: 'analysis', plan: effectivePlan, mode: effectivePlan,
+                conversationId: requestedConversationId ?? undefined, menu: DEFAULT_EMPTY_MENU }
+            ),
+            { status: 200 }
+          )
+        }
 
         const analysisResponse = await applyAnalysisResponsePolicy({
           response: response as ChatResponsePayload,
@@ -1271,7 +1578,7 @@ export async function POST(req: NextRequest) {
           }
         )
 
-        setCache(cacheKey, finalResponse)
+        await setCache(cacheKey, finalResponse)
 
         const enriched = enrichReadingResponse({
           response: finalResponse as any,
@@ -1392,6 +1699,10 @@ export async function POST(req: NextRequest) {
       ...getNormalizationDiagnostics(safeErrorResponse),
     })
     return NextResponse.json(safeErrorResponse, { status: 500 })
+  } finally {
+    // ── Décrément de la charge ────────────────────────────────────────────
+    // Garanti quelle que soit la sortie : return normal, throw, timeout.
+    decrementLoad()
   }
 }
 

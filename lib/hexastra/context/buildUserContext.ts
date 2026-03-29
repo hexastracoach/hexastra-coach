@@ -2,6 +2,7 @@ import type { SupabaseClient, User } from '@supabase/supabase-js'
 import type { BirthProfile, PractitionerUsageHex, UserMemoryRecord } from '@/lib/hexastra/types'
 import type { PlanKey } from '@/lib/plans'
 import { readUserMemory } from '@/lib/hexastra/memory/userMemory'
+import { mapDbPlanToPlanKey } from '@/lib/permissions/plan'
 
 export type HexastraUserContext = {
   userId: string | null
@@ -63,7 +64,15 @@ export async function buildUserContext({
     }
   }
 
-  const plan = (typeof profileRow?.plan === 'string' ? profileRow.plan : user?.user_metadata?.plan) as PlanKey | undefined
+  // Normalise la valeur brute DB (ex: 'essentiel' → 'essential') pour éviter que
+  // normalizePlan() en aval retombe sur 'free' faute de correspondance.
+  // fallbackPlan est déjà normalisé par route.ts — il a priorité si présent.
+  const rawDbPlan = typeof profileRow?.plan === 'string'
+    ? profileRow.plan
+    : (typeof user?.user_metadata?.plan === 'string' ? user.user_metadata.plan : undefined)
+  const plan: PlanKey | undefined = fallbackPlan !== 'free'
+    ? fallbackPlan                          // plan résolu par route.ts → priorité absolue
+    : (rawDbPlan !== undefined ? mapDbPlanToPlanKey(rawDbPlan) : undefined)
   const language =
     (typeof profileRow?.language === 'string' ? profileRow.language : undefined) ||
     (typeof user?.user_metadata?.language === 'string' ? user.user_metadata.language : undefined) ||
