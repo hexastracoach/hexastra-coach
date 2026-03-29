@@ -146,6 +146,8 @@ import {
   buildSmartUpgradeDecision,
   toSessionStatePatch,
 } from '@/lib/monetization/smartPricing'
+import { detectSubCategories, requiresTransits } from '@/lib/hexastra/engine/scienceQueryBuilder'
+import { buildSignals, type SubCategorySignal } from '@/lib/hexastra/engine/retrievalSignalExtractor'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
@@ -183,6 +185,7 @@ type SpecializedModuleResult = {
   source: 'gps_kua' | 'neurokua' | 'fusion' | 'timing' | 'science'
   publicSummary: string
   raw: Record<string, unknown> | null
+  subCategorySignals?: SubCategorySignal[]
 }
 
 const safeString = (value: unknown): string => (typeof value === 'string' ? value : '')
@@ -1169,6 +1172,10 @@ async function runSpecializedModule({
     return null
   }
 
+  // Détection des sous-catégories pour affiner l'appel Railway
+  const subCategories = detectSubCategories(latestUserMessage)
+  const includeTransits = requiresTransits(subCategories)
+
   // Nouvelle API : tout passe par /chart/fusion (couvre HD, numérologie, kua…)
   if (birthData?.birthDateISO || birthData?.date) {
     try {
@@ -1206,6 +1213,7 @@ async function runSpecializedModule({
         lon: fusionPayload.lon,
         question: fusionPayload.question,
         practitioner_usage: fusionPayload.practitioner_usage,
+        include_transits: includeTransits,
       })
 
       const summary =
@@ -1215,11 +1223,14 @@ async function runSpecializedModule({
             ? fusion.summary
             : `Utilise la synthèse fusionnée fournie comme signal dominant de la réponse finale.`
 
+      const fusionRaw =
+        fusion && typeof fusion === 'object' ? (fusion as Record<string, unknown>) : null
+
       return {
         source: domainRoute === 'neurokua' ? 'neurokua' : domainRoute,
         publicSummary: summary,
-        raw:
-          fusion && typeof fusion === 'object' ? (fusion as Record<string, unknown>) : null,
+        raw: fusionRaw,
+        subCategorySignals: buildSignals(subCategories, fusionRaw),
       }
     } catch (error) {
       logger.error('[runSpecializedModule:/chart/fusion] failed', {

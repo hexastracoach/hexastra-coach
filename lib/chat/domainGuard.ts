@@ -37,3 +37,23 @@ export function evaluateDomainGuard(intent: UserIntent): GuardDecision {
 export function isAllowed(intent: UserIntent): boolean {
   return evaluateDomainGuard(intent) === 'allowed'
 }
+
+// ── Science domain guard ───────────────────────────────────────────────────────
+// Toutes les sciences et sous-catégories HexAstra sont explicitement autorisées.
+// Ce guard est appelé en amont du routing par science (astro_transits, hd_type…).
+// Il ne bloque aucun domaine scientifique : la décision de routing est laissée
+// au pipeline KS.FUSION.V13.
+
+const ALLOWED_SCIENCES = new Set([
+  'astro',
+  'numerology',
+  'human_design',
+  'enneagram',
+  'kua',
+  'fusion',
+])
+
+/** Toujours `true` pour les sciences HexAstra — export explicite pour documentation. */
+export function isScienceAllowed(science: string): boolean {
+  return ALLOWED_SCIENCES.has(science)
+}
