@@ -12,6 +12,8 @@
 
 export type UserIntent =
   | 'direct_knowledge_query'   // "mes canaux", "mon kua", "mon type" — réponse factuelle directe
+  | 'timing_decision'          // quand agir, meilleur moment, est-ce le moment — stratégique + actionnable
+  | 'behavior_change'          // arrêter, addiction, habitude, je veux changer — moteur comportement
   | 'fusion_general_question'  // pourquoi, comment, je ressens, je bloque, etc.
   | 'relationship'             // relations, couple, famille, proches
   | 'love'                     // amour, attirance, vie sentimentale — plus ciblé que relationship
@@ -31,6 +33,8 @@ export type UserIntent =
 // ── Fusion intents (groupes qui routent vers fusion) ───────────────────────────
 
 export const FUSION_INTENTS: ReadonlySet<UserIntent> = new Set([
+  'timing_decision',
+  'behavior_change',
   'fusion_general_question',
   'relationship',
   'love',
@@ -52,6 +56,54 @@ export function isFusionIntent(intent: UserIntent): boolean {
 function deaccent(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 }
+
+/**
+ * Patterns → timing_decision (PRIORITÉ HAUTE — avant timing et decision)
+ *
+ * Règle combinée : "quand" + "arrêter/stop/quitter" → timing_decision
+ * Cas direct : "meilleur moment", "est-ce le bon moment", "now or later"
+ */
+const TIMING_DECISION_PATTERNS: RegExp[] = [
+  /\b(meilleur moment (pour|d[''']|de))\b/i,
+  /\b(quel est (le |un )?(bon|meilleur) moment)\b/i,
+  /\b(quelle est (la |une )?(bonne|meilleure) (periode|fenetre))\b/i,
+  /\b(est.?ce (le|un) bon moment (pour|de|d[''']))\b/i,
+  /\b(est.?ce le moment (de|pour|d[''']))\b/i,
+  /\b(c[''']est le bon moment)\b/i,
+  /\b(quand (est.?ce que je (dois|devrais)|faut.?il que je))\b/i,
+  /\b(now or later|attendre ou agir|agir ou attendre)\b/i,
+  /\b(dois.?je attendre ou)\b/i,
+  /\b(le bon timing (pour|de|d[''']))\b/i,
+  /\b(la bonne (fenetre|periode) (pour|de|d[''']))\b/i,
+]
+
+/**
+ * Règle combinée timing_decision : "quand" + verbe d'arrêt/changement → timing_decision
+ * Exemple : "je veux arrêter de fumer, quel est le meilleur moment ?"
+ */
+function isTimingDecisionCombined(msg: string): boolean {
+  const hasWhen = /\b(quand|meilleur moment|bon moment|bonne periode|fenetre|timing)\b/i.test(msg)
+  const hasChange = /\b(arr[eê]ter?|stopper?|quitter|se lib[eé]rer|changer|d[eé]crocher)\b/i.test(msg)
+  return hasWhen && hasChange
+}
+
+/**
+ * Patterns → behavior_change (PRIORITÉ HAUTE — avant blocage et inner_state)
+ *
+ * Questions sur comment modifier un comportement, arrêter une habitude, gérer une addiction.
+ */
+const BEHAVIOR_CHANGE_PATTERNS: RegExp[] = [
+  /\b(arr[eê]ter? de (fumer|boire|manger|procrast|consommer|jouer|scroller))\b/i,
+  /\b(arr[eê]ter? (le|la|les) (tabac|cigarette|alcool|sucre|porn|r[eé]seaux))\b/i,
+  /\b(addiction|d[eé]pendance|compulsion|accro[cq]?)\b/i,
+  /\b(fumer|tabac|cigarettes?|clope)\b/i,
+  /\b(procrastination|procrast[ei]n|je procrastine)\b/i,
+  /\b(habitude[s]? (n[eé]gative[s]?|toxique[s]?|[àa] changer|[àa] arr[eê]ter))\b/i,
+  /\b(je veux (changer|arr[eê]ter|stopper|me lib[eé]rer|d[eé]crocher))\b/i,
+  /\b(comment (arr[eê]ter|me d[eé]barrasser de|changer (cette |une |l['''])?habitude))\b/i,
+  /\b(me lib[eé]rer de|sortir de (cette |une )?(habitude|addiction|d[eé]pendance|compulsion))\b/i,
+  /\b(comportement r[eé]p[eé]titif|r[eé]p[eé]tition comportementale|pattern de comportement)\b/i,
+]
 
 /**
  * Patterns → direct_knowledge_query
@@ -244,6 +296,16 @@ export function classifyUserIntent(
   // 0. Données factuelles directes — priorité absolue avant science_specific
   // "mes canaux", "mon kua", "mon type hd", etc. → réponse factuelle sans narrative
   if (DIRECT_KNOWLEDGE_PATTERNS.some((p) => p.test(normalized))) return 'direct_knowledge_query'
+
+  // 0a. timing_decision — PRIORITÉ MAXIMALE sur timing et decision
+  // Règle combinée : "quand" + verbe d'arrêt/changement → timing_decision
+  // Direct : "meilleur moment pour", "est-ce le bon moment", "now or later"
+  if (isTimingDecisionCombined(normalized)) return 'timing_decision'
+  if (TIMING_DECISION_PATTERNS.some((p) => p.test(normalized))) return 'timing_decision'
+
+  // 0b. behavior_change — avant blocage et inner_state
+  // "arrêter de fumer", "addiction", "procrastination", "je veux changer"
+  if (BEHAVIOR_CHANGE_PATTERNS.some((p) => p.test(normalized))) return 'behavior_change'
 
   // 1a. Nouveaux intents précis (avant science_specific pour éviter les collisions)
   // love avant relationship (plus spécifique)

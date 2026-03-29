@@ -23,6 +23,7 @@ export type ResponseMode =
   | 'causal_reading'           // question WHY → Pourquoi ça se produit / Le mécanisme / Comment sortir
   | 'relational_profile'       // question WHO → Dynamique / Projections / Perception / Ajustement
   | 'timing_reading'           // question WHEN → Phase actuelle / Activations / Ce qui s'approche / Moment pour agir
+  | 'timing_strategic_response' // intent timing_decision / behavior_change → 7 blocs stratège, orienté décision
 
 export type ResponseModeInput = {
   requestKind: RequestKind
@@ -179,6 +180,51 @@ export function buildResponseModeDirective(mode: ResponseMode): string {
         '2. Est-ce que le mécanisme est clair ?',
         '3. Est-ce que je sais quoi faire ensuite ?',
         'Si non → réécrire plus précis, plus développé, plus incarné.',
+      ].join('\n')
+
+    case 'timing_strategic_response':
+      return [
+        '# TIMING_STRATEGIC_RESPONSE — MODE STRATÈGE : DÉCISION ET TIMING',
+        '',
+        'Cette règle est activée parce que la question porte sur QUAND agir ou COMMENT changer un comportement.',
+        'Réponds comme un stratège : concret, précis, orienté décision. Interdit de rester vague.',
+        '',
+        'STRUCTURE OBLIGATOIRE — 7 BLOCS DANS CET ORDRE EXACT :',
+        '',
+        '→ Ce qui se passe',
+        '[2–3 phrases. Lecture claire de la situation actuelle, ancrée dans le profil. Ce qui se passe concrètement, pas un ressenti supposé.]',
+        '',
+        '→ Pourquoi ça bloque',
+        '[3–4 phrases. Le mécanisme réel — pas spirituel vague. Le décalage entre le fonctionnement interne et la décision à prendre. La cause précise, liée au profil.]',
+        '',
+        '→ Le meilleur moment',
+        "[2–3 phrases. Un moment IDENTIFIABLE — une condition concrète, un état interne spécifique, un signal précis. Jamais \"quand tu seras prêt\" ou \"écoute-toi\". Décrire ce moment comme quelque chose que la personne pourra reconnaître.]",
+        '',
+        '→ Comment reconnaître la bonne fenêtre',
+        "[3–4 phrases. Des signaux concrets : une émotion précise, un comportement observable, un état corporel, un changement d'énergie. Ce sont des indicateurs mesurables, pas des intuitions vagues.]",
+        '',
+        '→ Les moments à éviter',
+        "[2–3 phrases. Les pièges classiques pour ce profil : les états internes ou contextes extérieurs qui conduisent à la rechute ou à la mauvaise décision. Précis, fondés sur le mécanisme du profil.]",
+        '',
+        '→ Ce que tu dois faire maintenant',
+        '[2–3 phrases. Action directe, applicable immédiatement. Sans flou. Pas "réfléchis à ce que tu veux" — mais une étape concrète, adaptée au profil, faisable dans les 24–48 heures.]',
+        '',
+        '→ Clé à retenir',
+        '[1 phrase courte et impactante. Ce qui résume le mécanisme central. Impossible à confondre avec du développement personnel générique.]',
+        '',
+        'INTERDICTIONS ABSOLUES :',
+        '- "écoute-toi", "suis ton intuition", "quand tu seras prêt", "prends soin de toi"',
+        '- Toute phrase applicable à n\'importe qui sans connaître ce profil',
+        '- Tout conseil sans ancrage dans les données profil',
+        '- Les moments doivent être RECONNAISSABLES — jamais abstraits',
+        '- Aucune mention des sciences ou modules internes',
+        '',
+        'RÈGLE DE VALIDATION :',
+        "La réponse est valide si l'utilisateur peut répondre oui à ces 3 questions :",
+        '1. Je sais EXACTEMENT quel moment attendre ?',
+        '2. Je saurai RECONNAÎTRE ce moment quand il arrivera ?',
+        '3. Je sais quoi faire MAINTENANT en attendant ?',
+        'Si non → réécrire avec plus de signaux concrets.',
       ].join('\n')
 
     case 'fusion_answer':

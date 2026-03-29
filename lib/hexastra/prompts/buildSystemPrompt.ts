@@ -1173,6 +1173,8 @@ ${detailedReadingDirective(input)}
 ${responseStrategyDirective(input)}
 ${(isFusionCoachingReading && input.plan !== 'free' && !input.questionShapeDirective) ? '' : (input.responseModeDirective ?? '')}
 ${input.questionShapeDirective ?? ''}
+${input.behaviorStrategyBlock ?? ''}
+${input.ksArbiterDirective ?? ''}
 ${stepDirective(input)}
 ${ksDirective(input)}
 ${depthDirective(input.responseDepth)}

@@ -126,6 +126,10 @@ import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra
 import { selectResponseMode, buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
 import { detectQuestionShape } from '@/lib/hexastra/orchestrator/questionShape'
 import { buildQuestionShapeDirective } from '@/lib/hexastra/orchestrator/buildPersonalAnswer'
+import { buildDecisionProfile, buildBehaviorBlock } from '@/lib/hexastra/orchestrator/behaviorEngine'
+import { resolveFlowType, needsBehaviorEngine } from '@/lib/hexastra/orchestration/queryRouter'
+import { detectVagueOutput } from '@/lib/hexastra/guards/hallucinationGuard'
+import { runKsPipeline, type KsPipelineOutput } from '@/lib/hexastra/orchestrator/ksPipeline'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
 import { isReliableExactData } from '@/lib/exact-data/reliability'
 import { buildCompactExactScienceBlock } from '@/lib/exact-data/compactBlocks'
@@ -2735,18 +2739,27 @@ export async function runHexastraFlow(input: {
       isFusionIntent: isIntentFusion,
     })
     // direct_knowledge_query: réponse factuelle directe — priorité absolue sur tout autre mode
+    // timing_decision / behavior_change → TIMING_STRATEGIC_RESPONSE (avant les autres overrides)
     const effectiveResponseMode: typeof responseMode =
       isDirectKnowledge
         ? 'direct_answer'
-        : semanticCtx.contextType === 'astro_followup' && exactDataResolved
-          ? 'calculated_reading'
-          : universalClassif.science === 'enneagram' && responseMode === 'calculated_reading'
-            ? 'interpretive_reading'
-            : responseMode
+        : (userIntent === 'timing_decision' || userIntent === 'behavior_change')
+          ? 'timing_strategic_response'
+          : semanticCtx.contextType === 'astro_followup' && exactDataResolved
+            ? 'calculated_reading'
+            : universalClassif.science === 'enneagram' && responseMode === 'calculated_reading'
+              ? 'interpretive_reading'
+              : responseMode
     if (effectiveResponseMode !== responseMode) {
-      flowLog('info', 'ENNEAGRAM_MODE_OVERRIDE', {
+      flowLog('info', 'RESPONSE_MODE_OVERRIDE', {
         from: responseMode,
         to: effectiveResponseMode,
+        reason: (userIntent === 'timing_decision' || userIntent === 'behavior_change')
+          ? 'timing_strategic_intent'
+          : universalClassif.science === 'enneagram'
+            ? 'enneagram_interpretive'
+            : 'astro_followup',
+        userIntent,
         science: universalClassif.science,
       })
     }
@@ -2762,7 +2775,10 @@ export async function runHexastraFlow(input: {
     const responseModeDirective = buildResponseModeDirective(effectiveResponseMode)
 
     // Question shape detection — adapts response structure to HOW/WHY/WHO/WHEN intent
-    const questionShape = isIntentFusion ? detectQuestionShape(latestUserMessage) : null
+    // Supprimé si timing_strategic_response est actif (sa structure 7-blocs est plus complète)
+    const isTimingStrategicMode = effectiveResponseMode === 'timing_strategic_response'
+    const questionShape =
+      isIntentFusion && !isTimingStrategicMode ? detectQuestionShape(latestUserMessage) : null
     const questionShapeDirective = questionShape
       ? buildQuestionShapeDirective({
           questionShape,
@@ -2776,6 +2792,12 @@ export async function runHexastraFlow(input: {
         plan,
         isFusionIntent: isIntentFusion,
         message: latestUserMessage.slice(0, 80),
+      })
+    }
+    if (isTimingStrategicMode && !questionShape) {
+      flowLog('info', 'QUESTION_SHAPE_SUPPRESSED', {
+        reason: 'timing_strategic_response_active',
+        userIntent,
       })
     }
 
@@ -3137,6 +3159,8 @@ export async function runHexastraFlow(input: {
     // For single sidebar intents: inject a compact single-science block.
     let intentCompactBlock: string | null = null
     let softMessage: string | null = null
+    let behaviorStrategyBlock: string | null = null
+    let ksPipelineOutput: KsPipelineOutput | null = null
     if (!exactDataNeeded && exactDataResolved && specializedResult?.raw) {
       const intentRaw = specializedResult.raw as Record<string, unknown>
       if (isIntentFusion) {
@@ -3235,6 +3259,79 @@ export async function runHexastraFlow(input: {
 
         // 7b. Compact Reading Core — enrichissement avec tone solaire + toneHint Lune/Ennéagramme
         const compactCore = buildCompactReadingCore(arbitration, fusionCtx, lang)
+
+        // 7b-bis. Behavior Engine — profil de décision + stratégie comportementale
+        // Activé pour timing_decision et behavior_change uniquement
+        const flowType = resolveFlowType(userIntent)
+        if (needsBehaviorEngine(flowType)) {
+          const decisionProfile = buildDecisionProfile(compactCore)
+          behaviorStrategyBlock = buildBehaviorBlock(userIntent, decisionProfile, isFr)
+          flowLog('info', 'BEHAVIOR_ENGINE_ACTIVATED', {
+            intent: userIntent,
+            flowType,
+            decisionStyle: decisionProfile.decisionStyle.slice(0, 80),
+            timingSignal: decisionProfile.timingSignal.slice(0, 80),
+          })
+        }
+
+        // 7c-bis. KS.FUSION.V13 Pipeline — orchestration complète
+        // Router → Signals → FusionEngine → PriorityField → Arbiter → Sentinel → Directive
+        try {
+          ksPipelineOutput = runKsPipeline({
+            userIntent,
+            userMessage: latestUserMessage,
+            compactCore,
+            fusionCtx,
+            flowType,
+            lang,
+          })
+
+          flowLog('info', 'KS_FLOW_TYPE', {
+            flowType,
+            intent: userIntent,
+          })
+          flowLog('info', 'KS_ROUTER_MODULES', {
+            modules: ksPipelineOutput.ksModules,
+            count: ksPipelineOutput.ksModules.length,
+          })
+          flowLog('info', 'KS_SIGNALS_COUNT', {
+            count: ksPipelineOutput.signals.length,
+            modules: ksPipelineOutput.signals.map(s => s.module),
+          })
+          flowLog('info', 'KS_FUSION_DOMINANT', {
+            dominantSignal: ksPipelineOutput.fusionSummary.dominantSignal,
+            dominantModule: ksPipelineOutput.fusionSummary.dominantModule,
+            dominantPhase: ksPipelineOutput.fusionSummary.dominantPhase,
+            dominantZone: ksPipelineOutput.fusionSummary.dominantZone,
+            answerStrategy: ksPipelineOutput.fusionSummary.answerStrategy,
+            sentinelStatus: ksPipelineOutput.fusionSummary.sentinelStatus,
+            confidence: ksPipelineOutput.fusionSummary.confidenceScore,
+            contradictions: ksPipelineOutput.fusionSummary.contradictions,
+          })
+          flowLog('info', 'KS_PRIORITY_FIELD', {
+            dominantField: ksPipelineOutput.priorityField.dominantField,
+            secondaryField: ksPipelineOutput.priorityField.secondaryField ?? null,
+            confidence: ksPipelineOutput.priorityField.confidence,
+            reason: ksPipelineOutput.priorityField.reason.slice(0, 100),
+          })
+          flowLog('info', 'KS_ARBITER_FOCUS', {
+            narrativeFocus: ksPipelineOutput.arbiter.narrativeFocus.slice(0, 120),
+            answerStrategy: ksPipelineOutput.arbiter.answerStrategy,
+            dominantDynamic: ksPipelineOutput.arbiter.dominantDynamic.slice(0, 100),
+          })
+          flowLog('info', 'KS_RESPONSE_MODE', {
+            effectiveMode: 'pending', // sera affiché après calcul effectiveResponseMode
+            intent: userIntent,
+            flowType,
+          })
+        } catch (pipelineErr) {
+          flowLog('warn', 'KS_PIPELINE_ERROR', {
+            error: pipelineErr instanceof Error ? pipelineErr.message : String(pipelineErr),
+            intent: userIntent,
+            hint: 'ksPipeline failed gracefully — proceeding without KS directive',
+          })
+          ksPipelineOutput = null
+        }
 
         flowLog('info', 'HEXASTRA_COMPACT_CORE_BUILT', {
           questionType:    compactCore.questionType,
@@ -3602,6 +3699,8 @@ export async function runHexastraFlow(input: {
       isAstroExactCompact: isAstroExactCompact || isHumanDesignExactCompact,
       responseModeDirective,
       questionShapeDirective: questionShapeDirective ?? undefined,
+      behaviorStrategyBlock: behaviorStrategyBlock ?? undefined,
+      ksArbiterDirective: ksPipelineOutput?.arbiterDirective ?? undefined,
       antiHallucinationRules: exactDataNeeded ? ANTI_HALLUCINATION_RULES : undefined,
       antiContradictionDirective: antiContradictionActive ? ANTI_CONTRADICTION_DIRECTIVE : undefined,
       isHoroscopeRoute: isHoroscopeRoute || undefined,
@@ -3825,6 +3924,19 @@ export async function runHexastraFlow(input: {
         responseExcerpt: rawMessage.slice(0, 120),
         hint: 'Response appears to be prose for a fact/list request. Check mode directive injection.',
       })
+    }
+
+    // Vagueness guard — critique pour timing_decision et behavior_change
+    if (effectiveResponseMode === 'timing_strategic_response') {
+      const vagueFound = detectVagueOutput(rawMessage)
+      if (vagueFound.length > 0) {
+        flowLog('warn', 'VAGUE_OUTPUT_DETECTED', {
+          phrases: vagueFound,
+          intent: userIntent,
+          responseExcerpt: rawMessage.slice(0, 150),
+          hint: 'Réponse contient des formules vagues malgré TIMING_STRATEGIC_RESPONSE. Vérifier la directive.',
+        })
+      }
     }
 
     if (openAiMs < openAiTimeoutMs) {

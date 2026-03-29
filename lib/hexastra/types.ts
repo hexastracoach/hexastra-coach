@@ -342,6 +342,20 @@ export type BuildPromptInput = {
    */
   questionShapeDirective?: string | null
   /**
+   * Directive d'orchestration KS.FUSION.V13 — produite par le ksPipeline.
+   * Contient : dynamique dominante, focus narratif unique, stratégie (action/prudence/observation/stabilisation).
+   * Injectée après behaviorStrategyBlock, non supprimée.
+   * Source : runKsPipeline() → arbiterDirective
+   */
+  ksArbiterDirective?: string | null
+  /**
+   * Bloc contextuel stratégique injecté pour les intents timing_decision / behavior_change.
+   * Généré par buildBehaviorBlock() dans runHexastraFlow via le behaviorEngine.
+   * Contient : profil de décision + stratégie comportementale personnalisée.
+   * Source : CompactReadingCore (decisionSignal, timingSignal, rightMovement, etc.)
+   */
+  behaviorStrategyBlock?: string | null
+  /**
    * Personalized data block for the horoscope (current date, sun sign, birth date, etc.).
    * Built by buildHoroscopeDataBlock() from birthData + optional Railway raw data.
    */

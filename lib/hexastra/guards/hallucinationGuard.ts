@@ -119,3 +119,56 @@ L'utilisateur conteste une valeur exacte. Ne la modifie PAS.
 Rappelle que la valeur provient du moteur de calcul (données de naissance).
 Si une erreur est possible, invite l'utilisateur à vérifier ses données de naissance enregistrées.
 Ne recalcule pas depuis ta mémoire de modèle — seul le bloc de données fait foi.`
+
+// ── Vagueness Output Guard ─────────────────────────────────────────────────────
+
+/**
+ * Phrases vagues bannies — signalent une réponse de développement personnel générique.
+ * Particulièrement critiques pour les intents timing_decision et behavior_change.
+ */
+const VAGUE_OUTPUT_PHRASES: string[] = [
+  'écoute-toi',
+  'ecoute-toi',
+  'quand tu seras prêt',
+  'quand tu seras pret',
+  "suis ton intuition",
+  'prends soin de toi',
+  'honore tes émotions',
+  'honore tes emotions',
+  'fais confiance au processus',
+  'le moment viendra',
+  'ça viendra naturellement',
+  'ca viendra naturellement',
+  'tu le sauras quand',
+  'fais-toi confiance',
+  'fais toi confiance',
+  'laisse venir les choses',
+  "à ton rythme",
+  "a ton rythme",
+]
+
+/**
+ * Détecte les phrases vagues dans une réponse LLM.
+ * Observabilité uniquement — ne bloque pas le flux.
+ * Retourne les phrases trouvées (tableau vide si aucune).
+ */
+export function detectVagueOutput(responseText: string): string[] {
+  const lower = (responseText || '').toLowerCase()
+  return VAGUE_OUTPUT_PHRASES.filter((phrase) => lower.includes(phrase))
+}
+
+/**
+ * Assertion stricte — à utiliser dans les tests ou en mode dev.
+ * Lance une erreur si une phrase vague est détectée.
+ *
+ * IMPORTANT : Ne jamais appeler dans le flux de production principal.
+ * Utiliser detectVagueOutput() + logging à la place.
+ */
+export function assertNoVagueOutput(text: string): void {
+  const found = detectVagueOutput(text)
+  if (found.length > 0) {
+    throw new Error(
+      `VAGUE_OUTPUT_DETECTED — phrases interdites trouvées : ${found.map((f) => `"${f}"`).join(', ')}`,
+    )
+  }
+}

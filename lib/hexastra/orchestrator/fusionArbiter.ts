@@ -47,6 +47,8 @@ function resolveQuestionTypeLabel(intent: string): string {
     inner_state: 'état_intérieur',
     blocage: 'blocage_pattern',
     timing: 'timing_cycle',
+    timing_decision: 'timing_décision_stratégique',
+    behavior_change: 'changement_comportemental',
     identity: 'identité',
     life_period: 'période_de_vie',
     exact_profile: 'profil_exact',
