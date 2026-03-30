@@ -94,4 +94,52 @@ describe('prioritizeStructuredSignals', () => {
 
     expect(prioritized.signals[0]?.subCategory).toBe('astro_transits_current')
   })
+
+  it('pushes a generic fusion energy retrieval block behind a more relevant exact-data current-state signal', () => {
+    const structuredSignals: StructuredSignal[] = [
+      {
+        science: 'fusion',
+        subCategory: 'fusion_energy_state',
+        score: 7.4,
+        sourceType: 'retrieval',
+        value: { documents: [] },
+      },
+      {
+        science: 'human_design',
+        subCategory: 'hd_current_transits',
+        score: 6.8,
+        sourceType: 'exact_data',
+        exactDataSection: 'humanDesignTransits',
+        value: { active_gates: ['57'] },
+      },
+      {
+        science: 'astro',
+        subCategory: 'astro_transits_current',
+        score: 6.4,
+        sourceType: 'exact_data',
+        exactDataSection: 'transits',
+        value: { moon: 'activation' },
+      },
+    ]
+
+    const prioritized = prioritizeStructuredSignals({
+      structuredSignals,
+      retrievalPlan: makePlan({
+        sciences: ['fusion', 'human_design', 'astro'],
+        subCategories: ['fusion_energy_state', 'hd_current_transits', 'astro_transits_current'],
+        weightedMatches: [
+          { subCategory: 'fusion_energy_state', science: 'fusion', score: 7.4, retrievalPriority: 74 },
+          { subCategory: 'hd_current_transits', science: 'human_design', score: 6.8, retrievalPriority: 88 },
+          { subCategory: 'astro_transits_current', science: 'astro', score: 6.4, retrievalPriority: 86 },
+        ],
+        dominantScience: 'fusion',
+        dominantSubCategory: null,
+      }),
+      intent: 'inner_state',
+    })
+
+    expect(prioritized.signals[0]?.subCategory).toBe('hd_current_transits')
+    expect(prioritized.signals[1]?.subCategory).toBe('astro_transits_current')
+    expect(prioritized.signals[2]?.subCategory).toBe('fusion_energy_state')
+  })
 })

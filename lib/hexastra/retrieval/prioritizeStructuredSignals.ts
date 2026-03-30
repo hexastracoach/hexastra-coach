@@ -53,6 +53,59 @@ function resolveSourceWeight(signal: StructuredSignal): number {
   }
 }
 
+function isCurrentStateAxis(subCategory: string): boolean {
+  return /energy|transits|current|cycle|timing|return|period|state/.test(subCategory)
+}
+
+function resolveGenericFusionRetrievalPenalty(args: {
+  signal: StructuredSignal
+  structuredSignals: StructuredSignal[]
+  intent?: string | null
+  dominantScience: string | null
+}): number {
+  const normalizedIntent = (args.intent ?? '').toLowerCase()
+
+  if (args.signal.sourceType !== 'retrieval' || args.signal.science !== 'fusion') {
+    return 0
+  }
+
+  if (!/fusion_(energy_state|timing|general)/.test(args.signal.subCategory)) {
+    return 0
+  }
+
+  if (!/(inner_state|blocage|timing|life_period|fusion_general_question)/.test(normalizedIntent)) {
+    return 0
+  }
+
+  const hasRelevantExactDataSignal = args.structuredSignals.some((candidate) => (
+    candidate.sourceType === 'exact_data' &&
+    candidate.science !== 'fusion' &&
+    isCurrentStateAxis(candidate.subCategory)
+  ))
+
+  if (!hasRelevantExactDataSignal) {
+    return 0
+  }
+
+  if (
+    /fusion_general_question/.test(normalizedIntent) &&
+    args.dominantScience === 'fusion' &&
+    args.signal.subCategory === 'fusion_general'
+  ) {
+    return 0
+  }
+
+  if (args.signal.subCategory === 'fusion_energy_state') {
+    return -1.35
+  }
+
+  if (args.signal.subCategory === 'fusion_timing') {
+    return -0.8
+  }
+
+  return -0.55
+}
+
 function resolveWeakSignalPenalty(args: {
   signal: StructuredSignal
   topScore: number
@@ -108,6 +161,12 @@ export function prioritizeStructuredSignals(args: {
       hasExactDataSignals,
       dominantScience,
     })
+    const genericFusionRetrievalPenalty = resolveGenericFusionRetrievalPenalty({
+      signal,
+      structuredSignals: args.structuredSignals,
+      intent: args.intent,
+      dominantScience,
+    })
 
     const priorityScore = Number(
       (
@@ -118,7 +177,8 @@ export function prioritizeStructuredSignals(args: {
         subCategoryBoost +
         exactSectionBoost +
         intentBoost +
-        weakSignalPenalty -
+        weakSignalPenalty +
+        genericFusionRetrievalPenalty -
         index * 0.001
       ).toFixed(3),
     )

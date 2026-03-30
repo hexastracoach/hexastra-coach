@@ -241,8 +241,15 @@ export function buildStructuredRetrievalSignalsBlock(args: {
   structuredSignals: StructuredSignal[]
   intent?: string
   flowType?: string
+  responseMode?: string
+  openingSelection?: {
+    dominantOpeningSource?: 'exact_data' | 'retrieval' | 'fusion' | null
+    dominantOpeningScience?: string | null
+    dominantOpeningSubCategory?: string | null
+    reasoningTags?: string[]
+  }
 }): string | null {
-  const { retrievalPlan, structuredSignals, intent, flowType } = args
+  const { retrievalPlan, structuredSignals, intent, flowType, responseMode, openingSelection } = args
 
   if (!structuredSignals.length) {
     return null
@@ -254,6 +261,13 @@ export function buildStructuredRetrievalSignalsBlock(args: {
     `SUBCATEGORIES : ${retrievalPlan.subCategories.slice(0, 8).join(', ') || 'fusion_general'}`,
     `TOP_K : ${retrievalPlan.preferredTopK} | FALLBACK : ${retrievalPlan.fallbackUsed ? 'oui' : 'non'}`,
     intent ? `INTENT : ${intent}${flowType ? ` | FLOW : ${flowType}` : ''}` : null,
+    responseMode ? `RESPONSE_MODE_HINT : ${responseMode}` : null,
+    openingSelection
+      ? `OPENING_HINT : source=${openingSelection.dominantOpeningSource ?? 'fusion'} | science=${openingSelection.dominantOpeningScience ?? 'none'} | subCategory=${openingSelection.dominantOpeningSubCategory ?? 'none'}`
+      : null,
+    openingSelection?.reasoningTags?.length
+      ? `OPENING_REASONING : ${openingSelection.reasoningTags.join(', ')}`
+      : null,
     '',
   ].filter((line): line is string => Boolean(line))
 

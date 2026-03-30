@@ -68,6 +68,13 @@ export type KnowledgePacket = {
     exactDataSection?: NormalizedFusionExactDataSection
     value: unknown
   }>
+  responseSelection?: {
+    responseMode: string
+    dominantOpeningSource: 'fusion' | 'exact_data' | 'retrieval'
+    dominantOpeningScience?: string | null
+    dominantOpeningSubCategory?: string | null
+    reasoningTags?: string[]
+  }
   ksNarrativeBrief?: string | null
   fusionHints?: string[]
 }
@@ -589,6 +596,7 @@ export function buildKnowledgePacket(params: {
   normalizedExactData?: NormalizedFusionExactData
   exactDataRequest?: ExactDataRequest | null
   structuredSignals?: StructuredSignal[]
+  responseSelection?: KnowledgePacket['responseSelection']
   ksNarrativeBrief?: string | null
   fusionHints?: string[]
 }): KnowledgePacket | null {
@@ -663,6 +671,7 @@ export function buildKnowledgePacket(params: {
     retrievalPlan: compactRetrievalPlan(params.retrievalPlan),
     exactData: summarizedExactData,
     structuredSignals: summarizeStructuredSignals(params.structuredSignals),
+    responseSelection: params.responseSelection ?? undefined,
     retrievalResults: params.results.slice(0, 6).map((result) => summarizeLayerResult(result)),
     exactDataRequest: params.exactDataRequest ?? null,
     ksNarrativeBrief: params.ksNarrativeBrief ?? null,

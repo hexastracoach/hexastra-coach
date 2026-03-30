@@ -108,6 +108,8 @@ export function buildExactDataRequestFromRetrievalPlan(
 
   const includeKuaDirections =
     hasAny(subCategories, [
+      'kua_number',
+      'kua_profile',
       'kua_sheng_chi',
       'kua_tien_yi',
       'kua_nien_yen',

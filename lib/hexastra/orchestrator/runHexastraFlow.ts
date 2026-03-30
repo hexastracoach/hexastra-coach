@@ -134,7 +134,11 @@ import { detectDirectTopic, buildDirectKnowledgeBlock } from '@/lib/hexastra/orc
 import { isActionableDirectRequest, directRequestSkipReason } from '@/lib/hexastra/orchestration/directRequest'
 import { detectHoroscopeIntent, isHoroscopeRequest, detectHoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import { buildHoroscopeDataBlock, validateHoroscopeOutput } from '@/lib/hexastra/prompts/horoscopePrompt'
-import { selectResponseMode, buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
+import {
+  selectResponseMode as selectLegacyResponseMode,
+  buildResponseModeDirective,
+} from '@/lib/hexastra/orchestration/responseModes'
+import { selectResponseModeSelection } from '@/lib/hexastra/orchestrator/selectResponseMode'
 import { detectQuestionShape } from '@/lib/hexastra/orchestrator/questionShape'
 import { buildQuestionShapeDirective } from '@/lib/hexastra/orchestrator/buildPersonalAnswer'
 import { buildDecisionProfile, buildBehaviorBlock } from '@/lib/hexastra/orchestrator/behaviorEngine'
@@ -2825,78 +2829,9 @@ export async function runHexastraFlow(input: {
       })
     }
 
-    // Response mode selection — passes effective reliability (post compact-context override)
-    const responseMode = selectResponseMode({
-      requestKind: universalClassif.requestKind,
-      subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
-      plan,
-      exactDataResolved,
-      exactDataReliable: effectiveReliable,
-      isPedagogical: universalClassif.requestKind === 'clarification',
-      isFusionIntent: isIntentFusion,
-    })
-    // direct_knowledge_query: réponse factuelle directe — priorité absolue sur tout autre mode
-    // timing_decision / behavior_change → TIMING_STRATEGIC_RESPONSE (avant les autres overrides)
-    const effectiveResponseMode: typeof responseMode =
-      isDirectKnowledge
-        ? 'direct_answer'
-        : (userIntent === 'timing_decision' || userIntent === 'behavior_change')
-          ? 'timing_strategic_response'
-          : semanticCtx.contextType === 'astro_followup' && exactDataResolved
-            ? 'calculated_reading'
-            : universalClassif.science === 'enneagram' && responseMode === 'calculated_reading'
-              ? 'interpretive_reading'
-              : responseMode
-    if (effectiveResponseMode !== responseMode) {
-      flowLog('info', 'RESPONSE_MODE_OVERRIDE', {
-        from: responseMode,
-        to: effectiveResponseMode,
-        reason: (userIntent === 'timing_decision' || userIntent === 'behavior_change')
-          ? 'timing_strategic_intent'
-          : universalClassif.science === 'enneagram'
-            ? 'enneagram_interpretive'
-            : 'astro_followup',
-        userIntent,
-        science: universalClassif.science,
-      })
-    }
-
-    flowLog('info', 'RESPONSE_MODE_SELECTED', {
-      responseMode: effectiveResponseMode,
-      requestKind: universalClassif.requestKind,
-      subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
-      plan,
-      exactDataResolved,
-    })
-
-    const responseModeDirective = buildResponseModeDirective(effectiveResponseMode)
-
-    // Question shape detection — adapts response structure to HOW/WHY/WHO/WHEN intent
-    // Supprimé si timing_strategic_response est actif (sa structure 7-blocs est plus complète)
-    const isTimingStrategicMode = effectiveResponseMode === 'timing_strategic_response'
-    const questionShape =
-      isIntentFusion && !isTimingStrategicMode ? detectQuestionShape(latestUserMessage) : null
-    const questionShapeDirective = questionShape
-      ? buildQuestionShapeDirective({
-          questionShape,
-          isFr: (userContext.language ?? fallbackLanguage) !== 'en',
-        })
-      : null
-
-    if (questionShape) {
-      flowLog('info', 'QUESTION_SHAPE_DETECTED', {
-        questionShape,
-        plan,
-        isFusionIntent: isIntentFusion,
-        message: latestUserMessage.slice(0, 80),
-      })
-    }
-    if (isTimingStrategicMode && !questionShape) {
-      flowLog('info', 'QUESTION_SHAPE_SUPPRESSED', {
-        reason: 'timing_strategic_response_active',
-        userIntent,
-      })
-    }
+    let effectiveResponseMode: ReturnType<typeof selectLegacyResponseMode> = 'concise_fusion_answer'
+    let responseModeDirective = ''
+    let questionShapeDirective: string | null = null
 
     // Anti-contradiction directive: inject when astro follow-up contradicts a value
     const antiContradictionActive = semanticCtx.contextType === 'astro_followup'
@@ -3016,6 +2951,7 @@ export async function runHexastraFlow(input: {
       exactDataDiagnostics: normalizedExactDataResult.diagnostics,
     })
     let structuredSignals = rawStructuredSignals
+    let prioritizedStructuredSignalScores: ReturnType<typeof prioritizeStructuredSignals>['scoredSignals'] = []
 
     try {
       const prioritizedStructuredSignalsResult = prioritizeStructuredSignals({
@@ -3025,6 +2961,7 @@ export async function runHexastraFlow(input: {
       })
 
       structuredSignals = prioritizedStructuredSignalsResult.signals
+      prioritizedStructuredSignalScores = prioritizedStructuredSignalsResult.scoredSignals
 
       flowLog('debug', 'STRUCTURED_SIGNALS_PRIORITIZED', {
         dominantScience: scientificRetrievalPlan.dominantScience ?? null,
@@ -3079,11 +3016,82 @@ export async function runHexastraFlow(input: {
       sectionsUsedViaAliasFallback: aliasFallbackSignalSections,
     })
 
-    const structuredRetrievalSignalsBlock = buildStructuredRetrievalSignalsBlock({
+    const responseModeSelection = selectResponseModeSelection({
+      userMessage: latestUserMessage,
+      requestKind: universalClassif.requestKind,
+      subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
+      plan,
+      exactDataResolved,
+      exactDataReliable: effectiveReliable,
+      isPedagogical: universalClassif.requestKind === 'clarification',
+      isFusionIntent: isIntentFusion,
+      isDirectKnowledge,
+      isTimingStrategicIntent: userIntent === 'timing_decision' || userIntent === 'behavior_change',
+      isAstroFollowupExact: semanticCtx.contextType === 'astro_followup' && exactDataResolved,
+      forceInterpretiveEnneagram: universalClassif.science === 'enneagram',
       retrievalPlan: scientificRetrievalPlan,
       structuredSignals,
+      scoredSignals: prioritizedStructuredSignalScores,
+      normalizedExactData: normalizedExactDataResult.exactData,
+      intent: userIntent,
+    })
+
+    effectiveResponseMode = responseModeSelection.responseMode
+    responseModeDirective = buildResponseModeDirective(effectiveResponseMode)
+    const presentationStructuredSignals =
+      responseModeSelection.orderedSignals && responseModeSelection.orderedSignals.length > 0
+        ? responseModeSelection.orderedSignals
+        : structuredSignals
+
+    flowLog('info', 'RESPONSE_MODE_SELECTED', {
+      responseMode: effectiveResponseMode,
+      requestKind: universalClassif.requestKind,
+      subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
+      plan,
+      exactDataResolved,
+      openingSource: responseModeSelection.dominantOpeningSource,
+      openingScience: responseModeSelection.dominantOpeningScience ?? null,
+      openingSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
+      reasoningTags: responseModeSelection.reasoningTags ?? [],
+    })
+
+    const isTimingStrategicMode = effectiveResponseMode === 'timing_strategic_response'
+    const questionShape =
+      isIntentFusion && !isTimingStrategicMode ? detectQuestionShape(latestUserMessage) : null
+    questionShapeDirective = questionShape
+      ? buildQuestionShapeDirective({
+          questionShape,
+          isFr: (userContext.language ?? fallbackLanguage) !== 'en',
+        })
+      : null
+
+    if (questionShape) {
+      flowLog('info', 'QUESTION_SHAPE_DETECTED', {
+        questionShape,
+        plan,
+        isFusionIntent: isIntentFusion,
+        message: latestUserMessage.slice(0, 80),
+      })
+    }
+    if (isTimingStrategicMode && !questionShape) {
+      flowLog('info', 'QUESTION_SHAPE_SUPPRESSED', {
+        reason: 'timing_strategic_response_active',
+        userIntent,
+      })
+    }
+
+    const structuredRetrievalSignalsBlock = buildStructuredRetrievalSignalsBlock({
+      retrievalPlan: scientificRetrievalPlan,
+      structuredSignals: presentationStructuredSignals,
       intent: userIntent,
       flowType: normalizedContextType,
+      responseMode: effectiveResponseMode,
+      openingSelection: {
+        dominantOpeningSource: responseModeSelection.dominantOpeningSource,
+        dominantOpeningScience: responseModeSelection.dominantOpeningScience ?? null,
+        dominantOpeningSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
+        reasoningTags: responseModeSelection.reasoningTags ?? [],
+      },
     })
     const knowledgeBlock = structuredRetrievalSignalsBlock ?? knowledgePayload?.block
 
@@ -3224,7 +3232,14 @@ export async function runHexastraFlow(input: {
       exactData: specializedResult?.raw ?? null,
       normalizedExactData: normalizedExactDataResult.exactData,
       exactDataRequest,
-      structuredSignals,
+      structuredSignals: presentationStructuredSignals,
+      responseSelection: {
+        responseMode: effectiveResponseMode,
+        dominantOpeningSource: responseModeSelection.dominantOpeningSource,
+        dominantOpeningScience: responseModeSelection.dominantOpeningScience ?? null,
+        dominantOpeningSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
+        reasoningTags: responseModeSelection.reasoningTags ?? [],
+      },
       ksNarrativeBrief,
       fusionHints: Array.from(
         new Set([
@@ -3493,8 +3508,9 @@ export async function runHexastraFlow(input: {
             fusionCtx,
             flowType,
             lang,
-            additionalSignals: structuredSignals.length > 0 ? undefined : retrievalSignalsResult?.signals,
-            structuredSignals,
+            additionalSignals:
+              presentationStructuredSignals.length > 0 ? undefined : retrievalSignalsResult?.signals,
+            structuredSignals: presentationStructuredSignals,
             retrievalPlan: scientificRetrievalPlan,
           })
 
@@ -3512,7 +3528,7 @@ export async function runHexastraFlow(input: {
           })
           flowLog('debug', 'KS_RETRIEVAL_CONTEXT', {
             retrievalContext: ksPipelineOutput.retrievalContext ?? null,
-            structuredSignalsCount: structuredSignals.length,
+            structuredSignalsCount: presentationStructuredSignals.length,
           })
           flowLog('info', 'KS_FUSION_DOMINANT', {
             dominantSignal: ksPipelineOutput.fusionSummary.dominantSignal,
@@ -4445,6 +4461,13 @@ export async function runHexastraFlow(input: {
         })),
         exactDataRequest,
         retrievalDebug,
+        responseSelection: {
+          responseMode: effectiveResponseMode,
+          dominantOpeningSource: responseModeSelection.dominantOpeningSource,
+          dominantOpeningScience: responseModeSelection.dominantOpeningScience ?? null,
+          dominantOpeningSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
+          reasoningTags: responseModeSelection.reasoningTags ?? [],
+        },
         responseDepth:
           plan === 'practitioner'
             ? 'expert'

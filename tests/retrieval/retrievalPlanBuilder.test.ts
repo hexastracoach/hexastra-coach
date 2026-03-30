@@ -125,4 +125,31 @@ describe('buildRetrievalPlanFromQuery', () => {
     expect(plan.dominantSubCategory).toBe('kua_favorable_directions')
     expect(plan.weightedMatches[0]?.subCategory).toBe('kua_favorable_directions')
   })
+
+  it('resolves "compatibilite astrologique" to astrology synastry', () => {
+    const plan = buildRetrievalPlanFromQuery('compatibilite astrologique')
+
+    expect(plan.dominantScience).toBe('astro')
+    expect(plan.dominantSubCategory).toBe('astro_synastry')
+    expect(plan.weightedMatches[0]?.subCategory).toBe('astro_synastry')
+  })
+
+  it('keeps fusion dominant for a broad current-life question with birth data available', () => {
+    const plan = buildRetrievalPlanFromQuery('que se passe-t-il pour moi en ce moment', {
+      hasBirthData: true,
+    })
+
+    expect(plan.dominantScience).toBe('fusion')
+    expect(plan.subCategories.slice(0, 4)).toEqual(
+      expect.arrayContaining(['fusion_general', 'fusion_timing', 'astro_transits_current']),
+    )
+  })
+
+  it('keeps a general direction question on the fusion decision track', () => {
+    const plan = buildRetrievalPlanFromQuery('quelle direction prendre')
+
+    expect(plan.dominantSubCategory).toBe('fusion_decision')
+    expect(plan.weightedMatches[0]?.subCategory).toBe('fusion_decision')
+    expect(plan.sciences[0]).toBe('fusion')
+  })
 })

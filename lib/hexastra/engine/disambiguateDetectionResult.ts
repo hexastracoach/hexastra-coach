@@ -37,6 +37,12 @@ const CONTEXT_SUBCATEGORY_BOOST = 2.4
 const BIRTH_DATA_TIMING_BOOST = 0.45
 const DOMINANT_SUBCATEGORY_MARGIN = 1.35
 const DOMINANT_SCIENCE_MARGIN = 1.75
+const STRONG_SCIENCE_QUALIFIER_BOOST = 2.1
+const STRONG_SUBCATEGORY_QUALIFIER_BOOST = 1.35
+const GLOBAL_SITUATION_FUSION_BOOST = 3.1
+const GLOBAL_SITUATION_TIMING_BOOST = 2.15
+const GLOBAL_SITUATION_SUPPORT_BOOST = 1.55
+const DECISION_DIRECTION_RESOLVED_BOOST = 5.4
 
 function escapeRegExp(input: string): string {
   return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -156,6 +162,26 @@ function registerAmbiguity(params: {
 }
 
 function buildMarkerSet(query: string) {
+  const astroQualifier = hasAnyPhrase(query, ['astrologique', 'astrologie', 'astro'])
+  const hdQualifier = hasAnyPhrase(query, ['human design', 'hd'])
+  const enneaQualifier = hasAnyPhrase(query, ['enneagramme', 'ennea'])
+  const numerologyQualifier = hasAnyPhrase(query, [
+    'numerologie',
+    'annee perso',
+    'annee personnelle',
+    'chemin de vie',
+  ])
+  const kuaQualifier = hasAnyPhrase(query, ['kua', 'feng shui'])
+  const kuaSpatial = hasAnyPhrase(query, [
+    'lit',
+    'bureau',
+    'maison',
+    'porte',
+    'favorable',
+    'feng shui',
+    'orientation',
+  ])
+
   return {
     type: hasPhrase(query, 'type'),
     profil: hasAnyPhrase(query, ['profil', 'profile']),
@@ -171,6 +197,20 @@ function buildMarkerSet(query: string) {
       'ce que je traverse',
       'pour moi en ce moment',
     ]),
+    periodQuestion: hasAnyPhrase(query, [
+      'bonne periode',
+      'bonne période',
+      'periode actuelle',
+      'période actuelle',
+      'qu est ce que je traverse',
+      'ce que je traverse',
+    ]),
+    astroQualifier,
+    hdQualifier,
+    enneaQualifier,
+    numerologyQualifier,
+    kuaQualifier,
+    kuaSpatial,
     hd: hasAnyPhrase(query, [
       'hd',
       'human design',
@@ -195,6 +235,7 @@ function buildMarkerSet(query: string) {
     ]),
     astro: hasAnyPhrase(query, [
       'astro',
+      'astrologique',
       'astrologie',
       'theme natal',
       'signe',
@@ -252,6 +293,70 @@ function buildMarkerSet(query: string) {
       'bonne direction',
       'orientation favorable',
     ]),
+  }
+}
+
+function hasStrongScienceQualifier(markers: ReturnType<typeof buildMarkerSet>): boolean {
+  return Boolean(
+    markers.astroQualifier ||
+      markers.hdQualifier ||
+      markers.enneaQualifier ||
+      markers.numerologyQualifier ||
+      markers.kuaQualifier,
+  )
+}
+
+function applyScienceWideBoost(
+  params: AmbiguityRuleParams,
+  science: Science,
+  boost: number,
+): void {
+  const candidates = uniq([
+    ...params.detection.subCategories,
+    ...params.detection.matches.map((match) => match.subCategory),
+  ])
+
+  for (const subCategory of candidates) {
+    if (getSubCategoryScience(subCategory) === science) {
+      addSubCategoryBoost(
+        params.scoreMap,
+        params.boostMap,
+        params.detection,
+        subCategory,
+        boost,
+      )
+    }
+  }
+}
+
+function applyStrongScienceQualifierBoosts(params: AmbiguityRuleParams): void {
+  if (params.markers.astroQualifier) {
+    applyScienceWideBoost(params, 'astro', STRONG_SCIENCE_QUALIFIER_BOOST)
+    if (params.markers.compatibilite) {
+      addSubCategoryBoost(
+        params.scoreMap,
+        params.boostMap,
+        params.detection,
+        'astro_synastry',
+        STRONG_SUBCATEGORY_QUALIFIER_BOOST + 1.1,
+      )
+    }
+  }
+
+  if (params.markers.hdQualifier) {
+    applyScienceWideBoost(params, 'human_design', STRONG_SCIENCE_QUALIFIER_BOOST)
+  }
+
+  if (params.markers.enneaQualifier) {
+    applyScienceWideBoost(params, 'enneagram', STRONG_SCIENCE_QUALIFIER_BOOST)
+  }
+
+  if (params.markers.numerologyQualifier) {
+    applyScienceWideBoost(params, 'numerology', STRONG_SCIENCE_QUALIFIER_BOOST)
+  }
+
+  if (params.markers.kuaQualifier) {
+    applyScienceWideBoost(params, 'kua', STRONG_SCIENCE_QUALIFIER_BOOST)
   }
 }
 
@@ -402,8 +507,13 @@ function applyDirectionRule(params: AmbiguityRuleParams): void {
   let candidates = ['fusion_decision', 'kua_favorable_directions']
   let resolvedTo: string | null = null
   let reason = 'Direction peut etre spatiale (Kua) ou decisionnelle.'
+  const shouldFavorKua =
+    params.markers.favorableDirection ||
+    params.markers.kuaQualifier ||
+    params.markers.kuaSpatial ||
+    params.contextScience === 'kua'
 
-  if (params.markers.favorableDirection || params.markers.kua || params.contextScience === 'kua') {
+  if (shouldFavorKua) {
     resolvedTo =
       hasAnyPhrase(params.detection.normalizedQuery, ['lit', 'orientation du lit', 'direction du lit'])
         ? 'kua_bed_orientation'
@@ -414,16 +524,25 @@ function applyDirectionRule(params: AmbiguityRuleParams): void {
     reason = 'Le vocabulaire spatial oriente vers une lecture Kua.'
   } else if (params.markers.decision) {
     resolvedTo = 'fusion_decision'
-    reason = 'Le vocabulaire de choix oriente vers une direction de decision.'
+    reason = 'Le vocabulaire de choix oriente vers une direction de decision generale.'
   }
 
   for (const candidate of candidates) {
+    const boost =
+      candidate === resolvedTo
+        ? params.markers.decision && !shouldFavorKua
+          ? DECISION_DIRECTION_RESOLVED_BOOST
+          : RESOLVED_TERM_BOOST
+        : params.markers.decision && !shouldFavorKua
+          ? 0.2
+          : AMBIGUOUS_TERM_BOOST
+
     addSubCategoryBoost(
       params.scoreMap,
       params.boostMap,
       params.detection,
       candidate,
-      candidate === resolvedTo ? RESOLVED_TERM_BOOST : AMBIGUOUS_TERM_BOOST,
+      boost,
     )
   }
 
@@ -551,7 +670,41 @@ function applyEnergyRule(params: AmbiguityRuleParams): void {
 }
 
 function applyPresentMomentRule(params: AmbiguityRuleParams): void {
-  if (!params.markers.genericSituation && !params.markers.now) return
+  if (!params.markers.genericSituation && !params.markers.now && !params.markers.periodQuestion) return
+
+  const shouldStabilizeFusion =
+    (params.markers.genericSituation || params.markers.periodQuestion) &&
+    !hasStrongScienceQualifier(params.markers)
+
+  if (shouldStabilizeFusion) {
+    addSubCategoryBoost(
+      params.scoreMap,
+      params.boostMap,
+      params.detection,
+      'fusion_general',
+      GLOBAL_SITUATION_FUSION_BOOST,
+    )
+    addSubCategoryBoost(
+      params.scoreMap,
+      params.boostMap,
+      params.detection,
+      'fusion_timing',
+      GLOBAL_SITUATION_TIMING_BOOST,
+    )
+    addSubCategoryBoost(
+      params.scoreMap,
+      params.boostMap,
+      params.detection,
+      'fusion_life_situation',
+      GLOBAL_SITUATION_SUPPORT_BOOST,
+    )
+    addSubCategoryBoost(params.scoreMap, params.boostMap, params.detection, 'astro_transits_current', 0.55)
+
+    if (params.markers.now || params.markers.periodQuestion) {
+      addSubCategoryBoost(params.scoreMap, params.boostMap, params.detection, 'num_personal_year', 0.45)
+    }
+    return
+  }
 
   addSubCategoryBoost(params.scoreMap, params.boostMap, params.detection, 'fusion_general', 1.8)
   addSubCategoryBoost(params.scoreMap, params.boostMap, params.detection, 'fusion_timing', 1.2)
@@ -651,6 +804,7 @@ export function disambiguateDetectionResult(
   }
 
   applyContextPreference(baseParams)
+  applyStrongScienceQualifierBoosts(baseParams)
   applyTypeRule(baseParams)
   applyProfileRule(baseParams)
   applyCycleRule(baseParams)

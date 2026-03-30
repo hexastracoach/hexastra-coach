@@ -68,12 +68,19 @@ describe('disambiguateDetectionResult', () => {
   })
 
   it('picks fusion as dominant for a generic current-life question', () => {
-    const result = disambiguate('que se passe-t-il pour moi en ce moment')
+    const result = disambiguate('que se passe-t-il pour moi en ce moment', { hasBirthData: true })
 
     expect(result.prioritizedSubCategories).toEqual(
-      expect.arrayContaining(['fusion_general', 'fusion_timing', 'astro_transits_current']),
+      expect.arrayContaining(['fusion_general', 'fusion_timing', 'fusion_life_situation', 'astro_transits_current']),
     )
     expect(result.dominantScience).toBe('fusion')
+  })
+
+  it('resolves "compatibilite astrologique" to astro synastry', () => {
+    const result = disambiguate('compatibilite astrologique')
+
+    expect(result.dominantScience).toBe('astro')
+    expect(result.dominantSubCategory).toBe('astro_synastry')
   })
 
   it('resolves "mon type hd" to Human Design', () => {
@@ -102,5 +109,13 @@ describe('disambiguateDetectionResult', () => {
 
     expect(result.dominantScience).toBe('kua')
     expect(result.dominantSubCategory).toBe('kua_favorable_directions')
+  })
+
+  it('keeps "quelle direction prendre" on the fusion decision side when no spatial cue is present', () => {
+    const result = disambiguate('quelle direction prendre')
+
+    expect(result.prioritizedSubCategories[0]).toBe('fusion_decision')
+    expect(result.dominantSubCategory).toBe('fusion_decision')
+    expect(result.prioritizedSciences[0]).toBe('fusion')
   })
 })

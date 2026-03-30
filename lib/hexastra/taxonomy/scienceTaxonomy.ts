@@ -2111,7 +2111,7 @@ export const SCIENCE_TAXONOMY: ScienceSubCategory[] = [
     key: 'fusion_decision',
     science: 'fusion',
     label: 'Fusion — Décision',
-    keywords: ['quelle decision', 'je ne sais pas quoi choisir', 'choisir entre', 'hésiter', 'je dois decider', 'aide a la decision', 'dois-je'],
+    keywords: ['quelle decision', 'je ne sais pas quoi choisir', 'choisir entre', 'hésiter', 'je dois decider', 'aide a la decision', 'dois-je', 'direction prendre', 'quelle direction prendre'],
     intentHints: ['make_decision'],
     priority: 80,
   },
