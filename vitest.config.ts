@@ -13,6 +13,7 @@ export default defineConfig({
       'tests/ks/**/*.test.ts',
       'tests/taxonomy/**/*.test.ts',
       'tests/retrieval/**/*.test.ts',
+      'tests/rendering/**/*.test.ts',
       'tests/evals/**/*.test.ts',
     ],
   },

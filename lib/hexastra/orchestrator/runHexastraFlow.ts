@@ -145,6 +145,7 @@ import { buildDecisionProfile, buildBehaviorBlock } from '@/lib/hexastra/orchest
 import { resolveFlowType, needsBehaviorEngine } from '@/lib/hexastra/orchestration/queryRouter'
 import { detectVagueOutput } from '@/lib/hexastra/guards/hallucinationGuard'
 import { runKsPipeline, type KsPipelineOutput } from '@/lib/hexastra/orchestrator/ksPipeline'
+import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
 import { isReliableExactData } from '@/lib/exact-data/reliability'
 import { buildCompactExactScienceBlock } from '@/lib/exact-data/compactBlocks'
@@ -3249,6 +3250,43 @@ export async function runHexastraFlow(input: {
         ]),
       ),
     })
+    let finalAnswerRendererResult: ReturnType<typeof buildFinalAnswer> | null = null
+    let usedDeterministicFinalAnswer = false
+
+    const shouldSkipDeterministicFinalRenderer =
+      isHoroscopeRoute ||
+      (isAstroExact && exactDataResolved) ||
+      (isHumanDesignExact && exactDataResolved)
+
+    if (
+      knowledgePacket &&
+      presentationStructuredSignals.length > 0 &&
+      !shouldSkipDeterministicFinalRenderer
+    ) {
+      try {
+        finalAnswerRendererResult = buildFinalAnswer({
+          userMessage: latestUserMessage,
+          responseMode: effectiveResponseMode,
+          openingSignal: responseModeSelection.openingSelection ?? null,
+          prioritizedSignals: presentationStructuredSignals,
+          knowledgePacket,
+        })
+
+        flowLog('info', 'FINAL_ANSWER_RENDERER_READY', {
+          responseMode: effectiveResponseMode,
+          openingSource: responseModeSelection.dominantOpeningSource,
+          openingScience: responseModeSelection.dominantOpeningScience ?? null,
+          openingSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
+          renderedChars: finalAnswerRendererResult.text.length,
+        })
+      } catch (error) {
+        finalAnswerRendererResult = null
+        flowLog('warn', 'FINAL_ANSWER_RENDERER_FALLBACK', {
+          error,
+          reason: 'buildFinalAnswer failed, keeping legacy render path',
+        })
+      }
+    }
 
     // Fallback progressif: structuredSignals deviennent la source prioritaire du bloc retrieval.
     // L'ancien extractRetrievalSignals reste disponible si le packet ne contient pas assez de matiere.
@@ -4045,59 +4083,72 @@ export async function runHexastraFlow(input: {
     let usedLocalFallback = false
     let fallbackType: string | null = null
     let rawMessage: string
-    const deterministicSimpleAstroAnswer =
-      isAstroExactCompact && astroCompactCtx
-        ? buildDeterministicAstroExactAnswer({
-            message: latestUserMessage,
-            ctx: astroCompactCtx,
-            language: userContext.language ?? fallbackLanguage,
-            subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory,
-            requestKind: universalClassif.requestKind,
-          })
-        : null
-    if (deterministicSimpleAstroAnswer) {
-      rawMessage = deterministicSimpleAstroAnswer
+    if (finalAnswerRendererResult?.text) {
+      rawMessage = finalAnswerRendererResult.text
+      usedDeterministicFinalAnswer = true
       openAiEndMs = openAiStartMs
-      flowLog('info', 'ASTRO_EXACT_SIMPLE_FACT_LOCAL_RESPONSE', {
-        subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory,
-        requestKind: universalClassif.requestKind,
+      flowLog('info', 'FINAL_ANSWER_RENDERER_USED', {
+        responseMode: effectiveResponseMode,
+        openingSource: responseModeSelection.dominantOpeningSource,
+        openingScience: responseModeSelection.dominantOpeningScience ?? null,
+        openingSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
         responseChars: rawMessage.length,
       })
     } else {
-      try {
-        rawMessage = await callOpenAIResponse({
-          ...payload,
-          max_output_tokens: effectiveMaxOutputTokens,
-          input: payload.input as { role: 'system' | 'user' | 'assistant'; content: string }[],
-          timeoutMs: openAiTimeoutMs,
+      const deterministicSimpleAstroAnswer =
+        isAstroExactCompact && astroCompactCtx
+          ? buildDeterministicAstroExactAnswer({
+              message: latestUserMessage,
+              ctx: astroCompactCtx,
+              language: userContext.language ?? fallbackLanguage,
+              subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory,
+              requestKind: universalClassif.requestKind,
+            })
+          : null
+      if (deterministicSimpleAstroAnswer) {
+        rawMessage = deterministicSimpleAstroAnswer
+        openAiEndMs = openAiStartMs
+        flowLog('info', 'ASTRO_EXACT_SIMPLE_FACT_LOCAL_RESPONSE', {
+          subcategory: detectedSubcategoryForGuard ?? universalClassif.subcategory,
+          requestKind: universalClassif.requestKind,
+          responseChars: rawMessage.length,
         })
-        openAiEndMs = Date.now()
-      } catch (openAiErr) {
-        openAiEndMs = Date.now()
-        const isTimeout = openAiErr instanceof Error && openAiErr.message.includes('timed out')
-        if (isTimeout && isAstroExactCompact && exactDataResolved && specializedResult?.raw) {
-          flowLog('warn', 'ASTRO_EXACT_LOCAL_FALLBACK_ACTIVATED', {
-            openAiMs: openAiEndMs - (openAiStartMs ?? openAiEndMs),
-            plan,
-            isAstroExactCompact,
-            reason: 'OpenAI timeout — Railway data available — serving local deterministic fallback',
-            hint: 'User sees calculated values + retry invitation instead of error',
+      } else {
+        try {
+          rawMessage = await callOpenAIResponse({
+            ...payload,
+            max_output_tokens: effectiveMaxOutputTokens,
+            input: payload.input as { role: 'system' | 'user' | 'assistant'; content: string }[],
+            timeoutMs: openAiTimeoutMs,
           })
-          usedLocalFallback = true
-          fallbackType = 'astro_exact_local'
-          rawMessage = astroCompactCtx
-            ? buildValidatedAstroExactFallback(
-                astroCompactCtx,
-                userContext.language ?? fallbackLanguage,
-                userContext.firstName ?? userContext.name ?? null,
-              )
-            : buildValidatedAstroExactFallback(
-                buildCompactNatalReadingContext(specializedResult.raw, exactDataMaxChars),
-                userContext.language ?? fallbackLanguage,
-                userContext.firstName ?? userContext.name ?? null,
-              )
-        } else {
-          throw openAiErr
+          openAiEndMs = Date.now()
+        } catch (openAiErr) {
+          openAiEndMs = Date.now()
+          const isTimeout = openAiErr instanceof Error && openAiErr.message.includes('timed out')
+          if (isTimeout && isAstroExactCompact && exactDataResolved && specializedResult?.raw) {
+            flowLog('warn', 'ASTRO_EXACT_LOCAL_FALLBACK_ACTIVATED', {
+              openAiMs: openAiEndMs - (openAiStartMs ?? openAiEndMs),
+              plan,
+              isAstroExactCompact,
+              reason: 'OpenAI timeout — Railway data available — serving local deterministic fallback',
+              hint: 'User sees calculated values + retry invitation instead of error',
+            })
+            usedLocalFallback = true
+            fallbackType = 'astro_exact_local'
+            rawMessage = astroCompactCtx
+              ? buildValidatedAstroExactFallback(
+                  astroCompactCtx,
+                  userContext.language ?? fallbackLanguage,
+                  userContext.firstName ?? userContext.name ?? null,
+                )
+              : buildValidatedAstroExactFallback(
+                  buildCompactNatalReadingContext(specializedResult.raw, exactDataMaxChars),
+                  userContext.language ?? fallbackLanguage,
+                  userContext.firstName ?? userContext.name ?? null,
+                )
+          } else {
+            throw openAiErr
+          }
         }
       }
     }
@@ -4222,13 +4273,15 @@ export async function runHexastraFlow(input: {
           : "Je poursuis avec une réponse courte basée sur les informations disponibles."
       flowLog('warn', 'fallback module used', { domainRoute, source: 'openai_empty_response' })
     }
-    message = buildKsLeadSummary({
-      flowStep,
-      selectedOutputStructure,
-      fusedSignal,
-      executedSubmodules,
-      message,
-    })
+    if (!usedDeterministicFinalAnswer) {
+      message = buildKsLeadSummary({
+        flowStep,
+        selectedOutputStructure,
+        fusedSignal,
+        executedSubmodules,
+        message,
+      })
+    }
 
     const hdHasUsableFields =
       hdCompactCtx !== null &&

@@ -19,6 +19,7 @@ export type ResponseModeSelection = {
   dominantOpeningScience?: string | null
   dominantOpeningSubCategory?: string | null
   reasoningTags?: string[]
+  openingSelection?: OpeningSignalSelection | null
   openingSignal?: StructuredSignal | null
   orderedSignals?: StructuredSignal[]
 }
@@ -174,6 +175,7 @@ export function selectResponseModeSelection(args: {
     dominantOpeningScience: openingSelection.dominantOpeningScience ?? null,
     dominantOpeningSubCategory: openingSelection.dominantOpeningSubCategory ?? null,
     reasoningTags: uniq([...reasoningTags, ...(openingSelection.reasoningTags ?? [])]),
+    openingSelection,
     openingSignal: openingSelection.signal,
     orderedSignals: openingSelection.orderedSignals,
   }
