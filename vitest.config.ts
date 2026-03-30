@@ -9,6 +9,6 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['tests/ks/**/*.test.ts', 'tests/taxonomy/**/*.test.ts'],
+    include: ['tests/ks/**/*.test.ts', 'tests/taxonomy/**/*.test.ts', 'tests/retrieval/**/*.test.ts'],
   },
 })

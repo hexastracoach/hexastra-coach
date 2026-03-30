@@ -1,0 +1,350 @@
+import type { DocumentScienceTag } from '@/lib/hexastra/vector/documentRegistry'
+import {
+  SCIENCE_SUBCATEGORY_INDEX,
+  type Science,
+} from '@/lib/hexastra/taxonomy/scienceTaxonomy'
+
+export type SubCategoryRetrievalConfig = {
+  subCategory: string
+  science: Science
+  vectorNamespaces?: string[]
+  scienceTags?: DocumentScienceTag[]
+  preferredTopK?: number
+  exactDataHints?: string[]
+  retrievalPriority?: number
+  allowFusionFallback?: boolean
+}
+
+const SCIENCE_DEFAULT_RETRIEVAL_CONFIG: Record<Science, Omit<SubCategoryRetrievalConfig, 'subCategory'>> = {
+  astro: {
+    science: 'astro',
+    vectorNamespaces: ['astrologie'],
+    scienceTags: ['astrolex'],
+    preferredTopK: 6,
+    exactDataHints: ['birth_chart_context'],
+    retrievalPriority: 70,
+    allowFusionFallback: true,
+  },
+  numerology: {
+    science: 'numerology',
+    vectorNamespaces: ['numerologie'],
+    scienceTags: ['numerologie'],
+    preferredTopK: 6,
+    exactDataHints: ['date_of_birth'],
+    retrievalPriority: 68,
+    allowFusionFallback: true,
+  },
+  human_design: {
+    science: 'human_design',
+    vectorNamespaces: ['human_design'],
+    scienceTags: ['human_design'],
+    preferredTopK: 6,
+    exactDataHints: ['birth_time_required'],
+    retrievalPriority: 72,
+    allowFusionFallback: true,
+  },
+  enneagram: {
+    science: 'enneagram',
+    vectorNamespaces: ['enneagramme'],
+    scienceTags: ['enneagramme'],
+    preferredTopK: 5,
+    exactDataHints: ['psychological_pattern'],
+    retrievalPriority: 64,
+    allowFusionFallback: true,
+  },
+  kua: {
+    science: 'kua',
+    vectorNamespaces: ['kua'],
+    scienceTags: ['kua'],
+    preferredTopK: 5,
+    exactDataHints: ['home_space_context'],
+    retrievalPriority: 66,
+    allowFusionFallback: true,
+  },
+  fusion: {
+    science: 'fusion',
+    vectorNamespaces: ['ks_fusion_globaux'],
+    scienceTags: ['global', 'transverse'],
+    preferredTopK: 6,
+    exactDataHints: ['cross_science_synthesis'],
+    retrievalPriority: 60,
+    allowFusionFallback: true,
+  },
+}
+
+export const SUBCATEGORY_RETRIEVAL_MAP: Record<string, SubCategoryRetrievalConfig> = {
+  astro_transits_current: {
+    subCategory: 'astro_transits_current',
+    science: 'astro',
+    vectorNamespaces: ['astrologie', 'astrologie/transits', 'ks_fusion_globaux'],
+    scienceTags: ['astrolex', 'global'],
+    preferredTopK: 8,
+    exactDataHints: ['include_transits', 'current_period', 'birth_chart_context'],
+    retrievalPriority: 96,
+    allowFusionFallback: true,
+  },
+  astro_synastry: {
+    subCategory: 'astro_synastry',
+    science: 'astro',
+    vectorNamespaces: ['astrologie', 'astrologie/relations', 'ks_fusion_globaux'],
+    scienceTags: ['astrolex', 'global'],
+    preferredTopK: 7,
+    exactDataHints: ['second_profile', 'relationship_context'],
+    retrievalPriority: 92,
+    allowFusionFallback: true,
+  },
+  astro_sign_rising: {
+    subCategory: 'astro_sign_rising',
+    science: 'astro',
+    vectorNamespaces: ['astrologie', 'astrologie/theme_natal'],
+    scienceTags: ['astrolex'],
+    preferredTopK: 6,
+    exactDataHints: ['birth_time_required', 'identity_axis'],
+    retrievalPriority: 84,
+    allowFusionFallback: true,
+  },
+  astro_dignities: {
+    subCategory: 'astro_dignities',
+    science: 'astro',
+    vectorNamespaces: ['astrologie', 'astrologie/technique'],
+    scienceTags: ['astrolex'],
+    preferredTopK: 5,
+    exactDataHints: ['planetary_state', 'direct_knowledge'],
+    retrievalPriority: 76,
+    allowFusionFallback: true,
+  },
+  num_life_path: {
+    subCategory: 'num_life_path',
+    science: 'numerology',
+    vectorNamespaces: ['numerologie', 'numerologie/fondations', 'ks_fusion_globaux'],
+    scienceTags: ['numerologie', 'global'],
+    preferredTopK: 7,
+    exactDataHints: ['date_of_birth', 'core_profile'],
+    retrievalPriority: 94,
+    allowFusionFallback: true,
+  },
+  num_personal_year: {
+    subCategory: 'num_personal_year',
+    science: 'numerology',
+    vectorNamespaces: ['numerologie', 'numerologie/cycles', 'ks_fusion_globaux'],
+    scienceTags: ['numerologie', 'global'],
+    preferredTopK: 7,
+    exactDataHints: ['current_year_cycle', 'timing_signal'],
+    retrievalPriority: 90,
+    allowFusionFallback: true,
+  },
+  num_name_analysis: {
+    subCategory: 'num_name_analysis',
+    science: 'numerology',
+    vectorNamespaces: ['numerologie', 'numerologie/noms'],
+    scienceTags: ['numerologie'],
+    preferredTopK: 6,
+    exactDataHints: ['name_vibration', 'identity_signal'],
+    retrievalPriority: 80,
+    allowFusionFallback: true,
+  },
+  hd_type: {
+    subCategory: 'hd_type',
+    science: 'human_design',
+    vectorNamespaces: ['human_design', 'human_design/fondations', 'ks_fusion_globaux'],
+    scienceTags: ['human_design', 'global'],
+    preferredTopK: 7,
+    exactDataHints: ['birth_time_required', 'bodygraph_type'],
+    retrievalPriority: 94,
+    allowFusionFallback: true,
+  },
+  hd_strategy: {
+    subCategory: 'hd_strategy',
+    science: 'human_design',
+    vectorNamespaces: ['human_design', 'human_design/decision', 'ks_fusion_globaux'],
+    scienceTags: ['human_design', 'global'],
+    preferredTopK: 7,
+    exactDataHints: ['decision_flow', 'strategy_first'],
+    retrievalPriority: 93,
+    allowFusionFallback: true,
+  },
+  hd_authority: {
+    subCategory: 'hd_authority',
+    science: 'human_design',
+    vectorNamespaces: ['human_design', 'human_design/decision', 'ks_fusion_globaux'],
+    scienceTags: ['human_design', 'global'],
+    preferredTopK: 7,
+    exactDataHints: ['inner_authority', 'decision_flow'],
+    retrievalPriority: 94,
+    allowFusionFallback: true,
+  },
+  hd_centers_overview: {
+    subCategory: 'hd_centers_overview',
+    science: 'human_design',
+    vectorNamespaces: ['human_design', 'human_design/centres'],
+    scienceTags: ['human_design'],
+    preferredTopK: 6,
+    exactDataHints: ['center_map', 'conditioning_context'],
+    retrievalPriority: 82,
+    allowFusionFallback: true,
+  },
+  hd_gates: {
+    subCategory: 'hd_gates',
+    science: 'human_design',
+    vectorNamespaces: ['human_design', 'human_design/portes'],
+    scienceTags: ['human_design'],
+    preferredTopK: 6,
+    exactDataHints: ['gates_activation', 'direct_knowledge'],
+    retrievalPriority: 84,
+    allowFusionFallback: true,
+  },
+  hd_channels: {
+    subCategory: 'hd_channels',
+    science: 'human_design',
+    vectorNamespaces: ['human_design', 'human_design/canaux'],
+    scienceTags: ['human_design'],
+    preferredTopK: 6,
+    exactDataHints: ['channels_activation', 'direct_knowledge'],
+    retrievalPriority: 85,
+    allowFusionFallback: true,
+  },
+  hd_incarnation_cross: {
+    subCategory: 'hd_incarnation_cross',
+    science: 'human_design',
+    vectorNamespaces: ['human_design', 'human_design/croix_incarnation', 'ks_fusion_globaux'],
+    scienceTags: ['human_design', 'global'],
+    preferredTopK: 7,
+    exactDataHints: ['incarnation_cross', 'spiritual_axis'],
+    retrievalPriority: 88,
+    allowFusionFallback: true,
+  },
+  ennea_type_core: {
+    subCategory: 'ennea_type_core',
+    science: 'enneagram',
+    vectorNamespaces: ['enneagramme', 'enneagramme/base', 'ks_fusion_globaux'],
+    scienceTags: ['enneagramme', 'global'],
+    preferredTopK: 6,
+    exactDataHints: ['core_type', 'identity_pattern'],
+    retrievalPriority: 90,
+    allowFusionFallback: true,
+  },
+  ennea_wings: {
+    subCategory: 'ennea_wings',
+    science: 'enneagram',
+    vectorNamespaces: ['enneagramme', 'enneagramme/structure'],
+    scienceTags: ['enneagramme'],
+    preferredTopK: 5,
+    exactDataHints: ['wing_pattern', 'type_refinement'],
+    retrievalPriority: 80,
+    allowFusionFallback: true,
+  },
+  ennea_instincts: {
+    subCategory: 'ennea_instincts',
+    science: 'enneagram',
+    vectorNamespaces: ['enneagramme', 'enneagramme/structure'],
+    scienceTags: ['enneagramme'],
+    preferredTopK: 6,
+    exactDataHints: ['instinct_stack', 'subtype_signal'],
+    retrievalPriority: 84,
+    allowFusionFallback: true,
+  },
+  ennea_disintegration: {
+    subCategory: 'ennea_disintegration',
+    science: 'enneagram',
+    vectorNamespaces: ['enneagramme', 'enneagramme/dynamique', 'ks_fusion_globaux'],
+    scienceTags: ['enneagramme', 'global'],
+    preferredTopK: 6,
+    exactDataHints: ['stress_line', 'block_pattern'],
+    retrievalPriority: 88,
+    allowFusionFallback: true,
+  },
+  kua_number: {
+    subCategory: 'kua_number',
+    science: 'kua',
+    vectorNamespaces: ['kua', 'kua/base', 'ks_fusion_globaux'],
+    scienceTags: ['kua', 'global'],
+    preferredTopK: 5,
+    exactDataHints: ['kua_calculation', 'birth_year_context'],
+    retrievalPriority: 88,
+    allowFusionFallback: true,
+  },
+  kua_favorable_directions: {
+    subCategory: 'kua_favorable_directions',
+    science: 'kua',
+    vectorNamespaces: ['kua', 'kua/directions', 'ks_fusion_globaux'],
+    scienceTags: ['kua', 'global'],
+    preferredTopK: 6,
+    exactDataHints: ['direction_map', 'home_space_context'],
+    retrievalPriority: 90,
+    allowFusionFallback: true,
+  },
+  kua_bed_orientation: {
+    subCategory: 'kua_bed_orientation',
+    science: 'kua',
+    vectorNamespaces: ['kua', 'kua/habitat', 'ks_fusion_globaux'],
+    scienceTags: ['kua', 'global'],
+    preferredTopK: 6,
+    exactDataHints: ['sleep_axis', 'home_space_context'],
+    retrievalPriority: 90,
+    allowFusionFallback: true,
+  },
+  fusion_general: {
+    subCategory: 'fusion_general',
+    science: 'fusion',
+    vectorNamespaces: ['ks_fusion_globaux'],
+    scienceTags: ['global', 'transverse'],
+    preferredTopK: 6,
+    exactDataHints: ['cross_science_synthesis'],
+    retrievalPriority: 70,
+    allowFusionFallback: true,
+  },
+  fusion_decision: {
+    subCategory: 'fusion_decision',
+    science: 'fusion',
+    vectorNamespaces: ['ks_fusion_globaux', 'fusion/decision'],
+    scienceTags: ['global', 'transverse', 'human_design'],
+    preferredTopK: 7,
+    exactDataHints: ['decision_context', 'cross_science_synthesis'],
+    retrievalPriority: 82,
+    allowFusionFallback: true,
+  },
+  fusion_relationships: {
+    subCategory: 'fusion_relationships',
+    science: 'fusion',
+    vectorNamespaces: ['ks_fusion_globaux', 'fusion/relations'],
+    scienceTags: ['global', 'transverse', 'astrolex', 'human_design', 'enneagramme'],
+    preferredTopK: 7,
+    exactDataHints: ['relationship_context', 'cross_science_synthesis'],
+    retrievalPriority: 82,
+    allowFusionFallback: true,
+  },
+  fusion_timing: {
+    subCategory: 'fusion_timing',
+    science: 'fusion',
+    vectorNamespaces: ['ks_fusion_globaux', 'fusion/timing'],
+    scienceTags: ['global', 'transverse', 'astrolex', 'numerologie'],
+    preferredTopK: 7,
+    exactDataHints: ['timing_context', 'cross_science_synthesis'],
+    retrievalPriority: 84,
+    allowFusionFallback: true,
+  },
+}
+
+export function resolveSubCategoryRetrievalConfig(subCategory: string): SubCategoryRetrievalConfig {
+  const explicitConfig = SUBCATEGORY_RETRIEVAL_MAP[subCategory]
+  if (explicitConfig) {
+    return explicitConfig
+  }
+
+  const category = SCIENCE_SUBCATEGORY_INDEX[subCategory]
+  if (!category) {
+    return {
+      subCategory,
+      ...SCIENCE_DEFAULT_RETRIEVAL_CONFIG.fusion,
+    }
+  }
+
+  return {
+    subCategory,
+    ...SCIENCE_DEFAULT_RETRIEVAL_CONFIG[category.science],
+  }
+}
+
+export function getRetrievalConfigsForSubCategories(subCategories: string[]): SubCategoryRetrievalConfig[] {
+  return [...new Set(subCategories)].map(resolveSubCategoryRetrievalConfig)
+}

@@ -72,12 +72,14 @@ export async function retrieveKnowledge({
   vectorStoreId,
   apiKey,
   domainRoute,
+  topKOverride,
 }: {
   query: string
   plan: PlanKey | string
   vectorStoreId: string
   apiKey: string
   domainRoute?: DomainRoute
+  topKOverride?: number
 }): Promise<SearchResult[]> {
   if (!query.trim() || !vectorStoreId || !apiKey) return []
 
@@ -86,6 +88,7 @@ export async function retrieveKnowledge({
     domainRoute,
     query,
   })
+  const topK = typeof topKOverride === 'number' ? Math.max(1, Math.round(topKOverride)) : config.topK
 
   try {
     const res = await fetch(
@@ -99,7 +102,7 @@ export async function retrieveKnowledge({
         },
         body: JSON.stringify({
           query: buildDomainBiasedQuery(query, domainRoute),
-          max_num_results: config.topK,
+          max_num_results: topK,
           reranking: { ranker: 'auto' },
         }),
         signal: AbortSignal.timeout(8000),
