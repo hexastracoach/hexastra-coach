@@ -1,4 +1,5 @@
 import type { DomainRoute } from '@/lib/hexastra/types'
+import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
 
 function deaccent(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -6,6 +7,8 @@ function deaccent(s: string): string {
 
 export function classifyQuery(message: string): DomainRoute {
   const text = deaccent((message || '').toLowerCase())
+  if (isCareerGuidanceQuery(text)) return 'career'
+
   const refersToHumanDesign =
     /(human design|design humain|bodygraph|porteum)/i.test(text) ||
     /\bmon hd\b/i.test(text) ||
@@ -16,7 +19,7 @@ export function classifyQuery(message: string): DomainRoute {
   if (/(neurokua|energie|equilibre|fatigue|stress|surcharge|recharge)/i.test(text)) return 'neurokua'
   if (/(lecture generale|hexastra complete|fusion|synthese)/i.test(text)) return 'fusion'
   if (/(relation|couple|amour|famille|proches)/i.test(text)) return 'relationship'
-  if (/(travail|carriere|argent|professionnel|emploi|projet pro)/i.test(text)) return 'career'
+  if (/(travail|carriere|argent|professionnel|emploi|projet pro|metier|voie pro|voie professionnelle|orientation professionnelle)/i.test(text)) return 'career'
   if (/(decision|choix|trancher|attendre|agir)/i.test(text)) return 'decision'
   if (/(timing|cycle|phase|periode|mois a venir|prochains mois)/i.test(text)) return 'timing'
   if (/(bien-etre|recentrage|confiance|motivation interieure)/i.test(text)) return 'wellbeing'

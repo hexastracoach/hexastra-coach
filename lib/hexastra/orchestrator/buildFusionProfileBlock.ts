@@ -25,6 +25,7 @@ import {
   LEGACY_KUA_KEYS,
   LEGACY_NUMEROLOGY_KEYS,
 } from '@/lib/hexastra/api/normalizeFusionExactData'
+import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -59,16 +60,14 @@ function mergeNested(raw: Record<string, unknown>, ...keys: string[]): Record<st
 
 function findValue(source: Record<string, unknown>, ...aliases: string[]): string | number | null {
   for (const alias of aliases) {
-    const v = source[alias]
-    if (v !== undefined && v !== null && v !== '') return v as string | number
+    const unwrapped = unwrapDisplayText(source[alias])
+    if (unwrapped) return unwrapped
   }
 
   const nested = findFirstMatchingValueDeep(source, aliases)
-  if (
-    typeof nested === 'string' ||
-    (typeof nested === 'number' && Number.isFinite(nested))
-  ) {
-    return nested
+  const unwrappedNested = unwrapDisplayText(nested)
+  if (unwrappedNested) {
+    return unwrappedNested
   }
 
   return null

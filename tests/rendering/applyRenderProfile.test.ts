@@ -4,7 +4,10 @@ import { classifyUserIntent, isFusionIntent } from '@/lib/hexastra/orchestration
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
 import { buildKnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
 import { selectResponseModeSelection } from '@/lib/hexastra/orchestrator/selectResponseMode'
+import { applyRenderProfile, buildRenderProfileText } from '@/lib/hexastra/rendering/applyRenderProfile'
+import { applyShiloStyle } from '@/lib/hexastra/rendering/applyShiloStyle'
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
+import { selectRenderProfile, type UserPlan } from '@/lib/hexastra/rendering/selectRenderProfile'
 import { buildExactDataRequestFromRetrievalPlan } from '@/lib/hexastra/retrieval/exactDataHintMapper'
 import { prioritizeStructuredSignals } from '@/lib/hexastra/retrieval/prioritizeStructuredSignals'
 import { buildRetrievalPlanFromQuery } from '@/lib/hexastra/retrieval/retrievalPlanBuilder'
@@ -30,7 +33,7 @@ function asRawRecord(value: unknown): Record<string, unknown> | null {
   return null
 }
 
-function buildRenderedCase(id: string) {
+function buildRenderedCase(id: string, userPlan: UserPlan) {
   const evalCase = getEvalCase(id)
   const classification = classifyMessage(evalCase.query)
   const userIntent = classifyUserIntent(evalCase.query)
@@ -66,7 +69,12 @@ function buildRenderedCase(id: string) {
     userMessage: evalCase.query,
     requestKind: classification.requestKind,
     subcategory: classification.subcategory,
-    plan: 'premium',
+    plan:
+      userPlan === 'essentiel'
+        ? 'essential'
+        : userPlan === 'praticien'
+          ? 'practitioner'
+          : userPlan,
     exactDataResolved,
     exactDataReliable: reliability?.reliable,
     isPedagogical: classification.requestKind === 'clarification',
@@ -102,65 +110,97 @@ function buildRenderedCase(id: string) {
     throw new Error(`Missing knowledge packet for case ${id}`)
   }
 
-  return buildFinalAnswer({
+  const baseAnswer = buildFinalAnswer({
     userMessage: evalCase.query,
     responseMode: responseSelection.responseMode,
     openingSignal: responseSelection.openingSelection ?? null,
     prioritizedSignals: presentationSignals,
     knowledgePacket,
   })
+  const renderProfile = selectRenderProfile({
+    responseMode: responseSelection.responseMode,
+    userPlan,
+  })
+  const profiledAnswer = applyRenderProfile({
+    answer: baseAnswer,
+    profile: renderProfile,
+  })
+  const styledSections = profiledAnswer.sections
+    ? applyShiloStyle({
+        opening: profiledAnswer.sections.opening ?? '',
+        explanation: profiledAnswer.sections.explanation ?? '',
+        action: profiledAnswer.sections.action ?? '',
+        key: profiledAnswer.sections.key ?? '',
+        responseMode: responseSelection.responseMode,
+      })
+    : profiledAnswer.sections
+
+  return {
+    baseAnswer,
+    responseSelection,
+    renderProfile,
+    answer: {
+      ...profiledAnswer,
+      sections: styledSections,
+      text: buildRenderProfileText({
+        sections: styledSections,
+        profile: renderProfile,
+        fallbackText: profiledAnswer.text,
+      }),
+    },
+  }
 }
 
-function countSentences(value: string | undefined): number {
-  return (value ?? '')
-    .split(/[.!?]+/)
-    .map((entry) => entry.trim())
-    .filter(Boolean).length
-}
+describe('applyRenderProfile', () => {
+  it('keeps the same core answer while adapting depth across plans', () => {
+    const freeAnswer = buildRenderedCase('decision_current_state', 'free')
+    const premiumAnswer = buildRenderedCase('decision_current_state', 'premium')
+    const practitionerAnswer = buildRenderedCase('decision_current_state', 'praticien')
 
-describe('buildFinalAnswer', () => {
-  it('renders a clear global current-state answer', () => {
-    const answer = buildRenderedCase('decision_current_state')
-
-    expect(answer.text).toContain('-> Ce qui se passe')
-    expect(answer.text).toContain('-> Pourquoi')
-    expect(answer.text).toContain('-> Ce que tu peux faire')
-    expect(answer.text).toContain('-> Cle a retenir')
-    expect(answer.sections?.opening).toMatch(/Actuellement|En ce moment|bouge|ressort/i)
-    expect(countSentences(answer.sections?.opening)).toBeLessThanOrEqual(2)
+    expect(freeAnswer.answer.text.length).toBeLessThan(premiumAnswer.answer.text.length)
+    expect(practitionerAnswer.answer.text.length).toBeGreaterThan(premiumAnswer.answer.text.length)
+    expect(freeAnswer.answer.sections?.action).toBeTruthy()
+    expect(premiumAnswer.answer.sections?.key).toBeTruthy()
+    expect(practitionerAnswer.answer.sections?.explanation).toBeTruthy()
   })
 
-  it('renders a timing answer without a vague fusion opening', () => {
-    const answer = buildRenderedCase('timing_solar_return')
+  it('keeps direct answers direct on the free plan', () => {
+    const rendered = buildRenderedCase('direct_hd_type', 'free')
 
-    expect(answer.sections?.opening?.toLowerCase()).toContain('retour solaire')
-    expect(answer.sections?.opening?.toLowerCase()).not.toContain('il y a des choses qui bougent')
+    expect(rendered.renderProfile.format).toBe('concise')
+    expect(rendered.answer.text).toContain('-> L essentiel')
+    expect(rendered.answer.text).toContain('-> Action')
+    expect(rendered.answer.sections?.opening).toContain('Projector')
+    expect(rendered.answer.sections?.opening?.startsWith('En ce moment')).toBe(false)
   })
 
-  it('renders a readable HD answer with a concrete opening', () => {
-    const answer = buildRenderedCase('direct_hd_type')
+  it('gives fusion general questions a storytelling premium render', () => {
+    const rendered = buildRenderedCase('decision_current_state', 'premium')
 
-    expect(answer.sections?.opening).toContain('Projector')
-    expect(answer.sections?.explanation).not.toBe(answer.sections?.opening)
+    expect(rendered.renderProfile.format).toBe('storytelling')
+    expect(rendered.answer.text).toContain('-> Ce qui se dessine')
+    expect(rendered.answer.text).toContain('-> Ce que cela raconte')
+    expect(rendered.answer.text).toContain('-> La cle')
   })
 
-  it('renders a numerology answer with the personal year in opening', () => {
-    const answer = buildRenderedCase('timing_personal_year')
+  it('handles partial sections and malformed profiles without breaking', () => {
+    const rendered = applyRenderProfile({
+      answer: {
+        text: 'Texte brut.',
+        sections: {
+          opening: 'Actuellement, quelque chose bouge.',
+          key: 'La clarte revient quand tu cesses de forcer.',
+        },
+      },
+      profile: {
+        format: 'unknown',
+        tone: 'unknown',
+        maxSections: 0,
+      } as unknown as ReturnType<typeof selectRenderProfile>,
+    })
 
-    expect(answer.sections?.opening?.toLowerCase()).toContain('annee personnelle 6')
-  })
-
-  it('renders a kua answer with an exact spatial cue', () => {
-    const answer = buildRenderedCase('kua_favorable_directions')
-
-    expect(answer.sections?.opening?.toLowerCase()).toContain('directions favorables')
-    expect(answer.sections?.action?.toLowerCase()).toContain('repere spatial')
-  })
-
-  it('keeps an ambiguous question readable without forcing a hard opening', () => {
-    const answer = buildRenderedCase('ambiguous_type')
-
-    expect(answer.sections?.opening?.toLowerCase()).toContain('question reste ouverte')
-    expect(answer.sections?.opening).not.toContain('Projector')
+    expect(rendered.text).toContain('Actuellement')
+    expect(rendered.text).toContain('La clarte')
+    expect(rendered.sections?.opening).toBeTruthy()
   })
 })

@@ -114,6 +114,7 @@ export function selectResponseModeSelection(args: {
     requestKind: args.requestKind,
     subcategory: args.subcategory,
     plan: args.plan,
+    intent: args.intent ?? null,
     exactDataResolved: args.exactDataResolved,
     exactDataReliable: args.exactDataReliable,
     isPedagogical: args.isPedagogical,
@@ -158,6 +159,10 @@ export function selectResponseModeSelection(args: {
     ) {
       reasoningTags.push('mono_science_exact_context_available')
     }
+  }
+
+  if (responseMode === 'career_fit_answer') {
+    reasoningTags.push('career_guidance_mode')
   }
 
   const openingSelection: OpeningSignalSelection = selectOpeningSignal({

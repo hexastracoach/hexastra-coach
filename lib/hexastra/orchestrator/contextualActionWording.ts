@@ -17,6 +17,7 @@
 export type ActionContext =
   | 'relationship'
   | 'love'
+  | 'career_guidance'
   | 'work_money'
   | 'decision'
   | 'blocage'
@@ -42,6 +43,7 @@ const ACTIONS_FR: Record<HDKey, ContextualActions> = {
   projecteur: {
     relationship:"ne pas forcer la connexion — laisser l'invitation venir naturellement",
     love:                  "ne pas projeter d'énergie sans retour — attendre que l'intérêt de l'autre soit réel",
+    career_guidance:       "chercher les roles ou ton regard est reconnu et sollicite, pas les postes ou tu dois te survendre pour exister",
     work_money:            "te placer là où ton expertise est reconnue et sollicitée, pas partout",
     decision:              "ne pas décider sous pression externe — laisser l'invitation clarifier le chemin",
     blocage:               "identifier où l'invitation manque — arrêter d'initier sans retour réel",
@@ -55,6 +57,7 @@ const ACTIONS_FR: Record<HDKey, ContextualActions> = {
   generateur: {
     relationship:"répondre depuis le ventre, pas depuis les attentes mentales — choisir ce qui illumine",
     love:                  "laisser la réponse sacrale guider vers les liens qui génèrent un vrai oui",
+    career_guidance:       "tester les pistes qui génèrent un vrai oui corporel, puis observer lesquelles tiennent dans la durée au travail",
     work_money:            "choisir ce qui génère un 'oui' corporel authentique, pas ce qui semble logique",
     decision:              "attendre la réponse du ventre — le oui ou le non — avant de t'engager",
     blocage:               "identifier ce qui ne génère plus de réponse vraie — et s'en libérer progressivement",
@@ -68,6 +71,7 @@ const ACTIONS_FR: Record<HDKey, ContextualActions> = {
   generateur_manifestant: {
     relationship:"informer avant d'agir — même dans les liens, la vitesse sans annonce crée des frictions",
     love:                  "ralentir juste assez pour laisser l'autre s'intégrer dans ton rythme naturel",
+    career_guidance:       "viser des metiers avec mouvement et polyvalence, tout en informant clairement quand tu changes de cap",
     work_money:            "informer les personnes clés avant de changer de cap — la communication réduit la résistance",
     decision:              "prévenir avant d'agir — même si la décision est déjà prise dans ta tête",
     blocage:               "identifier les résistances créées par le manque d'information vers les autres",
@@ -81,6 +85,7 @@ const ACTIONS_FR: Record<HDKey, ContextualActions> = {
   manifesteur: {
     relationship:"informer tes proches de tes mouvements — l'autonomie ne signifie pas l'isolement",
     love:                  "créer les conditions pour que l'autre comprenne et accueille ton besoin d'initier",
+    career_guidance:       "viser des roles ou tu peux initier et ouvrir la voie, puis informer clairement pour embarquer les autres",
     work_money:            "lancer ce qui doit être lancé — après avoir informé les personnes clés",
     decision:              "décider et informer — c'est ton droit naturel, mais l'annonce désamorce la résistance",
     blocage:               "identifier où la résistance vient du manque d'information vers l'entourage",
@@ -94,6 +99,7 @@ const ACTIONS_FR: Record<HDKey, ContextualActions> = {
   reflecteur: {
     relationship:"prendre le temps d'un cycle lunaire avant de s'engager profondément dans un lien",
     love:                  "observer comment tu te sens dans la présence de l'autre sur la durée d'un mois",
+    career_guidance:       "observer les environnements avant de te fixer: le bon metier se reconnait a la qualite du lieu et du rythme qu'il te renvoie",
     work_money:            "ne pas décider d'une orientation professionnelle sans avoir observé au moins un cycle lunaire",
     decision:              "attendre 28 jours — pas par peur, mais pour laisser la clarté s'installer vraiment",
     blocage:               "identifier si l'environnement actuel te reflète quelque chose de juste ou de faux",
@@ -110,6 +116,7 @@ const ACTIONS_EN: Record<HDKey, ContextualActions> = {
   projecteur: {
     relationship:"don't force connection — let the invitation come naturally",
     love:                  "don't project energy without return — wait for genuine interest from the other",
+    career_guidance:       "look for roles where your insight is recognized and invited, not jobs where you must oversell yourself to exist",
     work_money:            "position yourself where your expertise is recognized and invited, not everywhere",
     decision:              "don't decide under external pressure — let the invitation clarify the path",
     blocage:               "identify where the invitation is missing — stop initiating without real return",
@@ -123,6 +130,7 @@ const ACTIONS_EN: Record<HDKey, ContextualActions> = {
   generateur: {
     relationship:"respond from the gut, not from mental expectations — choose what lights you up",
     love:                  "let the sacral response guide you toward connections that generate a true yes",
+    career_guidance:       "test the paths that generate a true body yes, then notice which ones stay alive over time at work",
     work_money:            "choose what generates an authentic body yes, not what seems logically correct",
     decision:              "wait for the gut response — the yes or no — before committing",
     blocage:               "identify what no longer generates a true response — and release it gradually",
@@ -136,6 +144,7 @@ const ACTIONS_EN: Record<HDKey, ContextualActions> = {
   generateur_manifestant: {
     relationship:"inform before acting — even in relationships, speed without announcement creates friction",
     love:                  "slow down just enough to let the other integrate into your natural rhythm",
+    career_guidance:       "aim for roles with movement and variety, while clearly informing others when you change course",
     work_money:            "inform key people before changing course — communication reduces resistance",
     decision:              "notify before acting — even if the decision is already made in your head",
     blocage:               "identify resistance created by lack of information toward others",
@@ -149,6 +158,7 @@ const ACTIONS_EN: Record<HDKey, ContextualActions> = {
   manifesteur: {
     relationship:"inform those close to you of your movements — autonomy doesn't mean isolation",
     love:                  "create conditions for the other to understand and welcome your need to initiate",
+    career_guidance:       "aim for roles where you can initiate and open the path, then inform clearly to bring others with you",
     work_money:            "launch what needs to be launched — after informing key people",
     decision:              "decide and inform — it's your natural right, but the announcement defuses resistance",
     blocage:               "identify where resistance comes from lack of information toward others",
@@ -162,6 +172,7 @@ const ACTIONS_EN: Record<HDKey, ContextualActions> = {
   reflecteur: {
     relationship:"take the time of a lunar cycle before deeply committing to a connection",
     love:                  "observe how you feel in the other's presence over the duration of a month",
+    career_guidance:       "observe environments before committing: the right profession shows up in the quality of place and rhythm it reflects back to you",
     work_money:            "don't decide on a professional direction without observing at least one lunar cycle",
     decision:              "wait 28 days — not from fear, but to let clarity truly settle",
     blocage:               "identify if the current environment reflects something true or false to you",

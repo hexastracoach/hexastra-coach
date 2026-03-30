@@ -65,6 +65,13 @@ const INTENT_ENRICHMENT: Record<string, Partial<Record<ScienceKey, string>>> = {
     human_design: 'type profil travail stratégie vocation canaux manifestation',
     numerology:   'expression chemin de vie vocation argent cycles travail 8 abondance',
   },
+  career_guidance: {
+    astrology:    'metier vocation milieu du ciel maison 10 maison 6 mercure mars saturne orientation professionnelle',
+    human_design: 'type profil strategie autorite travail compatible contribution environnement professionnel centres definis',
+    numerology:   'chemin de vie expression annee personnelle voie professionnelle vocation metier compatible',
+    enneagram:    'type de travail style professionnel peur de l echec posture au travail',
+    kua:          'element kua directions favorables bureau environnement professionnel',
+  },
   inner_state: {
     human_design: 'non-soi autorité intérieure type fonctionnement centres ouverts conditioning',
     enneagram:    'type état intérieur motivation peur désir profond intégration',
@@ -149,6 +156,7 @@ export function getPrioritySciencesForIntent(intent: string): ScienceKey[] {
     relationship:     ['astrology', 'human_design', 'enneagram'],
     love:             ['astrology', 'human_design', 'enneagram'],
     decision:         ['human_design', 'astrology', 'numerology'],
+    career_guidance:  ['human_design', 'astrology', 'numerology', 'enneagram', 'kua'],
     work_money:       ['astrology', 'numerology', 'human_design'],
     inner_state:      ['human_design', 'enneagram', 'astrology'],
     blocage:          ['human_design', 'enneagram', 'astrology'],

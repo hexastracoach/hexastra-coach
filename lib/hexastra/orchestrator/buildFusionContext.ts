@@ -21,6 +21,7 @@ import {
   LEGACY_KUA_KEYS,
   LEGACY_NUMEROLOGY_KEYS,
 } from '@/lib/hexastra/api/normalizeFusionExactData'
+import { unwrapDisplayValue } from '@/lib/hexastra/utils/unwrapDisplayValue'
 import { getIntentFieldMap, type IntentFieldMap, type IntentModule } from './intentFieldMapping'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -105,6 +106,25 @@ function extractAstroFields(
   raw: Record<string, unknown>,
   fields: string[],
 ): Record<string, string | number | string[] | null> {
+  const FALLBACK_ALIASES: Record<string, string[]> = {
+    sunSign: ['sunSign', 'sun', 'soleil'],
+    moonSign: ['moonSign', 'moon', 'lune'],
+    risingSign: ['risingSign', 'ascendant', 'rising'],
+    mercurySign: ['mercurySign', 'mercury', 'mercure'],
+    venusSign: ['venusSign', 'venus'],
+    marsSign: ['marsSign', 'mars'],
+    jupiterSign: ['jupiterSign', 'jupiter'],
+    saturnSign: ['saturnSign', 'saturn', 'saturne'],
+    dominantElements: ['dominantElements', 'elements_dominants'],
+    dominantModalities: ['dominantModalities', 'modalites_dominantes'],
+    stelliums: ['stelliums', 'stellium'],
+    keyAspects: ['keyAspects', 'aspects', 'aspects_cles'],
+    dominantSigns: ['dominantSigns', 'signes_dominants'],
+    midheaven: ['midheaven', 'mc', 'medium_coeli', 'milieu_du_ciel', 'angles.mc.sign', 'angles.mc.label'],
+    house10: ['house10', 'house_10', 'maison10', 'maison_10', 'tenth_house', 'houses.10.sign', 'houses.10.label', 'houses.house10.sign', 'houses.house_10.sign'],
+    house6: ['house6', 'house_6', 'maison6', 'maison_6', 'sixth_house', 'houses.6.sign', 'houses.6.label', 'houses.house6.sign', 'houses.house_6.sign'],
+  }
+
   try {
     const ctx = buildCompactNatalReadingContext(raw, 2000)
     const available: Record<string, unknown> = {
@@ -122,17 +142,57 @@ function extractAstroFields(
       stelliums: ctx.stelliums?.length ? ctx.stelliums : null,
       keyAspects: ctx.keyAspects?.length ? ctx.keyAspects : null,
       dominantSigns: ctx.dominantSigns?.length ? ctx.dominantSigns : null,
+      midheaven: findValue(
+        raw,
+        'midheaven',
+        'mc',
+        'medium_coeli',
+        'milieu_du_ciel',
+        'angles.mc.sign',
+        'angles.mc.label',
+      ),
+      house10: findValue(
+        raw,
+        'house10',
+        'house_10',
+        'maison10',
+        'maison_10',
+        'tenth_house',
+        'houses.10.sign',
+        'houses.10.label',
+        'houses.house10.sign',
+        'houses.house_10.sign',
+      ),
+      house6: findValue(
+        raw,
+        'house6',
+        'house_6',
+        'maison6',
+        'maison_6',
+        'sixth_house',
+        'houses.6.sign',
+        'houses.6.label',
+        'houses.house6.sign',
+        'houses.house_6.sign',
+      ),
     }
     const result: Record<string, string | number | string[] | null> = {}
     for (const field of fields) {
-      const v = available[field]
-      if (v !== undefined && v !== null) {
-        result[field] = v as string | number | string[] | null
+      const v = unwrapDisplayValue(available[field])
+      if (v !== null) {
+        result[field] = v
       }
     }
     return result
   } catch {
-    return {}
+    const result: Record<string, string | number | string[] | null> = {}
+    for (const field of fields) {
+      const value = findValue(raw, ...(FALLBACK_ALIASES[field] ?? [field]))
+      if (value !== null) {
+        result[field] = value
+      }
+    }
+    return result
   }
 }
 
@@ -176,15 +236,31 @@ function mergeNested(raw: Record<string, unknown>, ...keys: string[]): Record<st
   return merged
 }
 
+function getPathValue(source: unknown, path: string): unknown {
+  let current: unknown = source
+
+  for (const key of path.split('.')) {
+    if (!current || typeof current !== 'object') {
+      return null
+    }
+
+    current = (current as Record<string, unknown>)[key]
+  }
+
+  return current
+}
+
 function findValue(src: Record<string, unknown>, ...aliases: string[]): string | number | string[] | null {
   for (const alias of aliases) {
-    const v = src[alias]
-    if (v !== undefined && v !== null && v !== '') return v as string | number | string[]
+    const candidate = alias.includes('.') ? getPathValue(src, alias) : src[alias]
+    const unwrapped = unwrapDisplayValue(candidate)
+    if (unwrapped !== null) return unwrapped
   }
 
   const nested = findFirstMatchingValueDeep(src, aliases)
-  if (nested !== null && nested !== undefined && nested !== '') {
-    return nested as string | number | string[]
+  const unwrappedNested = unwrapDisplayValue(nested)
+  if (unwrappedNested !== null) {
+    return unwrappedNested
   }
 
   return null
@@ -245,7 +321,8 @@ function extractKuaFields(
   const src = mergeFusionExactSectionWithLegacy(raw, 'kuaDirections', LEGACY_KUA_KEYS)
   const ALIASES: Record<string, string[]> = {
     kua: ['nombre_kua', 'kua', 'kua_number', 'numero_kua'],
-    directions: ['direction_kua', 'directions', 'favorable_directions'],
+    directions: ['direction_kua', 'directions', 'favorable_directions', 'favorableDirections'],
+    favorableDirections: ['favorable_directions', 'favorableDirections', 'direction_kua', 'directions'],
     element: ['element', 'element_kua'],
   }
   const result: Record<string, string | number | string[] | null> = {}

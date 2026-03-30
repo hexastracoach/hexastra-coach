@@ -89,6 +89,13 @@ describe('classifyMessage — interpretation', () => {
     expect(result.requestKind).toBe('guidance')
     expect(result.needsVectorEnrichment).toBe(true)
   })
+
+  it('detects career guidance routing for "quel metier est fait pour moi"', () => {
+    const result = classifyMessage('quel métier est fait pour moi ?')
+    expect(result.domainRoute).toBe('career')
+    expect(result.requestKind).toBe('guidance')
+    expect(result.needsInterpretation).toBe(true)
+  })
 })
 
 // ─── Synthesis ────────────────────────────────────────────────────────────────

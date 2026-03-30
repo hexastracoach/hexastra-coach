@@ -25,6 +25,14 @@ function inferIntentBoost(intent: string | null | undefined, subCategory: string
     return /strategy|authority|decision|timing|direction/.test(subCategory) ? 0.9 : 0
   }
 
+  if (/career_guidance|work_money/.test(normalizedIntent)) {
+    return /career|work|vocation|money_axis|work_style|type|profile|life_path|number|environment|direction/.test(
+      subCategory,
+    )
+      ? 0.95
+      : 0
+  }
+
   if (/relationship|love/.test(normalizedIntent)) {
     return /synastry|compatibility|connection|relationship/.test(subCategory) ? 0.9 : 0
   }

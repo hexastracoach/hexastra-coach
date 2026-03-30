@@ -24,6 +24,7 @@ const INTENT_TO_LIFE_ZONE: Record<string, LifeZone> = {
   relation:                'relation',
 
   // Travail / Blocage professionnel
+  career_guidance:         'work',
   work_money:              'work',
   blocage:                 'work',
   money_work:              'work',

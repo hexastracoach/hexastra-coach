@@ -1,7 +1,7 @@
 import type { KnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
 import type { OpeningSignalSelection } from '@/lib/hexastra/orchestrator/selectOpeningSignal'
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
-import { applyShiloStyle } from '@/lib/hexastra/rendering/applyShiloStyle'
+import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
 
 export type FinalAnswerInput = {
   userMessage: string
@@ -115,6 +115,11 @@ function findByPaths(value: unknown, paths: string[]): unknown {
 }
 
 function stringifyCandidate(value: unknown): string | null {
+  const unwrapped = unwrapDisplayText(value)
+  if (unwrapped) {
+    return normalize(unwrapped)
+  }
+
   if (typeof value === 'string') {
     return normalize(value)
   }
@@ -474,7 +479,7 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
   const secondaryActionSignal =
     explanationSignals.find((signal) => signal !== primaryActionSignal) ?? null
 
-  const rawSections = {
+  const sections = {
     opening: buildOpeningText(
       input.responseMode,
       input.openingSignal,
@@ -484,20 +489,6 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
     explanation: buildExplanationText(openingSignal, prioritizedSignals),
     action: buildActionText(primaryActionSignal, secondaryActionSignal, input.responseMode),
     key: buildKeyText(primaryActionSignal, input.responseMode),
-  }
-
-  let sections = rawSections
-
-  try {
-    sections = applyShiloStyle({
-      opening: rawSections.opening,
-      explanation: rawSections.explanation,
-      action: rawSections.action,
-      key: rawSections.key,
-      responseMode: input.responseMode,
-    })
-  } catch {
-    sections = rawSections
   }
 
   const openingTitle =

@@ -19,6 +19,7 @@ import {
   LEGACY_KUA_KEYS,
   LEGACY_NUMEROLOGY_KEYS,
 } from '@/lib/hexastra/api/normalizeFusionExactData'
+import { unwrapDisplayText, unwrapDisplayValue } from '@/lib/hexastra/utils/unwrapDisplayValue'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -44,16 +45,16 @@ function deaccent(s: string): string {
 }
 
 function safeStr(v: unknown): string | null {
-  if (!v) return null
-  if (typeof v === 'string') return v.trim() || null
-  if (typeof v === 'number') return String(v)
-  return null
+  return unwrapDisplayText(v)
 }
 
 function safeArr(v: unknown): string[] {
-  if (!v) return []
-  if (Array.isArray(v)) return v.map(String).filter(Boolean)
-  if (typeof v === 'string' && v.trim()) return v.split(',').map((s) => s.trim()).filter(Boolean)
+  const unwrapped = unwrapDisplayValue(v)
+  if (!unwrapped) return []
+  if (Array.isArray(unwrapped)) return unwrapped.map(String).filter(Boolean)
+  if (typeof unwrapped === 'string' && unwrapped.trim()) {
+    return unwrapped.split(',').map((s) => s.trim()).filter(Boolean)
+  }
   return []
 }
 

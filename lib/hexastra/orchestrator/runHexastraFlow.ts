@@ -85,6 +85,7 @@ import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInpu
 import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
 import { buildScopeRefusalResponse } from '@/lib/hexastra/orchestration/scopeRefusalTemplate'
 import { detectContext } from '@/lib/hexastra/orchestration/detectContext'
+import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
 import type { OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
 import {
   requiresExactData,
@@ -117,6 +118,7 @@ import { classifyUserIntent, isFusionIntent } from '@/lib/hexastra/orchestration
 import { buildFusionProfileBlock } from '@/lib/hexastra/orchestrator/buildFusionProfileBlock'
 import { buildFusionContext, buildOrientedFusionBlock } from '@/lib/hexastra/orchestrator/buildFusionContext'
 import { runFusionArbiter } from '@/lib/hexastra/orchestrator/fusionArbiter'
+import { getIntentFieldMap } from '@/lib/hexastra/orchestrator/intentFieldMapping'
 import { buildCompactReadingCore } from '@/lib/hexastra/orchestrator/compactReadingCore'
 import { renderPremiumReading } from '@/lib/hexastra/renderer/renderPremiumReading'
 import { mapCompactCoreToSpheres } from '@/lib/hexastra/reading/mapCompactCoreToSpheres'
@@ -146,6 +148,10 @@ import { resolveFlowType, needsBehaviorEngine } from '@/lib/hexastra/orchestrati
 import { detectVagueOutput } from '@/lib/hexastra/guards/hallucinationGuard'
 import { runKsPipeline, type KsPipelineOutput } from '@/lib/hexastra/orchestrator/ksPipeline'
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
+import { applyRenderProfile, buildRenderProfileText } from '@/lib/hexastra/rendering/applyRenderProfile'
+import { applyShiloStyle } from '@/lib/hexastra/rendering/applyShiloStyle'
+import { normalizeUserPlan } from '@/lib/hexastra/rendering/normalizeUserPlan'
+import { selectRenderProfile } from '@/lib/hexastra/rendering/selectRenderProfile'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
 import { isReliableExactData } from '@/lib/exact-data/reliability'
 import { buildCompactExactScienceBlock } from '@/lib/exact-data/compactBlocks'
@@ -1481,9 +1487,16 @@ export async function runHexastraFlow(input: {
 
     // Central input normalization to keep the flow crash-proof
     const normalizedMessages = safeArray<ChatMessage>(input.messages)
+    const latestUserMessageForIntent =
+      normalizedMessages.filter((m) => m.role === 'user').at(-1)?.content ?? ''
+    const inferredSidebarIntentKey =
+      input.userIntentKey ??
+      (latestUserMessageForIntent && isCareerGuidanceQuery(latestUserMessageForIntent)
+        ? 'money_work'
+        : null)
     // Resolve contextType: intent sidebar takes precedence over generic 'general'
     const intentContextType: ContextType | null = (() => {
-      const k = input.userIntentKey
+      const k = inferredSidebarIntentKey
       if (!k) return null
       const map: Record<string, ContextType> = {
         understand_situation: 'general',
@@ -1540,7 +1553,7 @@ export async function runHexastraFlow(input: {
       selectedMenuKey: normalizedSelectedMenuKey,
       selectedSubmenuKey: normalizedSelectedSubmenuKey,
       journeyEnabled: normalizedJourneyToggle,
-      userIntentKey: input.userIntentKey ?? null,
+      userIntentKey: inferredSidebarIntentKey ?? null,
       resolvedContextType: normalizedContextType,
     })
 
@@ -1672,15 +1685,22 @@ export async function runHexastraFlow(input: {
       // ── Intent-first routing (INTENT > ROUTE > DATA > RENDER) ────────────────
       const userIntent = classifyUserIntent(
         latestUserMessage,
-        input.userIntentKey ?? null,
+        inferredSidebarIntentKey ?? null,
       )
       const isIntentFusion = isFusionIntent(userIntent)
       flowLog('info', 'INTENT_CLASSIFIED', {
         userIntent,
         isIntentFusion,
-        sidebarIntentKey: input.userIntentKey ?? null,
+        sidebarIntentKey: inferredSidebarIntentKey ?? null,
         messagePreview: latestUserMessage.slice(0, 60),
       })
+      if (userIntent === 'career_guidance') {
+        flowLog('info', 'CAREER_INTENT_DETECTED', {
+          userIntent,
+          inferredSidebarIntentKey: inferredSidebarIntentKey ?? 'money_work',
+          messagePreview: latestUserMessage.slice(0, 100),
+        })
+      }
 
       const explicitScienceIntent = detectExplicitScienceIntent({
         message: latestUserMessage,
@@ -1823,7 +1843,7 @@ export async function runHexastraFlow(input: {
       const flowStep = isHoroscopeRoute
         ? 'analysis'
         // Fusion intent or sidebar intent always forces analysis (never micro_profile)
-        : (isIntentFusion || Boolean(input.userIntentKey)) &&
+        : (isIntentFusion || Boolean(inferredSidebarIntentKey)) &&
             computedFlowStep !== 'sensitive_support' &&
             computedFlowStep !== 'birthdata' &&
             computedFlowStep !== 'practitioner_usage'
@@ -2368,6 +2388,22 @@ export async function runHexastraFlow(input: {
       requestKind: universalClassif.requestKind,
     })
     const domainRoute = astroFollowupRouting.route
+    if (userIntent === 'career_guidance') {
+      const careerFieldMap = getIntentFieldMap('career_guidance')
+      flowLog('info', 'CAREER_ROUTE_SELECTED', {
+        userIntent,
+        selectedDomainRoute: domainRoute,
+        effectiveDomainForApiPreview:
+          semanticCtx.contextType === 'astro_followup'
+            ? astroFollowupRouting.effectiveDomainForApi
+            : isIntentFusion
+              ? 'fusion'
+              : domainRoute,
+        sidebarIntentKey: inferredSidebarIntentKey ?? 'money_work',
+        readingAngle: careerFieldMap.readingAngleFr,
+        needsInterpretation: true,
+      })
+    }
 
     if (astroFollowupRouting.lockTrigger === 'astro_exact_with_birth_data') {
       flowLog(
@@ -3055,6 +3091,14 @@ export async function runHexastraFlow(input: {
       openingSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
       reasoningTags: responseModeSelection.reasoningTags ?? [],
     })
+    if (userIntent === 'career_guidance') {
+      flowLog('info', 'CAREER_RESPONSE_MODE_SELECTED', {
+        responseMode: effectiveResponseMode,
+        domainRoute,
+        requestKind: universalClassif.requestKind,
+        readingAngle: getIntentFieldMap('career_guidance').readingAngleFr,
+      })
+    }
 
     const isTimingStrategicMode = effectiveResponseMode === 'timing_strategic_response'
     const questionShape =
@@ -3256,7 +3300,9 @@ export async function runHexastraFlow(input: {
     const shouldSkipDeterministicFinalRenderer =
       isHoroscopeRoute ||
       (isAstroExact && exactDataResolved) ||
-      (isHumanDesignExact && exactDataResolved)
+      (isHumanDesignExact && exactDataResolved) ||
+      userIntent === 'career_guidance' ||
+      effectiveResponseMode === 'career_fit_answer'
 
     if (
       knowledgePacket &&
@@ -3264,16 +3310,61 @@ export async function runHexastraFlow(input: {
       !shouldSkipDeterministicFinalRenderer
     ) {
       try {
-        finalAnswerRendererResult = buildFinalAnswer({
+        const renderUserPlan = normalizeUserPlan(plan)
+        const renderProfile = selectRenderProfile({
+          responseMode: effectiveResponseMode,
+          userPlan: renderUserPlan,
+        })
+
+        const rawFinalAnswer = buildFinalAnswer({
           userMessage: latestUserMessage,
           responseMode: effectiveResponseMode,
           openingSignal: responseModeSelection.openingSelection ?? null,
           prioritizedSignals: presentationStructuredSignals,
           knowledgePacket,
         })
+        const profiledFinalAnswer = applyRenderProfile({
+          answer: rawFinalAnswer,
+          profile: renderProfile,
+        })
+
+        let styledFinalAnswer = profiledFinalAnswer
+
+        if (profiledFinalAnswer.sections) {
+          try {
+            const styledSections = applyShiloStyle({
+              opening: profiledFinalAnswer.sections.opening ?? '',
+              explanation: profiledFinalAnswer.sections.explanation ?? '',
+              action: profiledFinalAnswer.sections.action ?? '',
+              key: profiledFinalAnswer.sections.key ?? '',
+              responseMode: effectiveResponseMode,
+            })
+
+            styledFinalAnswer = {
+              ...profiledFinalAnswer,
+              sections: styledSections,
+              text: buildRenderProfileText({
+                sections: styledSections,
+                profile: renderProfile,
+                fallbackText: profiledFinalAnswer.text,
+              }),
+            }
+          } catch (styleError) {
+            styledFinalAnswer = profiledFinalAnswer
+            flowLog('warn', 'FINAL_ANSWER_STYLE_FALLBACK', {
+              error: styleError,
+              reason: 'applyShiloStyle failed, keeping profiled render',
+            })
+          }
+        }
+
+        finalAnswerRendererResult = styledFinalAnswer
 
         flowLog('info', 'FINAL_ANSWER_RENDERER_READY', {
           responseMode: effectiveResponseMode,
+          userPlan: renderUserPlan,
+          renderProfileFormat: renderProfile.format,
+          renderProfileTone: renderProfile.tone,
           openingSource: responseModeSelection.dominantOpeningSource,
           openingScience: responseModeSelection.dominantOpeningScience ?? null,
           openingSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
@@ -3748,8 +3839,8 @@ export async function runHexastraFlow(input: {
           money_work: 'numerology',
           inner_state: 'human_design',
         }
-        const intentScienceForBlock = input.userIntentKey
-          ? (INTENT_SCIENCE_FOR_BLOCK[input.userIntentKey] ?? null)
+        const intentScienceForBlock = inferredSidebarIntentKey
+          ? (INTENT_SCIENCE_FOR_BLOCK[inferredSidebarIntentKey] ?? null)
           : null
         if (intentScienceForBlock) {
           if (intentScienceForBlock === 'astrology') {
@@ -3762,7 +3853,7 @@ export async function runHexastraFlow(input: {
           }
           if (intentCompactBlock) {
             flowLog('info', 'INTENT_PROFILE_BLOCK_INJECTED', {
-              userIntentKey: input.userIntentKey,
+              userIntentKey: inferredSidebarIntentKey,
               scienceUsed: intentScienceForBlock,
               blockChars: intentCompactBlock.length,
             })
@@ -3962,7 +4053,7 @@ export async function runHexastraFlow(input: {
       renderMode: input.renderMode ?? null,
       selectedScience: selectedScienceForPrompt,
       selectedSubcategory: universalClassif.subcategory,
-      userIntentKey: input.userIntentKey ?? null,
+      userIntentKey: inferredSidebarIntentKey ?? null,
       exactDataBlock: exactDataBlockForPrompt,
       requiresExactData: exactDataNeeded,
       hdProfileBlock,

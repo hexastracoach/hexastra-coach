@@ -9,6 +9,8 @@
  *   exact_fact > exact_profile > synthesis > interpretation > guidance > clarification > mixed > unknown
  */
 
+import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type RequestKind =
@@ -157,6 +159,9 @@ export function classifyRequestKind(message: string, subcategory?: string | null
 
   // interpretation: meaning / explanation
   if (matchesAny(message, INTERPRETATION_PATTERNS)) return 'interpretation'
+
+  // career guidance behaves like a guided interpretive request
+  if (isCareerGuidanceQuery(message)) return 'guidance'
 
   // guidance: what to do, how to act
   if (matchesAny(message, GUIDANCE_PATTERNS)) return 'guidance'

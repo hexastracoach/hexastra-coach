@@ -114,6 +114,14 @@ const WEIGHTS_WORK_MONEY: IntentModuleWeights = {
   kua: 0.38,          // directions favorables = support contextuel
 }
 
+const WEIGHTS_CAREER_GUIDANCE: IntentModuleWeights = {
+  astrology: 0.84,
+  human_design: 0.95,
+  numerology: 0.82,
+  enneagram: 0.52,
+  kua: 0.36,
+}
+
 const WEIGHTS_BLOCAGE: IntentModuleWeights = {
   astrology: 0.85,    // Lune + Saturne = mécanismes bloquants
   human_design: 0.92, // centres définis/ouverts = patterns répétitifs
@@ -315,6 +323,29 @@ export const INTENT_FIELD_MAPS: Record<string, IntentFieldMap> = {
     secondaryModules: ['numerology', 'astrology'],
     depth: 'focused',
     readingQuestion: 'Quelle est ma stratégie naturelle pour avancer dans ma vie professionnelle ?',
+  },
+
+  /**
+   * CAREER_GUIDANCE — métier, voie pro, orientation professionnelle
+   * Dominant : HD (mode de contribution) + astro vocationnelle + numerologie
+   */
+  career_guidance: {
+    intent: 'career_guidance',
+    readingAngleFr: 'Orientation professionnelle — environnement, rôle, mode de contribution',
+    readingAngleEn: 'Career guidance — environment, role, mode of contribution',
+    activeModules: ['human_design', 'astrology', 'numerology', 'enneagram', 'kua'],
+    moduleWeights: WEIGHTS_CAREER_GUIDANCE,
+    priorityFields: {
+      astrology: ['sunSign', 'mercurySign', 'marsSign', 'saturnSign', 'midheaven', 'house10', 'house6'],
+      human_design: ['hdType', 'hdStrategy', 'hdAuthority', 'hdProfile', 'hdDefinedCenters'],
+      numerology: ['lifePath', 'expression', 'personalYear'],
+      enneagram: ['enneagramType'],
+      kua: ['element', 'favorableDirections', 'directions', 'kua'],
+    },
+    dominantModule: 'human_design',
+    secondaryModules: ['astrology', 'numerology'],
+    depth: 'focused',
+    readingQuestion: 'Quels environnements, rôles et types de métiers correspondent vraiment à ma manière de contribuer ?',
   },
 
   /**

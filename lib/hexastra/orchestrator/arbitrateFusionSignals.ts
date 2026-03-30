@@ -266,6 +266,208 @@ function buildEnergyPattern(
     : isFr ? 'Dynamique énergétique multi-dimensionnelle' : 'Multi-dimensional energy dynamic'
 }
 
+function stringifyField(value: string | number | string[] | null | undefined): string | null {
+  if (typeof value === 'string') {
+    return value.trim() || null
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : null
+  }
+
+  if (Array.isArray(value)) {
+    const cleaned = value.map((entry) => String(entry).trim()).filter(Boolean)
+    return cleaned.length > 0 ? cleaned.join(', ') : null
+  }
+
+  return null
+}
+
+function hasAnyToken(value: string | null | undefined, tokens: string[]): boolean {
+  if (!value) return false
+  const normalized = deaccent(value)
+  return tokens.some((token) => normalized.includes(deaccent(token)))
+}
+
+function resolveCareerAxisPoints(args: {
+  hdType: string | null
+  hdDefinedCenters: string | null
+  mercurySign: string | null
+  marsSign: string | null
+  saturnSign: string | null
+  sunSign: string | null
+  midheaven: string | null
+  house10: string | null
+  house6: string | null
+  lifePath: string | number | string[] | null
+  expression: string | number | string[] | null
+  enneagramType: string | number | string[] | null
+  kuaElement: string | null
+  favorableDirections: string | null
+  isFr: boolean
+}): string[] {
+  const points: string[] = []
+  const lifePathValue = stringifyField(args.lifePath)
+  const expressionValue = stringifyField(args.expression)
+  const enneagramValue = stringifyField(args.enneagramType)
+
+  if (args.hdType) {
+    if (hasAnyToken(args.hdType, ['projecteur', 'projector'])) {
+      points.push(
+        args.isFr
+          ? "Autonomie vs cadre: besoin d'autonomie d'expertise, avec peu de micro-management et un rôle de conseil, de diagnostic ou de guidage."
+          : 'Autonomy vs structure: needs expert autonomy with light structure and a role in guidance, diagnosis, or counsel.',
+      )
+    } else if (hasAnyToken(args.hdType, ['manifesteur', 'manifestor'])) {
+      points.push(
+        args.isFr
+          ? "Exécution vs leadership: profil fait pour initier, ouvrir une voie et décider vite, plus que pour exécuter dans un cadre trop verrouillé."
+          : 'Execution vs leadership: built to initiate and open paths more than to execute inside rigid structures.',
+      )
+    } else if (hasAnyToken(args.hdType, ['generateur manifestant', 'manifesting generator'])) {
+      points.push(
+        args.isFr
+          ? "Stabilité vs variété: besoin de variété, de rythme et de polyvalence; les rôles trop répétitifs finissent par éteindre l'élan."
+          : 'Stability vs variety: needs movement, variety, and polyvalence; overly repetitive roles drain momentum.',
+      )
+    } else if (hasAnyToken(args.hdType, ['generateur', 'generator'])) {
+      points.push(
+        args.isFr
+          ? "Exécution vs leadership: très bon dans la construction concrète, l'endurance et l'amélioration continue quand le travail déclenche un vrai oui."
+          : 'Execution vs leadership: strong in concrete building, endurance, and steady improvement when the work triggers a true yes.',
+      )
+    } else if (hasAnyToken(args.hdType, ['reflecteur', 'reflector'])) {
+      points.push(
+        args.isFr
+          ? "Environnement favorable: le lieu, l'équipe et l'ambiance comptent autant que le poste; le bon métier se reconnaît aussi à la qualité du cadre."
+          : 'Favorable environment: place, team, and atmosphere matter as much as the role; the right profession is also revealed by the quality of the environment.',
+      )
+    }
+  }
+
+  if (args.hdDefinedCenters && hasAnyToken(args.hdDefinedCenters, ['gorge', 'throat'])) {
+    points.push(
+      args.isFr
+        ? 'Relationnel vs analytique: vraie force de communication, de transmission, de coordination ou de prise de parole.'
+        : 'Relational vs analytical: strong communication, transmission, coordination, or speaking axis.',
+    )
+  } else if (
+    hasAnyToken(args.mercurySign, ['gemeaux', 'gemini', 'balance', 'libra', 'verseau', 'aquarius'])
+  ) {
+    points.push(
+      args.isFr
+        ? 'Relationnel vs analytique: biais net vers la communication, la médiation, la pédagogie ou les rôles d’interface.'
+        : 'Relational vs analytical: clear bias toward communication, mediation, teaching, or interface roles.',
+    )
+  } else {
+    points.push(
+      args.isFr
+        ? 'Relationnel vs analytique: avantage pour l’analyse, le tri, la stratégie ou la résolution de problèmes complexes.'
+        : 'Relational vs analytical: strong analytical, strategic, and complex problem-solving bias.',
+    )
+  }
+
+  if (
+    hasAnyToken(args.sunSign, ['lion', 'leo']) ||
+    hasAnyToken(args.midheaven, ['lion', 'leo']) ||
+    lifePathValue === '3'
+  ) {
+    points.push(
+      args.isFr
+        ? 'Créatif vs opérationnel vs stratégique: dominante créative et visible, utile dans des rôles d’expression, de marque, de contenu ou de représentation.'
+        : 'Creative vs operational vs strategic: creative and visible axis, useful for expression, brand, content, or representation roles.',
+    )
+  } else if (
+    hasAnyToken(args.saturnSign, ['capricorne', 'capricorn', 'vierge', 'virgo']) ||
+    lifePathValue === '4'
+  ) {
+    points.push(
+      args.isFr
+        ? 'Créatif vs opérationnel vs stratégique: dominante opérationnelle et structurante, utile pour piloter, organiser, fiabiliser ou exécuter proprement.'
+        : 'Creative vs operational vs strategic: operational and structuring axis, useful for running, organizing, stabilizing, or executing cleanly.',
+    )
+  } else {
+    points.push(
+      args.isFr
+        ? 'Créatif vs opérationnel vs stratégique: profil plutôt stratégique, bon pour lire les enjeux, relier les pièces et orienter les décisions.'
+        : 'Creative vs operational vs strategic: more strategic profile, strong for reading stakes, connecting pieces, and orienting decisions.',
+    )
+  }
+
+  if (
+    lifePathValue === '1' ||
+    lifePathValue === '8' ||
+    lifePathValue === '22' ||
+    enneagramValue === '3' ||
+    enneagramValue === '8'
+  ) {
+    points.push(
+      args.isFr
+        ? 'Types de rôles compatibles: pilotage, direction, entrepreneuriat, développement, stratégie ou responsabilités visibles.'
+        : 'Compatible role families: leadership, entrepreneurship, development, strategy, or visible responsibility.',
+    )
+  } else if (
+    lifePathValue === '2' ||
+    lifePathValue === '6' ||
+    enneagramValue === '2' ||
+    enneagramValue === '9'
+  ) {
+    points.push(
+      args.isFr
+        ? 'Types de rôles compatibles: accompagnement, relation client, coordination humaine, soin, pédagogie ou support à forte dimension humaine.'
+        : 'Compatible role families: support, client-facing work, human coordination, care, teaching, or people-centered support roles.',
+    )
+  } else if (
+    lifePathValue === '5' ||
+    enneagramValue === '7' ||
+    hasAnyToken(args.marsSign, ['sagittaire', 'sagittarius', 'gemeaux', 'gemini'])
+  ) {
+    points.push(
+      args.isFr
+        ? 'Types de rôles compatibles: métiers mobiles, commerciaux, projets transverses, communication, innovation ou contextes à forte variété.'
+        : 'Compatible role families: mobile roles, business development, transversal projects, communication, innovation, or high-variety environments.',
+    )
+  } else {
+    points.push(
+      args.isFr
+        ? 'Types de rôles compatibles: conseil, analyse, expertise, stratégie, conception ou métiers de discernement.'
+        : 'Compatible role families: consulting, analysis, expertise, strategy, design, or discernment-heavy work.',
+    )
+  }
+
+  const workEnvironment = args.house10 ?? args.midheaven
+  const dailyEnvironment = args.house6
+  const environmentParts = [workEnvironment, dailyEnvironment].filter(Boolean)
+
+  if (environmentParts.length > 0 || args.kuaElement || args.favorableDirections) {
+    const spatial = args.favorableDirections
+      ? args.isFr
+        ? ` repère spatial utile: ${args.favorableDirections}.`
+        : ` useful spatial support: ${args.favorableDirections}.`
+      : ''
+    const kuaTone = args.kuaElement
+      ? args.isFr
+        ? ` Élément Kua ${args.kuaElement}.`
+        : ` Kua element ${args.kuaElement}.`
+      : ''
+    points.push(
+      args.isFr
+        ? `Environnement favorable: ${environmentParts.join(' / ') || 'cadre aligné au rythme réel'} plutôt que des contextes flous ou trop dispersés.${spatial}${kuaTone}`
+        : `Favorable environment: ${environmentParts.join(' / ') || 'an environment aligned with the real rhythm'} rather than fuzzy or overly scattered contexts.${spatial}${kuaTone}`,
+    )
+  }
+
+  if (expressionValue && !points.some((point) => point.includes(expressionValue))) {
+    points.push(
+      args.isFr
+        ? `Mode de contribution: l'expression ${expressionValue} confirme que la forme, la voix ou la manière de transmettre comptent vraiment dans la réussite pro.`
+        : `Contribution mode: expression ${expressionValue} confirms that voice, form, or the way of transmitting matters in professional success.`,
+    )
+  }
+
+  return [...new Set(points)].slice(0, 5)
+}
+
 // ── Arbitrage par intent ───────────────────────────────────────────────────────
 
 function arbitrateRelationship(ctx: FusionContext, isFr: boolean): FusionArbitration {
@@ -760,6 +962,130 @@ function arbitrateWorkMoney(ctx: FusionContext, isFr: boolean): FusionArbitratio
   }
 }
 
+function arbitrateCareerGuidance(ctx: FusionContext, isFr: boolean): FusionArbitration {
+  const hd = ctx.modules.human_design.fields
+  const astro = ctx.modules.astrology.fields
+  const nume = ctx.modules.numerology.fields
+  const enn = ctx.modules.enneagram.fields
+  const kua = ctx.modules.kua.fields
+
+  const hdType = hd['hdType'] as string | null
+  const hdAuthority = hd['hdAuthority'] as string | null
+  const hdStrategy = hd['hdStrategy'] as string | null
+  const hdProfile = hd['hdProfile'] as string | null
+  const hdDefinedCenters = hd['hdDefinedCenters'] as string | null
+  const sunSign = astro['sunSign'] as string | null
+  const mercurySign = astro['mercurySign'] as string | null
+  const marsSign = astro['marsSign'] as string | null
+  const saturnSign = astro['saturnSign'] as string | null
+  const midheaven = stringifyField(astro['midheaven'] as string | number | string[] | null)
+  const house10 = stringifyField(astro['house10'] as string | number | string[] | null)
+  const house6 = stringifyField(astro['house6'] as string | number | string[] | null)
+  const lifePath = nume['lifePath']
+  const personalYear = nume['personalYear']
+  const expression = nume['expression']
+  const enneagramType = enn['enneagramType'] as string | number | string[] | null
+  const kuaElement = stringifyField(kua['element'] as string | number | string[] | null)
+  const favorableDirections = stringifyField(
+    (kua['favorableDirections'] ?? kua['directions']) as string | number | string[] | null,
+  )
+
+  const hdDynamic = getHDTypeDynamic(hdType)
+  const lpPattern = getLifePathPattern(lifePath)
+  const careerAxes = resolveCareerAxisPoints({
+    hdType,
+    hdDefinedCenters,
+    mercurySign,
+    marsSign,
+    saturnSign,
+    sunSign,
+    midheaven,
+    house10,
+    house6,
+    lifePath,
+    expression,
+    enneagramType,
+    kuaElement,
+    favorableDirections,
+    isFr,
+  })
+
+  const dominantDynamic = hdDynamic
+    ? isFr
+      ? `${hdType} — tu contribues mieux dans un rôle aligné à ta mécanique réelle qu'en essayant de rentrer dans n'importe quel métier.`
+      : `${hdType} — you contribute best in roles aligned with your real mechanism, not by forcing yourself into any job.`
+    : lpPattern
+      ? isFr
+        ? `Chemin de vie ${lifePath}: ${lpPattern}`
+        : `Life path ${lifePath}: ${lpPattern}`
+      : isFr
+        ? 'Orientation professionnelle à lire par rôle, environnement et mode de contribution.'
+        : 'Career fit should be read through role, environment, and mode of contribution.'
+
+  const secondaryDynamic = careerAxes[0] ?? (
+    isFr
+      ? 'Le bon métier se reconnaît moins par son titre que par le cadre, le rythme et la façon de contribuer.'
+      : 'The right profession is recognized less by title than by environment, rhythm, and contribution style.'
+  )
+
+  const innerOuterGap = hdDynamic
+    ? isFr
+      ? `Ton fonctionnement naturel (${hdDynamic.action}) n'est pas toujours compatible avec les cadres pros trop standardisés ou trop rigides.`
+      : `Your natural functioning (${hdDynamic.action}) is not always compatible with overly standardized or rigid work settings.`
+    : isFr
+      ? "Le décalage vient surtout d'un métier choisi pour sa logique externe plutôt que pour ton mode réel de contribution."
+      : 'The gap mostly comes from choosing work for external logic rather than your real contribution style.'
+
+  const priorityAction = getContextualAction(hdType, hdStrategy, ctx.intent, isFr)
+    ?? (
+      isFr
+        ? 'Tester un environnement de travail concret avant de chercher le métier parfait sur le papier.'
+        : 'Test a concrete work environment before chasing the perfect profession on paper.'
+    )
+
+  const cyclePart = personalYear
+    ? isFr
+      ? ` L'année personnelle ${personalYear} colore aussi la manière d'aborder ce repositionnement.`
+      : ` Personal year ${personalYear} also colors how this repositioning should be approached.`
+    : ''
+  const astroAnchor = [midheaven, house10, house6].filter(Boolean).join(' / ')
+  const mainBlock = isFr
+    ? `Cette orientation professionnelle ne se joue pas seulement sur "quel métier ?", mais surtout sur "dans quel rôle, quel environnement et quel rythme tu fonctionnes bien". ${hdType ?? 'Le profil HD'} donne le mode de contribution, ${astroAnchor || 'les repères astro vocationnels'} montrent le terrain pro, et le Chemin de vie ${stringifyField(lifePath) ?? '?'} précise le moteur de fond.${cyclePart}`
+    : `This career orientation is not only about "which profession?" but above all about "which role, environment, and rhythm fit you". ${hdType ?? 'The HD profile'} shows the contribution style, ${astroAnchor || 'the vocational astro markers'} show the professional terrain, and Life Path ${stringifyField(lifePath) ?? '?'} clarifies the deeper driver.${cyclePart}`
+
+  const supportPoints = careerAxes
+
+  const signalConfidence = Number(
+    (
+      (ctx.modules.human_design.weight + ctx.modules.astrology.weight + ctx.modules.numerology.weight) /
+      3
+    ).toFixed(2),
+  )
+  const { usedFields, ignoredFields, weightsApplied, reliabilitySummary } = buildTraceability(ctx)
+  const decisionStyle = buildDecisionStyle(hdAuthority, hdStrategy, isFr)
+  const relationalPattern = buildRelationalPattern(hdType, hdProfile, null, null, isFr)
+  const energyPattern = buildEnergyPattern(hdType, null, null, isFr)
+
+  return {
+    dominantDynamic,
+    secondaryDynamic,
+    mainBlock,
+    innerOuterGap,
+    priorityAction,
+    supportPoints,
+    decisionStyle,
+    relationalPattern,
+    energyPattern,
+    dominantModule: 'human_design',
+    signalConfidence,
+    questionType: ctx.intent,
+    usedFields,
+    ignoredFields,
+    weightsApplied,
+    reliabilitySummary,
+  }
+}
+
 function arbitrateBlocage(ctx: FusionContext, isFr: boolean): FusionArbitration {
   // blocage = centres HD définis/ouverts + peur ennéagramme
   const hd = ctx.modules.human_design.fields
@@ -1057,6 +1383,8 @@ export function arbitrateFusionSignals(ctx: FusionContext, lang = 'fr'): FusionA
       return arbitrateLove(ctx, isFr)
     case 'decision':
       return arbitrateDecision(ctx, isFr)
+    case 'career_guidance':
+      return arbitrateCareerGuidance(ctx, isFr)
     case 'work_money':
       return arbitrateWorkMoney(ctx, isFr)
     case 'inner_state':

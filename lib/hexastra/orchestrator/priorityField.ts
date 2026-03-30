@@ -53,6 +53,7 @@ const INTENT_FIELD_BOOST: Record<string, KsZoneHint> = {
   decision:              'direction',
   relationship:          'relation',
   love:                  'relation',
+  career_guidance:       'direction',
   work_money:            'expansion',
   inner_state:           'identity',
   blocage:               'identity',

@@ -17,6 +17,7 @@ export type ResponseMode =
   | 'interpretive_reading'
   | 'guided_exploration'
   | 'pedagogical_explanation'
+  | 'career_fit_answer'
   | 'fusion_answer'
   | 'concise_fusion_answer'
   | 'action_guidance'          // question HOW → Comment agir / Ce qu'il faut éviter / Prochaine étape
@@ -29,6 +30,7 @@ export type ResponseModeInput = {
   requestKind: RequestKind
   subcategory: string | null
   plan: 'free' | 'essential' | 'premium' | 'practitioner'
+  intent?: string | null
   isTimeoutRisk?: boolean
   exactDataResolved?: boolean
   exactDataReliable?: boolean
@@ -49,11 +51,15 @@ export type ResponseModeInput = {
  * 8. Fallback: resolved+reliable -> calculated_reading, else guided_exploration
  */
 export function selectResponseMode(input: ResponseModeInput): ResponseMode {
-  const { requestKind, exactDataResolved, exactDataReliable, isPedagogical, isFusionIntent } = input
+  const { requestKind, exactDataResolved, exactDataReliable, isPedagogical, isFusionIntent, intent } = input
 
   // Conceptual question — never inject personal data
   if (isPedagogical || requestKind === 'clarification') {
     return 'pedagogical_explanation'
+  }
+
+  if (intent === 'career_guidance') {
+    return 'career_fit_answer'
   }
 
   // Fusion intents (relational, emotional, decisional, situational) → 3-block concise
@@ -129,6 +135,23 @@ export function buildResponseModeDirective(mode: ResponseMode): string {
         "- Explique le concept clairement, sans reference aux donnees personnelles de l utilisateur.",
         '- Ton: accessible, direct, sans jargon inutile.',
         "- N invente pas de donnees personnelles. Reponds a la question conceptuelle uniquement.",
+      ].join('\n')
+
+    case 'career_fit_answer':
+      return [
+        'MODE DE REPONSE: ORIENTATION PROFESSIONNELLE',
+        '- La question porte sur le metier, la vocation ou la voie professionnelle adaptee.',
+        '- Reste concret et utile: traduis les signaux en environnement de travail, role, mode de contribution et types de metiers compatibles.',
+        '- Ne fais pas une lecture globale de personnalite si la question demande une orientation metier.',
+        '- Structure obligatoire en 5 blocs, dans cet ordre exact :',
+        '1. Fonctionnement naturel au travail',
+        '2. Environnements favorables',
+        '3. Types de metiers compatibles',
+        '4. Types de metiers moins adaptes',
+        '5. Action concrete pour tester la bonne voie',
+        '- Priorise Human Design, astrologie vocationnelle, numerologie, enneagramme et Kua uniquement si ces donnees sont presentes.',
+        '- Traduis les donnees en axes metier concrets: autonomie vs cadre, relationnel vs analytique, execution vs leadership, stabilite vs variete, creatif vs operationnel vs strategique.',
+        "- N invente aucune profession ultra specifique si les signaux ne la soutiennent pas clairement; propose plutot des familles de roles ou d'environnements.",
       ].join('\n')
 
     case 'concise_fusion_answer':

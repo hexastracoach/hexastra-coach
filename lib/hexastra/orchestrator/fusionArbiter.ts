@@ -43,6 +43,7 @@ function resolveQuestionTypeLabel(intent: string): string {
     relationship: 'relation_générale',
     love: 'amour_attraction',
     decision: 'décision',
+    career_guidance: 'orientation_professionnelle',
     work_money: 'travail_argent',
     inner_state: 'état_intérieur',
     blocage: 'blocage_pattern',
