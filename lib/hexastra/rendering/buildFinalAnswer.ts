@@ -2,6 +2,7 @@ import type { KnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledge
 import type { OpeningSignalSelection } from '@/lib/hexastra/orchestrator/selectOpeningSignal'
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
 import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
+import { getFusionSubcategoryCopy } from '@/lib/hexastra/rendering/fusionSubcategoryCopy'
 
 export type FinalAnswerInput = {
   userMessage: string
@@ -20,6 +21,8 @@ export type FinalAnswer = {
     key?: string
   }
 }
+
+type SignalSnippetVariant = 'opening' | 'explanation'
 
 function normalize(text: string): string {
   return (text || '')
@@ -144,12 +147,50 @@ function humanizeSubCategory(subCategory: string): string {
     .trim()
 }
 
-function resolveSignalSnippet(signal: StructuredSignal): string {
+function looksLikeInternalSignalKey(value: string): boolean {
+  const normalized = normalize(value).toLowerCase()
+  return (
+    /^(astro|hd|num|kua|fusion|timing|ennea)(_[a-z0-9]+)+$/.test(normalized) ||
+    /^(exact_profile|inner_state|life_period|blocage|relationship|career_guidance|fusion_general_question)$/.test(
+      normalized,
+    )
+  )
+}
+
+function resolveHumanFallbackSnippet(
+  signal: StructuredSignal,
+  variant: SignalSnippetVariant,
+): string {
+  if (signal.science === 'fusion') {
+    const copy = getFusionSubcategoryCopy(signal.subCategory)
+    return variant === 'opening' ? copy.opening : copy.explanation
+  }
+
+  return humanizeSubCategory(signal.subCategory) || 'la dynamique principale du moment'
+}
+
+function sanitizeSnippetCandidate(
+  signal: StructuredSignal,
+  candidate: string | null,
+): string | null {
+  const cleaned = normalize(candidate ?? '')
+  if (!cleaned) {
+    return null
+  }
+
+  return looksLikeInternalSignalKey(cleaned) ? null : cleaned
+}
+
+function resolveSignalSnippet(
+  signal: StructuredSignal,
+  variant: SignalSnippetVariant = 'opening',
+): string {
   if (signal.sourceType === 'retrieval') {
     const documentsValue = signal.value as { documents?: Array<{ excerpt?: string }> }
     const excerpt = documentsValue.documents?.[0]?.excerpt
-    if (excerpt) {
-      return compact(excerpt, 170)
+    const sanitizedExcerpt = sanitizeSnippetCandidate(signal, excerpt ?? null)
+    if (sanitizedExcerpt) {
+      return compact(sanitizedExcerpt, 170)
     }
   }
 
@@ -159,19 +200,22 @@ function resolveSignalSnippet(signal: StructuredSignal): string {
       const strategyValue = stringifyCandidate(
         findByPaths(signal.value, ['hdStrategy', 'strategy', 'strategie']),
       )
-      if (typeValue && strategyValue) {
-        return `tu es ${typeValue} et ta bonne direction passe par ${strategyValue.toLowerCase()}`
+      const safeTypeValue = sanitizeSnippetCandidate(signal, typeValue)
+      const safeStrategyValue = sanitizeSnippetCandidate(signal, strategyValue)
+      if (safeTypeValue && safeStrategyValue) {
+        return `tu es ${safeTypeValue} et ta bonne direction passe par ${safeStrategyValue.toLowerCase()}`
       }
-      if (typeValue) {
-        return `tu es ${typeValue}`
+      if (safeTypeValue) {
+        return `tu es ${safeTypeValue}`
       }
       break
     }
 
     case 'hd_profile': {
       const profileValue = stringifyCandidate(findByPaths(signal.value, ['hdProfile', 'profile']))
-      if (profileValue) {
-        return `ton profil ${profileValue} decrit une maniere bien precise d avancer et d apprendre`
+      const safeProfileValue = sanitizeSnippetCandidate(signal, profileValue)
+      if (safeProfileValue) {
+        return `ton profil ${safeProfileValue} decrit une maniere bien precise d avancer et d apprendre`
       }
       break
     }
@@ -180,24 +224,27 @@ function resolveSignalSnippet(signal: StructuredSignal): string {
       const yearValue = stringifyCandidate(
         findByPaths(signal.value, ['yearly.personalYearNumber', 'personalYearNumber', 'personalYear']),
       )
-      if (yearValue) {
-        return `tu es dans une annee personnelle ${yearValue}`
+      const safeYearValue = sanitizeSnippetCandidate(signal, yearValue)
+      if (safeYearValue) {
+        return `tu es dans une annee personnelle ${safeYearValue}`
       }
       break
     }
 
     case 'num_life_path': {
       const lifePath = stringifyCandidate(findByPaths(signal.value, ['chemin_de_vie', 'lifePath']))
-      if (lifePath) {
-        return `ton chemin de vie est ${lifePath}`
+      const safeLifePath = sanitizeSnippetCandidate(signal, lifePath)
+      if (safeLifePath) {
+        return `ton chemin de vie est ${safeLifePath}`
       }
       break
     }
 
     case 'kua_number': {
       const kuaNumber = stringifyCandidate(findByPaths(signal.value, ['kua_number', 'kuaNumber']))
-      if (kuaNumber) {
-        return `ton nombre Kua est ${kuaNumber}`
+      const safeKuaNumber = sanitizeSnippetCandidate(signal, kuaNumber)
+      if (safeKuaNumber) {
+        return `ton nombre Kua est ${safeKuaNumber}`
       }
       break
     }
@@ -206,32 +253,36 @@ function resolveSignalSnippet(signal: StructuredSignal): string {
       const directions = stringifyCandidate(
         findByPaths(signal.value, ['favorable_directions', 'favorableDirections']),
       )
-      if (directions) {
-        return `tes directions favorables sont ${directions}`
+      const safeDirections = sanitizeSnippetCandidate(signal, directions)
+      if (safeDirections) {
+        return `tes directions favorables sont ${safeDirections}`
       }
       break
     }
 
     case 'kua_bed_orientation': {
       const direction = stringifyCandidate(findByPaths(signal.value, ['bed_orientation', 'bedOrientation']))
-      if (direction) {
-        return `pour le repos, l orientation la plus soutenante est ${direction}`
+      const safeDirection = sanitizeSnippetCandidate(signal, direction)
+      if (safeDirection) {
+        return `pour le repos, l orientation la plus soutenante est ${safeDirection}`
       }
       break
     }
 
     case 'kua_desk_orientation': {
       const direction = stringifyCandidate(findByPaths(signal.value, ['desk_orientation', 'deskOrientation']))
-      if (direction) {
-        return `pour le bureau, l orientation la plus soutenante est ${direction}`
+      const safeDirection = sanitizeSnippetCandidate(signal, direction)
+      if (safeDirection) {
+        return `pour le bureau, l orientation la plus soutenante est ${safeDirection}`
       }
       break
     }
 
     case 'astro_solar_return': {
       const annualTheme = stringifyCandidate(findByPaths(signal.value, ['annual_theme', 'theme', 'emphasis']))
-      if (annualTheme) {
-        return `ton retour solaire ouvre une phase de ${annualTheme.toLowerCase()}`
+      const safeAnnualTheme = sanitizeSnippetCandidate(signal, annualTheme)
+      if (safeAnnualTheme) {
+        return `ton retour solaire ouvre une phase de ${safeAnnualTheme.toLowerCase()}`
       }
       break
     }
@@ -240,8 +291,9 @@ function resolveSignalSnippet(signal: StructuredSignal): string {
       const progression = stringifyCandidate(
         findByPaths(signal.value, ['secondary_progressions.moon', 'moon', 'progressed_moon']),
       )
-      if (progression) {
-        return progression
+      const safeProgression = sanitizeSnippetCandidate(signal, progression)
+      if (safeProgression) {
+        return safeProgression
       }
       break
     }
@@ -263,18 +315,21 @@ function resolveSignalSnippet(signal: StructuredSignal): string {
 
   const preferred = preferredPaths[signal.subCategory]
   if (preferred) {
-    const candidate = stringifyCandidate(findByPaths(signal.value, preferred))
+    const candidate = sanitizeSnippetCandidate(
+      signal,
+      stringifyCandidate(findByPaths(signal.value, preferred)),
+    )
     if (candidate) {
       return compact(candidate, 170)
     }
   }
 
-  const firstScalar = flattenScalarTexts(signal.value, 3)[0]
+  const firstScalar = sanitizeSnippetCandidate(signal, flattenScalarTexts(signal.value, 3)[0] ?? null)
   if (firstScalar) {
     return compact(firstScalar, 170)
   }
 
-  return humanizeSubCategory(signal.subCategory)
+  return resolveHumanFallbackSnippet(signal, variant)
 }
 
 function buildOpeningText(
@@ -286,10 +341,18 @@ function buildOpeningText(
   const openingSignal = openingSelection?.signal ?? prioritizedSignals[0] ?? null
   if (!openingSignal) {
     const fallbackHint = knowledgePacket.fusionHints?.[0] ?? 'le mouvement principal du moment'
+    if (looksLikeInternalSignalKey(fallbackHint)) {
+      if (fallbackHint.startsWith('fusion_') || fallbackHint === 'timing_fusion') {
+        return sentence(getFusionSubcategoryCopy(fallbackHint).opening)
+      }
+
+      return sentence('le point central, pour l instant, demande surtout de lire la dynamique principale avant de conclure')
+    }
+
     return sentence(`le point central, pour l instant, tourne autour de ${fallbackHint.replace(/_/g, ' ')}`)
   }
 
-  const snippet = resolveSignalSnippet(openingSignal)
+  const snippet = resolveSignalSnippet(openingSignal, 'opening')
 
   if (openingSelection?.dominantOpeningScience === null && openingSelection?.dominantOpeningSubCategory === null) {
     return sentence(`la question reste ouverte et demande de garder plusieurs angles vivants avant de conclure trop vite`)
@@ -338,7 +401,7 @@ function selectExplanationSignals(
 }
 
 function buildFactSentence(signal: StructuredSignal): string {
-  const snippet = resolveSignalSnippet(signal)
+  const snippet = resolveSignalSnippet(signal, 'explanation')
 
   if (signal.science === 'fusion') {
     return sentence(snippet)
@@ -352,7 +415,7 @@ function buildFactSentence(signal: StructuredSignal): string {
 }
 
 function buildContextSentence(signal: StructuredSignal): string {
-  const snippet = resolveSignalSnippet(signal)
+  const snippet = resolveSignalSnippet(signal, 'explanation')
 
   if (signal.science === 'fusion') {
     return sentence(`au fond, ${snippet}`)

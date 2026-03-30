@@ -3,6 +3,7 @@ import { normalizeFusionExactDataWithDiagnostics } from '@/lib/hexastra/api/norm
 import { classifyUserIntent, isFusionIntent } from '@/lib/hexastra/orchestration/intentClassifier'
 import { classifyMessage } from '@/lib/hexastra/orchestration/universalClassification'
 import { buildKnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
+import type { KnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
 import { selectResponseModeSelection } from '@/lib/hexastra/orchestrator/selectResponseMode'
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
 import { buildExactDataRequestFromRetrievalPlan } from '@/lib/hexastra/retrieval/exactDataHintMapper'
@@ -118,6 +119,35 @@ function countSentences(value: string | undefined): number {
     .filter(Boolean).length
 }
 
+function makeMinimalKnowledgePacket(): KnowledgePacket {
+  return {
+    domainRoute: 'fusion',
+    focus: {
+      selectedMenuLabel: null,
+      selectedSubmenuLabel: null,
+      scienceFocus: null,
+      subscienceFocus: null,
+    },
+    constraints: {
+      selectedPromptHint: null,
+      selectedOutputStructure: null,
+    },
+    priorityOrder: [],
+    hierarchyGuide: '',
+    fusionGuide: '',
+    ignoredSources: [],
+    masterPrompt: null,
+    readingStructure: null,
+    menuPrompt: null,
+    sciencePrompt: [],
+    subsciencePrompt: [],
+    referenceBook: [],
+    supportingKnowledge: [],
+    orderedSources: [],
+    fusionHints: ['fusion_general'],
+  }
+}
+
 describe('buildFinalAnswer', () => {
   it('renders a clear global current-state answer', () => {
     const answer = buildRenderedCase('decision_current_state')
@@ -162,5 +192,161 @@ describe('buildFinalAnswer', () => {
 
     expect(answer.sections?.opening?.toLowerCase()).toContain('question reste ouverte')
     expect(answer.sections?.opening).not.toContain('Projector')
+  })
+
+  it('never renders timing_fusion as a raw internal key', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'est-ce le bon moment ?',
+      responseMode: 'timing_strategic_response',
+      openingSignal: {
+        signal: {
+          science: 'fusion',
+          subCategory: 'timing_fusion',
+          sourceType: 'fusion',
+          value: 'timing_fusion',
+        },
+        orderedSignals: [
+          {
+            science: 'fusion',
+            subCategory: 'timing_fusion',
+            sourceType: 'fusion',
+            value: 'timing_fusion',
+          },
+        ],
+        dominantOpeningSource: 'fusion',
+        dominantOpeningScience: 'fusion',
+        dominantOpeningSubCategory: 'timing_fusion',
+        reasoningTags: [],
+      },
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'timing_fusion',
+          sourceType: 'fusion',
+          value: 'timing_fusion',
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).not.toContain('timing_fusion')
+    expect(answer.sections?.opening?.toLowerCase()).toContain('bon moment')
+  })
+
+  it('never renders fusion_general as a raw internal key', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'que se passe-t-il pour moi ?',
+      responseMode: 'interpretive_reading',
+      openingSignal: {
+        signal: {
+          science: 'fusion',
+          subCategory: 'fusion_general',
+          sourceType: 'fusion',
+          value: 'fusion_general',
+        },
+        orderedSignals: [
+          {
+            science: 'fusion',
+            subCategory: 'fusion_general',
+            sourceType: 'fusion',
+            value: 'fusion_general',
+          },
+        ],
+        dominantOpeningSource: 'fusion',
+        dominantOpeningScience: 'fusion',
+        dominantOpeningSubCategory: 'fusion_general',
+        reasoningTags: [],
+      },
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'fusion_general',
+          sourceType: 'fusion',
+          value: 'fusion_general',
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).not.toContain('fusion_general')
+    expect(answer.sections?.opening?.toLowerCase()).toContain('clarifier')
+  })
+
+  it('uses a human fallback for unknown fusion subcategories', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'que se passe-t-il ?',
+      responseMode: 'concise_fusion_answer',
+      openingSignal: {
+        signal: {
+          science: 'fusion',
+          subCategory: 'fusion_unknown_axis',
+          sourceType: 'fusion',
+          value: 'fusion_unknown_axis',
+        },
+        orderedSignals: [
+          {
+            science: 'fusion',
+            subCategory: 'fusion_unknown_axis',
+            sourceType: 'fusion',
+            value: 'fusion_unknown_axis',
+          },
+        ],
+        dominantOpeningSource: 'fusion',
+        dominantOpeningScience: 'fusion',
+        dominantOpeningSubCategory: 'fusion_unknown_axis',
+        reasoningTags: [],
+      },
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'fusion_unknown_axis',
+          sourceType: 'fusion',
+          value: 'fusion_unknown_axis',
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).not.toContain('fusion_unknown_axis')
+    expect(answer.sections?.opening?.toLowerCase()).toContain('reorganiser')
+    expect(answer.sections?.explanation?.toLowerCase()).toContain('dynamique en cours')
+  })
+
+  it('never leaks internal non-fusion keys either', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'mon type',
+      responseMode: 'direct_answer',
+      openingSignal: {
+        signal: {
+          science: 'human_design',
+          subCategory: 'hd_type',
+          sourceType: 'exact_data',
+          value: 'hd_type',
+        },
+        orderedSignals: [
+          {
+            science: 'human_design',
+            subCategory: 'hd_type',
+            sourceType: 'exact_data',
+            value: 'hd_type',
+          },
+        ],
+        dominantOpeningSource: 'exact_data',
+        dominantOpeningScience: 'human_design',
+        dominantOpeningSubCategory: 'hd_type',
+        reasoningTags: [],
+      },
+      prioritizedSignals: [
+        {
+          science: 'human_design',
+          subCategory: 'hd_type',
+          sourceType: 'exact_data',
+          value: 'hd_type',
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).not.toContain('hd_type')
   })
 })

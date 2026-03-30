@@ -156,6 +156,7 @@ import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
 import { isReliableExactData } from '@/lib/exact-data/reliability'
 import { buildCompactExactScienceBlock } from '@/lib/exact-data/compactBlocks'
 import { normalizeFusionExactDataWithDiagnostics } from '@/lib/hexastra/api/normalizeFusionExactData'
+import { normalizeApiBaseUrl } from '@/lib/hexastra/api/normalizeApiBaseUrl'
 import {
   shouldBlockFalsePlanLimitation,
   containsFalsePlanLimitation,
@@ -173,8 +174,21 @@ import { buildSignals, type SubCategorySignal } from '@/lib/hexastra/engine/retr
 import { SCIENCE_SUBCATEGORY_INDEX } from '@/lib/hexastra/taxonomy/scienceTaxonomy'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
-const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
+const NORMALIZED_API_BASE = normalizeApiBaseUrl(process.env.HEXASTRA_API_URL)
+const API_URL = NORMALIZED_API_BASE.url
 const API_KEY = process.env.HEXASTRA_API_KEY || ''
+
+if (NORMALIZED_API_BASE.warning === 'missing_protocol') {
+  logger.warn('[runHexastraFlow] HEXASTRA_API_URL normalized with https:// prefix', {
+    rawValue: NORMALIZED_API_BASE.input,
+    normalizedUrl: NORMALIZED_API_BASE.url,
+  })
+} else if (NORMALIZED_API_BASE.warning === 'invalid_url') {
+  logger.warn('[runHexastraFlow] HEXASTRA_API_URL invalid after normalization', {
+    rawValue: NORMALIZED_API_BASE.input,
+    normalizedUrl: NORMALIZED_API_BASE.url || null,
+  })
+}
 
 // Global: just under Vercel/Railway function limit (30 s)
 const GLOBAL_FLOW_TIMEOUT_MS = 29000
