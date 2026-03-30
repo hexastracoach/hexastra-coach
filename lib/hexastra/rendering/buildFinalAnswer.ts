@@ -1,6 +1,7 @@
 import type { KnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
 import type { OpeningSignalSelection } from '@/lib/hexastra/orchestrator/selectOpeningSignal'
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
+import { applyShiloStyle } from '@/lib/hexastra/rendering/applyShiloStyle'
 
 export type FinalAnswerInput = {
   userMessage: string
@@ -473,7 +474,7 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
   const secondaryActionSignal =
     explanationSignals.find((signal) => signal !== primaryActionSignal) ?? null
 
-  const sections = {
+  const rawSections = {
     opening: buildOpeningText(
       input.responseMode,
       input.openingSignal,
@@ -483,6 +484,20 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
     explanation: buildExplanationText(openingSignal, prioritizedSignals),
     action: buildActionText(primaryActionSignal, secondaryActionSignal, input.responseMode),
     key: buildKeyText(primaryActionSignal, input.responseMode),
+  }
+
+  let sections = rawSections
+
+  try {
+    sections = applyShiloStyle({
+      opening: rawSections.opening,
+      explanation: rawSections.explanation,
+      action: rawSections.action,
+      key: rawSections.key,
+      responseMode: input.responseMode,
+    })
+  } catch {
+    sections = rawSections
   }
 
   const openingTitle =

@@ -126,7 +126,7 @@ describe('buildFinalAnswer', () => {
     expect(answer.text).toContain('-> Pourquoi')
     expect(answer.text).toContain('-> Ce que tu peux faire')
     expect(answer.text).toContain('-> Cle a retenir')
-    expect(answer.sections?.opening).toContain('Actuellement')
+    expect(answer.sections?.opening).toMatch(/En ce moment|bouge|ressort/i)
     expect(countSentences(answer.sections?.opening)).toBeLessThanOrEqual(2)
   })
 
