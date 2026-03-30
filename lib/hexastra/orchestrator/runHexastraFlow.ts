@@ -157,6 +157,7 @@ import { isReliableExactData } from '@/lib/exact-data/reliability'
 import { buildCompactExactScienceBlock } from '@/lib/exact-data/compactBlocks'
 import { normalizeFusionExactDataWithDiagnostics } from '@/lib/hexastra/api/normalizeFusionExactData'
 import { normalizeApiBaseUrl } from '@/lib/hexastra/api/normalizeApiBaseUrl'
+import { buildHexastraApiJsonPostRequest } from '@/lib/hexastra/api/buildHexastraApiJsonPostRequest'
 import {
   shouldBlockFalsePlanLimitation,
   containsFalsePlanLimitation,
@@ -1066,32 +1067,52 @@ async function callRailway(path: string, payload: Record<string, unknown>) {
   }
 
   const url = `${API_URL}${path}`
+  const request = buildHexastraApiJsonPostRequest(payload, API_KEY)
 
   const started = Date.now()
-  flowLog('info', 'before Railway call', { path, timeoutMs: 9000 })
+  flowLog('info', 'before Railway call', {
+    path,
+    url,
+    method: request.debug.method,
+    hasBody: request.debug.hasBody,
+    bodyBytes: request.debug.bodyBytes,
+    hasApiKey: request.debug.hasApiKey,
+    timeoutMs: 9000,
+  })
   const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(API_KEY ? { 'x-api-key': API_KEY } : {}),
-    },
-    body: JSON.stringify(payload),
+    ...request.init,
     signal: AbortSignal.timeout(9000),
   })
 
   if (!res.ok) {
+    const errorText = await res.text().catch(() => '')
     flowLog('warn', 'after Railway call', {
       path,
+      url,
+      method: request.debug.method,
       status: res.status,
+      statusText: res.statusText,
+      allow: res.headers.get('allow'),
       ok: false,
+      hasBody: request.debug.hasBody,
+      bodyBytes: request.debug.bodyBytes,
       durationMs: Date.now() - started,
+      errorText: errorText || null,
     })
-    throw new Error(`Railway ${path} failed with status ${res.status}`)
+    const suffix =
+      res.status === 405
+        ? ` (Method Not Allowed while using ${request.debug.method})`
+        : ''
+    throw new Error(`Railway ${path} failed with status ${res.status}${suffix}`)
   }
   flowLog('info', 'after Railway call', {
     path,
+    url,
+    method: request.debug.method,
     status: res.status,
     ok: true,
+    hasBody: request.debug.hasBody,
+    bodyBytes: request.debug.bodyBytes,
     durationMs: Date.now() - started,
   })
 

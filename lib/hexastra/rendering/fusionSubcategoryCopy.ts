@@ -3,7 +3,7 @@ export type FusionSubcategoryCopy = {
   explanation: string
 }
 
-const GENERIC_FUSION_SUBCATEGORY_COPY: FusionSubcategoryCopy = {
+export const GENERIC_FUSION_SUBCATEGORY_COPY: FusionSubcategoryCopy = {
   opening: 'Quelque chose est en train de se reorganiser dans ta situation actuelle.',
   explanation:
     'Le plus utile maintenant est de lire la dynamique en cours avant de forcer une decision.',
@@ -68,4 +68,81 @@ export function getFusionSubcategoryCopy(subCategory: string | null | undefined)
   }
 
   return FUSION_SUBCATEGORY_COPY[subCategory] ?? GENERIC_FUSION_SUBCATEGORY_COPY
+}
+
+export type FusionFallbackMode =
+  | 'timing_strategic_response'
+  | 'fusion_general'
+  | 'interpretive_reading'
+  | 'calculated_reading'
+
+export const FUSION_SUBCATEGORY_COPY_VARIANTS: Partial<
+  Record<FusionFallbackMode, Partial<Record<string, Partial<FusionSubcategoryCopy>>>>
+> = {
+  timing_strategic_response: {
+    timing_fusion: {
+      explanation:
+        'Le plus juste maintenant est de laisser apparaitre une fenetre claire avant d agir ou de trancher.',
+    },
+    fusion_timing: {
+      explanation:
+        'Le plus juste maintenant est de laisser apparaitre une fenetre claire avant d agir ou de trancher.',
+    },
+    fusion_decision: {
+      opening: 'Tu es devant un choix qui demande surtout le bon tempo.',
+      explanation:
+        'La vraie avance ici viendra d un signal stable et exploitable, pas d une acceleration sous tension.',
+    },
+  },
+  fusion_general: {
+    timing_fusion: {
+      opening: 'Quelque chose se recale dans ton rythme actuel.',
+      explanation:
+        'Il y a un temps juste a respecter avant que la suite devienne vraiment lisible.',
+    },
+    fusion_timing: {
+      opening: 'Quelque chose se recale dans ton rythme actuel.',
+      explanation:
+        'Il y a un temps juste a respecter avant que la suite devienne vraiment lisible.',
+    },
+    fusion_general: {
+      opening: 'Un mouvement de fond prend doucement sa vraie forme.',
+      explanation:
+        'Tout n est pas encore resolu, mais la dynamique devient assez claire pour etre lue avec plus de calme.',
+    },
+  },
+  interpretive_reading: {
+    timing_fusion: {
+      opening: 'Tu sens que ca bouge, mais la clarte vient davantage du rythme que de l effort.',
+      explanation:
+        'Ce moment demande d ecouter ce qui murit en toi avant de vouloir accelerer.',
+    },
+    fusion_timing: {
+      opening: 'Tu sens que ca bouge, mais la clarte vient davantage du rythme que de l effort.',
+      explanation:
+        'Ce moment demande d ecouter ce qui murit en toi avant de vouloir accelerer.',
+    },
+    fusion_general: {
+      opening: 'Quelque chose cherche a se remettre en ordre plus profondement.',
+      explanation:
+        'La lecture la plus juste ici passe par ce qui se recompose en profondeur, pas seulement par ce qui est visible tout de suite.',
+    },
+  },
+  calculated_reading: {
+    timing_fusion: {
+      opening: 'Le signal actuel parle surtout d un ajustement de timing.',
+      explanation:
+        'Le fait le plus utile ici est que le bon resultat depend davantage du moment choisi que de l intensite mise.',
+    },
+    fusion_timing: {
+      opening: 'Le signal actuel parle surtout d un ajustement de timing.',
+      explanation:
+        'Le fait le plus utile ici est que le bon resultat depend davantage du moment choisi que de l intensite mise.',
+    },
+    fusion_general: {
+      opening: 'Le signal principal indique une reorganisation de fond.',
+      explanation:
+        'Le point concret a retenir est qu une dynamique generale se remet en place, meme si tous les effets ne sont pas encore visibles.',
+    },
+  },
 }

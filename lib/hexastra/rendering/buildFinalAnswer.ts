@@ -2,7 +2,7 @@ import type { KnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledge
 import type { OpeningSignalSelection } from '@/lib/hexastra/orchestrator/selectOpeningSignal'
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
 import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
-import { getFusionSubcategoryCopy } from '@/lib/hexastra/rendering/fusionSubcategoryCopy'
+import { getFusionFallbackCopy } from '@/lib/hexastra/rendering/getFusionFallbackCopy'
 
 export type FinalAnswerInput = {
   userMessage: string
@@ -160,9 +160,13 @@ function looksLikeInternalSignalKey(value: string): boolean {
 function resolveHumanFallbackSnippet(
   signal: StructuredSignal,
   variant: SignalSnippetVariant,
+  responseMode: string,
 ): string {
   if (signal.science === 'fusion') {
-    const copy = getFusionSubcategoryCopy(signal.subCategory)
+    const copy = getFusionFallbackCopy({
+      subCategory: signal.subCategory,
+      responseMode,
+    })
     return variant === 'opening' ? copy.opening : copy.explanation
   }
 
@@ -184,6 +188,7 @@ function sanitizeSnippetCandidate(
 function resolveSignalSnippet(
   signal: StructuredSignal,
   variant: SignalSnippetVariant = 'opening',
+  responseMode = 'concise_fusion_answer',
 ): string {
   if (signal.sourceType === 'retrieval') {
     const documentsValue = signal.value as { documents?: Array<{ excerpt?: string }> }
@@ -329,7 +334,7 @@ function resolveSignalSnippet(
     return compact(firstScalar, 170)
   }
 
-  return resolveHumanFallbackSnippet(signal, variant)
+  return resolveHumanFallbackSnippet(signal, variant, responseMode)
 }
 
 function buildOpeningText(
@@ -343,7 +348,12 @@ function buildOpeningText(
     const fallbackHint = knowledgePacket.fusionHints?.[0] ?? 'le mouvement principal du moment'
     if (looksLikeInternalSignalKey(fallbackHint)) {
       if (fallbackHint.startsWith('fusion_') || fallbackHint === 'timing_fusion') {
-        return sentence(getFusionSubcategoryCopy(fallbackHint).opening)
+        return sentence(
+          getFusionFallbackCopy({
+            subCategory: fallbackHint,
+            responseMode,
+          }).opening,
+        )
       }
 
       return sentence('le point central, pour l instant, demande surtout de lire la dynamique principale avant de conclure')
@@ -352,7 +362,7 @@ function buildOpeningText(
     return sentence(`le point central, pour l instant, tourne autour de ${fallbackHint.replace(/_/g, ' ')}`)
   }
 
-  const snippet = resolveSignalSnippet(openingSignal, 'opening')
+  const snippet = resolveSignalSnippet(openingSignal, 'opening', responseMode)
 
   if (openingSelection?.dominantOpeningScience === null && openingSelection?.dominantOpeningSubCategory === null) {
     return sentence(`la question reste ouverte et demande de garder plusieurs angles vivants avant de conclure trop vite`)
@@ -400,8 +410,8 @@ function selectExplanationSignals(
   return chosen
 }
 
-function buildFactSentence(signal: StructuredSignal): string {
-  const snippet = resolveSignalSnippet(signal, 'explanation')
+function buildFactSentence(signal: StructuredSignal, responseMode: string): string {
+  const snippet = resolveSignalSnippet(signal, 'explanation', responseMode)
 
   if (signal.science === 'fusion') {
     return sentence(snippet)
@@ -414,8 +424,8 @@ function buildFactSentence(signal: StructuredSignal): string {
   return sentence(`le signal qui appuie cette lecture parle de ${snippet}`)
 }
 
-function buildContextSentence(signal: StructuredSignal): string {
-  const snippet = resolveSignalSnippet(signal, 'explanation')
+function buildContextSentence(signal: StructuredSignal, responseMode: string): string {
+  const snippet = resolveSignalSnippet(signal, 'explanation', responseMode)
 
   if (signal.science === 'fusion') {
     return sentence(`au fond, ${snippet}`)
@@ -427,6 +437,7 @@ function buildContextSentence(signal: StructuredSignal): string {
 function buildExplanationText(
   openingSignal: StructuredSignal | null,
   prioritizedSignals: StructuredSignal[],
+  responseMode: string,
 ): string {
   const signals = selectExplanationSignals(openingSignal, prioritizedSignals)
   const primary = signals[0] ?? null
@@ -438,9 +449,11 @@ function buildExplanationText(
     signals.find((signal) => signal !== primary && signal !== secondary) ?? null
 
   return uniqSentences([
-    primary ? buildFactSentence(primary) : null,
-    secondary ? buildContextSentence(secondary) : null,
-    tertiary && tertiary.science !== secondary?.science ? buildContextSentence(tertiary) : null,
+    primary ? buildFactSentence(primary, responseMode) : null,
+    secondary ? buildContextSentence(secondary, responseMode) : null,
+    tertiary && tertiary.science !== secondary?.science
+      ? buildContextSentence(tertiary, responseMode)
+      : null,
   ]).join(' ')
 }
 
@@ -549,7 +562,7 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
       prioritizedSignals,
       input.knowledgePacket,
     ),
-    explanation: buildExplanationText(openingSignal, prioritizedSignals),
+    explanation: buildExplanationText(openingSignal, prioritizedSignals, input.responseMode),
     action: buildActionText(primaryActionSignal, secondaryActionSignal, input.responseMode),
     key: buildKeyText(primaryActionSignal, input.responseMode),
   }

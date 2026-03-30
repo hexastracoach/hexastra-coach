@@ -6,6 +6,7 @@ import {
   DEFAULT_HEXASTRA_API_BASE_URL,
   normalizeApiBaseUrl,
 } from '@/lib/hexastra/api/normalizeApiBaseUrl'
+import { buildHexastraApiJsonPostRequest } from '@/lib/hexastra/api/buildHexastraApiJsonPostRequest'
 
 export const runtime = 'nodejs'
 
@@ -43,19 +44,25 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const response = await fetch(`${API_URL}/enneagram`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
-      body: JSON.stringify(payload),
+    const url = `${API_URL}/enneagram`
+    const request = buildHexastraApiJsonPostRequest(payload, apiKey)
+    const response = await fetch(url, {
+      ...request.init,
       signal: AbortSignal.timeout(8000),
     })
 
     if (!response.ok) {
       const err = await response.text().catch(() => '')
-      logger.error('[enneagram] backend error', { status: response.status, err })
+      logger.error('[enneagram] backend error', {
+        url,
+        method: request.debug.method,
+        status: response.status,
+        statusText: response.statusText,
+        allow: response.headers.get('allow'),
+        hasBody: request.debug.hasBody,
+        bodyBytes: request.debug.bodyBytes,
+        err,
+      })
       return internalError('Service temporairement indisponible')
     }
 

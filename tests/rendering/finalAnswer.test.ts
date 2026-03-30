@@ -233,6 +233,80 @@ describe('buildFinalAnswer', () => {
     expect(answer.sections?.opening?.toLowerCase()).toContain('bon moment')
   })
 
+  it('varies timing fusion fallback copy depending on responseMode', () => {
+    const timingAnswer = buildFinalAnswer({
+      userMessage: 'est-ce le bon moment ?',
+      responseMode: 'timing_strategic_response',
+      openingSignal: {
+        signal: {
+          science: 'fusion',
+          subCategory: 'timing_fusion',
+          sourceType: 'fusion',
+          value: 'timing_fusion',
+        },
+        orderedSignals: [
+          {
+            science: 'fusion',
+            subCategory: 'timing_fusion',
+            sourceType: 'fusion',
+            value: 'timing_fusion',
+          },
+        ],
+        dominantOpeningSource: 'fusion',
+        dominantOpeningScience: 'fusion',
+        dominantOpeningSubCategory: 'timing_fusion',
+        reasoningTags: [],
+      },
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'timing_fusion',
+          sourceType: 'fusion',
+          value: 'timing_fusion',
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    const interpretiveAnswer = buildFinalAnswer({
+      userMessage: 'qu est-ce que je traverse ?',
+      responseMode: 'interpretive_reading',
+      openingSignal: {
+        signal: {
+          science: 'fusion',
+          subCategory: 'timing_fusion',
+          sourceType: 'fusion',
+          value: 'timing_fusion',
+        },
+        orderedSignals: [
+          {
+            science: 'fusion',
+            subCategory: 'timing_fusion',
+            sourceType: 'fusion',
+            value: 'timing_fusion',
+          },
+        ],
+        dominantOpeningSource: 'fusion',
+        dominantOpeningScience: 'fusion',
+        dominantOpeningSubCategory: 'timing_fusion',
+        reasoningTags: [],
+      },
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'timing_fusion',
+          sourceType: 'fusion',
+          value: 'timing_fusion',
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(timingAnswer.sections?.explanation).not.toBe(interpretiveAnswer.sections?.explanation)
+    expect(timingAnswer.sections?.explanation?.toLowerCase()).toContain('fenetre claire')
+    expect(interpretiveAnswer.sections?.explanation?.toLowerCase()).toContain('murit en toi')
+  })
+
   it('never renders fusion_general as a raw internal key', () => {
     const answer = buildFinalAnswer({
       userMessage: 'que se passe-t-il pour moi ?',
@@ -269,7 +343,7 @@ describe('buildFinalAnswer', () => {
     })
 
     expect(answer.text).not.toContain('fusion_general')
-    expect(answer.sections?.opening?.toLowerCase()).toContain('clarifier')
+    expect(answer.sections?.opening?.toLowerCase()).toContain('ordre plus profondement')
   })
 
   it('uses a human fallback for unknown fusion subcategories', () => {
