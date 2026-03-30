@@ -10,6 +10,11 @@
 import type { Science } from '@/lib/hexastra/orchestration/universalClassification'
 import { resolveStrictAstroContext } from '@/lib/hexastra/guards/extractCoreAstro'
 import {
+  LEGACY_KUA_KEYS,
+  LEGACY_NUMEROLOGY_KEYS,
+  mergeFusionExactSectionWithLegacy,
+} from '@/lib/hexastra/api/normalizeFusionExactData'
+import {
   mergeHumanDesignSources,
   resolveHumanDesignCoreFields,
 } from '@/lib/humandesign/fieldResolver'
@@ -87,29 +92,6 @@ function mergeNested(raw: Record<string, unknown>, ...nestKeys: string[]): Recor
     return { ...blockObj, ...raw }
   }
   return raw
-}
-
-/**
- * Merge ALL known Numerology source objects from a raw /chart/fusion response.
- */
-function mergeNumerologySources(raw: Record<string, unknown>): Record<string, unknown> {
-  const merged: Record<string, unknown> = {}
-  for (const key of [
-    'numerologie',
-    'numerology',
-    'numerologie_complete',
-    'numerologieComplete',
-    'numerology_complete',
-    'numerologyComplete',
-    'numerologyFull',
-    'numbers',
-  ]) {
-    const block = raw[key]
-    if (block && typeof block === 'object' && !Array.isArray(block)) {
-      Object.assign(merged, block as Record<string, unknown>)
-    }
-  }
-  return { ...merged, ...raw }
 }
 
 function findPresentAliasDeep(
@@ -345,7 +327,10 @@ function checkNumerologyReliability(
   const missing: string[] = []
   const errors: string[] = []
 
-  const merged = mergeNumerologySources(raw)
+  const merged = {
+    ...raw,
+    ...mergeFusionExactSectionWithLegacy(raw, 'numerologyCycles', LEGACY_NUMEROLOGY_KEYS),
+  }
   const numerologySourceKeys = [
     'numerologie',
     'numerology',
@@ -391,7 +376,8 @@ function checkNumerologyReliability(
   const matchedAliases = Object.fromEntries(
     Object.entries(aliasGroups).map(([field, aliases]) => [
       field,
-      findPresentAliasInSources(merged, aliases, numerologySourceKeys),
+      findPresentAliasInSources(merged, aliases, numerologySourceKeys) ??
+        findPresentAliasDeep(merged, aliases),
     ]),
   ) as Record<keyof typeof aliasGroups, string | null>
 
@@ -416,7 +402,10 @@ function checkNumerologyReliability(
 
 function checkKuaReliability(raw: Record<string, unknown>): ReliabilityResult {
   const missing: string[] = []
-  const merged = mergeNested(raw, 'kua')
+  const merged = {
+    ...raw,
+    ...mergeFusionExactSectionWithLegacy(raw, 'kuaDirections', LEGACY_KUA_KEYS),
+  }
 
   if (!hasValue(merged, 'nombre_kua', 'kua', 'kua_number', 'numero_kua')) {
     missing.push('nombre_kua')

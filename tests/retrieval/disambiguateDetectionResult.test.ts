@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest'
+import { buildScienceDetectionResult } from '@/lib/hexastra/engine/scienceQueryBuilder'
+import { disambiguateDetectionResult } from '@/lib/hexastra/engine/disambiguateDetectionResult'
+
+function disambiguate(query: string, context?: Parameters<typeof disambiguateDetectionResult>[1]) {
+  return disambiguateDetectionResult(buildScienceDetectionResult(query), context)
+}
+
+describe('disambiguateDetectionResult', () => {
+  it('keeps "mon type" ambiguous between HD and enneagram', () => {
+    const result = disambiguate('mon type')
+
+    expect(result.prioritizedSubCategories).toEqual(
+      expect.arrayContaining(['hd_type', 'ennea_type_core']),
+    )
+    expect(result.dominantScience).toBeNull()
+    expect(result.ambiguities.some((entry) => entry.term === 'type' && entry.resolvedTo === null)).toBe(true)
+  })
+
+  it('keeps "mon profil" open across several profile sciences', () => {
+    const result = disambiguate('mon profil')
+
+    expect(result.prioritizedSubCategories).toEqual(
+      expect.arrayContaining(['hd_profile', 'num_core_profile', 'kua_profile']),
+    )
+    expect(result.dominantScience).toBeNull()
+  })
+
+  it('expands "mon cycle actuel" into timing-oriented candidates without forcing one science', () => {
+    const result = disambiguate('mon cycle actuel')
+
+    expect(result.prioritizedSubCategories).toEqual(
+      expect.arrayContaining(['fusion_timing', 'astro_transits_current', 'num_personal_year', 'hd_current_cycle']),
+    )
+    expect(result.dominantScience).toBeNull()
+  })
+
+  it('keeps "ma direction" ambiguous between decision and Kua', () => {
+    const result = disambiguate('ma direction')
+
+    expect(result.prioritizedSubCategories).toEqual(
+      expect.arrayContaining(['fusion_decision', 'kua_favorable_directions']),
+    )
+    expect(result.dominantScience).toBeNull()
+  })
+
+  it('keeps "mon retour" open across return families', () => {
+    const result = disambiguate('mon retour')
+
+    expect(result.prioritizedSubCategories).toEqual(
+      expect.arrayContaining(['astro_solar_return', 'astro_lunar_return', 'astro_saturn_return', 'hd_return_reading']),
+    )
+    expect(result.dominantScience).toBeNull()
+  })
+
+  it('keeps "ma compatibilité" open across relationship sciences', () => {
+    const result = disambiguate('ma compatibilité')
+
+    expect(result.prioritizedSubCategories).toEqual(
+      expect.arrayContaining([
+        'astro_synastry',
+        'hd_connection_dynamics',
+        'num_relationship_compatibility',
+        'ennea_relationship_dynamics',
+      ]),
+    )
+    expect(result.dominantScience).toBeNull()
+  })
+
+  it('picks fusion as dominant for a generic current-life question', () => {
+    const result = disambiguate('que se passe-t-il pour moi en ce moment')
+
+    expect(result.prioritizedSubCategories).toEqual(
+      expect.arrayContaining(['fusion_general', 'fusion_timing', 'astro_transits_current']),
+    )
+    expect(result.dominantScience).toBe('fusion')
+  })
+
+  it('resolves "mon type hd" to Human Design', () => {
+    const result = disambiguate('mon type hd', { hasBirthData: true })
+
+    expect(result.dominantScience).toBe('human_design')
+    expect(result.dominantSubCategory).toBe('hd_type')
+  })
+
+  it('resolves "mon profil human design" to the HD profile', () => {
+    const result = disambiguate('mon profil human design', { hasBirthData: true })
+
+    expect(result.dominantScience).toBe('human_design')
+    expect(result.dominantSubCategory).toBe('hd_profile')
+  })
+
+  it('resolves "mon année perso" to numerology', () => {
+    const result = disambiguate('mon année perso')
+
+    expect(result.dominantScience).toBe('numerology')
+    expect(result.dominantSubCategory).toBe('num_personal_year')
+  })
+
+  it('resolves "mes directions favorables" to Kua', () => {
+    const result = disambiguate('mes directions favorables')
+
+    expect(result.dominantScience).toBe('kua')
+    expect(result.dominantSubCategory).toBe('kua_favorable_directions')
+  })
+})

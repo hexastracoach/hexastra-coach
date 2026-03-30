@@ -192,6 +192,65 @@ describe('buildHoroscopeDataBlock', () => {
   it('does not throw when all params are null', () => {
     expect(() => buildHoroscopeDataBlock(null, null, null, 'daily')).not.toThrow()
   })
+
+  it('reads canonical exactData transits in the horoscope data block', () => {
+    const block = buildHoroscopeDataBlock(
+      null,
+      null,
+      {
+        exactData: {
+          transits: {
+            saturn: 'clarification',
+          },
+        },
+      },
+      'daily',
+    )
+
+    expect(block).toContain('TRANSITS ACTUELS')
+    expect(block).toContain('saturn')
+  })
+
+  it('reads personal year from exactData.numerology_cycles', () => {
+    const block = buildHoroscopeDataBlock(
+      null,
+      null,
+      {
+        exactData: {
+          numerology_cycles: {
+            yearly: {
+              personalYearNumber: 7,
+            },
+          },
+        },
+      },
+      'daily',
+    )
+
+    expect(block).toContain('ANN')
+    expect(block).toContain('7')
+  })
+
+  it('reads sun, moon and ascendant from nested tropical placements', () => {
+    const block = buildHoroscopeDataBlock(
+      null,
+      null,
+      {
+        tropical: {
+          planets: {
+            sun: { sign: 'Taurus' },
+            moon: { sign: 'Cancer' },
+          },
+          ascendant: { sign: 'Leo' },
+        },
+      },
+      'daily',
+    )
+
+    expect(block).toContain('SIGNE SOLAIRE: Taureau')
+    expect(block).toContain('SIGNE LUNAIRE: Cancer')
+    expect(block).toContain('ASCENDANT: Lion')
+  })
 })
 
 // ── DAILY_REQUIRED_BLOCKS — nouvelle structure ────────────────────────────────

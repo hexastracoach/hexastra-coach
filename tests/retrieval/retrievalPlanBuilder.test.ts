@@ -35,6 +35,8 @@ describe('buildRetrievalPlanFromQuery', () => {
     expect(plan.subCategories).toContain('hd_type')
     expect(plan.scienceTags).toContain('human_design')
     expect(plan.weightedMatches[0]?.subCategory).toBe('hd_type')
+    expect(plan.dominantScience).toBe('human_design')
+    expect(plan.dominantSubCategory).toBe('hd_type')
   })
 
   it('builds a human design retrieval plan for channels', () => {
@@ -98,5 +100,29 @@ describe('buildRetrievalPlanFromQuery', () => {
     expect(plan.subCategories).toEqual(['fusion_general'])
     expect(plan.sciences).toEqual(['fusion'])
     expect(plan.vectorNamespaces).toContain('ks_fusion_globaux')
+  })
+
+  it('keeps "mon type" multi-science when the query is truly ambiguous', () => {
+    const plan = buildRetrievalPlanFromQuery('mon type')
+
+    expect(plan.sciences).toEqual(expect.arrayContaining(['human_design', 'enneagram']))
+    expect(plan.subCategories).toEqual(expect.arrayContaining(['hd_type', 'ennea_type_core']))
+    expect(plan.dominantScience).toBeNull()
+  })
+
+  it('resolves "mon profil human design" to the HD profile even if the phrase is generic', () => {
+    const plan = buildRetrievalPlanFromQuery('mon profil human design', { hasBirthData: true })
+
+    expect(plan.dominantScience).toBe('human_design')
+    expect(plan.dominantSubCategory).toBe('hd_profile')
+    expect(plan.weightedMatches[0]?.subCategory).toBe('hd_profile')
+  })
+
+  it('resolves "mes directions favorables" to Kua with a dominant subcategory', () => {
+    const plan = buildRetrievalPlanFromQuery('mes directions favorables')
+
+    expect(plan.dominantScience).toBe('kua')
+    expect(plan.dominantSubCategory).toBe('kua_favorable_directions')
+    expect(plan.weightedMatches[0]?.subCategory).toBe('kua_favorable_directions')
   })
 })

@@ -21,9 +21,12 @@ import type { CompactReadingCore } from './compactReadingCore'
 import type { FusionContext } from './buildFusionContext'
 import type { UserIntent } from '../orchestration/intentClassifier'
 import type { FlowType } from '../orchestration/queryRouter'
+import type { RetrievalPlan } from '@/lib/hexastra/retrieval/retrievalPlanBuilder'
+import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
 import { resolveKsModules } from '../orchestration/queryRouter'
 import {
   type KsSignal,
+  type KsSourceLayer,
   type FusionSummary,
   type KsZoneHint,
   type KsPhaseHint,
@@ -43,6 +46,10 @@ export type KsPipelineInput = {
   lang?: string
   /** Signaux additionnels issus du retrieval vectoriel (extractRetrievalSignals) */
   additionalSignals?: KsSignal[]
+  /** Signaux structurés issus du RetrievalPlan + retrieval + exact data */
+  structuredSignals?: StructuredSignal[]
+  /** Contexte retrieval exposé à la couche de fusion */
+  retrievalPlan?: RetrievalPlan | null
 }
 
 export type KsPipelineOutput = {
@@ -52,6 +59,16 @@ export type KsPipelineOutput = {
   priorityField: PriorityFieldResult
   arbiter: KsArbiterResult
   arbiterDirective: string
+  retrievalContext?: {
+    sciences: string[]
+    subCategories: string[]
+    weightedMatches: Array<{
+      subCategory: string
+      science: string
+      score: number
+      retrievalPriority: number
+    }>
+  }
 }
 
 // ── Module → KS label mapping ─────────────────────────────────────────────────
@@ -62,6 +79,81 @@ const MODULE_TO_KS: Record<string, string> = {
   numerology:   'KS.Resonance.Balance',
   enneagram:    'KS.Porteum',
   kua:          'KS.DeconditioMap',
+}
+
+const SCIENCE_TO_KS: Record<string, string> = {
+  astro: 'KS.Threshold.Timing',
+  human_design: 'KS.Presence.Field',
+  numerology: 'KS.Resonance.Balance',
+  enneagram: 'KS.Porteum',
+  kua: 'KS.DeconditioMap',
+  fusion: 'KS.Strategic.Arbiter',
+}
+
+const SCIENCE_TO_LAYER: Record<string, KsSourceLayer> = {
+  astro: 'cosmos',
+  human_design: 'human',
+  numerology: 'symbolic',
+  enneagram: 'human',
+  kua: 'nature',
+  fusion: 'strategic',
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function summarizeStructuredValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 2)
+      .map((entry) => summarizeStructuredValue(entry))
+      .join(' | ')
+  }
+
+  if (!value || typeof value !== 'object') {
+    return String(value ?? '')
+  }
+
+  return JSON.stringify(value).slice(0, 260)
+}
+
+function buildKsSignalsFromStructuredSignals(
+  structuredSignals: StructuredSignal[],
+): KsSignal[] {
+  return structuredSignals.slice(0, 10).map((signal) => {
+    const description = summarizeStructuredValue(signal.value)
+    const sourceType = signal.sourceType ?? 'fusion'
+    const confidence =
+      sourceType === 'exact_data'
+        ? 0.88
+        : sourceType === 'retrieval'
+          ? 0.72
+          : 0.58
+    const intensity = clamp((signal.score ?? 5) / 10, 0.4, 0.95)
+
+    return {
+      module: SCIENCE_TO_KS[signal.science] ?? 'KS.Strategic.Arbiter',
+      sourceLayer: SCIENCE_TO_LAYER[signal.science] ?? 'strategic',
+      signals: [
+        {
+          tag: signal.subCategory,
+          description: description || `${signal.science}:${signal.subCategory}`,
+          intensity,
+          confidence,
+        },
+      ],
+      phaseHint: description ? inferPhase(description) : null,
+      zoneHint: description ? inferZone(description) : null,
+      riskFlag: false,
+      opportunityFlag: sourceType === 'exact_data' && intensity >= 0.7,
+      notes: `structured_signal:${sourceType}`,
+    }
+  })
 }
 
 // ── Helpers de conversion phase/zone ──────────────────────────────────────────
@@ -409,7 +501,17 @@ function buildArbiterDirective(
  * Appelé depuis runHexastraFlow après que compactCore soit disponible.
  */
 export function runKsPipeline(input: KsPipelineInput): KsPipelineOutput {
-  const { userIntent, userMessage, compactCore, fusionCtx, flowType, lang = 'fr', additionalSignals } = input
+  const {
+    userIntent,
+    userMessage,
+    compactCore,
+    fusionCtx,
+    flowType,
+    lang = 'fr',
+    additionalSignals,
+    structuredSignals,
+    retrievalPlan,
+  } = input
   const isFr = !lang.startsWith('en')
 
   // Étape 3 — Module resolution
@@ -419,11 +521,17 @@ export function runKsPipeline(input: KsPipelineInput): KsPipelineOutput {
 
   // Étape 4 — Conversion en KsSignal[]
   const coreSignals = buildKsSignalsFromFusion(compactCore, fusionCtx, ksModules)
+  const structuredKsSignals =
+    structuredSignals && structuredSignals.length > 0
+      ? buildKsSignalsFromStructuredSignals(structuredSignals)
+      : []
 
   // Merge signaux retrieval vectoriel (si présents) — enrichissent sans écraser
-  const signals = additionalSignals && additionalSignals.length > 0
-    ? [...coreSignals, ...additionalSignals]
-    : coreSignals
+  const signals = [
+    ...coreSignals,
+    ...structuredKsSignals,
+    ...(additionalSignals ?? []),
+  ]
 
   // Étape 5 — Fusion Engine
   const fusionSummary = buildFusionSummary(signals)
@@ -458,5 +566,12 @@ export function runKsPipeline(input: KsPipelineInput): KsPipelineOutput {
     priorityField: priorityFieldResult,
     arbiter: arbiterResult,
     arbiterDirective,
+    retrievalContext: retrievalPlan
+      ? {
+          sciences: retrievalPlan.sciences,
+          subCategories: retrievalPlan.subCategories,
+          weightedMatches: retrievalPlan.weightedMatches.slice(0, 8),
+        }
+      : undefined,
   }
 }

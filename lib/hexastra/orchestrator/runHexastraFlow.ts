@@ -21,8 +21,18 @@ import {
   writeSessionState,
 } from '@/lib/hexastra/memory/sessionMemory'
 import { writeUserMemory } from '@/lib/hexastra/memory/userMemory'
-import { multiLayerRetrieval } from '@/lib/hexastra/retrieval/multiLayerRetrieval'
+import {
+  multiLayerRetrieval,
+  multiLayerRetrievalWithPlan,
+} from '@/lib/hexastra/retrieval/multiLayerRetrieval'
 import { extractRetrievalSignals } from '@/lib/hexastra/retrieval/retrievalSignalExtractor'
+import { buildRetrievalPlanFromQuery } from '@/lib/hexastra/retrieval/retrievalPlanBuilder'
+import { buildExactDataRequestFromRetrievalPlan } from '@/lib/hexastra/retrieval/exactDataHintMapper'
+import {
+  buildStructuredRetrievalSignalsBlock,
+  buildStructuredSignals,
+} from '@/lib/hexastra/retrieval/structuredSignalBuilder'
+import { prioritizeStructuredSignals } from '@/lib/hexastra/retrieval/prioritizeStructuredSignals'
 
 import type {
   BirthProfile,
@@ -134,6 +144,7 @@ import { runKsPipeline, type KsPipelineOutput } from '@/lib/hexastra/orchestrato
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
 import { isReliableExactData } from '@/lib/exact-data/reliability'
 import { buildCompactExactScienceBlock } from '@/lib/exact-data/compactBlocks'
+import { normalizeFusionExactDataWithDiagnostics } from '@/lib/hexastra/api/normalizeFusionExactData'
 import {
   shouldBlockFalsePlanLimitation,
   containsFalsePlanLimitation,
@@ -148,6 +159,7 @@ import {
 } from '@/lib/monetization/smartPricing'
 import { detectSubCategories, requiresTransits } from '@/lib/hexastra/engine/scienceQueryBuilder'
 import { buildSignals, type SubCategorySignal } from '@/lib/hexastra/engine/retrievalSignalExtractor'
+import { SCIENCE_SUBCATEGORY_INDEX } from '@/lib/hexastra/taxonomy/scienceTaxonomy'
 
 const VECTOR_STORE_ID = process.env.OPENAI_VECTOR_STORE_ID || ''
 const API_URL = (process.env.HEXASTRA_API_URL || '').replace(/\/$/, '')
@@ -1139,11 +1151,15 @@ async function runSpecializedModule({
   birthData,
   practitionerUsage,
   messages,
+  retrievalPlan,
+  exactDataRequest,
 }: {
   domainRoute: DomainRoute
   birthData: BirthProfile | null
   practitionerUsage: PractitionerUsageHex
   messages: ChatMessage[]
+  retrievalPlan?: ReturnType<typeof buildRetrievalPlanFromQuery> | null
+  exactDataRequest?: ReturnType<typeof buildExactDataRequestFromRetrievalPlan> | null
 }): Promise<SpecializedModuleResult | null> {
   const latestUserMessage =
     messages.filter((m) => m.role === 'user').at(-1)?.content?.trim() ?? ''
@@ -1173,8 +1189,14 @@ async function runSpecializedModule({
   }
 
   // Détection des sous-catégories pour affiner l'appel Railway
-  const subCategories = detectSubCategories(latestUserMessage)
-  const includeTransits = requiresTransits(subCategories)
+  const subCategories =
+    retrievalPlan?.subCategories?.length
+      ? retrievalPlan.subCategories
+          .map((subCategory) => SCIENCE_SUBCATEGORY_INDEX[subCategory])
+          .filter((subCategory): subCategory is NonNullable<typeof subCategory> => Boolean(subCategory))
+      : detectSubCategories(latestUserMessage)
+  const includeTransits =
+    Boolean(exactDataRequest?.includeTransits) || requiresTransits(subCategories)
 
   // Nouvelle API : tout passe par /chart/fusion (couvre HD, numérologie, kua…)
   if (birthData?.birthDateISO || birthData?.date) {
@@ -1214,6 +1236,12 @@ async function runSpecializedModule({
         question: fusionPayload.question,
         practitioner_usage: fusionPayload.practitioner_usage,
         include_transits: includeTransits,
+        include_progressions: Boolean(exactDataRequest?.includeProgressions),
+        include_solar_return: Boolean(exactDataRequest?.includeSolarReturn),
+        include_lunar_return: Boolean(exactDataRequest?.includeLunarReturn),
+        include_human_design_transits: Boolean(exactDataRequest?.includeHumanDesignTransits),
+        include_numerology_cycles: Boolean(exactDataRequest?.includeNumerologyCycles),
+        include_kua_directions: Boolean(exactDataRequest?.includeKuaDirections),
       })
 
       const summary =
@@ -2375,12 +2403,27 @@ export async function runHexastraFlow(input: {
       domainRoute,
       query: retrievalQuery || latestUserMessage,
     })
-    const retrievalPlan = buildRetrievalPlan({
+    const retrievalDisambiguationContext = {
+      hasBirthData,
+      domainRoute,
+      selectedScience:
+        explicitScienceIntent?.science ??
+        resolvePublicScienceFromSelectionKey(selectedSubmenuKey) ??
+        resolvePublicScienceFromSelectionKey(selectedMenuKey),
+      selectedSubCategory:
+        universalClassif.subcategory ??
+        resolveKsSelectionKeyFromMenuKey(selectedSubmenuKey ?? selectedMenuKey),
+    }
+    const menuRetrievalPlan = buildRetrievalPlan({
       plan,
       flowStep,
       domainRoute,
       specializedSource: null,
     }) as any
+    let scientificRetrievalPlan = buildRetrievalPlanFromQuery(
+      retrievalQuery || latestUserMessage,
+      retrievalDisambiguationContext,
+    )
 
     // ── Skip vector retrieval based on universal vector policy ────────────────
     // Policy: exact fact/profile → skip; interpretation/guidance → enrich.
@@ -2412,17 +2455,56 @@ export async function runHexastraFlow(input: {
       })
     }
 
-    const retrievalResults =
-      !skipVectorRetrieval && VECTOR_STORE_ID && process.env.OPENAI_API_KEY
-        ? await multiLayerRetrieval({
-            query: retrievalQuery || latestUserMessage,
-            plan,
-            vectorStoreId: VECTOR_STORE_ID,
-            apiKey: process.env.OPENAI_API_KEY,
-            domainRoute,
-            intent: userIntent,
-          })
-        : []
+    let retrievalResults =
+      [] as Awaited<ReturnType<typeof multiLayerRetrieval>>
+
+    if (!skipVectorRetrieval && VECTOR_STORE_ID && process.env.OPENAI_API_KEY) {
+      try {
+        const retrievalEnvelope = await multiLayerRetrievalWithPlan({
+          query: retrievalQuery || latestUserMessage,
+          plan,
+          vectorStoreId: VECTOR_STORE_ID,
+          apiKey: process.env.OPENAI_API_KEY,
+          domainRoute,
+          intent: userIntent,
+          retrievalPlan: scientificRetrievalPlan,
+        })
+
+        retrievalResults = retrievalEnvelope.results
+        scientificRetrievalPlan = retrievalEnvelope.retrievalPlan
+      } catch (error) {
+        flowLog('warn', 'RETRIEVAL_PLAN_PIPELINE_FALLBACK', {
+          error,
+          reason: 'multiLayerRetrievalWithPlan failed, falling back to legacy array retrieval',
+        })
+
+        retrievalResults = await multiLayerRetrieval({
+          query: retrievalQuery || latestUserMessage,
+          plan,
+          vectorStoreId: VECTOR_STORE_ID,
+          apiKey: process.env.OPENAI_API_KEY,
+          domainRoute,
+          intent: userIntent,
+        })
+      }
+    }
+
+    const exactDataRequest = buildExactDataRequestFromRetrievalPlan(scientificRetrievalPlan)
+    const retrievalDebug = {
+      sciences: scientificRetrievalPlan.sciences,
+      subCategories: scientificRetrievalPlan.subCategories,
+      preferredTopK: scientificRetrievalPlan.preferredTopK,
+      exactDataRequest,
+      fallbackUsed: scientificRetrievalPlan.fallbackUsed,
+      dominantScience: scientificRetrievalPlan.dominantScience ?? null,
+      dominantSubCategory: scientificRetrievalPlan.dominantSubCategory ?? null,
+      ambiguities: scientificRetrievalPlan.ambiguities ?? [],
+      topWeightedMatches: scientificRetrievalPlan.weightedMatches.slice(0, 6),
+      vectorSkipped: skipVectorRetrieval,
+      resultsCount: retrievalResults.length,
+    }
+
+    flowLog('debug', 'RETRIEVAL_PLAN_RESOLVED', retrievalDebug)
 
     const knowledgePayload =
       retrievalResults.length
@@ -2432,12 +2514,12 @@ export async function runHexastraFlow(input: {
     const resolvedSelectedMenuKey =
       selectedMenuKey ??
       userContext.session?.selectedMenuKey ??
-      retrievalPlan?.menu?.selectedMenuKey ??
+      menuRetrievalPlan?.menu?.selectedMenuKey ??
       null
     const resolvedSelectedSubmenuKey =
       selectedSubmenuKey ??
       userContext.session?.selectedSubmenuKey ??
-      retrievalPlan?.menu?.selectedSubmenuKey ??
+      menuRetrievalPlan?.menu?.selectedSubmenuKey ??
       null
 
     const sessionContext = await buildSessionContext({
@@ -2450,7 +2532,7 @@ export async function runHexastraFlow(input: {
       practitioner: plan === 'practitioner',
     })
 
-    const menuInstruction = retrievalPlan?.menu?.instruction ?? null
+    const menuInstruction = menuRetrievalPlan?.menu?.instruction ?? null
     const selectionExecutionContract =
       selectionExecutionContractPreview ??
       getCompatibleSelectionExecutionContract(selectedSubmenu?.key ?? null) ??
@@ -2538,6 +2620,8 @@ export async function runHexastraFlow(input: {
           birthData: normalizeBirthData(userContext.birthData),
           practitionerUsage: normalizedPractitionerUsage,
           messages: limitedMessages,
+          retrievalPlan: scientificRetrievalPlan,
+          exactDataRequest,
         })
       : null
     astroEndMs = Date.now()
@@ -2913,8 +2997,95 @@ export async function runHexastraFlow(input: {
     const activeModules = Array.from(
       new Set([...selectionModules, ...selectionSubmodules, ...getModulesForDomain(domainRoute)])
     )
+    const normalizedExactDataResult = normalizeFusionExactDataWithDiagnostics(
+      specializedResult?.raw ?? null,
+    )
 
-    const knowledgeBlock = knowledgePayload?.block
+    flowLog('debug', 'FUSION_EXACT_DATA_NORMALIZED', {
+      detectedSections: normalizedExactDataResult.diagnostics.detectedSections,
+      sectionsUsedViaExactData: normalizedExactDataResult.diagnostics.exactDataSections,
+      sectionsUsedViaAliasFallback: normalizedExactDataResult.diagnostics.aliasFallbackSections,
+      missingSections: normalizedExactDataResult.diagnostics.missingSections,
+    })
+
+    const rawStructuredSignals = buildStructuredSignals({
+      retrievalPlan: scientificRetrievalPlan,
+      retrievalResults,
+      exactData: specializedResult?.raw ?? null,
+      normalizedExactData: normalizedExactDataResult.exactData,
+      exactDataDiagnostics: normalizedExactDataResult.diagnostics,
+    })
+    let structuredSignals = rawStructuredSignals
+
+    try {
+      const prioritizedStructuredSignalsResult = prioritizeStructuredSignals({
+        structuredSignals: rawStructuredSignals,
+        retrievalPlan: scientificRetrievalPlan,
+        intent: userIntent,
+      })
+
+      structuredSignals = prioritizedStructuredSignalsResult.signals
+
+      flowLog('debug', 'STRUCTURED_SIGNALS_PRIORITIZED', {
+        dominantScience: scientificRetrievalPlan.dominantScience ?? null,
+        dominantSubCategory: scientificRetrievalPlan.dominantSubCategory ?? null,
+        topBefore: rawStructuredSignals.slice(0, 5).map((signal) => ({
+          science: signal.science,
+          subCategory: signal.subCategory,
+          sourceType: signal.sourceType ?? 'fusion',
+        })),
+        topAfter: structuredSignals.slice(0, 5).map((signal) => ({
+          science: signal.science,
+          subCategory: signal.subCategory,
+          sourceType: signal.sourceType ?? 'fusion',
+        })),
+        scores: prioritizedStructuredSignalsResult.scoredSignals
+          .sort((a, b) => b.priorityScore - a.priorityScore)
+          .slice(0, 6)
+          .map((signal) => ({
+            subCategory: signal.subCategory,
+            science: signal.science,
+            sourceType: signal.sourceType ?? 'fusion',
+            priorityScore: signal.priorityScore,
+          })),
+      })
+    } catch (error) {
+      flowLog('warn', 'STRUCTURED_SIGNALS_PRIORITIZATION_FALLBACK', {
+        error,
+        reason: 'prioritizeStructuredSignals failed, keeping original order',
+      })
+    }
+
+    const structuredExactDataSections = Array.from(
+      new Set(
+        structuredSignals
+          .filter((signal) => signal.sourceType === 'exact_data' && signal.exactDataSection)
+          .map((signal) => signal.exactDataSection)
+          .filter(Boolean),
+      ),
+    )
+    const exactDataSignalSections = structuredExactDataSections.filter(
+      (section) => normalizedExactDataResult.diagnostics.sourceBySection[section] === 'exactData',
+    )
+    const aliasFallbackSignalSections = structuredExactDataSections.filter(
+      (section) => normalizedExactDataResult.diagnostics.sourceBySection[section] === 'alias',
+    )
+
+    flowLog('debug', 'STRUCTURED_SIGNALS_EXACT_DATA_USAGE', {
+      totalStructuredSignals: structuredSignals.length,
+      exactDataStructuredSignals: structuredSignals.filter((signal) => signal.sourceType === 'exact_data').length,
+      structuredSignalSectionsDetected: structuredExactDataSections,
+      sectionsUsedViaExactData: exactDataSignalSections,
+      sectionsUsedViaAliasFallback: aliasFallbackSignalSections,
+    })
+
+    const structuredRetrievalSignalsBlock = buildStructuredRetrievalSignalsBlock({
+      retrievalPlan: scientificRetrievalPlan,
+      structuredSignals,
+      intent: userIntent,
+      flowType: normalizedContextType,
+    })
+    const knowledgeBlock = structuredRetrievalSignalsBlock ?? knowledgePayload?.block
 
     // Construire des signaux KS robustes
     const signals: KSSignal[] = []
@@ -3049,13 +3220,27 @@ export async function runHexastraFlow(input: {
       selectedPromptHint,
       selectedOutputStructure,
       latestUserMessage,
+      retrievalPlan: scientificRetrievalPlan,
+      exactData: specializedResult?.raw ?? null,
+      normalizedExactData: normalizedExactDataResult.exactData,
+      exactDataRequest,
+      structuredSignals,
+      ksNarrativeBrief,
+      fusionHints: Array.from(
+        new Set([
+          ...scientificRetrievalPlan.sciences,
+          ...scientificRetrievalPlan.subCategories.slice(0, 4),
+          ...scientificRetrievalPlan.exactDataHints.slice(0, 4),
+        ]),
+      ),
     })
 
-    // Extraction des signaux vectoriels structurés par science
-    // Alimente additionalSignals (ksPipeline) + vectorRetrievalSignalsBlock (buildChatPayload)
-    // flowType non disponible ici — passé séparément plus bas dans le pipeline KS
+    // Fallback progressif: structuredSignals deviennent la source prioritaire du bloc retrieval.
+    // L'ancien extractRetrievalSignals reste disponible si le packet ne contient pas assez de matiere.
     const retrievalSignalsResult =
-      knowledgePacket?.orderedSources && knowledgePacket.orderedSources.length > 0
+      structuredRetrievalSignalsBlock
+        ? null
+        : knowledgePacket?.orderedSources && knowledgePacket.orderedSources.length > 0
         ? extractRetrievalSignals({
             orderedSources: knowledgePacket.orderedSources as Parameters<typeof extractRetrievalSignals>[0]['orderedSources'],
             intent: userIntent,
@@ -3308,7 +3493,9 @@ export async function runHexastraFlow(input: {
             fusionCtx,
             flowType,
             lang,
-            additionalSignals: retrievalSignalsResult?.signals,
+            additionalSignals: structuredSignals.length > 0 ? undefined : retrievalSignalsResult?.signals,
+            structuredSignals,
+            retrievalPlan: scientificRetrievalPlan,
           })
 
           flowLog('info', 'KS_FLOW_TYPE', {
@@ -3322,6 +3509,10 @@ export async function runHexastraFlow(input: {
           flowLog('info', 'KS_SIGNALS_COUNT', {
             count: ksPipelineOutput.signals.length,
             modules: ksPipelineOutput.signals.map(s => s.module),
+          })
+          flowLog('debug', 'KS_RETRIEVAL_CONTEXT', {
+            retrievalContext: ksPipelineOutput.retrievalContext ?? null,
+            structuredSignalsCount: structuredSignals.length,
           })
           flowLog('info', 'KS_FUSION_DOMINANT', {
             dominantSignal: ksPipelineOutput.fusionSummary.dominantSignal,
@@ -3751,7 +3942,10 @@ export async function runHexastraFlow(input: {
       isAstroExactCompact: isAstroExactCompact || isHumanDesignExactCompact,
       isHoroscopeRoute: isHoroscopeRoute || undefined,
       horoscopeVariant: horoscopeVariant ?? undefined,
-      vectorRetrievalSignalsBlock: retrievalSignalsResult?.block ?? null,
+      vectorRetrievalSignalsBlock:
+        structuredRetrievalSignalsBlock ??
+        retrievalSignalsResult?.block ??
+        null,
     })
 
     if (isAstroExactCompact || isHumanDesignExactCompact) {
@@ -4229,6 +4423,28 @@ export async function runHexastraFlow(input: {
         fusionOnlyExperience: true,
         scienceBreakdownAvailable,
         advancedAnalysisAvailable: plan === 'practitioner',
+        retrievalPlan: {
+          sciences: scientificRetrievalPlan.sciences,
+          subCategories: scientificRetrievalPlan.subCategories,
+          vectorNamespaces: scientificRetrievalPlan.vectorNamespaces,
+          scienceTags: scientificRetrievalPlan.scienceTags,
+          exactDataHints: scientificRetrievalPlan.exactDataHints,
+          weightedMatches: scientificRetrievalPlan.weightedMatches.slice(0, 8),
+          preferredTopK: scientificRetrievalPlan.preferredTopK,
+          fallbackUsed: scientificRetrievalPlan.fallbackUsed,
+          dominantScience: scientificRetrievalPlan.dominantScience ?? null,
+          dominantSubCategory: scientificRetrievalPlan.dominantSubCategory ?? null,
+          ambiguities: scientificRetrievalPlan.ambiguities ?? [],
+        },
+        retrievalResults: retrievalResults.slice(0, 6).map((result) => ({
+          source: result.source,
+          filename: result.filename ?? null,
+          score: Number(result.score.toFixed(3)),
+          scienceTag: result.scienceTag ?? null,
+          retrievalFocus: result.retrievalFocus ?? null,
+        })),
+        exactDataRequest,
+        retrievalDebug,
         responseDepth:
           plan === 'practitioner'
             ? 'expert'

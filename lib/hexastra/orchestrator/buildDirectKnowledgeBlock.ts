@@ -13,6 +13,12 @@
 
 import { buildCompactHumanDesignContext } from '@/lib/humandesign/compactContext'
 import { buildCompactNatalReadingContext } from '@/lib/hexastra/guards/exactDataGuard'
+import {
+  findFirstMatchingValueDeep,
+  mergeFusionExactSectionWithLegacy,
+  LEGACY_KUA_KEYS,
+  LEGACY_NUMEROLOGY_KEYS,
+} from '@/lib/hexastra/api/normalizeFusionExactData'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -56,7 +62,8 @@ function pick(obj: Record<string, unknown>, ...keys: string[]): unknown {
     const v = obj[key]
     if (v !== null && v !== undefined) return v
   }
-  return null
+
+  return findFirstMatchingValueDeep(obj, keys)
 }
 
 // ── Détection du topic depuis le message ──────────────────────────────────────
@@ -219,10 +226,7 @@ function buildEnneagramBlock(raw: Record<string, unknown>, isFr: boolean): strin
 }
 
 function buildKuaBlock(raw: Record<string, unknown>, isFr: boolean): string {
-  const merged: Record<string, unknown> = {
-    ...((raw.kua ?? {}) as object),
-    ...raw,
-  }
+  const merged = mergeFusionExactSectionWithLegacy(raw, 'kuaDirections', LEGACY_KUA_KEYS)
 
   const kuaNumber = safeStr(pick(merged, 'kua', 'kua_number', 'nombre_kua', 'kuaNumber', 'kua_num'))
   const goodDirs = safeArr(pick(merged, 'good_directions', 'directions_favorables', 'favorable_directions', 'best_directions'))
@@ -252,10 +256,7 @@ function buildKuaBlock(raw: Record<string, unknown>, isFr: boolean): string {
 }
 
 function buildNumerologyBlock(raw: Record<string, unknown>, isFr: boolean): string {
-  const merged: Record<string, unknown> = {
-    ...((raw.numerology ?? raw.numerologie ?? {}) as object),
-    ...raw,
-  }
+  const merged = mergeFusionExactSectionWithLegacy(raw, 'numerologyCycles', LEGACY_NUMEROLOGY_KEYS)
 
   const lifePath = safeStr(pick(merged, 'chemin_de_vie', 'life_path', 'lifePath', 'cheminVie', 'lifePathNumber'))
   const personalYear = safeStr(pick(merged, 'annee_personnelle', 'personal_year', 'personalYear', 'yearNumber'))

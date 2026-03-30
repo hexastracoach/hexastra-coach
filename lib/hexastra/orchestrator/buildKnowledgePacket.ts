@@ -1,5 +1,13 @@
 import type { DomainRoute } from '@/lib/hexastra/types'
 import type { LayerResult } from '@/lib/hexastra/retrieval/multiLayerRetrieval'
+import type { RetrievalPlan } from '@/lib/hexastra/retrieval/retrievalPlanBuilder'
+import type { ExactDataRequest } from '@/lib/hexastra/retrieval/exactDataHintMapper'
+import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
+import {
+  normalizeFusionExactData,
+  type NormalizedFusionExactData,
+  type NormalizedFusionExactDataSection,
+} from '@/lib/hexastra/api/normalizeFusionExactData'
 import {
   lookupDocumentRegistry,
   type DocumentRole,
@@ -10,7 +18,7 @@ type KnowledgeRole = DocumentRole | 'noise'
 
 type ScienceTag = DocumentScienceTag | null
 
-type KnowledgePacketEntry = {
+export type KnowledgePacketEntry = {
   role: KnowledgeRole
   filename: string | null
   source: string
@@ -18,6 +26,50 @@ type KnowledgePacketEntry = {
   priority: number
   scienceTag: ScienceTag
   excerpt: string
+}
+
+export type KnowledgePacket = {
+  domainRoute: DomainRoute
+  focus: {
+    selectedMenuLabel: string | null
+    selectedSubmenuLabel: string | null
+    scienceFocus: string | null
+    subscienceFocus: string | null
+  }
+  constraints: {
+    selectedPromptHint: string | null
+    selectedOutputStructure: string | null
+  }
+  priorityOrder: readonly KnowledgeRole[]
+  hierarchyGuide: string
+  fusionGuide: string
+  ignoredSources: Array<{
+    filename: string | null
+    source: string
+    score: number
+  }>
+  masterPrompt: KnowledgePacketEntry | null
+  readingStructure: KnowledgePacketEntry | null
+  menuPrompt: KnowledgePacketEntry | null
+  sciencePrompt: KnowledgePacketEntry[]
+  subsciencePrompt: KnowledgePacketEntry[]
+  referenceBook: KnowledgePacketEntry[]
+  supportingKnowledge: KnowledgePacketEntry[]
+  orderedSources: Array<ReturnType<typeof summarizeEntry>>
+  retrievalPlan?: RetrievalPlan | null
+  retrievalResults?: LayerResult[]
+  exactData?: unknown
+  exactDataRequest?: ExactDataRequest | null
+  structuredSignals?: Array<{
+    science: string
+    subCategory: string
+    score?: number
+    sourceType?: 'exact_data' | 'retrieval' | 'fusion'
+    exactDataSection?: NormalizedFusionExactDataSection
+    value: unknown
+  }>
+  ksNarrativeBrief?: string | null
+  fusionHints?: string[]
 }
 
 function summarizeEntry(entry: KnowledgePacketEntry | null | undefined) {
@@ -48,6 +100,96 @@ function compactExcerpt(text: string, maxChars = 420) {
   const wordCut = cleaned.lastIndexOf(' ', maxChars)
   if (wordCut > maxChars * 0.6) return `${cleaned.slice(0, wordCut).trim()}...`
   return `${cleaned.slice(0, maxChars).trim()}...`
+}
+
+function compactRetrievalPlan(plan?: RetrievalPlan | null): RetrievalPlan | null {
+  if (!plan) return null
+
+  return {
+    ...plan,
+    sciences: plan.sciences.slice(0, 8),
+    subCategories: plan.subCategories.slice(0, 12),
+    vectorNamespaces: plan.vectorNamespaces.slice(0, 8),
+    scienceTags: plan.scienceTags.slice(0, 8),
+    exactDataHints: plan.exactDataHints.slice(0, 8),
+    weightedMatches: plan.weightedMatches.slice(0, 8),
+  }
+}
+
+function summarizeLayerResult(result: LayerResult): LayerResult {
+  return {
+    ...result,
+    text: compactExcerpt(result.text, 220),
+  }
+}
+
+function summarizeStructuredSignalValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return compactExcerpt(value, 240)
+  }
+
+  if (Array.isArray(value)) {
+    return value.slice(0, 2).map((entry) => summarizeStructuredSignalValue(entry))
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value
+  }
+
+  const record = value as Record<string, unknown>
+
+  if (Array.isArray(record.documents)) {
+    return {
+      documents: record.documents.slice(0, 2).map((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return entry
+        }
+
+        const document = entry as Record<string, unknown>
+        return {
+          ...document,
+          excerpt:
+            typeof document.excerpt === 'string'
+              ? compactExcerpt(document.excerpt, 180)
+              : document.excerpt,
+        }
+      }),
+    }
+  }
+
+  return compactExcerpt(JSON.stringify(record), 320)
+}
+
+function summarizeStructuredSignals(
+  signals: StructuredSignal[] | undefined,
+): KnowledgePacket['structuredSignals'] {
+  return signals?.slice(0, 8).map((signal) => ({
+    science: signal.science,
+    subCategory: signal.subCategory,
+    score: signal.score,
+    sourceType: signal.sourceType,
+    exactDataSection: signal.exactDataSection,
+    value: summarizeStructuredSignalValue(signal.value),
+  }))
+}
+
+function summarizeNormalizedExactData(
+  exactData: NormalizedFusionExactData | null | undefined,
+): KnowledgePacket['exactData'] {
+  if (!exactData) return null
+
+  const hasAnySection = Object.values(exactData).some((value) => value !== null && value !== undefined)
+  if (!hasAnySection) return null
+
+  return {
+    transits: summarizeStructuredSignalValue(exactData.transits),
+    progressions: summarizeStructuredSignalValue(exactData.progressions),
+    solarReturn: summarizeStructuredSignalValue(exactData.solarReturn),
+    lunarReturn: summarizeStructuredSignalValue(exactData.lunarReturn),
+    humanDesignTransits: summarizeStructuredSignalValue(exactData.humanDesignTransits),
+    numerologyCycles: summarizeStructuredSignalValue(exactData.numerologyCycles),
+    kuaDirections: summarizeStructuredSignalValue(exactData.kuaDirections),
+  }
 }
 
 function buildHaystack(result: LayerResult) {
@@ -442,7 +584,17 @@ export function buildKnowledgePacket(params: {
   selectedPromptHint?: string | null
   selectedOutputStructure?: string | null
   latestUserMessage?: string | null
-}) {
+  retrievalPlan?: RetrievalPlan | null
+  exactData?: unknown
+  normalizedExactData?: NormalizedFusionExactData
+  exactDataRequest?: ExactDataRequest | null
+  structuredSignals?: StructuredSignal[]
+  ksNarrativeBrief?: string | null
+  fusionHints?: string[]
+}): KnowledgePacket | null {
+  const normalizedExactData =
+    params.normalizedExactData ?? normalizeFusionExactData(params.exactData ?? null)
+  const summarizedExactData = summarizeNormalizedExactData(normalizedExactData)
   const scienceFocus = inferScienceFocus({
     domainRoute: params.domainRoute,
     selectedMenuLabel: params.selectedMenuLabel,
@@ -472,7 +624,7 @@ export function buildKnowledgePacket(params: {
   const entries = allEntries.filter((entry) => entry.role !== 'noise')
   const ignoredSources = allEntries.filter((entry) => entry.role === 'noise')
 
-  const packet = {
+  const packet: Omit<KnowledgePacket, 'orderedSources'> = {
     domainRoute: params.domainRoute,
     focus: {
       selectedMenuLabel: params.selectedMenuLabel ?? null,
@@ -508,6 +660,13 @@ export function buildKnowledgePacket(params: {
     subsciencePrompt: selectRoleEntries(entries, 'subsciencePrompt', 2),
     referenceBook: selectReferenceBooks(entries, scienceFocus, 3),
     supportingKnowledge: selectRoleEntries(entries, 'supportingKnowledge', 4),
+    retrievalPlan: compactRetrievalPlan(params.retrievalPlan),
+    exactData: summarizedExactData,
+    structuredSignals: summarizeStructuredSignals(params.structuredSignals),
+    retrievalResults: params.results.slice(0, 6).map((result) => summarizeLayerResult(result)),
+    exactDataRequest: params.exactDataRequest ?? null,
+    ksNarrativeBrief: params.ksNarrativeBrief ?? null,
+    fusionHints: params.fusionHints?.slice(0, 8) ?? [],
   }
 
   const orderedSources = [
@@ -519,13 +678,22 @@ export function buildKnowledgePacket(params: {
     ...packet.supportingKnowledge.map((entry) => summarizeEntry(entry)),
   ].filter(Boolean)
 
+  const hasStructuredMatter =
+    Boolean(packet.retrievalPlan) ||
+    Boolean(packet.exactData) ||
+    Boolean(packet.exactDataRequest && Object.keys(packet.exactDataRequest).length > 0) ||
+    Boolean(packet.structuredSignals && packet.structuredSignals.length > 0) ||
+    Boolean(packet.ksNarrativeBrief) ||
+    Boolean(packet.fusionHints && packet.fusionHints.length > 0)
+
   if (
     !packet.masterPrompt &&
     !packet.readingStructure &&
     packet.sciencePrompt.length === 0 &&
     packet.subsciencePrompt.length === 0 &&
     packet.referenceBook.length === 0 &&
-    packet.supportingKnowledge.length === 0
+    packet.supportingKnowledge.length === 0 &&
+    !hasStructuredMatter
   ) {
     return null
   }

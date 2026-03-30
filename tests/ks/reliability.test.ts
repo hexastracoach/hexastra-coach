@@ -226,6 +226,24 @@ describe('isReliableExactData — numerology', () => {
     expect(result.missingFields).toHaveLength(0)
   })
 
+  it('accepts numerology cycles nested under exactData', () => {
+    const result = isReliableExactData('numerology', ['annee_personnelle', 'chemin_de_vie'], {
+      exactData: {
+        numerology_cycles: {
+          core: {
+            lifePathNumber: 8,
+          },
+          yearly: {
+            personalYearNumber: 3,
+          },
+        },
+      },
+    })
+    expect(result.reliable).toBe(true)
+    expect(result.completeness).toBe(1)
+    expect(result.missingFields).toHaveLength(0)
+  })
+
   it('fails a multi numerology request when one requested field is missing', () => {
     const result = isReliableExactData('numerology', ['annee_personnelle', 'chemin_de_vie'], {
       numerology: {
@@ -291,6 +309,19 @@ describe('isReliableExactData — kua', () => {
     })
     expect(result.reliable).toBe(false)
     expect(result.completeness).toBe(0)
+  })
+
+  it('accepts kua fields nested under exactData.kua_directions', () => {
+    const result = isReliableExactData('kua', null, {
+      exactData: {
+        kua_directions: {
+          nombre_kua: 9,
+          favorable_directions: ['South'],
+        },
+      },
+    })
+    expect(result.reliable).toBe(true)
+    expect(result.completeness).toBe(1)
   })
 })
 

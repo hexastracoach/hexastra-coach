@@ -15,6 +15,12 @@
 
 import { buildCompactNatalReadingContext } from '@/lib/hexastra/guards/exactDataGuard'
 import { buildCompactHumanDesignContext } from '@/lib/humandesign/compactContext'
+import {
+  findFirstMatchingValueDeep,
+  mergeFusionExactSectionWithLegacy,
+  LEGACY_KUA_KEYS,
+  LEGACY_NUMEROLOGY_KEYS,
+} from '@/lib/hexastra/api/normalizeFusionExactData'
 import { getIntentFieldMap, type IntentFieldMap, type IntentModule } from './intentFieldMapping'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -170,19 +176,25 @@ function mergeNested(raw: Record<string, unknown>, ...keys: string[]): Record<st
   return merged
 }
 
-function findValue(src: Record<string, unknown>, ...aliases: string[]): string | number | null {
+function findValue(src: Record<string, unknown>, ...aliases: string[]): string | number | string[] | null {
   for (const alias of aliases) {
     const v = src[alias]
-    if (v !== undefined && v !== null && v !== '') return v as string | number
+    if (v !== undefined && v !== null && v !== '') return v as string | number | string[]
   }
+
+  const nested = findFirstMatchingValueDeep(src, aliases)
+  if (nested !== null && nested !== undefined && nested !== '') {
+    return nested as string | number | string[]
+  }
+
   return null
 }
 
 function extractNumerologyFields(
   raw: Record<string, unknown>,
   fields: string[],
-): Record<string, string | number | null> {
-  const src = mergeNested(raw, 'numerology', 'numerologie', 'numbers')
+): Record<string, string | number | string[] | null> {
+  const src = mergeFusionExactSectionWithLegacy(raw, 'numerologyCycles', LEGACY_NUMEROLOGY_KEYS)
   const ALIASES: Record<string, string[]> = {
     lifePath: ['chemin_de_vie', 'life_path', 'lifePath', 'lifePathNumber', 'cheminVie'],
     expression: ['expression', 'expression_number', 'expressionNumber'],
@@ -191,7 +203,7 @@ function extractNumerologyFields(
     personalYear: ['annee_personnelle', 'personal_year', 'personalYear'],
     personalMonth: ['mois_personnel', 'personal_month', 'personalMonth'],
   }
-  const result: Record<string, string | number | null> = {}
+  const result: Record<string, string | number | string[] | null> = {}
   for (const field of fields) {
     const aliases = ALIASES[field]
     if (aliases) {
@@ -205,7 +217,7 @@ function extractNumerologyFields(
 function extractEnneagramFields(
   raw: Record<string, unknown>,
   fields: string[],
-): { data: Record<string, string | number | null>; isHeuristic: boolean } {
+): { data: Record<string, string | number | string[] | null>; isHeuristic: boolean } {
   const src = mergeNested(raw, 'enneagram', 'enneagramme')
   const ALIASES: Record<string, string[]> = {
     enneagramType: ['type_enn', 'type', 'enneagram_type'],
@@ -215,7 +227,7 @@ function extractEnneagramFields(
     desire: ['desir', 'desire', 'core_desire'],
   }
   const isHeuristic = Boolean(src['is_heuristic'] ?? src['heuristic'])
-  const data: Record<string, string | number | null> = {}
+  const data: Record<string, string | number | string[] | null> = {}
   for (const field of fields) {
     const aliases = ALIASES[field]
     if (aliases) {
@@ -229,14 +241,14 @@ function extractEnneagramFields(
 function extractKuaFields(
   raw: Record<string, unknown>,
   fields: string[],
-): Record<string, string | number | null> {
-  const src = mergeNested(raw, 'kua')
+): Record<string, string | number | string[] | null> {
+  const src = mergeFusionExactSectionWithLegacy(raw, 'kuaDirections', LEGACY_KUA_KEYS)
   const ALIASES: Record<string, string[]> = {
     kua: ['nombre_kua', 'kua', 'kua_number', 'numero_kua'],
     directions: ['direction_kua', 'directions', 'favorable_directions'],
     element: ['element', 'element_kua'],
   }
-  const result: Record<string, string | number | null> = {}
+  const result: Record<string, string | number | string[] | null> = {}
   for (const field of fields) {
     const aliases = ALIASES[field]
     if (aliases) {
@@ -269,10 +281,10 @@ export function buildFusionContext(
   // Extraire chaque module
   let astroFields: Record<string, string | number | string[] | null> = {}
   let hdFields: Record<string, string | null> = {}
-  let numeFields: Record<string, string | number | null> = {}
-  let ennData: Record<string, string | number | null> = {}
+  let numeFields: Record<string, string | number | string[] | null> = {}
+  let ennData: Record<string, string | number | string[] | null> = {}
   let ennIsHeuristic = false
-  let kuaFields: Record<string, string | number | null> = {}
+  let kuaFields: Record<string, string | number | string[] | null> = {}
 
   astroFields = extractAstroFields(raw, mapping.priorityFields.astrology)
   if (Object.keys(astroFields).length === 0) warnings.push('astrology: aucun champ extrait')

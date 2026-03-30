@@ -2,6 +2,11 @@ import {
   buildScienceDetectionResult,
   type ScienceDetectionResult,
 } from '@/lib/hexastra/engine/scienceQueryBuilder'
+import {
+  disambiguateDetectionResult,
+  type DetectionAmbiguity,
+  type DetectionDisambiguationContext,
+} from '@/lib/hexastra/engine/disambiguateDetectionResult'
 import { prepareQuery } from '@/lib/hexastra/taxonomy/scienceSynonyms'
 import { SCIENCE_SUBCATEGORY_INDEX } from '@/lib/hexastra/taxonomy/scienceTaxonomy'
 import {
@@ -23,6 +28,9 @@ export type RetrievalPlan = {
   }>
   preferredTopK: number
   fallbackUsed: boolean
+  dominantScience?: string | null
+  dominantSubCategory?: string | null
+  ambiguities?: DetectionAmbiguity[]
 }
 
 type WeightedEntry = RetrievalPlan['weightedMatches'][number] & {
@@ -37,6 +45,13 @@ function uniq<T>(values: T[]): T[] {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
+}
+
+function prioritizeValues<T extends string>(values: T[], preferred: readonly T[]): T[] {
+  return uniq([
+    ...preferred.filter((value) => values.includes(value)),
+    ...values,
+  ])
 }
 
 function sortByWeight(items: Array<{ value: string; weight: number }>): string[] {
@@ -77,20 +92,31 @@ function getSyntheticScore(args: {
   return Number((base + args.retrievalPriority / 220).toFixed(2))
 }
 
-function buildWeightedEntries(detection: ScienceDetectionResult): WeightedEntry[] {
+function buildWeightedEntries(
+  detection: ScienceDetectionResult,
+  context?: DetectionDisambiguationContext,
+): {
+  weightedEntries: WeightedEntry[]
+  disambiguation: ReturnType<typeof disambiguateDetectionResult>
+} {
+  const disambiguation = disambiguateDetectionResult(detection, context)
   const directMatchBySubCategory = new Map(
     detection.matches.map((match) => [match.subCategory, match]),
   )
   const topDirectScore = detection.matches[0]?.score ?? 3
 
-  return detection.subCategories
+  const weightedEntries = disambiguation.prioritizedSubCategories
     .map((subCategory, position) => {
       const config = resolveSubCategoryRetrievalConfig(subCategory)
       const directMatch = directMatchBySubCategory.get(subCategory)
       const retrievalPriority = config.retrievalPriority ?? 50
+      const disambiguationBoost = disambiguation.subCategoryBoosts[subCategory] ?? 0
       const score = directMatch
-        ? directMatch.score + getExactKeywordBoost(subCategory, directMatch.matchedTerms) + retrievalPriority / 140
-        : getSyntheticScore({ topDirectScore, position, retrievalPriority })
+        ? directMatch.score +
+          getExactKeywordBoost(subCategory, directMatch.matchedTerms) +
+          retrievalPriority / 140 +
+          disambiguationBoost
+        : getSyntheticScore({ topDirectScore, position, retrievalPriority }) + disambiguationBoost
 
       return {
         subCategory,
@@ -103,6 +129,8 @@ function buildWeightedEntries(detection: ScienceDetectionResult): WeightedEntry[
       }
     })
     .sort((a, b) => b.score - a.score)
+
+  return { weightedEntries, disambiguation }
 }
 
 function computePreferredTopK(
@@ -128,8 +156,9 @@ function computePreferredTopK(
 
 export function buildRetrievalPlanFromDetection(
   detection: ScienceDetectionResult,
+  context?: DetectionDisambiguationContext,
 ): RetrievalPlan {
-  const weightedEntries = buildWeightedEntries(detection)
+  const { weightedEntries, disambiguation } = buildWeightedEntries(detection, context)
   const fallbackUsed = detection.fallbackUsed || weightedEntries.length === 0
 
   const safeEntries =
@@ -148,8 +177,14 @@ export function buildRetrievalPlanFromDetection(
         ]
 
   return {
-    sciences: uniq(safeEntries.map((entry) => entry.science)),
-    subCategories: uniq(safeEntries.map((entry) => entry.subCategory)),
+    sciences: prioritizeValues(
+      uniq(safeEntries.map((entry) => entry.science)),
+      disambiguation.prioritizedSciences,
+    ),
+    subCategories: prioritizeValues(
+      uniq(safeEntries.map((entry) => entry.subCategory)),
+      disambiguation.prioritizedSubCategories,
+    ),
     vectorNamespaces: sortByWeight(
       safeEntries.flatMap((entry) =>
         entry.vectorNamespaces.map((value) => ({ value, weight: entry.score })),
@@ -173,11 +208,17 @@ export function buildRetrievalPlanFromDetection(
     })),
     preferredTopK: computePreferredTopK(safeEntries, fallbackUsed),
     fallbackUsed,
+    dominantScience: disambiguation.dominantScience,
+    dominantSubCategory: disambiguation.dominantSubCategory,
+    ambiguities: disambiguation.ambiguities,
   }
 }
 
-export function buildRetrievalPlanFromQuery(query: string): RetrievalPlan {
-  return buildRetrievalPlanFromDetection(buildScienceDetectionResult(query))
+export function buildRetrievalPlanFromQuery(
+  query: string,
+  context?: DetectionDisambiguationContext,
+): RetrievalPlan {
+  return buildRetrievalPlanFromDetection(buildScienceDetectionResult(query), context)
 }
 
 export function buildRetrievalQueryHints(plan: RetrievalPlan): string {

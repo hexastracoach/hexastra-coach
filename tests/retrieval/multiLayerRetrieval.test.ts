@@ -71,6 +71,13 @@ describe('multiLayerRetrieval', () => {
     expect(
       mockedRetrieveKnowledge.mock.calls.some(([args]) => typeof args.topKOverride === 'number'),
     ).toBe(true)
+    expect(
+      mockedRetrieveKnowledge.mock.calls.some(
+        ([args]) =>
+          Array.isArray(args.providerFilters?.vectorNamespaces) &&
+          args.providerFilters.vectorNamespaces.length > 0,
+      ),
+    ).toBe(true)
   })
 
   it('keeps the legacy array return shape for existing callers', async () => {

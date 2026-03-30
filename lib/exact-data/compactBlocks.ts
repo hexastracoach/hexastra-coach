@@ -1,4 +1,10 @@
 import type { Science } from '@/lib/hexastra/orchestration/universalClassification'
+import {
+  LEGACY_KUA_KEYS,
+  LEGACY_NUMEROLOGY_KEYS,
+  mergeFusionExactSectionWithLegacy,
+  resolveFusionExactDataSection,
+} from '@/lib/hexastra/api/normalizeFusionExactData'
 
 type RequestedField = {
   id: string
@@ -42,26 +48,6 @@ function mergeNested(raw: Record<string, unknown>, ...keys: string[]): Record<st
     }
   }
   return raw
-}
-
-function mergeNumerologySources(raw: Record<string, unknown>): Record<string, unknown> {
-  const merged: Record<string, unknown> = {}
-  for (const key of [
-    'numerologie',
-    'numerology',
-    'numerologie_complete',
-    'numerologieComplete',
-    'numerology_complete',
-    'numerologyComplete',
-    'numerologyFull',
-    'numbers',
-  ]) {
-    const block = raw[key]
-    if (block && typeof block === 'object' && !Array.isArray(block)) {
-      Object.assign(merged, block as Record<string, unknown>)
-    }
-  }
-  return { ...merged, ...raw }
 }
 
 function findFirstValueDeep(
@@ -210,10 +196,12 @@ export function buildCompactExactScienceBlock(params: {
 
   switch (science) {
     case 'numerology': {
-      const merged = mergeNumerologySources(raw)
-      const summarySeed = findSummarySeed(
-        raw.numerology ?? raw.numerologie ?? raw.numerologyFull ?? raw.numbers ?? null,
-      )
+      const merged = mergeFusionExactSectionWithLegacy(raw, 'numerologyCycles', LEGACY_NUMEROLOGY_KEYS)
+      const summarySeed =
+        findSummarySeed(resolveFusionExactDataSection(raw, 'numerologyCycles').value) ??
+        findSummarySeed(
+          raw.numerology ?? raw.numerologie ?? raw.numerologyFull ?? raw.numbers ?? null,
+        )
 
       return buildBlockFromFields({
         header: 'DONNÉES NUMÉROLOGIQUES (source de vérité — citer exactement):',
@@ -262,8 +250,10 @@ export function buildCompactExactScienceBlock(params: {
     }
 
     case 'kua': {
-      const merged = mergeNested(raw, 'kua')
-      const summarySeed = findSummarySeed(raw.kua ?? null)
+      const merged = mergeFusionExactSectionWithLegacy(raw, 'kuaDirections', LEGACY_KUA_KEYS)
+      const summarySeed =
+        findSummarySeed(resolveFusionExactDataSection(raw, 'kuaDirections').value) ??
+        findSummarySeed(raw.kua ?? null)
 
       return buildBlockFromFields({
         header: 'DONNÉES KUA (source de vérité — citer exactement):',

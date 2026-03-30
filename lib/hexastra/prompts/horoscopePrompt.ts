@@ -24,6 +24,14 @@
  */
 
 import { applySafetySuffix } from '@/lib/hexastra/guards/safety'
+import {
+  LEGACY_NUMEROLOGY_KEYS,
+  findFirstMatchingValueDeep,
+  mergeFusionExactSectionWithLegacy,
+  normalizeFusionExactData,
+  toFusionRecord,
+} from '@/lib/hexastra/api/normalizeFusionExactData'
+import { resolveStrictAstroContext } from '@/lib/hexastra/guards/extractCoreAstro'
 import type { BuildPromptInput } from '@/lib/hexastra/types'
 import type { HoroscopeVariant } from '@/lib/hexastra/orchestration/horoscopeClassifier'
 import type { BirthProfile } from '@/lib/hexastra/types'
@@ -65,6 +73,48 @@ export const WEEKLY_REQUIRED_BLOCKS = [
  * Builds the personalized data block injected into the horoscope prompt.
  * Uses raw API data when available; falls back to birth date from profile.
  */
+function compactHoroscopeValue(value: unknown, maxChars = 400): string | null {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  if (typeof value === 'string') {
+    return value.slice(0, maxChars)
+  }
+
+  return JSON.stringify(value).slice(0, maxChars)
+}
+
+function resolveHoroscopeNumerologySnapshot(raw: Record<string, unknown>) {
+  const profile = toFusionRecord(raw.numerologyProfile) ?? {}
+  const mergedCycles = mergeFusionExactSectionWithLegacy(raw, 'numerologyCycles', LEGACY_NUMEROLOGY_KEYS)
+  const source = { ...profile, ...mergedCycles }
+
+  return {
+    lifePath:
+      findFirstMatchingValueDeep(source, [
+        'chemin_de_vie',
+        'life_path',
+        'lifePath',
+        'lifePathNumber',
+      ]) ??
+      raw.chemin_de_vie ??
+      raw.life_path ??
+      raw.lifePath ??
+      null,
+    personalYear:
+      findFirstMatchingValueDeep(source, [
+        'annee_personnelle',
+        'personal_year',
+        'personalYear',
+        'personalYearNumber',
+      ]) ??
+      raw.annee_personnelle ??
+      raw.personal_year ??
+      null,
+  }
+}
+
 export function buildHoroscopeDataBlock(
   firstName: string | null | undefined,
   birthData: BirthProfile | null | undefined,
@@ -80,30 +130,35 @@ export function buildHoroscopeDataBlock(
   if (firstName) parts.push(`PRÉNOM: ${firstName}`)
 
   if (raw) {
+    const astroContext = resolveStrictAstroContext(raw)
     const sunSign =
+      astroContext.placements.sun.placement?.sign ??
       raw.sun ?? raw.signe_solaire ?? raw.sun_sign ?? raw.soleil ??
       (raw.tropical as Record<string, unknown>)?.sun
     if (sunSign) parts.push(`SIGNE SOLAIRE: ${sunSign}`)
 
     const moonSign =
+      astroContext.placements.moon.placement?.sign ??
       raw.moon ?? raw.signe_lunaire ?? raw.moon_sign ?? raw.lune ??
       (raw.tropical as Record<string, unknown>)?.moon
     if (moonSign) parts.push(`SIGNE LUNAIRE: ${moonSign}`)
 
     const ascendant =
+      astroContext.placements.ascendant.placement?.sign ??
       raw.ascendant ?? raw.rising ?? raw.asc ??
       (raw.tropical as Record<string, unknown>)?.ascendant
     if (ascendant) parts.push(`ASCENDANT: ${ascendant}`)
 
-    const lifePath = raw.chemin_de_vie ?? raw.life_path ?? raw.lifePath
+    const numerologySnapshot = resolveHoroscopeNumerologySnapshot(raw)
+    const lifePath = numerologySnapshot.lifePath
     if (lifePath) parts.push(`CHEMIN DE VIE: ${lifePath}`)
 
-    const anneePersonnelle = raw.annee_personnelle ?? raw.personal_year
+    const anneePersonnelle = numerologySnapshot.personalYear
     if (anneePersonnelle) parts.push(`ANNÉE PERSONNELLE: ${anneePersonnelle}`)
 
-    const transits = raw.transits ?? raw.current_transits
-    if (transits && typeof transits === 'object') {
-      parts.push(`TRANSITS ACTUELS: ${JSON.stringify(transits).slice(0, 400)}`)
+    const transitsPreview = compactHoroscopeValue(normalizeFusionExactData(raw).transits)
+    if (transitsPreview) {
+      parts.push(`TRANSITS ACTUELS: ${transitsPreview}`)
     }
   } else if (birthData?.date) {
     parts.push(`DATE DE NAISSANCE: ${birthData.date}`)

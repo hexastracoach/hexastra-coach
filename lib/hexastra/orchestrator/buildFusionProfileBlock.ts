@@ -19,6 +19,12 @@
 
 import { buildCompactNatalReadingContext } from '@/lib/hexastra/guards/exactDataGuard'
 import { buildCompactHumanDesignContext } from '@/lib/humandesign/compactContext'
+import {
+  findFirstMatchingValueDeep,
+  mergeFusionExactSectionWithLegacy,
+  LEGACY_KUA_KEYS,
+  LEGACY_NUMEROLOGY_KEYS,
+} from '@/lib/hexastra/api/normalizeFusionExactData'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -56,6 +62,15 @@ function findValue(source: Record<string, unknown>, ...aliases: string[]): strin
     const v = source[alias]
     if (v !== undefined && v !== null && v !== '') return v as string | number
   }
+
+  const nested = findFirstMatchingValueDeep(source, aliases)
+  if (
+    typeof nested === 'string' ||
+    (typeof nested === 'number' && Number.isFinite(nested))
+  ) {
+    return nested
+  }
+
   return null
 }
 
@@ -121,7 +136,7 @@ function extractHDSummary(raw: Record<string, unknown>): string | null {
 }
 
 function extractNumerologySummary(raw: Record<string, unknown>): string | null {
-  const src = mergeNested(raw, 'numerology', 'numerologie', 'numbers')
+  const src = mergeFusionExactSectionWithLegacy(raw, 'numerologyCycles', LEGACY_NUMEROLOGY_KEYS)
   const parts: string[] = []
 
   const lifePath = findValue(src, 'chemin_de_vie', 'life_path', 'lifePath', 'lifePathNumber', 'cheminVie')
@@ -162,7 +177,7 @@ function extractEnneagramSummary(raw: Record<string, unknown>): string | null {
 }
 
 function extractKuaSummary(raw: Record<string, unknown>): string | null {
-  const src = mergeNested(raw, 'kua')
+  const src = mergeFusionExactSectionWithLegacy(raw, 'kuaDirections', LEGACY_KUA_KEYS)
   const parts: string[] = []
 
   const kua = findValue(src, 'nombre_kua', 'kua', 'kua_number', 'numero_kua')
@@ -349,7 +364,7 @@ export function buildFusionProfileBlock(
   } catch { /* ignore */ }
 
   // Get numerology life path for synthesis
-  const numeRaw = mergeNested(raw, 'numerology', 'numerologie', 'numbers')
+  const numeRaw = mergeFusionExactSectionWithLegacy(raw, 'numerologyCycles', LEGACY_NUMEROLOGY_KEYS)
   const lifePath = findValue(numeRaw, 'chemin_de_vie', 'life_path', 'lifePath', 'lifePathNumber', 'cheminVie')
 
   // Get enneagram type for synthesis

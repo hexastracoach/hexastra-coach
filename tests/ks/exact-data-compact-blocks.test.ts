@@ -25,6 +25,26 @@ describe('buildCompactExactScienceBlock', () => {
     expect(block).not.toContain('Capricorne')
   })
 
+  it('reads numerology cycles from exactData without leaking unrelated fields', () => {
+    const block = buildCompactExactScienceBlock({
+      science: 'numerology',
+      requestedSubcategories: ['chemin_de_vie', 'annee_personnelle'],
+      raw: {
+        exactData: {
+          numerology_cycles: {
+            core: { lifePathNumber: 9 },
+            yearly: { personalYearNumber: 2 },
+          },
+        },
+        humanDesign: { type_hd: 'Generator' },
+      },
+    })
+
+    expect(block).toContain('CHEMIN DE VIE: 9')
+    expect(block).toContain('PERSONNELLE: 2')
+    expect(block).not.toContain('Generator')
+  })
+
   it('builds a kua-only block without leaking astrology', () => {
     const block = buildCompactExactScienceBlock({
       science: 'kua',
@@ -43,6 +63,26 @@ describe('buildCompactExactScienceBlock', () => {
     expect(block).toContain('NOMBRE KUA: 1')
     expect(block).toContain('DIRECTIONS FAVORABLES: Est, Sud-Est, Sud, Nord')
     expect(block).not.toContain('Verseau')
+  })
+
+  it('reads kua directions from exactData without leaking astrology', () => {
+    const block = buildCompactExactScienceBlock({
+      science: 'kua',
+      requestedSubcategories: ['nombre_kua', 'direction_kua'],
+      raw: {
+        exactData: {
+          kua_directions: {
+            nombre_kua: 6,
+            favorable_directions: ['Nord', 'Est'],
+          },
+        },
+        tropical: { sun: { sign: 'Cancer' } },
+      },
+    })
+
+    expect(block).toContain('NOMBRE KUA: 6')
+    expect(block).toContain('DIRECTIONS FAVORABLES: Nord, Est')
+    expect(block).not.toContain('Cancer')
   })
 
   it('builds an enneagram-only block without hypothetical leakage', () => {

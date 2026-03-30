@@ -172,6 +172,10 @@ export type HexastraApiResponse = {
     orchestrationTrace?: OrchestrationTrace
     usedLocalFallback?: boolean
     fallbackType?: string | null
+    retrievalPlan?: Record<string, unknown>
+    retrievalResults?: Array<Record<string, unknown>>
+    exactDataRequest?: Record<string, boolean | undefined>
+    retrievalDebug?: Record<string, unknown>
   }
   updatedEvolutionProfile?: Record<string, unknown> | null
 }

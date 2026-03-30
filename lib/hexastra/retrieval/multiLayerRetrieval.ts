@@ -1,4 +1,7 @@
-import { retrieveKnowledge } from '@/lib/vectorSearch'
+import {
+  retrieveKnowledge,
+  type RetrievalProviderFilters,
+} from '@/lib/vectorSearch'
 import type { DomainRoute } from '@/lib/hexastra/types'
 import type { DocumentScienceTag } from '@/lib/hexastra/vector/documentRegistry'
 import { lookupDocumentRegistry } from '@/lib/hexastra/vector/documentRegistry'
@@ -174,6 +177,23 @@ function buildFusionQuery(
     .join(' | ')
 }
 
+function buildProviderFilters(args: {
+  vectorNamespaces?: string[]
+  scienceTags?: string[]
+}): RetrievalProviderFilters | undefined {
+  const vectorNamespaces = uniq(args.vectorNamespaces ?? []).slice(0, 6)
+  const scienceTags = uniq(args.scienceTags ?? []).slice(0, 6)
+
+  if (vectorNamespaces.length === 0 && scienceTags.length === 0) {
+    return undefined
+  }
+
+  return {
+    ...(vectorNamespaces.length > 0 ? { vectorNamespaces } : {}),
+    ...(scienceTags.length > 0 ? { scienceTags } : {}),
+  }
+}
+
 function computeFocusedTopK(args: {
   focusedRetrieval: FocusedScienceRetrieval
   retrievalPlan: RetrievalPlan
@@ -303,6 +323,7 @@ export async function multiLayerRetrievalWithPlan({
   apiKey,
   domainRoute,
   intent,
+  retrievalPlan: retrievalPlanOverride,
 }: {
   query: string
   plan: string
@@ -310,8 +331,9 @@ export async function multiLayerRetrievalWithPlan({
   apiKey: string
   domainRoute?: DomainRoute
   intent?: string
+  retrievalPlan?: RetrievalPlan
 }): Promise<MultiLayerRetrievalResult> {
-  const retrievalPlan = buildRetrievalPlanFromQuery(query)
+  const retrievalPlan = retrievalPlanOverride ?? buildRetrievalPlanFromQuery(query)
 
   if (!vectorStoreId || !apiKey) {
     return {
@@ -336,6 +358,10 @@ export async function multiLayerRetrievalWithPlan({
       apiKey,
       domainRoute,
       topKOverride: baseTopK,
+      providerFilters: buildProviderFilters({
+        vectorNamespaces: retrievalPlan.vectorNamespaces,
+        scienceTags: retrievalPlan.scienceTags,
+      }),
     }).then((items) => ({ source: 'knowledge', items })),
   ]
 
@@ -348,6 +374,10 @@ export async function multiLayerRetrievalWithPlan({
         apiKey,
         domainRoute,
         topKOverride: Math.max(planCap, retrievalPlan.preferredTopK - 1),
+        providerFilters: buildProviderFilters({
+          vectorNamespaces: retrievalPlan.vectorNamespaces,
+          scienceTags: retrievalPlan.scienceTags,
+        }),
       }).then((items) => ({ source: 'domain', items })),
     )
   }
@@ -366,6 +396,10 @@ export async function multiLayerRetrievalWithPlan({
           retrievalPlan,
           planCap,
           topScore,
+        }),
+        providerFilters: buildProviderFilters({
+          vectorNamespaces: focusedRetrieval.vectorNamespaces,
+          scienceTags: focusedRetrieval.scienceTags,
         }),
       }).then((items) => ({
         source: `science_focus:${focusedRetrieval.science}`,
@@ -389,6 +423,10 @@ export async function multiLayerRetrievalWithPlan({
         apiKey,
         domainRoute: 'fusion',
         topKOverride: Math.max(5, retrievalPlan.preferredTopK - 1),
+        providerFilters: buildProviderFilters({
+          vectorNamespaces: ['ks_fusion_globaux'],
+          scienceTags: ['global', 'transverse'],
+        }),
       }).then((items) => ({ source: 'ks_fusion', items, focusScience: 'fusion' })),
     )
   }
