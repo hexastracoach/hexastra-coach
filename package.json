@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "test:ks": "vitest run tests/ks",
+    "test:taxonomy": "vitest run tests/taxonomy",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test": "vitest run tests/ks",
