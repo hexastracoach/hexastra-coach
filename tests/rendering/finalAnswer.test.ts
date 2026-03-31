@@ -503,14 +503,59 @@ describe('buildFinalAnswer', () => {
     expect(answer.text).not.toContain('POURQUOI CA BLOQUE')
     expect(answer.text).not.toContain('CE QUE TU DOIS FAIRE')
     expect(answer.text).not.toContain('CLE A RETENIR')
-    expect(answer.text).not.toMatch(/Sph[eè]re/i)
+    expect(answer.text).not.toMatch(/Sphere/i)
     expect((answer.text.match(/^\d+\.\s+/gm) ?? []).length).toBe(3)
+    expect((answer.text.match(/^Pourquoi:/gm) ?? []).length).toBe(3)
     expect((answer.text.match(/^Dans la vraie vie:/gm) ?? []).length).toBe(3)
+    expect(answer.text).toContain('Debut d annee:')
+    expect(answer.text).toContain('Milieu d annee:')
+    expect(answer.text).toContain('Fin d annee:')
     expect(answer.sections).toBeUndefined()
 
     const validation = validateYearlyPriorityAnswerFormat(answer.text)
     expect(validation.valid).toBe(true)
     expect(validation.priorityCount).toBe(3)
+  })
+
+  it('keeps the three yearly priorities distinct and concretely grounded', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Quel axe privilegier en 2026 ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: null,
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: { summary: 'clarifier ton cap, trier tes engagements et assumer un axe plus net' },
+        },
+        {
+          science: 'astrology',
+          subCategory: 'astro_transits_current',
+          sourceType: 'exact_data',
+          value: { summary: 'la traction existe mais elle doit etre lue avant d accelerer' },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: 'engager ton energie sur moins de fronts mais avec plus de nettete' },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    const priorityTitles = Array.from(answer.text.matchAll(/^\d+\.\s+(.+)$/gm)).map((match) => match[1])
+    const priorityBlocks = answer.text
+      .split(/\n\n/)
+      .filter((block) => /^\d+\.\s+/m.test(block))
+
+    expect(new Set(priorityTitles).size).toBe(3)
+    expect(priorityBlocks).toHaveLength(3)
+    for (const block of priorityBlocks) {
+      expect(block).toContain('Pourquoi:')
+      expect(block).toContain('Dans la vraie vie:')
+    }
   })
 
   it('rejects the legacy generic template for yearly priorities', () => {
@@ -527,7 +572,7 @@ describe('buildFinalAnswer', () => {
       'CLE A RETENIR',
       'Avance mieux.',
       '',
-      'Sphère centrale',
+      'Sphere centrale',
     ].join('\n'))
 
     expect(validation.valid).toBe(false)

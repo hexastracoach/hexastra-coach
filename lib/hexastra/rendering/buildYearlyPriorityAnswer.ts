@@ -18,9 +18,20 @@ type AnnualFamily =
 
 type PriorityTemplate = {
   title: string
-  explanation: string
+  orientationAxis: string
+  orientationMeaning: string
+  whyPriority: string
   realLife: string
   pitfall: string
+  timingStart: string
+  timingMiddle: string
+  timingEnd: string
+  immediateAction: string
+}
+
+type PrioritySelection = {
+  signal: StructuredSignal | null
+  family: AnnualFamily
 }
 
 export type YearlyPriorityValidation = {
@@ -42,11 +53,11 @@ function sentence(value: string | null | undefined): string {
   return /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`
 }
 
-function compact(value: string, maxChars = 150): string {
+function compact(value: string, maxChars = 165): string {
   const cleaned = normalize(value)
   if (cleaned.length <= maxChars) return cleaned
   const cut = cleaned.lastIndexOf(' ', maxChars)
-  return `${cleaned.slice(0, cut > 80 ? cut : maxChars).trim()}...`
+  return `${cleaned.slice(0, cut > 90 ? cut : maxChars).trim()}...`
 }
 
 function flattenScalarTexts(value: unknown, limit = 6, bucket: string[] = []): string[] {
@@ -140,8 +151,43 @@ function familyFromSignal(signal: StructuredSignal | null): AnnualFamily | null 
   return 'cap'
 }
 
+function describePersonalYear(signal: StructuredSignal): string | null {
+  const numberCandidate = findByPaths(signal.value, [
+    'yearly.personalYearNumber',
+    'personalYearNumber',
+    'personalYear',
+  ])
+
+  const number = typeof numberCandidate === 'number'
+    ? numberCandidate
+    : typeof numberCandidate === 'string'
+      ? Number(numberCandidate)
+      : null
+
+  if (!number || !Number.isFinite(number)) return null
+
+  const map: Record<number, string> = {
+    1: 'un cycle d initiative et de relance nette',
+    2: 'un cycle d alliance, de patience strategique et d ajustement relationnel',
+    3: 'un cycle d expression, de visibilite utile et de mise en mouvement',
+    4: 'un cycle de structure, de cadre et de fondations solides',
+    5: 'un cycle de mouvement, de tri rapide et de reconfiguration',
+    6: 'un cycle de responsabilite, d engagement durable et de stabilisation',
+    7: 'un cycle de recul, d approfondissement et de recentrage',
+    8: 'un cycle de consolidation, de responsabilite et de resultats mesurables',
+    9: 'un cycle de cloture, de tri final et de detachement utile',
+  }
+
+  return map[number] ?? `un cycle ${number} qui demande une lecture plus strategique de tes priorites`
+}
+
 function describeSignal(signal: StructuredSignal | null): string {
-  if (!signal) return 'ton annee demande un recentrage net'
+  if (!signal) return 'ton annee demande un tri net des engagements et une meilleure allocation de ton energie'
+
+  if (signal.subCategory === 'num_personal_year') {
+    const personalYear = describePersonalYear(signal)
+    if (personalYear) return personalYear
+  }
 
   const exactPaths: Record<string, string[]> = {
     annual_guidance: ['publicSummary', 'summary', 'message'],
@@ -149,9 +195,9 @@ function describeSignal(signal: StructuredSignal | null): string {
     astro_progressions: ['secondary_progressions.moon', 'moon', 'progressed_moon', 'summary'],
     astro_lunar_return: ['theme', 'summary', 'annual_theme'],
     astro_transits_current: ['summary', 'saturn', 'mars', 'moon', 'sun'],
+    astro_transits_timing: ['summary', 'saturn', 'mars', 'moon', 'sun'],
     hd_current_transits: ['current_cycle', 'summary'],
     hd_current_cycle: ['current_cycle', 'summary'],
-    num_personal_year: ['yearly.personalYearNumber', 'personalYearNumber', 'personalYear', 'summary'],
     kua_annual_influence: ['summary', 'annualInfluence', 'annualDirection'],
     kua_favorable_directions: ['favorable_directions', 'favorableDirections', 'summary'],
   }
@@ -164,17 +210,17 @@ function describeSignal(signal: StructuredSignal | null): string {
 
   switch (familyFromSignal(signal)) {
     case 'cap':
-      return 'ton cap demande d etre clarifie et assume'
+      return 'le signal principal te demande de choisir plus franchement ton axe utile'
     case 'maturation':
-      return 'quelque chose murit en profondeur avant de se montrer pleinement'
+      return 'quelque chose doit etre affine avant d etre expose ou decide'
     case 'rythme':
-      return 'le bon rythme compte plus que la force brute'
+      return 'la traction existe, mais elle doit etre lue avant d accelerer'
     case 'alignement':
-      return 'ton energie doit etre engagee plus proprement'
+      return 'ton energie doit etre engagee sur moins de fronts, mais avec plus de nettete'
     case 'direction':
-      return 'ta direction gagne a etre rendue plus concrete'
+      return 'ton cadre concret doit mieux soutenir le cap que tu veux tenir'
     case 'cycle':
-      return 'le cycle en cours pousse a construire sur du solide'
+      return 'le cycle en cours favorise ce qui se consolide proprement et se mesure'
     default:
       return 'l annee te demande un tri plus net'
   }
@@ -184,46 +230,82 @@ function priorityTemplate(family: AnnualFamily, year: string): PriorityTemplate 
   switch (family) {
     case 'maturation':
       return {
-        title: 'Maturer avant de montrer',
-        explanation: `En ${year}, ce qui doit compter ne se force pas. Il faut laisser murir ce qui prend de la profondeur avant de l exposer trop vite.`,
-        realLife: 'Dans la vraie vie: travaille le fond, affine ton message, et ne lance pas trop tot un projet encore instable.',
-        pitfall: 'Vouloir prouver trop vite que tout est deja pret.',
+        title: 'Maturer avant d exposer',
+        orientationAxis: 'maturation de fond et positionnement plus juste',
+        orientationMeaning: 'ce qui compte ne doit pas sortir trop tot; la qualite prime sur la vitesse d affichage',
+        whyPriority: `En ${year}, cette priorite compte parce que ce qui est encore flou ou trop brut perdra de sa force si tu le pousses trop vite.`,
+        realLife: 'Reprends ce qui est prometteur mais encore brouillon, affine le fond, teste-le sur un terrain limite, puis seulement ensuite rends-le visible.',
+        pitfall: 'Montrer trop tot quelque chose qui n a pas encore passe le test du reel.',
+        timingStart: `Observe ce qui murit reellement en debut de ${year} et retire ce qui demande encore trop d effort pour trop peu de clarte.`,
+        timingMiddle: 'Expose seulement ce qui a gagne en solidite et en coherence.',
+        timingEnd: 'Consolide ce qui a tenu dans la duree et laisse tomber ce qui reste a moitie prepare.',
+        immediateAction: 'Dans les 72 prochaines heures, reprends un projet ou une decision importante, clarifie ce qui manque encore, puis planifie un seul test concret avant toute exposition plus large.',
       }
     case 'rythme':
       return {
-        title: 'Rythme juste',
-        explanation: `Ton vrai levier cette annee n est pas d en faire plus, mais de savoir quand accelerer et quand observer.`,
-        realLife: 'Dans la vraie vie: reduis les relances inutiles, protege les plages de concentration, et avance seulement sur ce qui montre une vraie traction.',
-        pitfall: 'Confondre urgence, pression et bon timing.',
+        title: 'Cadencer l execution',
+        orientationAxis: 'acceleration selective et cadence mieux tenue',
+        orientationMeaning: 'l annee ne te demande pas plus d activite, mais une meilleure lecture de la traction et du bon moment',
+        whyPriority: `Cette priorite est centrale en ${year} parce que la qualite du rythme fera la difference entre avancee utile et dispersion epuisante.`,
+        realLife: 'Travaille sur peu de sujets a forte traction, bloque des plages nettes de concentration, et evite les relances reactives qui te font changer de cap toutes les deux heures.',
+        pitfall: 'Relancer dix sujets a la fois des que l anxiete ou la pression monte.',
+        timingStart: `En debut de ${year}, lis d abord la traction reelle avant d ajouter de nouveaux chantiers.`,
+        timingMiddle: 'Accelere franchement seulement la ou le reel repond deja et ou un axe devient plus evident.',
+        timingEnd: 'Ralentis pour stabiliser le bon rythme au lieu de finir l annee dans l empilement.',
+        immediateAction: 'Dans les 24 a 72 heures, bloque un creneau de 90 minutes sur un seul sujet a traction prouvee, puis supprime une relance ou une reunion qui brouille ton rythme.',
       }
     case 'alignement':
       return {
-        title: 'Alignement energetique',
-        explanation: `L annee te demande d engager ton energie la ou la reponse est claire, pas la ou la pression est la plus forte.`,
-        realLife: 'Dans la vraie vie: accepte moins de sollicitations, choisis mieux tes oui, et coupe les efforts qui vident sans nourrir.',
-        pitfall: 'Dire oui pour calmer la pression ou rassurer les autres.',
+        title: 'Nettoyer tes oui',
+        orientationAxis: 'selection energetique et engagements plus propres',
+        orientationMeaning: 'ce qui t eleve cette annee ne vient pas d un plus grand volume, mais d une meilleure qualite de tes oui',
+        whyPriority: `C est prioritaire cette annee parce que ton energie devient un filtre strategique: mal engagee, elle te disperse; bien engagee, elle clarifie tout le reste.`,
+        realLife: 'Accepte moins de sollicitations, dis oui seulement quand le corps et le contexte repondent, et coupe les efforts qui consomment beaucoup sans produire de veritable avancee.',
+        pitfall: 'Dire oui pour calmer la pression, rester agreable ou ne pas decevoir, puis avancer a vide.',
+        timingStart: `Le debut de ${year} sert a nettoyer les sollicitations, les obligations parasites et les oui reflexes.`,
+        timingMiddle: 'Engage-toi sur peu de sujets, mais engage-toi vraiment quand la reponse est claire.',
+        timingEnd: 'Protege ton energie et mesure ce qui t a reellement nourrie ou epuisee.',
+        immediateAction: 'Dans les 24 a 72 heures, liste les engagements qui te vident, ferme explicitement un non, puis confirme un seul oui vraiment aligne.',
       }
     case 'direction':
       return {
-        title: 'Direction concrete',
-        explanation: `Ta priorite est de rendre ton axe visible et praticable, pas seulement inspirant sur le papier.`,
-        realLife: 'Dans la vraie vie: simplifie ton environnement, clarifie le prochain cap, et aligne tes choix quotidiens avec ce cap.',
-        pitfall: 'Changer tout ton cadre d un coup au lieu d ajuster le point le plus decisif.',
+        title: 'Reconfigurer le cadre',
+        orientationAxis: 'repositionnement concret du cadre et du cap',
+        orientationMeaning: 'la clarte viendra moins d une grande revelation que d un meilleur alignement entre ton environnement, ton axe et tes decisions',
+        whyPriority: `Cette priorite compte en ${year} parce que ton cadre quotidien soutient ou sabote directement ton cap: si le decor reste flou, l execution restera floue aussi.`,
+        realLife: 'Simplifie ton environnement, redefinis le prochain cap visible, reordonne tes priorites de semaine, et fais converger tes decisions concretes avec l axe que tu veux vraiment tenir.',
+        pitfall: 'Changer le decor, les outils ou l organisation sans changer la vraie decision de fond.',
+        timingStart: `En debut de ${year}, reconfigure ton cadre: agenda, espace, priorites et points de friction visibles.`,
+        timingMiddle: 'Fais converger tes choix de temps, d espace et d attention avec le cap retenu.',
+        timingEnd: 'Stabilise les reperes qui ont vraiment soutenu ta direction et coupe le superflu.',
+        immediateAction: 'Dans les 72 prochaines heures, choisis ton axe prioritaire, modifie un point concret de ton environnement pour le soutenir, puis rattache une action visible a cet axe.',
       }
     case 'cycle':
       return {
-        title: 'Construire le bon cycle',
-        explanation: `Le mouvement de ${year} soutient ce qui se consolide proprement, pas ce qui se disperse en trop de fronts ouverts.`,
-        realLife: 'Dans la vraie vie: termine ce qui a une vraie valeur, pose une base durable, et ferme les chantiers sans elan reel.',
-        pitfall: 'Empiler des debuts sans construire de base stable.',
+        title: 'Consolider ce qui tient',
+        orientationAxis: 'consolidation, responsabilites utiles et resultats durables',
+        orientationMeaning: 'l annee favorise ce qui se construit proprement, se mesure, et peut etre tenu dans la duree',
+        whyPriority: `En ${year}, cette priorite est strategique parce que les resultats viendront davantage de la consolidation que d un nouveau grand saut mal prepare.`,
+        realLife: 'Termine ce qui a deja de la valeur, renforce ce qui donne des resultats clairs, pose une base durable, et ferme les sujets qui restent eternellement au stade de l intention.',
+        pitfall: 'Empiler des debuts enthousiasmants sans fermer, cadrer ni mesurer ce qui doit vraiment grandir.',
+        timingStart: `Le debut de ${year} sert a fermer les vieux fronts et a clarifier ce qui merite vraiment une base solide.`,
+        timingMiddle: 'Mets l energie au milieu d annee sur la construction, le cadre et la preuve de resultat.',
+        timingEnd: 'Consolide ce qui tient, mesure ce qui a vraiment avance et laisse mourir ce qui reste sans assise.',
+        immediateAction: 'Dans les 48 a 72 heures, ferme un chantier sans elan reel et consacre un bloc de travail net a ce qui construit la base la plus durable de ton annee.',
       }
     case 'cap':
     default:
       return {
-        title: 'Cap a assumer',
-        explanation: `Le mouvement dominant de ${year} te pousse a choisir plus franchement ce que tu veux vraiment porter.`,
-        realLife: 'Dans la vraie vie: trie tes projets, nomme ta priorite numero un, et retire les engagements qui diluent ton axe principal.',
-        pitfall: 'Te disperser entre plusieurs priorites declarees comme urgentes.',
+        title: 'Trier pour choisir',
+        orientationAxis: 'tri strategique et structuration du cap',
+        orientationMeaning: 'ce qui doit grandir cette annee passe par moins de fronts ouverts et plus de choix assumes',
+        whyPriority: `Cette priorite est decisive en ${year} parce qu un cap brouille disperse tes ressources, alors qu un cap assume rend l execution beaucoup plus lisible.`,
+        realLife: 'Trie tes projets, nomme clairement ta priorite numero un, coupe les engagements tiedes, et cesse de traiter au meme niveau ce qui est central et ce qui est secondaire.',
+        pitfall: 'Garder des projets tiedes ouverts pour ne decevoir personne et finir par diluer ton axe principal.',
+        timingStart: `Le debut de ${year} sert a faire l inventaire, nommer le cap et sortir des engagements qui n ont plus de vraie traction.`,
+        timingMiddle: 'Mets ensuite tes moyens uniquement sur ce qui confirme ce cap dans le reel.',
+        timingEnd: 'Stabilise la priorite choisie et coupe ce qui voudrait rouvrir la dispersion.',
+        immediateAction: 'Dans les 24 a 72 heures, ecris noir sur blanc tes 3 vraies priorites, reporte un engagement secondaire et bloque un premier livrable visible sur la priorite numero un.',
       }
   }
 }
@@ -231,8 +313,8 @@ function priorityTemplate(family: AnnualFamily, year: string): PriorityTemplate 
 function buildPrioritySignals(
   openingSignal: StructuredSignal | null,
   prioritizedSignals: StructuredSignal[],
-): Array<{ signal: StructuredSignal | null; family: AnnualFamily }> {
-  const chosen: Array<{ signal: StructuredSignal | null; family: AnnualFamily }> = []
+): PrioritySelection[] {
+  const chosen: PrioritySelection[] = []
   const seenFamilies = new Set<AnnualFamily>()
   const candidates = [...(openingSignal ? [openingSignal] : []), ...prioritizedSignals]
 
@@ -256,91 +338,76 @@ function buildPrioritySignals(
 
 function buildOrientation(
   year: string,
-  openingSignal: StructuredSignal | null,
-  prioritizedSignals: StructuredSignal[],
+  priorities: PrioritySelection[],
 ): string {
-  const primary = describeSignal(openingSignal ?? prioritizedSignals[0] ?? null)
-  const secondary = describeSignal(prioritizedSignals.find((signal) => signal !== openingSignal) ?? null)
+  const primary = priorities[0] ?? { signal: null, family: 'cap' as const }
+  const secondary = priorities[1] ?? null
+  const primaryTemplate = priorityTemplate(primary.family, year)
+  const primaryEvidence = describeSignal(primary.signal)
 
-  return [
-    sentence(`En ${year}, le mouvement dominant demande surtout de clarifier le cap et de concentrer ton energie sur ce qui porte vraiment`),
-    sentence(primary),
-    secondary && secondary !== primary
-      ? sentence(`Le bon axe n est pas d en faire plus, mais d assumer plus nettement ce qui doit devenir central: ${secondary}`)
-      : '',
+  const sentences = [
+    sentence(`En ${year}, l axe dominant est ${primaryTemplate.orientationAxis}: ${primaryTemplate.orientationMeaning}`),
+    sentence(`Le signal le plus net montre ${primaryEvidence}`),
   ]
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(' ')
+
+  if (secondary) {
+    const secondaryTemplate = priorityTemplate(secondary.family, year)
+    sentences.push(
+      sentence(`Le second mouvement utile de l annee passe par ${secondaryTemplate.orientationAxis}, pas par l empilement de nouveaux fronts`),
+    )
+  }
+
+  return sentences.slice(0, 3).join(' ')
 }
 
-function buildPriorityBlock(year: string, signal: StructuredSignal | null, family: AnnualFamily, index: number): string {
-  const template = priorityTemplate(family, year)
-  const evidence = describeSignal(signal)
+function buildPriorityBlock(year: string, selection: PrioritySelection, index: number): string {
+  const template = priorityTemplate(selection.family, year)
+  const evidence = describeSignal(selection.signal)
 
   return [
     `${index}. ${template.title}`,
-    `Pourquoi: ${sentence(`${template.explanation} Signal d appui: ${evidence}`)}`,
-    `Dans la vraie vie: ${sentence(template.realLife.replace(/^Dans la vraie vie:\s*/i, ''))}`,
+    `Pourquoi: ${sentence(`${template.whyPriority} Le signal d appui va dans ce sens: ${evidence}`)}`,
+    `Dans la vraie vie: ${sentence(template.realLife)}`,
   ].join('\n')
 }
 
-function buildPitfalls(year: string, priorityFamilies: AnnualFamily[]): string {
-  const unique = Array.from(new Set(priorityFamilies))
-  const pitfalls = unique
+function buildPitfalls(year: string, priorities: PrioritySelection[]): string {
+  const pitfalls = priorities
     .slice(0, 2)
-    .map((family) => sentence(priorityTemplate(family, year).pitfall))
+    .map((selection) => {
+      const template = priorityTemplate(selection.family, year)
+      return sentence(template.pitfall)
+    })
 
-  const withFallbacks = pitfalls.length === 2
+  const completedPitfalls = pitfalls.length >= 2
     ? pitfalls
     : [
         ...pitfalls,
-        sentence('Te disperser en rouvrant des sujets qui ne sont pas sur ton axe principal.'),
+        sentence('Te remettre a traiter comme urgents des sujets qui ne servent ni ton cap, ni ton rythme, ni ta consolidation.'),
       ].slice(0, 2)
 
-  return withFallbacks.map((entry) => `- ${entry}`).join('\n')
+  return completedPitfalls.map((entry) => `- ${entry}`).join('\n')
 }
 
-function buildTiming(year: string, priorityFamilies: AnnualFamily[]): string {
-  const dominant = priorityFamilies[0] ?? 'cap'
-  const accelerationCue =
-    dominant === 'rythme' || dominant === 'alignement'
-      ? 'Accelere quand la reponse du reel est claire et qu un axe prend vraiment.'
-      : 'Accelere quand ton axe est clarifie et que l execution devient simple.'
+function buildTiming(year: string, priorities: PrioritySelection[]): string {
+  const first = priorities[0] ?? { signal: null, family: 'cap' as const }
+  const second = priorities[1] ?? first
+  const third = priorities[2] ?? second
 
-  const observationCue =
-    dominant === 'maturation'
-      ? 'Observe d abord ce qui murit avant de l exposer.'
-      : 'Observe avant de rajouter de nouvelles charges.'
-
-  const consolidationCue =
-    dominant === 'cycle' || dominant === 'direction'
-      ? 'Consolide ce qui tient vraiment et simplifie le reste.'
-      : 'Consolide les choix qui ont prouve leur traction.'
+  const firstTemplate = priorityTemplate(first.family, year)
+  const secondTemplate = priorityTemplate(second.family, year)
+  const thirdTemplate = priorityTemplate(third.family, year)
 
   return [
-    `Debut d annee: ${sentence(`${observationCue} Le debut de ${year} sert a trier, nommer et ajuster`)}`,
-    `Milieu d annee: ${sentence(accelerationCue)}`,
-    `Fin d annee: ${sentence(consolidationCue)}`,
+    `Debut d annee: ${sentence(firstTemplate.timingStart)}`,
+    `Milieu d annee: ${sentence(secondTemplate.timingMiddle)}`,
+    `Fin d annee: ${sentence(thirdTemplate.timingEnd)}`,
   ].join('\n')
 }
 
-function buildImmediateAction(priorityFamily: AnnualFamily): string {
-  switch (priorityFamily) {
-    case 'rythme':
-      return sentence('Dans les 72 prochaines heures, bloque un seul creneau de 90 minutes pour ta priorite numero un et annule une demande qui parasite ton rythme.')
-    case 'alignement':
-      return sentence('Dans les prochaines 24 a 72 heures, liste les engagements qui te vident, garde un seul vrai oui, et ferme explicitement un non.')
-    case 'direction':
-      return sentence('Dans les 72 prochaines heures, choisis ton axe prioritaire, reconfigure un point concret de ton environnement, puis rattache une action visible a cet axe.')
-    case 'cycle':
-      return sentence('Dans les 48 prochaines heures, ferme un chantier sans elan reel et consacre un bloc de travail net a ce qui construit la base de ton annee.')
-    case 'maturation':
-      return sentence('Dans les 72 prochaines heures, reprends une idee importante, clarifie son fond, puis pose une seule action qui la fait murir proprement.')
-    case 'cap':
-    default:
-      return sentence('Dans les 24 a 72 heures, ecris noir sur blanc tes 3 priorites, supprime une dispersion immediate, et bloque un premier pas concret sur la priorite numero un.')
-  }
+function buildImmediateAction(year: string, primary: PrioritySelection): string {
+  const template = priorityTemplate(primary.family, year)
+  return sentence(template.immediateAction)
 }
 
 export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): string {
@@ -348,27 +415,24 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
   const openingSignal = input.openingSignal?.signal ?? prioritizedSignals[0] ?? null
   const year = extractRequestedYear(input.userMessage)
   const priorities = buildPrioritySignals(openingSignal, prioritizedSignals)
-  const priorityFamilies = priorities.map((entry) => entry.family)
-  const primaryFamily = priorityFamilies[0] ?? 'cap'
+  const primary = priorities[0] ?? { signal: null, family: 'cap' as const }
 
-  const blocks = [
+  return [
     `ORIENTATION ${year}`,
-    buildOrientation(year, openingSignal, prioritizedSignals),
+    buildOrientation(year, priorities),
     '',
     'TES 3 PRIORITES REELLES',
-    priorities.map((entry, index) => buildPriorityBlock(year, entry.signal, entry.family, index + 1)).join('\n\n'),
+    priorities.map((selection, index) => buildPriorityBlock(year, selection, index + 1)).join('\n\n'),
     '',
     'CE QUI VA TE FREINER',
-    buildPitfalls(year, priorityFamilies),
+    buildPitfalls(year, priorities),
     '',
     'TON TIMING',
-    buildTiming(year, priorityFamilies),
+    buildTiming(year, priorities),
     '',
     'ACTION IMMEDIATE',
-    buildImmediateAction(primaryFamily),
-  ]
-
-  return blocks.join('\n')
+    buildImmediateAction(year, primary),
+  ].join('\n')
 }
 
 export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriorityValidation {
@@ -383,10 +447,10 @@ export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriority
   ]
   const disallowedPatterns = [
     /CE QUI SE PASSE/i,
-    /POURQUOI\s+[CÇ]A\s+BLOQUE/i,
+    /POURQUOI\s+(?:CA|\u00C7A)\s+BLOQUE/i,
     /CE QUE TU DOIS FAIRE/i,
     /CLE\s+A\s+RETENIR/i,
-    /SPH[EÈ]RE/i,
+    /SPH(?:ERE|\u00C8RE|\u00E8RE)/i,
   ]
 
   for (const pattern of requiredHeadings) {
