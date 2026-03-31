@@ -82,3 +82,16 @@ export async function POST(req: NextRequest) {
     return internalError('Erreur serveur')
   }
 }
+
+export async function GET(req: NextRequest) {
+  logger.error('[fusion] unexpected GET on /api/fusion', {
+    url: req.url,
+    userAgent: req.headers.get('user-agent'),
+    referer: req.headers.get('referer'),
+  })
+
+  return new Response('Use POST JSON on /api/fusion', {
+    status: 405,
+    headers: { Allow: 'POST' },
+  })
+}
