@@ -179,7 +179,13 @@ const NORMALIZED_API_BASE = normalizeApiBaseUrl(process.env.HEXASTRA_API_URL)
 const API_URL = NORMALIZED_API_BASE.url
 const API_KEY = process.env.HEXASTRA_API_KEY || ''
 
-if (NORMALIZED_API_BASE.warning === 'missing_protocol') {
+if (NORMALIZED_API_BASE.warning === 'railway_http_upgraded_to_https') {
+  logger.warn('api_url_upgraded_to_https_for_railway', {
+    scope: 'runHexastraFlow',
+    rawValue: NORMALIZED_API_BASE.input,
+    normalizedUrl: NORMALIZED_API_BASE.url,
+  })
+} else if (NORMALIZED_API_BASE.warning === 'missing_protocol') {
   logger.warn('[runHexastraFlow] HEXASTRA_API_URL normalized with https:// prefix', {
     rawValue: NORMALIZED_API_BASE.input,
     normalizedUrl: NORMALIZED_API_BASE.url,

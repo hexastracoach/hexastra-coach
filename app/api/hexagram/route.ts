@@ -15,7 +15,13 @@ const NORMALIZED_API_BASE = normalizeApiBaseUrl(process.env.HEXASTRA_API_URL, {
 })
 const API_URL = NORMALIZED_API_BASE.url
 
-if (
+if (NORMALIZED_API_BASE.warning === 'railway_http_upgraded_to_https') {
+  logger.warn('api_url_upgraded_to_https_for_railway', {
+    scope: 'hexagram',
+    rawValue: NORMALIZED_API_BASE.input,
+    normalizedUrl: NORMALIZED_API_BASE.url,
+  })
+} else if (
   NORMALIZED_API_BASE.input &&
   (NORMALIZED_API_BASE.warning === 'missing_protocol' ||
     NORMALIZED_API_BASE.warning === 'invalid_url')

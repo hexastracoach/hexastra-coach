@@ -13,6 +13,14 @@ describe('normalizeApiBaseUrl', () => {
     expect(normalized.addedProtocol).toBe(true)
   })
 
+  it('upgrades Railway http urls to https', () => {
+    const normalized = normalizeApiBaseUrl('http://hexastra-api-production.up.railway.app')
+
+    expect(normalized.url).toBe('https://hexastra-api-production.up.railway.app')
+    expect(normalized.warning).toBe('railway_http_upgraded_to_https')
+    expect(normalized.addedProtocol).toBe(false)
+  })
+
   it('removes a trailing slash from an already valid url', () => {
     const normalized = normalizeApiBaseUrl('https://hexastra-api-production.up.railway.app/')
 

@@ -7,10 +7,18 @@ export type NormalizedApiBaseUrlResult = {
   removedTrailingSlash: boolean
   collapsedDuplicateSlashes: boolean
   usedFallback: boolean
-  warning: 'missing' | 'missing_protocol' | 'invalid_url' | null
+  warning: 'missing' | 'missing_protocol' | 'railway_http_upgraded_to_https' | 'invalid_url' | null
 }
 
 const PROTOCOL_PREFIX_RE = /^[a-z][a-z0-9+.-]*:\/\//i
+
+type NormalizedCandidate = {
+  url: string
+  addedProtocol: boolean
+  removedTrailingSlash: boolean
+  collapsedDuplicateSlashes: boolean
+  upgradedRailwayHttpToHttps: boolean
+}
 
 function trimTrailingSlashes(pathname: string): string {
   if (!pathname || pathname === '/') {
@@ -20,13 +28,30 @@ function trimTrailingSlashes(pathname: string): string {
   return pathname.replace(/\/+$/, '')
 }
 
-function normalizeCandidate(candidate: string) {
+function isRailwayHostname(hostname: string): boolean {
+  return /(^|\.)railway\.app$/i.test(hostname)
+}
+
+function toPublicCandidate(normalized: NormalizedCandidate) {
+  const { upgradedRailwayHttpToHttps: _ignored, ...publicCandidate } = normalized
+  return publicCandidate
+}
+
+function normalizeCandidate(candidate: string): NormalizedCandidate {
   const addedProtocol = !PROTOCOL_PREFIX_RE.test(candidate)
   const withProtocol = addedProtocol ? `https://${candidate.replace(/^\/+/, '')}` : candidate
   const parsed = new URL(withProtocol)
 
   if (!/^https?:$/i.test(parsed.protocol)) {
     throw new Error(`Unsupported protocol: ${parsed.protocol}`)
+  }
+
+  const upgradedRailwayHttpToHttps =
+    isRailwayHostname(parsed.hostname) &&
+    /^http:$/i.test(parsed.protocol)
+
+  if (upgradedRailwayHttpToHttps) {
+    parsed.protocol = 'https:'
   }
 
   const collapsedPathname = parsed.pathname.replace(/\/{2,}/g, '/')
@@ -40,6 +65,7 @@ function normalizeCandidate(candidate: string) {
       `${parsed.protocol}//${parsed.host}${collapsedPathname}` !==
         `${parsed.protocol}//${parsed.host}${trimmedPathname}`,
     collapsedDuplicateSlashes: parsed.pathname !== collapsedPathname,
+    upgradedRailwayHttpToHttps,
   }
 }
 
@@ -56,8 +82,13 @@ export function normalizeApiBaseUrl(
       return {
         input,
         usedFallback: false,
-        warning: normalized.addedProtocol ? 'missing_protocol' : null,
-        ...normalized,
+        warning:
+          normalized.upgradedRailwayHttpToHttps
+            ? 'railway_http_upgraded_to_https'
+            : normalized.addedProtocol
+              ? 'missing_protocol'
+              : null,
+        ...toPublicCandidate(normalized),
       }
     } catch {
       if (fallback) {
@@ -67,7 +98,7 @@ export function normalizeApiBaseUrl(
             input,
             usedFallback: true,
             warning: 'invalid_url',
-            ...normalizedFallback,
+            ...toPublicCandidate(normalizedFallback),
           }
         } catch {
           // Fall through to an empty result below.
@@ -93,7 +124,7 @@ export function normalizeApiBaseUrl(
         input,
         usedFallback: false,
         warning: null,
-        ...normalizedFallback,
+        ...toPublicCandidate(normalizedFallback),
       }
     } catch {
       // Fall through to an empty result below.
