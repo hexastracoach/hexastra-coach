@@ -204,3 +204,23 @@ describe('buildResponseModeDirective', () => {
     expect(buildResponseModeDirective('pedagogical_explanation')).toContain('EXPLICATION PEDAGOGIQUE')
   })
 })
+
+describe('yearly priority response mode', () => {
+  it('returns yearly_priority_answer for yearly priorities', () => {
+    expect(selectResponseMode({
+      requestKind: 'yearly_priorities',
+      subcategory: 'annual_guidance',
+      plan: 'premium',
+      exactDataResolved: true,
+      exactDataReliable: true,
+    })).toBe('yearly_priority_answer')
+  })
+
+  it('enforces the dedicated annual structure in the directive', () => {
+    const directive = buildResponseModeDirective('yearly_priority_answer')
+    expect(directive).toContain('PRIORITES ANNUELLES STRATEGIQUES')
+    expect(directive).toContain('Orientation dominante de l annee')
+    expect(directive).toContain('Trois priorites concretes')
+    expect(directive).toContain('Bon timing et rythme')
+  })
+})

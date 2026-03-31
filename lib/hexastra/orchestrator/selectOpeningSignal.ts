@@ -26,13 +26,19 @@ function normalize(text: string): string {
 }
 
 function isSoftFusionSubCategory(subCategory: string): boolean {
-  return /fusion_(general|timing|life_situation|blockage|energy_state|relationships|decision)/.test(
+  return /(annual_guidance|fusion_(general|timing|life_situation|blockage|energy_state|relationships|decision))/.test(
     subCategory,
   )
 }
 
 function isTimingStateSubCategory(subCategory: string): boolean {
   return /transits|current|timing|return|progression|cycle|period|energy|state/.test(subCategory)
+}
+
+function isAnnualPrioritySignal(subCategory: string): boolean {
+  return /annual_guidance|annual|year|solar_return|lunar_return|progressions|transits|current_cycle|personal_year|kua_annual/.test(
+    subCategory,
+  )
 }
 
 function isExplicitScienceQuery(normalizedQuery: string): boolean {
@@ -149,6 +155,12 @@ export function selectOpeningSignal(args: {
       signal.science !== 'fusion' &&
       isTimingStateSubCategory(signal.subCategory),
   )
+  const exactAnnual = findFirst(
+    primarySignals,
+    (signal) =>
+      signal.sourceType === 'exact_data' &&
+      isAnnualPrioritySignal(signal.subCategory),
+  )
   const softFusion = findFirst(
     primarySignals,
     (signal) => signal.science === 'fusion' && isSoftFusionSubCategory(signal.subCategory),
@@ -161,7 +173,14 @@ export function selectOpeningSignal(args: {
   let chosenSignal: StructuredSignal | null = firstSignal
   const reasoningTags: string[] = []
 
-  if (ambiguous) {
+  if (args.responseMode === 'yearly_priority_answer') {
+    chosenSignal = exactAnnual ?? exactSpecific ?? softFusion ?? firstSignal
+    reasoningTags.push(
+      chosenSignal?.sourceType === 'exact_data'
+        ? 'yearly_priority_exact_opening'
+        : 'yearly_priority_fusion_opening',
+    )
+  } else if (ambiguous) {
     if (softFusion) {
       chosenSignal = softFusion
       reasoningTags.push('ambiguous_soft_fusion_opening')

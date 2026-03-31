@@ -130,3 +130,18 @@ describe('classifyMessage — fallback / general', () => {
     expect(result.requestKind).toBeDefined()
   })
 })
+
+describe('classifyMessage - yearly priorities', () => {
+  it('routes annual priority questions as exact-data-backed interpretive fusion guidance', () => {
+    const result = classifyMessage('quelles sont mes priorites pour 2026 ?')
+
+    expect(result.intent).toBe('strategic_priority')
+    expect(result.science).toBe('fusion')
+    expect(result.subcategory).toBe('annual_guidance')
+    expect(result.requestKind).toBe('yearly_priorities')
+    expect(result.needsExactData).toBe(true)
+    expect(result.needsInterpretation).toBe(true)
+    expect(result.domainRoute).toBe('fusion')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9)
+  })
+})

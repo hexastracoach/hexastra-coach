@@ -15,6 +15,7 @@ export type ResponseMode =
   | 'direct_answer'            // réponse factuelle immédiate — données brutes, liste, aucun refus
   | 'calculated_reading'
   | 'interpretive_reading'
+  | 'yearly_priority_answer'
   | 'guided_exploration'
   | 'pedagogical_explanation'
   | 'career_fit_answer'
@@ -60,6 +61,9 @@ export function selectResponseMode(input: ResponseModeInput): ResponseMode {
 
   if (intent === 'career_guidance') {
     return 'career_fit_answer'
+  }
+  if (requestKind === 'yearly_priorities') {
+    return 'yearly_priority_answer'
   }
 
   // Fusion intents (relational, emotional, decisional, situational) → 3-block concise
@@ -117,6 +121,22 @@ export function buildResponseModeDirective(mode: ResponseMode): string {
         '- Fonde-toi exclusivement sur les donnees presentes dans le bloc de donnees exact.',
         "- N invente pas de placements, profils ou valeurs absents du bloc.",
         '- Si des donnees manquent, construis ta lecture sur ce qui est disponible sans combler les trous.',
+      ].join('\n')
+
+    case 'yearly_priority_answer':
+      return [
+        '# YEARLY_PRIORITY_ANSWER_MODE - PRIORITES ANNUELLES STRATEGIQUES',
+        "- La question est interpretative, mais elle doit etre ancree dans les exact data fusion disponibles.",
+        '- Croise en priorite les transits, progressions, retour solaire, retour lunaire, transits Human Design, cycles numerologiques et directions Kua quand ces donnees sont presentes.',
+        "- Interdis toute lecture generique: chaque point doit venir d'un signal coherent de l'annee en cours.",
+        '- Structure obligatoire en 5 blocs, dans cet ordre exact :',
+        '1. Orientation dominante de l annee',
+        '2. Trois priorites concretes',
+        '3. Deux dispersions ou pieges a eviter',
+        '4. Bon timing et rythme',
+        '5. Action immediate a faire maintenant',
+        '- Ton Hexastra: clair, concret, premium, dense sans etre verbeux.',
+        '- Si certaines donnees annuelles manquent, le dire brievement puis construire la lecture avec les signaux exacts disponibles.',
       ].join('\n')
 
     case 'guided_exploration':

@@ -177,3 +177,17 @@ describe('vector policy — unknown', () => {
     expect(result.shouldEnrich).toBe(false)
   })
 })
+
+describe('vector policy - yearly priorities', () => {
+  it('enriches because the query is interpretive even when backed by exact data', () => {
+    const result = shouldUseVectorEnrichment({
+      requestKind: 'yearly_priorities',
+      science: 'fusion',
+      subcategory: 'annual_guidance',
+      exactDataResolved: true,
+    })
+
+    expect(result.shouldEnrich).toBe(true)
+    expect(result.reason).toContain('exact-data-backed interpretive query')
+  })
+})

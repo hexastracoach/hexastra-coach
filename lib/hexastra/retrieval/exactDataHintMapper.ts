@@ -23,8 +23,10 @@ export function buildExactDataRequestFromRetrievalPlan(
 ): ExactDataRequest {
   const subCategories = retrievalPlan.subCategories ?? []
   const exactDataHints = retrievalPlan.exactDataHints ?? []
+  const isAnnualGuidance = subCategories.includes('annual_guidance')
 
   const includeTransits =
+    isAnnualGuidance ||
     subCategories.some((subCategory) => subCategory.startsWith('astro_transits_')) ||
     hasAny(subCategories, [
       'astro_retrogrades_current',
@@ -43,6 +45,7 @@ export function buildExactDataRequestFromRetrievalPlan(
     hasHint(exactDataHints, 'include_transits')
 
   const includeProgressions =
+    isAnnualGuidance ||
     hasAny(subCategories, [
       'astro_progressions',
       'astro_secondary_progressions',
@@ -50,6 +53,7 @@ export function buildExactDataRequestFromRetrievalPlan(
     ]) || hasHint(exactDataHints, 'include_progressions')
 
   const includeSolarReturn =
+    isAnnualGuidance ||
     hasAny(subCategories, [
       'astro_solar_return',
       'astro_annual_themes',
@@ -61,6 +65,7 @@ export function buildExactDataRequestFromRetrievalPlan(
     hasHint(exactDataHints, 'include_solar_return')
 
   const includeLunarReturn =
+    isAnnualGuidance ||
     hasAny(subCategories, [
       'astro_lunar_return',
       'astro_monthly_cycles',
@@ -71,6 +76,7 @@ export function buildExactDataRequestFromRetrievalPlan(
     hasHint(exactDataHints, 'include_lunar_return')
 
   const includeHumanDesignTransits =
+    isAnnualGuidance ||
     hasAny(subCategories, [
       'hd_current_transits',
       'hd_current_cycle',
@@ -94,6 +100,7 @@ export function buildExactDataRequestFromRetrievalPlan(
     ]) || hasHint(exactDataHints, 'include_human_design_transits')
 
   const includeNumerologyCycles =
+    isAnnualGuidance ||
     hasAny(subCategories, [
       'num_personal_year',
       'num_personal_month',
@@ -107,6 +114,7 @@ export function buildExactDataRequestFromRetrievalPlan(
     ]) || hasHint(exactDataHints, 'include_numerology_cycles')
 
   const includeKuaDirections =
+    isAnnualGuidance ||
     hasAny(subCategories, [
       'kua_number',
       'kua_profile',

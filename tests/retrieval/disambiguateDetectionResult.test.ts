@@ -118,4 +118,20 @@ describe('disambiguateDetectionResult', () => {
     expect(result.dominantSubCategory).toBe('fusion_decision')
     expect(result.prioritizedSciences[0]).toBe('fusion')
   })
+
+  it('prioritizes annual guidance for yearly strategic questions', () => {
+    const result = disambiguate('sur quoi me concentrer cette annee ?')
+
+    expect(result.prioritizedSubCategories).toEqual(
+      expect.arrayContaining([
+        'annual_guidance',
+        'astro_annual_themes',
+        'astro_solar_return',
+        'astro_progressions',
+        'num_personal_year',
+        'hd_current_transits',
+      ]),
+    )
+    expect(result.prioritizedSubCategories[0]).toBe('annual_guidance')
+  })
 })

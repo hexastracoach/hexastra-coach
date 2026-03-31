@@ -143,6 +143,16 @@ export function selectResponseModeSelection(args: {
       normalizedQuery,
     )
 
+  if (args.requestKind === 'yearly_priorities') {
+    responseMode = 'yearly_priority_answer'
+    reasoningTags.push(
+      'yearly_priority_override',
+      args.exactDataResolved
+        ? 'exact_data_backed_interpretive_query'
+        : 'yearly_priority_waiting_for_exact_data',
+    )
+  }
+
   if (responseMode === 'concise_fusion_answer') {
     if (isGlobalCurrent) {
       reasoningTags.push('global_current_fusion_mode')

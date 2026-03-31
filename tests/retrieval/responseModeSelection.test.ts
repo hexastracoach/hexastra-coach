@@ -157,4 +157,105 @@ describe('selectResponseModeSelection', () => {
     expect(selection.responseMode).toBe('concise_fusion_answer')
     expect(['fusion', null]).toContain(selection.dominantOpeningScience)
   })
+
+  it('forces the yearly priority answer mode with an exact annual opening', () => {
+    const retrievalPlan = {
+      sciences: ['fusion', 'astro', 'numerology', 'human_design', 'kua'],
+      subCategories: [
+        'annual_guidance',
+        'astro_annual_themes',
+        'astro_solar_return',
+        'astro_progressions',
+        'num_personal_year',
+        'hd_current_transits',
+        'kua_annual_influence',
+      ],
+      vectorNamespaces: ['ks_fusion_globaux'],
+      scienceTags: ['global', 'transverse'],
+      exactDataHints: [
+        'include_transits',
+        'include_progressions',
+        'include_solar_return',
+        'include_lunar_return',
+        'include_human_design_transits',
+        'include_numerology_cycles',
+        'include_kua_directions',
+      ],
+      weightedMatches: [
+        { subCategory: 'annual_guidance', science: 'fusion', score: 9.4, retrievalPriority: 92 },
+        { subCategory: 'astro_annual_themes', science: 'astro', score: 8.7, retrievalPriority: 75 },
+        { subCategory: 'astro_progressions', science: 'astro', score: 8.3, retrievalPriority: 70 },
+        { subCategory: 'num_personal_year', science: 'numerology', score: 8.1, retrievalPriority: 90 },
+      ],
+      preferredTopK: 8,
+      fallbackUsed: false,
+      dominantScience: 'fusion',
+      dominantSubCategory: 'annual_guidance',
+      ambiguities: [],
+    }
+
+    expect(buildExactDataRequestFromRetrievalPlan(retrievalPlan)).toMatchObject({
+      includeTransits: true,
+      includeProgressions: true,
+      includeSolarReturn: true,
+      includeLunarReturn: true,
+      includeHumanDesignTransits: true,
+      includeNumerologyCycles: true,
+      includeKuaDirections: true,
+    })
+
+    const annualSignal = {
+      science: 'fusion',
+      subCategory: 'annual_guidance',
+      sourceType: 'exact_data' as const,
+      exactDataSection: 'solarReturn' as const,
+      value: { annual_theme: 'consolidation et simplification' },
+    }
+
+    const selection = selectResponseModeSelection({
+      userMessage: 'quelles sont mes priorites pour 2026 ?',
+      requestKind: 'yearly_priorities',
+      subcategory: 'annual_guidance',
+      plan: 'premium',
+      exactDataResolved: true,
+      exactDataReliable: true,
+      isFusionIntent: true,
+      retrievalPlan,
+      structuredSignals: [
+        annualSignal,
+        {
+          science: 'astro',
+          subCategory: 'astro_annual_themes',
+          sourceType: 'exact_data',
+          exactDataSection: 'solarReturn',
+          value: { annual_theme: 'consolidation et simplification' },
+        },
+        {
+          science: 'numerology',
+          subCategory: 'num_personal_year',
+          sourceType: 'exact_data',
+          exactDataSection: 'numerologyCycles',
+          value: { yearly: { personalYearNumber: 8 } },
+        },
+      ],
+      scoredSignals: [
+        {
+          ...annualSignal,
+          priorityScore: 12.4,
+        },
+      ],
+      intent: 'fusion_general_question',
+    })
+
+    expect(selection.responseMode).toBe('yearly_priority_answer')
+    expect(selection.dominantOpeningSource).toBe('exact_data')
+    expect(selection.dominantOpeningSubCategory).toBe('annual_guidance')
+    expect(selection.reasoningTags).toEqual(
+      expect.arrayContaining([
+        'yearly_priority_override',
+        'exact_data_backed_interpretive_query',
+        'yearly_priority_exact_opening',
+      ]),
+    )
+  })
 })

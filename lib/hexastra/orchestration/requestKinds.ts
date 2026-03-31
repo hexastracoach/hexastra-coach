@@ -10,12 +10,14 @@
  */
 
 import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
+import { isYearlyPriorityQuestion } from '@/lib/hexastra/orchestration/yearlyPriorityRouting'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type RequestKind =
   | 'exact_fact'        // "quelles sont mes planètes ?" / "quel est mon ascendant ?"
   | 'exact_profile'     // "quel est mon profil HD ?" / "quel est mon type ?"
+  | 'yearly_priorities' // guidance annuelle interpretee a partir des exact data fusion
   | 'interpretation'    // "ça dit quoi sur moi ?" / "explique-moi mon profil 3/5"
   | 'synthesis'         // "fais-moi une lecture complète" / "qui suis-je ?"
   | 'comparison'        // "est-ce mieux X ou Y ?" — unused for now, reserved
@@ -154,6 +156,8 @@ export function classifyRequestKind(message: string, subcategory?: string | null
   // exact_profile: user wants to know their type / identity label
   if (matchesAny(message, EXACT_PROFILE_PATTERNS)) return 'exact_profile'
 
+  if (isYearlyPriorityQuestion(message) || subcategory === 'annual_guidance') return 'yearly_priorities'
+
   // synthesis: full portrait / complete reading
   if (matchesAny(message, SYNTHESIS_PATTERNS)) return 'synthesis'
 
@@ -187,14 +191,26 @@ export function classifyRequestKind(message: string, subcategory?: string | null
  * Whether this requestKind requires exact data from the calculation engine.
  */
 export function requestKindNeedsExactData(kind: RequestKind): boolean {
-  return kind === 'exact_fact' || kind === 'exact_profile' || kind === 'synthesis' || kind === 'mixed'
+  return (
+    kind === 'exact_fact' ||
+    kind === 'exact_profile' ||
+    kind === 'yearly_priorities' ||
+    kind === 'synthesis' ||
+    kind === 'mixed'
+  )
 }
 
 /**
  * Whether this requestKind benefits from interpretive enrichment.
  */
 export function requestKindNeedsInterpretation(kind: RequestKind): boolean {
-  return kind === 'interpretation' || kind === 'synthesis' || kind === 'guidance' || kind === 'mixed'
+  return (
+    kind === 'yearly_priorities' ||
+    kind === 'interpretation' ||
+    kind === 'synthesis' ||
+    kind === 'guidance' ||
+    kind === 'mixed'
+  )
 }
 
 /**

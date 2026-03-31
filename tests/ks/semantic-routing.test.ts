@@ -131,3 +131,11 @@ describe('computeFlowStep — blockMicroProfile', () => {
     expect(step).toBe('micro_profile')
   })
 })
+
+describe('detectContext - yearly priorities', () => {
+  it('detects strategic_priority for annual priorities', () => {
+    const result = detectContext('Quelles sont mes priorites pour 2026 ?')
+    expect(result.contextType).toBe('strategic_priority')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9)
+  })
+})

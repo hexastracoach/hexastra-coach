@@ -22,6 +22,15 @@ export type SubCategoryExactDataResolution =
   | null
 
 const SUBCATEGORY_TO_NORMALIZED_SECTIONS: Record<string, NormalizedExactPathCandidate[]> = {
+  annual_guidance: [
+    { section: 'solarReturn' },
+    { section: 'progressions' },
+    { section: 'transits' },
+    { section: 'lunarReturn' },
+    { section: 'humanDesignTransits' },
+    { section: 'numerologyCycles' },
+    { section: 'kuaDirections' },
+  ],
   astro_transits_current: [{ section: 'transits' }],
   astro_transits_love: [{ section: 'transits' }],
   astro_transits_work: [{ section: 'transits' }],
@@ -81,6 +90,20 @@ const SUBCATEGORY_TO_NORMALIZED_SECTIONS: Record<string, NormalizedExactPathCand
 }
 
 const SUBCATEGORY_TO_LEGACY_EXACT_PATHS: Record<string, string[]> = {
+  annual_guidance: [
+    'solar_return',
+    'solarReturn',
+    'progressions',
+    'transits',
+    'current_transits',
+    'lunar_return',
+    'lunarReturn',
+    'human_design_transits',
+    'humanDesignTransits',
+    'numerology',
+    'numerologie',
+    'kua',
+  ],
   astro_transits_current: ['transits', 'current_transits'],
   astro_transits_love: ['transits', 'current_transits'],
   astro_transits_work: ['transits', 'current_transits'],

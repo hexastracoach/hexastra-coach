@@ -23,6 +23,12 @@ describe('selectRenderProfile', () => {
       selectRenderProfile({ responseMode: 'concise_fusion_answer', userPlan: 'premium' }).format,
     ).toBe('storytelling')
   })
+
+  it('treats yearly_priority_answer as an interpretive render bucket', () => {
+    expect(
+      selectRenderProfile({ responseMode: 'yearly_priority_answer', userPlan: 'premium' }).format,
+    ).toBe('storytelling')
+  })
 })
 
 describe('normalizeUserPlan', () => {

@@ -15,12 +15,14 @@
  */
 
 import type { ChatMessage } from '@/lib/chat/chatPayloadBuilder'
+import { isYearlyPriorityQuestion } from '@/lib/hexastra/orchestration/yearlyPriorityRouting'
 
 export type SemanticContextType =
   | 'profile'              // Who am I? My nature, my strengths (generic profile read)
   | 'astro_exact'          // Explicit astrology calculation: natal chart, transits, aspects, houses
   | 'astro_followup'       // Short contradiction / re-check after a previous astro exact turn
   | 'human_design_exact'   // Human Design chart request: type, profile, authority, centers, gates
+  | 'strategic_priority'   // Annual strategic guidance backed by exact fusion data
   | 'current'              // What's happening now? My current situation
   | 'timing'               // Future phases, upcoming periods, cycles
   | 'decision'             // Should I? Which option? What to choose?
@@ -109,6 +111,10 @@ export function detectContext(message: string, history?: ChatMessage[]): Semanti
   if (history && history.length > 0) {
     const followup = detectAstroFollowup(message, history)
     if (followup) return followup
+  }
+
+  if (isYearlyPriorityQuestion(text)) {
+    return { contextType: 'strategic_priority', confidence: 0.91 }
   }
 
   // ── DECISION — highest specificity ───────────────────────────────────────

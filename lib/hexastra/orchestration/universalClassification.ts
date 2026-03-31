@@ -92,6 +92,7 @@ const HEXAGRAM_SUBCATS = new Set([
 ])
 
 const FUSION_SUBCATS = new Set([
+  'annual_guidance',
   'lecture_fusionnee', 'compatibilite_fusion', 'decision_fusion', 'timing_fusion',
   'etat_emotionnel', 'lecture_generale',
 ])
@@ -134,6 +135,7 @@ function resolveScience(
   // Semantic context overrides everything for exact routes
   if (semanticContext === 'astro_exact' || semanticContext === 'astro_followup') return 'astrology'
   if (semanticContext === 'human_design_exact') return 'human_design'
+  if (semanticContext === 'strategic_priority') return 'fusion'
 
   // Subcategory-based resolution (most precise — from current message)
   if (subcategory) {

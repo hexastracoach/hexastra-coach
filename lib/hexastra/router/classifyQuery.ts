@@ -1,5 +1,6 @@
 import type { DomainRoute } from '@/lib/hexastra/types'
 import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
+import { isYearlyPriorityQuestion } from '@/lib/hexastra/orchestration/yearlyPriorityRouting'
 
 function deaccent(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -8,6 +9,7 @@ function deaccent(s: string): string {
 export function classifyQuery(message: string): DomainRoute {
   const text = deaccent((message || '').toLowerCase())
   if (isCareerGuidanceQuery(text)) return 'career'
+  if (isYearlyPriorityQuestion(text)) return 'fusion'
 
   const refersToHumanDesign =
     /(human design|design humain|bodygraph|porteum)/i.test(text) ||

@@ -1,4 +1,5 @@
 import type { ScienceDetectionResult } from '@/lib/hexastra/engine/scienceQueryBuilder'
+import { isYearlyPriorityQuestion } from '@/lib/hexastra/orchestration/yearlyPriorityRouting'
 import {
   SCIENCE_SUBCATEGORY_INDEX,
   type Science,
@@ -715,6 +716,33 @@ function applyPresentMomentRule(params: AmbiguityRuleParams): void {
   }
 }
 
+function applyAnnualPriorityRule(params: AmbiguityRuleParams): void {
+  if (!isYearlyPriorityQuestion(params.detection.normalizedQuery)) return
+
+  const boosts: Array<[string, number]> = [
+    ['annual_guidance', 6.2],
+    ['astro_annual_themes', 2.8],
+    ['astro_solar_return', 2.5],
+    ['astro_progressions', 2.4],
+    ['astro_lunar_return', 1.8],
+    ['astro_transits_current', 1.9],
+    ['hd_current_transits', 2.2],
+    ['hd_current_cycle', 1.9],
+    ['num_personal_year', 2.4],
+    ['kua_annual_influence', 1.9],
+  ]
+
+  for (const [subCategory, boost] of boosts) {
+    addSubCategoryBoost(
+      params.scoreMap,
+      params.boostMap,
+      params.detection,
+      subCategory,
+      boost,
+    )
+  }
+}
+
 function applyBirthDataTimingBoost(params: AmbiguityRuleParams): void {
   if (!params.markers.now && !params.markers.cycle && !params.markers.retour) {
     return
@@ -813,6 +841,7 @@ export function disambiguateDetectionResult(
   applyCompatibilityRule(baseParams)
   applyEnergyRule(baseParams)
   applyPresentMomentRule(baseParams)
+  applyAnnualPriorityRule(baseParams)
 
   if (context?.hasBirthData) {
     applyBirthDataTimingBoost(baseParams)

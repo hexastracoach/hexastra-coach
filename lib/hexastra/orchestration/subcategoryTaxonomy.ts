@@ -478,6 +478,18 @@ export const SUBCATEGORY_ENTRIES: SubcategoryEntry[] = [
   // HEXASTRA FUSION
   // ─────────────────────────────────────────────
   {
+    key: 'annual_guidance',
+    science: 'hexastra_fusion',
+    responseType: 'fusion_reading',
+    weight: 9,
+    patterns: [
+      /\b(priorit[eÃ©]s? (pour|de) (20\d{2}|cette ann[eÃ©]e|mon ann[eÃ©]e)|quelle?s? priorit[eÃ©]s? pour (20\d{2}|cette ann[eÃ©]e))\b/i,
+      /\b(sur quoi me concentrer (pour|en)? ?(20\d{2}|cette ann[eÃ©]e)|sur quoi se concentrer cette ann[eÃ©]e)\b/i,
+      /\b(quel axe (privilegier|principal) (pour|en)? ?(20\d{2}|cette ann[eÃ©]e)|axe principal de l.ann[eÃ©]e)\b/i,
+      /\b(o[uÃ¹] mettre (mon|son) [eÃ©]nergie (pour|en)? ?(20\d{2}|cette ann[eÃ©]e)|cap de l.ann[eÃ©]e)\b/i,
+    ],
+  },
+  {
     key: 'lecture_fusionnee',
     science: 'hexastra_fusion',
     responseType: 'fusion_reading',

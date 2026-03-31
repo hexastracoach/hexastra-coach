@@ -2774,6 +2774,7 @@ export async function runHexastraFlow(input: {
       specializedResult?.raw ?? null,
     )
     let exactDataResolved = rawExactDataResolved && reliabilityResult.completeness > 0
+    const isYearlyPriorityRequest = universalClassif.requestKind === 'yearly_priorities'
     flowLog(reliabilityResult.reliable ? 'info' : 'warn', 'EXACT_DATA_RELIABLE', {
       science: universalClassif.science,
       subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
@@ -2853,6 +2854,18 @@ export async function runHexastraFlow(input: {
           })
         }
       }
+    }
+
+    if (isYearlyPriorityRequest && exactDataResolved) {
+      flowLog('info', 'EXACT_DATA_BACKED_INTERPRETIVE_QUERY', {
+        requestKind: universalClassif.requestKind,
+        subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
+        science: universalClassif.science,
+        exactDataResolved,
+        exactDataReliable: effectiveReliable,
+        exactDataSectionsRequested: Object.keys(exactDataRequest ?? {}),
+        queryNature: 'exact-data-backed interpretive query',
+      })
     }
 
     const isStrictExactRequestKind =
@@ -3127,6 +3140,10 @@ export async function runHexastraFlow(input: {
       subcategory: universalClassif.subcategory ?? detectedSubcategoryForGuard,
       plan,
       exactDataResolved,
+      queryNature:
+        isYearlyPriorityRequest && exactDataResolved
+          ? 'exact-data-backed interpretive query'
+          : universalClassif.requestKind,
       openingSource: responseModeSelection.dominantOpeningSource,
       openingScience: responseModeSelection.dominantOpeningScience ?? null,
       openingSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
@@ -3342,8 +3359,18 @@ export async function runHexastraFlow(input: {
       isHoroscopeRoute ||
       (isAstroExact && exactDataResolved) ||
       (isHumanDesignExact && exactDataResolved) ||
+      (isYearlyPriorityRequest && exactDataResolved) ||
       userIntent === 'career_guidance' ||
       effectiveResponseMode === 'career_fit_answer'
+
+    if (isYearlyPriorityRequest && exactDataResolved) {
+      flowLog('info', 'YEARLY_PRIORITY_LLM_RENDER_FORCED', {
+        requestKind: universalClassif.requestKind,
+        responseMode: effectiveResponseMode,
+        exactDataResolved,
+        reason: 'yearly priorities with exact data bypass deterministic final renderer',
+      })
+    }
 
     if (
       knowledgePacket &&

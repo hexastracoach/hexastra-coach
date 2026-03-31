@@ -39,6 +39,7 @@ const RAW_INTENT_SCIENCE_MAP: Record<UserIntent, IntentScienceEntry> = {
   understand_period: {
     sciences: ['astro', 'numerology', 'human_design', 'fusion'],
     subCategories: [
+      'annual_guidance',
       'astro_transits_current',
       'astro_solar_return',
       'num_personal_year',
@@ -58,6 +59,10 @@ const RAW_INTENT_SCIENCE_MAP: Record<UserIntent, IntentScienceEntry> = {
       'energie actuelle',
       'analyse de ma periode',
       'ce qui se passe en ce moment',
+      'priorites cette annee',
+      'sur quoi me concentrer cette annee',
+      'ou mettre mon energie cette annee',
+      'cap de l annee',
     ],
   },
   understand_relationship: {

@@ -102,6 +102,7 @@ function normalizeResponseModeBucket(responseMode: string): ResponseModeBucket {
     case 'calculated_reading':
       return 'calculated_reading'
     case 'interpretive_reading':
+    case 'yearly_priority_answer':
     case 'career_fit_answer':
       return 'interpretive_reading'
     case 'fusion_general':

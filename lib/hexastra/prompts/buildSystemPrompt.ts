@@ -914,6 +914,8 @@ EXACT DATA FIDELITY:
 function hexastraCoreSixBlockDirective(input: BuildPromptInput): string {
   // Skip for concise_fusion_answer — it has its own locked 3-block sentinel
   if (input.responseModeDirective?.startsWith('# CONCISE_FUSION_ANSWER_MODE')) return ''
+  // Skip for yearly priorities — dedicated 5-block annual structure
+  if (input.responseModeDirective?.startsWith('# YEARLY_PRIORITY_ANSWER_MODE')) return ''
   // Skip for fusion_answer mode — it has its own locked 4-block template
   if (input.responseModeDirective?.startsWith('# FUSION_ANSWER_MODE')) return ''
   // Skip for praticien render mode — it has its own 7-section structure

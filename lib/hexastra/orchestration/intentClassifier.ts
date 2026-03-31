@@ -1,4 +1,5 @@
 import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
+import { isYearlyPriorityQuestion } from '@/lib/hexastra/orchestration/yearlyPriorityRouting'
 
 export type UserIntent =
   | 'direct_knowledge_query'
@@ -202,6 +203,7 @@ export function classifyUserIntent(
 
   const normalized = deaccent((message || '').toLowerCase())
 
+  if (isYearlyPriorityQuestion(normalized)) return 'fusion_general_question'
   if (DIRECT_KNOWLEDGE_PATTERNS.some((p) => p.test(normalized))) return 'direct_knowledge_query'
   if (isTimingDecisionCombined(normalized)) return 'timing_decision'
   if (TIMING_DECISION_PATTERNS.some((p) => p.test(normalized))) return 'timing_decision'

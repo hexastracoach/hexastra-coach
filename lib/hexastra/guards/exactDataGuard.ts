@@ -9,6 +9,7 @@ import { normalizeAstroSign, resolveStrictAstroContext, type CoreAstroPlacement 
 
 /** All subcategory keys where deterministic API data is mandatory */
 export const EXACT_DATA_REQUIRED_SUBCATEGORIES = new Set<string>([
+  'annual_guidance',
   'ascendant',
   'theme_natal',
   'maisons',
