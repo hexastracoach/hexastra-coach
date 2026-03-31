@@ -138,4 +138,15 @@ describe('detectContext - yearly priorities', () => {
     expect(result.contextType).toBe('strategic_priority')
     expect(result.confidence).toBeGreaterThanOrEqual(0.9)
   })
+
+  it.each([
+    'sur quoi je dois me concentrer cette annee ?',
+    'qu est-ce que je dois arreter en 2026 ?',
+    'quel axe choisir ?',
+    'ou je perds mon energie ?',
+  ])('detects strategic_priority for yearly strategic variant: %s', (query) => {
+    const result = detectContext(query)
+    expect(result.contextType).toBe('strategic_priority')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.9)
+  })
 })

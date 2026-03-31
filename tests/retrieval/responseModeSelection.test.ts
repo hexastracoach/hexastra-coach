@@ -258,4 +258,89 @@ describe('selectResponseModeSelection', () => {
       ]),
     )
   })
+
+  it.each([
+    'quel axe choisir ?',
+    'ou je perds mon energie ?',
+    'ce que je dois laisser tomber',
+  ])('keeps yearly strategic variants out of concise_fusion_answer: %s', (query) => {
+    const classification = classifyMessage(query)
+    const userIntent = classifyUserIntent(query)
+    const annualSignal = {
+      science: 'fusion',
+      subCategory: 'annual_guidance',
+      sourceType: 'exact_data' as const,
+      exactDataSection: 'solarReturn' as const,
+      value: { summary: 'tri strategique, recentrage du cap et fermeture des dispersions' },
+    }
+
+    const selection = selectResponseModeSelection({
+      userMessage: query,
+      requestKind: classification.requestKind,
+      subcategory: classification.subcategory,
+      plan: 'premium',
+      exactDataResolved: true,
+      exactDataReliable: true,
+      isFusionIntent: isFusionIntent(userIntent),
+      retrievalPlan: {
+        sciences: ['fusion', 'astro', 'numerology', 'human_design', 'kua'],
+        subCategories: [
+          'annual_guidance',
+          'astro_solar_return',
+          'astro_progressions',
+          'num_personal_year',
+          'hd_current_transits',
+          'kua_annual_influence',
+        ],
+        vectorNamespaces: ['ks_fusion_globaux'],
+        scienceTags: ['global', 'transverse'],
+        exactDataHints: [
+          'include_transits',
+          'include_progressions',
+          'include_solar_return',
+          'include_lunar_return',
+          'include_human_design_transits',
+          'include_numerology_cycles',
+          'include_kua_directions',
+        ],
+        weightedMatches: [
+          { subCategory: 'annual_guidance', science: 'fusion', score: 9.2, retrievalPriority: 92 },
+          { subCategory: 'astro_solar_return', science: 'astro', score: 8.1, retrievalPriority: 75 },
+        ],
+        preferredTopK: 8,
+        fallbackUsed: false,
+        dominantScience: 'fusion',
+        dominantSubCategory: 'annual_guidance',
+        ambiguities: [],
+      },
+      structuredSignals: [
+        annualSignal,
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          exactDataSection: 'humanDesignTransits',
+          value: { current_cycle: 'engager ton energie sur moins de fronts' },
+        },
+      ],
+      scoredSignals: [
+        {
+          ...annualSignal,
+          priorityScore: 12.1,
+        },
+      ],
+      intent: userIntent,
+    })
+
+    expect(classification.requestKind).toBe('yearly_priorities')
+    expect(classification.subcategory).toBe('annual_guidance')
+    expect(selection.responseMode).toBe('yearly_priority_answer')
+    expect(selection.responseMode).not.toBe('concise_fusion_answer')
+    expect(selection.reasoningTags).toEqual(
+      expect.arrayContaining([
+        'yearly_priority_override',
+        'exact_data_backed_interpretive_query',
+      ]),
+    )
+  })
 })

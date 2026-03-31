@@ -646,6 +646,7 @@ function applyCompatibilityRule(params: AmbiguityRuleParams): void {
 }
 
 function applyEnergyRule(params: AmbiguityRuleParams): void {
+  if (isYearlyPriorityQuestion(params.detection.normalizedQuery)) return
   if (!params.markers.energie && !params.markers.genericSituation) return
 
   const candidates = ['fusion_energy_state', 'astro_transits_current', 'hd_current_transits']

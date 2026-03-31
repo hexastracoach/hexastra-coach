@@ -134,4 +134,23 @@ describe('disambiguateDetectionResult', () => {
     )
     expect(result.prioritizedSubCategories[0]).toBe('annual_guidance')
   })
+
+  it.each([
+    'qu est-ce que je dois arreter en 2026 ?',
+    'quel axe choisir ?',
+    'ou je perds mon energie ?',
+  ])('prioritizes annual guidance for strategic variant: %s', (query) => {
+    const result = disambiguate(query)
+
+    expect(result.prioritizedSubCategories[0]).toBe('annual_guidance')
+    expect(result.prioritizedSubCategories).toEqual(
+      expect.arrayContaining([
+        'annual_guidance',
+        'astro_solar_return',
+        'astro_progressions',
+        'num_personal_year',
+        'hd_current_transits',
+      ]),
+    )
+  })
 })

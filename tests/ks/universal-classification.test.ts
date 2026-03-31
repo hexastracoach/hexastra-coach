@@ -71,6 +71,7 @@ describe('classifyMessage — numerology', () => {
     const result = classifyMessage("quelle est mon année personnelle")
     expect(result.science).toBe('numerology')
     expect(result.subcategory).toBe('annee_personnelle')
+    expect(result.requestKind).not.toBe('yearly_priorities')
   })
 })
 
@@ -143,5 +144,22 @@ describe('classifyMessage - yearly priorities', () => {
     expect(result.needsInterpretation).toBe(true)
     expect(result.domainRoute).toBe('fusion')
     expect(result.confidence).toBeGreaterThanOrEqual(0.9)
+  })
+
+  it.each([
+    'sur quoi je dois me concentrer cette annee ?',
+    'qu est-ce que je dois arreter en 2026 ?',
+    'quel axe choisir ?',
+    'ou je perds mon energie ?',
+  ])('routes close yearly strategic variants to annual guidance: %s', (query) => {
+    const result = classifyMessage(query)
+
+    expect(result.intent).toBe('strategic_priority')
+    expect(result.science).toBe('fusion')
+    expect(result.subcategory).toBe('annual_guidance')
+    expect(result.requestKind).toBe('yearly_priorities')
+    expect(result.needsExactData).toBe(true)
+    expect(result.needsInterpretation).toBe(true)
+    expect(result.domainRoute).toBe('fusion')
   })
 })

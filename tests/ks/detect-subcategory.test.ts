@@ -92,6 +92,10 @@ describe('Kua', () => {
 
 describe('Hexastra Fusion', () => {
   it('priorites annuelles', () => expectPrimary('quelles sont mes priorites pour 2026 ?', 'annual_guidance', 'hexastra_fusion'))
+  it('concentration annuelle', () => expectPrimary('sur quoi je dois me concentrer cette annee ?', 'annual_guidance', 'hexastra_fusion'))
+  it('arret annuel', () => expectPrimary('qu est-ce que je dois arreter en 2026 ?', 'annual_guidance', 'hexastra_fusion'))
+  it('axe strategique sans annee explicite', () => expectPrimary('quel axe choisir ?', 'annual_guidance', 'hexastra_fusion'))
+  it('dispersion strategique sans annee explicite', () => expectPrimary('ou je perds mon energie ?', 'annual_guidance', 'hexastra_fusion'))
   it('lecture fusionnée', () => expectPrimary('lecture fusionnée hexastra', 'lecture_fusionnee', 'hexastra_fusion'))
   it('timing fusion', () => expectPrimary('meilleur moment pour lancer mon projet', 'timing_fusion', 'hexastra_fusion'))
   it('décision fusion', () => expectPrimary('aide-moi à décider entre deux options', 'decision_fusion', 'hexastra_fusion'))
