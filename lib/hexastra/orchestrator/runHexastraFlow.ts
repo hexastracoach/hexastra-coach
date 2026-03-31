@@ -3160,8 +3160,10 @@ export async function runHexastraFlow(input: {
     }
 
     const isTimingStrategicMode = effectiveResponseMode === 'timing_strategic_response'
+    const isYearlyPriorityMode = effectiveResponseMode === 'yearly_priority_answer'
+    const shouldSuppressQuestionShape = isTimingStrategicMode || isYearlyPriorityMode
     const questionShape =
-      isIntentFusion && !isTimingStrategicMode ? detectQuestionShape(latestUserMessage) : null
+      isIntentFusion && !shouldSuppressQuestionShape ? detectQuestionShape(latestUserMessage) : null
     questionShapeDirective = questionShape
       ? buildQuestionShapeDirective({
           questionShape,
@@ -3177,10 +3179,11 @@ export async function runHexastraFlow(input: {
         message: latestUserMessage.slice(0, 80),
       })
     }
-    if (isTimingStrategicMode && !questionShape) {
+    if (shouldSuppressQuestionShape && !questionShape) {
       flowLog('info', 'QUESTION_SHAPE_SUPPRESSED', {
-        reason: 'timing_strategic_response_active',
+        reason: isYearlyPriorityMode ? 'yearly_priority_answer_active' : 'timing_strategic_response_active',
         userIntent,
+        responseMode: effectiveResponseMode,
       })
     }
 

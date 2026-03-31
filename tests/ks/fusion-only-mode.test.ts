@@ -13,6 +13,7 @@ import {
 } from '@/lib/hexastra/fusionOnly'
 import { getInternalMenuForMode, getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
 import { buildSystemPrompt } from '@/lib/hexastra/prompts/buildSystemPrompt'
+import { buildResponseModeDirective } from '@/lib/hexastra/orchestration/responseModes'
 
 describe('fusion-only mode', () => {
   it('exposes a fusion-only public menu while keeping internal science menus available', () => {
@@ -128,5 +129,31 @@ describe('fusion-only mode', () => {
 
     expect(menu[0]?.label).toBe('Explorer votre situation')
     expect(menu[0]?.submenu?.some((item) => item.key === 'hexastra_analysis')).toBe(true)
+  })
+
+  it('isolates yearly priorities from fusion coaching and question-shape templates', () => {
+    const prompt = buildSystemPrompt({
+      plan: 'premium',
+      mode: 'libre_approfondi',
+      language: 'fr',
+      contextType: 'general',
+      practitionerUsage: null,
+      requestType: 'chat',
+      domainRoute: 'fusion',
+      flowStep: 'analysis',
+      analysisMode: 'hexastra_fusion',
+      fusionOnlyExperience: true,
+      responseModeDirective: buildResponseModeDirective('yearly_priority_answer'),
+      questionShapeDirective: '# QUESTION_SHAPE: COMMENT -> ACTION_GUIDANCE',
+      messages: [{ role: 'user', content: 'Sur quoi je dois me concentrer cette annee ?' }],
+    })
+
+    expect(prompt).toContain('# YEARLY_PRIORITY_ANSWER_MODE')
+    expect(prompt).toContain('OUTPUT SENTINEL - STRUCTURE FINALE ANNUELLE OBLIGATOIRE')
+    expect(prompt).toContain('Ne pas utiliser: CE QUI SE PASSE')
+    expect(prompt).toContain('Debut d annee')
+    expect(prompt).not.toContain('STRUCTURE DE SORTIE â€” PLAN PREMIUM')
+    expect(prompt).not.toContain('◆ 1. Sphère centrale')
+    expect(prompt).not.toContain('# QUESTION_SHAPE:')
   })
 })

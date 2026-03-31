@@ -1022,6 +1022,44 @@ ${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
  * Enforces the 4-block developed structure. Overrides all prior format instructions.
  */
 function outputSentinel(input: BuildPromptInput): string {
+  if (input.responseModeDirective?.startsWith('# YEARLY_PRIORITY_ANSWER_MODE')) {
+    return `
+OUTPUT SENTINEL - STRUCTURE FINALE ANNUELLE OBLIGATOIRE:
+Cette consigne annule toute structure concurrente vue plus haut.
+La reponse finale doit contenir EXACTEMENT ces 5 blocs dans cet ordre. Rien d autre.
+
+1. ORIENTATION [ANNEE DEMANDEE]
+[2 a 3 phrases maximum. Mouvement dominant concret de l annee: tri, structuration, expansion selective, consolidation, repositionnement.]
+
+2. TES 3 PRIORITES REELLES
+[Exactement 3 priorites. Chacune contient: un titre court, Pourquoi:, Dans la vraie vie:. Au moins une priorite doit couper, arreter, supprimer ou refuser.]
+
+3. CE QUI VA TE FREINER
+[Exactement 2 freins comportementaux, precis, non generiques.]
+
+4. TON TIMING
+[Trois sous-parties visibles: Debut d annee, Milieu d annee, Fin d annee. Chaque phase a un role different.]
+
+5. ACTION IMMEDIATE
+[Une seule action concrete, mesurable, faisable dans les 24 a 72h.]
+
+INTERDICTIONS ABSOLUES:
+- Ne pas utiliser: CE QUI SE PASSE
+- Ne pas utiliser: POURQUOI CA BLOQUE
+- Ne pas utiliser: CE QUE TU DOIS FAIRE
+- Ne pas utiliser: CLE A RETENIR
+- Ne pas utiliser: SPHERE ou SPHERES
+- Ne pas utiliser de meta technique: true, false, signal, confidence, score, debug
+- Ne pas ajouter de phrase introductive ou de conclusion hors structure
+
+CONTROLE FINAL AVANT ENVOI:
+- Verifier qu il y a exactement 3 priorites numerotees
+- Verifier qu il y a exactement 2 freins
+- Verifier qu au moins une priorite est radicale
+- Verifier que chaque bloc aide une decision ou une action concrete
+`.trim()
+  }
+
   if (!input.responseModeDirective?.startsWith('# CONCISE_FUSION_ANSWER_MODE')) return ''
   return `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1079,6 +1117,8 @@ export function buildSystemPrompt(input: BuildPromptInput): string {
 - Plans free / essential / premium: garder la lecture lisible et pedagogique, sans exposer publiquement les disciplines sous-jacentes.`
 
   const isFr = (input.language ?? 'fr').slice(0, 2).toLowerCase() !== 'en'
+  const isYearlyPriorityMode = input.responseModeDirective?.startsWith('# YEARLY_PRIORITY_ANSWER_MODE') ?? false
+  const effectiveQuestionShapeDirective = isYearlyPriorityMode ? '' : (input.questionShapeDirective ?? '')
 
   /**
    * Lectures fusion/coaching : la directive 12-sphères coaching remplace le 6-block.
@@ -1091,6 +1131,7 @@ export function buildSystemPrompt(input: BuildPromptInput): string {
    */
   const isFusionCoachingReading =
     Boolean(input.fusionOnlyExperience) &&
+    !isYearlyPriorityMode &&
     !resolveRequestedScience(input.selectedScience) &&
     input.renderMode !== 'praticien' &&
     input.requestType !== 'micro_profile' &&
@@ -1173,8 +1214,8 @@ ${requestDirective(input)}
 ${isFusionCoachingReading ? buildFullHexastraCoachingDirective(input.plan, isFr) : hexastraCoreSixBlockDirective(input)}
 ${detailedReadingDirective(input)}
 ${responseStrategyDirective(input)}
-${(isFusionCoachingReading && input.plan !== 'free' && !input.questionShapeDirective) ? '' : (input.responseModeDirective ?? '')}
-${input.questionShapeDirective ?? ''}
+${(isFusionCoachingReading && input.plan !== 'free' && !effectiveQuestionShapeDirective) ? '' : (input.responseModeDirective ?? '')}
+${effectiveQuestionShapeDirective}
 ${input.behaviorStrategyBlock ?? ''}
 ${input.ksArbiterDirective ?? ''}
 ${stepDirective(input)}

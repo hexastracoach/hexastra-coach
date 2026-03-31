@@ -261,7 +261,11 @@ describe('selectResponseModeSelection', () => {
 
   it.each([
     'quel axe choisir ?',
+    'quel axe je dois vraiment choisir ?',
+    'quel cap choisir ?',
+    'quelle direction prendre ?',
     'ou je perds mon energie ?',
+    'ou orienter mon energie ?',
     'ce que je dois laisser tomber',
   ])('keeps yearly strategic variants out of concise_fusion_answer: %s', (query) => {
     const classification = classifyMessage(query)

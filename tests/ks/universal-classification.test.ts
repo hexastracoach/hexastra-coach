@@ -150,7 +150,11 @@ describe('classifyMessage - yearly priorities', () => {
     'sur quoi je dois me concentrer cette annee ?',
     'qu est-ce que je dois arreter en 2026 ?',
     'quel axe choisir ?',
+    'quel axe je dois vraiment choisir ?',
+    'quel cap choisir ?',
+    'quelle direction prendre ?',
     'ou je perds mon energie ?',
+    'ou orienter mon energie ?',
   ])('routes close yearly strategic variants to annual guidance: %s', (query) => {
     const result = classifyMessage(query)
 
