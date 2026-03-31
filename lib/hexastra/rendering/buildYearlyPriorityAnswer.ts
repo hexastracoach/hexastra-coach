@@ -43,6 +43,7 @@ export type YearlyPriorityValidation = {
 
 const FORBIDDEN_ANNUAL_WORDS = ['true', 'false', 'signal', 'confidence'] as const
 const RADICAL_PRIORITY_PATTERN = /\b(stop|supprime|coupe|refuse)\b/i
+const RADICAL_FAMILY_PRIORITY: AnnualFamily[] = ['cap', 'alignement', 'cycle', 'direction']
 
 function normalize(text: string): string {
   return (text || '')
@@ -155,8 +156,8 @@ function familyFromSignal(signal: StructuredSignal | null): AnnualFamily | null 
 
   if (/annual_guidance|solar_return|fusion_general|fusion_timing|fusion_decision/.test(key)) return 'cap'
   if (/progressions|lunar_return/.test(key)) return 'maturation'
-  if (/transits|timing/.test(key)) return 'rythme'
   if (/hd_current_transits|hd_current_cycle/.test(key)) return 'alignement'
+  if (/transits|timing/.test(key)) return 'rythme'
   if (/kua/.test(key)) return 'direction'
   if (/num_personal_year|numerology|cycle/.test(key)) return 'cycle'
 
@@ -222,19 +223,19 @@ function describeSignal(signal: StructuredSignal | null): string {
 
   switch (familyFromSignal(signal)) {
     case 'cap':
-      return 'il faut choisir plus franchement l axe qui merite vraiment tes ressources'
+      return 'il faut fermer des projets ouverts, clarifier les engagements prioritaires et choisir un cap qui guide vraiment l execution'
     case 'maturation':
-      return 'quelque chose doit etre affine avant d etre expose ou decide'
+      return 'un projet, une decision ou une prise de parole doit etre retravaille avant d etre expose dans le reel'
     case 'rythme':
-      return 'la traction existe, mais elle doit etre lue avant d accelerer'
+      return 'l execution peut accelerer, mais seulement sur quelques actions qui donnent deja des resultats visibles'
     case 'alignement':
-      return 'ton energie doit etre engagee sur moins de fronts, mais avec plus de nettete'
+      return 'tes engagements doivent etre tries plus severement pour que ton energie soutienne ce qui avance vraiment'
     case 'direction':
-      return 'ton cadre concret doit mieux soutenir le cap que tu veux tenir'
+      return 'ton cadre quotidien doit mieux soutenir l execution: agenda, espace, priorites visibles et points de friction'
     case 'cycle':
-      return 'le cycle en cours favorise ce qui se consolide proprement et se mesure'
+      return 'le cycle en cours favorise les resultats mesurables, les engagements tenables et la fermeture des projets ouverts sans preuve'
     default:
-      return 'l annee te demande un tri plus net'
+      return 'l annee demande de fermer des projets ouverts et de clarifier les engagements qui meritent encore ton energie'
   }
 }
 
@@ -333,7 +334,7 @@ function buildPriorityTemplateForSelection(selection: PrioritySelection, year: s
     case 'maturation':
       return {
         ...base,
-        title: 'Stoppe l exposition precoce',
+        title: 'Ne montre pas trop tot',
         whyPriority: `En ${year}, montrer trop tot ce qui est encore en construction te ferait perdre en credibilite et en justesse.`,
         realLife: 'Stoppe les annonces prematurees, refuse de presenter un projet encore flou, et coupe les prises de parole qui te forcent a afficher avant d etre prete.',
       }
@@ -400,9 +401,14 @@ function buildPrioritySignals(
     if (chosen.length === 3) break
   }
 
-  return chosen.map((selection, index) => ({
+  const radicalFamily =
+    RADICAL_FAMILY_PRIORITY.find((family) => chosen.some((selection) => selection.family === family)) ??
+    chosen[0]?.family ??
+    null
+
+  return chosen.map((selection) => ({
     ...selection,
-    isRadical: index === 0,
+    isRadical: selection.family === radicalFamily,
   }))
 }
 
@@ -441,13 +447,34 @@ function buildPriorityBlock(year: string, selection: PrioritySelection, index: n
   ].join('\n')
 }
 
+function pitfallVarietyKey(family: AnnualFamily): string {
+  switch (family) {
+    case 'cap':
+    case 'alignement':
+      return 'selection'
+    case 'direction':
+      return 'cadre'
+    case 'cycle':
+      return 'consolidation'
+    case 'rythme':
+      return 'cadence'
+    case 'maturation':
+    default:
+      return 'exposition'
+  }
+}
+
 function buildPitfalls(year: string, priorities: PrioritySelection[]): string {
-  const pitfalls = priorities
-    .slice(0, 2)
-    .map((selection) => {
-      const template = priorityTemplate(selection.family, year)
-      return sentence(template.pitfall)
-    })
+  const pitfalls: string[] = []
+  const seenVarietyKeys = new Set<string>()
+
+  for (const selection of priorities) {
+    const varietyKey = pitfallVarietyKey(selection.family)
+    if (seenVarietyKeys.has(varietyKey)) continue
+    seenVarietyKeys.add(varietyKey)
+    pitfalls.push(sentence(priorityTemplate(selection.family, year).pitfall))
+    if (pitfalls.length === 2) break
+  }
 
   const completedPitfalls = pitfalls.length >= 2
     ? pitfalls
@@ -457,6 +484,60 @@ function buildPitfalls(year: string, priorities: PrioritySelection[]): string {
       ].slice(0, 2)
 
   return completedPitfalls.map((entry) => `- ${entry}`).join('\n')
+}
+
+function timingLead(phase: 'start' | 'middle' | 'end', family: AnnualFamily): string {
+  if (phase === 'start') {
+    switch (family) {
+      case 'maturation':
+        return 'Observe et trie'
+      case 'rythme':
+        return 'Cadre et trie'
+      case 'alignement':
+        return 'Nettoie et trie'
+      case 'direction':
+        return 'Reorganise et trie'
+      case 'cycle':
+        return 'Trie et ferme'
+      case 'cap':
+      default:
+        return 'Trie et clarifie'
+    }
+  }
+
+  if (phase === 'middle') {
+    switch (family) {
+      case 'maturation':
+        return 'Teste sans surexposer'
+      case 'rythme':
+        return 'Accelere sur preuve'
+      case 'alignement':
+        return 'Engage-toi nettement'
+      case 'direction':
+        return 'Repositionne et execute'
+      case 'cycle':
+        return 'Construis et mesure'
+      case 'cap':
+      default:
+        return 'Teste et accelere'
+    }
+  }
+
+  switch (family) {
+    case 'maturation':
+      return 'Consolide ce qui a tenu'
+    case 'rythme':
+      return 'Stabilise le rythme'
+    case 'alignement':
+      return 'Consolide les bons oui'
+    case 'direction':
+      return 'Fixe le cadre'
+    case 'cycle':
+      return 'Consolide les resultats'
+    case 'cap':
+    default:
+      return 'Consolide sans rouvrir'
+  }
 }
 
 function buildTiming(year: string, priorities: PrioritySelection[]): string {
@@ -469,9 +550,9 @@ function buildTiming(year: string, priorities: PrioritySelection[]): string {
   const thirdTemplate = priorityTemplate(third.family, year)
 
   return [
-    `Debut d annee: ${sentence(firstTemplate.timingStart)}`,
-    `Milieu d annee: ${sentence(secondTemplate.timingMiddle)}`,
-    `Fin d annee: ${sentence(thirdTemplate.timingEnd)}`,
+    `Debut d annee: ${sentence(`${timingLead('start', first.family)}. ${firstTemplate.timingStart}`)}`,
+    `Milieu d annee: ${sentence(`${timingLead('middle', second.family)}. ${secondTemplate.timingMiddle}`)}`,
+    `Fin d annee: ${sentence(`${timingLead('end', third.family)}. ${thirdTemplate.timingEnd}`)}`,
   ].join('\n')
 }
 

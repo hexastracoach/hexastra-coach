@@ -581,4 +581,73 @@ describe('buildFinalAnswer', () => {
     expect(validation.valid).toBe(false)
     expect(validation.issues.join(' ')).toMatch(/disallowed_block/)
   })
+
+  it('prefers a naturally radical family over a first maturation item', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Ou mettre mon energie en 2026 ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: null,
+      prioritizedSignals: [
+        {
+          science: 'astrology',
+          subCategory: 'astro_progressions',
+          sourceType: 'exact_data',
+          value: { secondary_progressions: { moon: 'maturite emotionnelle et tri interieur' } },
+        },
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: { summary: 'clarifier ton cap et fermer les projets ouverts qui brouillent ton execution' },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: 'engager ton energie sur moins de fronts avec des oui plus nets' },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).toContain('1. Maturer avant d exposer')
+    expect(answer.text).toContain('2. Coupe le secondaire')
+    expect(answer.text).not.toContain('Ne montre pas trop tot')
+  })
+
+  it('keeps yearly pitfalls and timing differentiated for adjacent strategic families', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Quelles sont mes priorites pour 2026 ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: null,
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: { summary: 'fermer des projets ouverts et choisir un cap plus net' },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: 'dire oui sur moins de fronts mais avec plus de nettete' },
+        },
+        {
+          science: 'kua',
+          subCategory: 'kua_annual_influence',
+          sourceType: 'exact_data',
+          value: { annualInfluence: 'reconfigurer le cadre concret et simplifier les priorites visibles' },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).toContain('- Garder des projets tiedes ouverts pour ne decevoir personne et finir par diluer ton axe principal.')
+    expect(answer.text).toContain('- Changer le decor, les outils ou l organisation sans changer la vraie decision de fond.')
+    expect(answer.text).not.toContain('Dire oui pour calmer la pression, rester agreable ou ne pas decevoir, puis avancer a vide.')
+    expect(answer.text).toContain('Debut d annee: Trie et clarifie.')
+    expect(answer.text).toContain('Milieu d annee: Engage-toi nettement.')
+    expect(answer.text).toContain('Fin d annee: Fixe le cadre.')
+  })
 })
