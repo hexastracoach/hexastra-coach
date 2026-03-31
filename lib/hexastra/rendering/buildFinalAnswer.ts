@@ -3,6 +3,7 @@ import type { OpeningSignalSelection } from '@/lib/hexastra/orchestrator/selectO
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
 import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
 import { getFusionFallbackCopy } from '@/lib/hexastra/rendering/getFusionFallbackCopy'
+import { buildYearlyPriorityAnswer } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
 
 export type FinalAnswerInput = {
   userMessage: string
@@ -548,6 +549,16 @@ function buildKeyText(primary: StructuredSignal | null, responseMode: string): s
 }
 
 export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
+  if (input.responseMode === 'yearly_priority_answer') {
+    return {
+      text: buildYearlyPriorityAnswer({
+        userMessage: input.userMessage,
+        openingSignal: input.openingSignal,
+        prioritizedSignals: input.prioritizedSignals,
+      }),
+    }
+  }
+
   const prioritizedSignals = input.prioritizedSignals.slice(0, 6)
   const openingSignal = input.openingSignal?.signal ?? prioritizedSignals[0] ?? null
   const explanationSignals = selectExplanationSignals(openingSignal, prioritizedSignals)

@@ -6,6 +6,7 @@ import { buildKnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledge
 import type { KnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
 import { selectResponseModeSelection } from '@/lib/hexastra/orchestrator/selectResponseMode'
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
+import { validateYearlyPriorityAnswerFormat } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
 import { buildExactDataRequestFromRetrievalPlan } from '@/lib/hexastra/retrieval/exactDataHintMapper'
 import { prioritizeStructuredSignals } from '@/lib/hexastra/retrieval/prioritizeStructuredSignals'
 import { buildRetrievalPlanFromQuery } from '@/lib/hexastra/retrieval/retrievalPlanBuilder'
@@ -422,5 +423,114 @@ describe('buildFinalAnswer', () => {
     })
 
     expect(answer.text).not.toContain('hd_type')
+  })
+
+  it('renders yearly priorities with the dedicated annual structure only', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Quelles sont mes priorites pour 2026 ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: {
+        signal: {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: {
+            summary: '2026 te demande de recentrer ton energie sur un cap plus net et plus soutenable.',
+          },
+        },
+        orderedSignals: [
+          {
+            science: 'fusion',
+            subCategory: 'annual_guidance',
+            sourceType: 'exact_data',
+            value: {
+              summary: '2026 te demande de recentrer ton energie sur un cap plus net et plus soutenable.',
+            },
+          },
+        ],
+        dominantOpeningSource: 'exact_data',
+        dominantOpeningScience: 'fusion',
+        dominantOpeningSubCategory: 'annual_guidance',
+        reasoningTags: ['yearly_priority_override', 'exact_data_backed_interpretive_query'],
+      },
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: { summary: 'recentre ton axe et coupe les dispersions' },
+        },
+        {
+          science: 'astrology',
+          subCategory: 'astro_solar_return',
+          sourceType: 'exact_data',
+          value: { annual_theme: 'leadership plus assume et recentrage du cap' },
+        },
+        {
+          science: 'astrology',
+          subCategory: 'astro_progressions',
+          sourceType: 'exact_data',
+          value: { secondary_progressions: { moon: 'maturite emotionnelle et tri interieur' } },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: 'engager ton energie seulement la ou la reponse est claire' },
+        },
+        {
+          science: 'numerology',
+          subCategory: 'num_personal_year',
+          sourceType: 'exact_data',
+          value: { yearly: { personalYearNumber: 8 } },
+        },
+        {
+          science: 'kua',
+          subCategory: 'kua_annual_influence',
+          sourceType: 'exact_data',
+          value: { annualInfluence: 'clarifier la direction et simplifier le cadre' },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).toContain('ORIENTATION 2026')
+    expect(answer.text).toContain('TES 3 PRIORITES REELLES')
+    expect(answer.text).toContain('CE QUI VA TE FREINER')
+    expect(answer.text).toContain('TON TIMING')
+    expect(answer.text).toContain('ACTION IMMEDIATE')
+    expect(answer.text).not.toContain('CE QUI SE PASSE')
+    expect(answer.text).not.toContain('POURQUOI CA BLOQUE')
+    expect(answer.text).not.toContain('CE QUE TU DOIS FAIRE')
+    expect(answer.text).not.toContain('CLE A RETENIR')
+    expect(answer.text).not.toMatch(/Sph[eè]re/i)
+    expect((answer.text.match(/^\d+\.\s+/gm) ?? []).length).toBe(3)
+    expect((answer.text.match(/^Dans la vraie vie:/gm) ?? []).length).toBe(3)
+    expect(answer.sections).toBeUndefined()
+
+    const validation = validateYearlyPriorityAnswerFormat(answer.text)
+    expect(validation.valid).toBe(true)
+    expect(validation.priorityCount).toBe(3)
+  })
+
+  it('rejects the legacy generic template for yearly priorities', () => {
+    const validation = validateYearlyPriorityAnswerFormat([
+      'CE QUI SE PASSE',
+      'Ca bouge un peu partout.',
+      '',
+      'POURQUOI CA BLOQUE',
+      'Tu es disperse.',
+      '',
+      'CE QUE TU DOIS FAIRE',
+      'Recentre-toi.',
+      '',
+      'CLE A RETENIR',
+      'Avance mieux.',
+      '',
+      'Sphère centrale',
+    ].join('\n'))
+
+    expect(validation.valid).toBe(false)
+    expect(validation.issues.join(' ')).toMatch(/disallowed_block/)
   })
 })

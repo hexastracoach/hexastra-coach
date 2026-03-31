@@ -150,6 +150,7 @@ import { runKsPipeline, type KsPipelineOutput } from '@/lib/hexastra/orchestrato
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
 import { applyRenderProfile, buildRenderProfileText } from '@/lib/hexastra/rendering/applyRenderProfile'
 import { applyShiloStyle } from '@/lib/hexastra/rendering/applyShiloStyle'
+import { validateYearlyPriorityAnswerFormat } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
 import { normalizeUserPlan } from '@/lib/hexastra/rendering/normalizeUserPlan'
 import { selectRenderProfile } from '@/lib/hexastra/rendering/selectRenderProfile'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
@@ -4331,6 +4332,36 @@ export async function runHexastraFlow(input: {
         usedLocalFallback = true
         fallbackType = enforcedAstroRender.fallbackType
         rawMessage = enforcedAstroRender.message
+      }
+    }
+
+    if (effectiveResponseMode === 'yearly_priority_answer') {
+      const yearlyPriorityValidation = validateYearlyPriorityAnswerFormat(rawMessage)
+      if (!yearlyPriorityValidation.valid) {
+        const fallbackYearlyAnswer = buildFinalAnswer({
+          userMessage: latestUserMessage,
+          responseMode: effectiveResponseMode,
+          openingSignal: responseModeSelection.openingSelection ?? null,
+          prioritizedSignals: presentationStructuredSignals,
+          knowledgePacket,
+        })
+
+        rawMessage = fallbackYearlyAnswer.text
+        usedLocalFallback = true
+        fallbackType = 'yearly_priority_renderer'
+
+        flowLog('warn', 'YEARLY_PRIORITY_RENDER_STRUCTURE_FALLBACK', {
+          issues: yearlyPriorityValidation.issues,
+          priorityCount: yearlyPriorityValidation.priorityCount,
+          responseMode: effectiveResponseMode,
+          usedDeterministicFinalAnswer,
+        })
+      } else {
+        flowLog('info', 'YEARLY_PRIORITY_RENDER_VALIDATED', {
+          responseMode: effectiveResponseMode,
+          priorityCount: yearlyPriorityValidation.priorityCount,
+          usedDeterministicFinalAnswer,
+        })
       }
     }
 
