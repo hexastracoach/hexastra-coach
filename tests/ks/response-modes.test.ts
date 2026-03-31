@@ -223,6 +223,8 @@ describe('yearly priority response mode', () => {
     expect(directive).toContain('Trois priorites concretes')
     expect(directive).toContain('Bon timing et rythme')
     expect(directive).toContain('exactement 3 priorites distinctes')
+    expect(directive).toContain('Au moins une priorite doit etre radicale')
+    expect(directive).toContain('true, false, signal, confidence')
     expect(directive).toContain('24 a 72h')
   })
 })

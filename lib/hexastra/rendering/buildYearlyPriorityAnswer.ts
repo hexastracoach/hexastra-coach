@@ -32,6 +32,7 @@ type PriorityTemplate = {
 type PrioritySelection = {
   signal: StructuredSignal | null
   family: AnnualFamily
+  isRadical: boolean
 }
 
 export type YearlyPriorityValidation = {
@@ -40,21 +41,32 @@ export type YearlyPriorityValidation = {
   priorityCount: number
 }
 
+const FORBIDDEN_ANNUAL_WORDS = ['true', 'false', 'signal', 'confidence'] as const
+const RADICAL_PRIORITY_PATTERN = /\b(stop|supprime|coupe|refuse)\b/i
+
 function normalize(text: string): string {
   return (text || '')
     .replace(/\s+/g, ' ')
     .trim()
 }
 
+function sanitizeAnnualContent(text: string): string {
+  return normalize(text)
+    .replace(/\btrue\b/gi, 'vrai')
+    .replace(/\bfalse\b/gi, 'faux')
+    .replace(/\bconfidence\b/gi, 'fiabilite')
+    .replace(/\bsignal\b/gi, 'point cle')
+}
+
 function sentence(value: string | null | undefined): string {
-  const cleaned = normalize(value ?? '')
+  const cleaned = sanitizeAnnualContent(value ?? '')
   if (!cleaned) return ''
   const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
   return /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`
 }
 
 function compact(value: string, maxChars = 165): string {
-  const cleaned = normalize(value)
+  const cleaned = sanitizeAnnualContent(value)
   if (cleaned.length <= maxChars) return cleaned
   const cut = cleaned.lastIndexOf(' ', maxChars)
   return `${cleaned.slice(0, cut > 90 ? cut : maxChars).trim()}...`
@@ -113,9 +125,9 @@ function findByPaths(value: unknown, paths: string[]): unknown {
 
 function stringifyCandidate(value: unknown): string | null {
   const unwrapped = unwrapDisplayText(value)
-  if (unwrapped) return normalize(unwrapped)
+  if (unwrapped) return sanitizeAnnualContent(unwrapped)
 
-  if (typeof value === 'string') return normalize(value)
+  if (typeof value === 'string') return sanitizeAnnualContent(value)
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
 
   if (Array.isArray(value)) {
@@ -210,7 +222,7 @@ function describeSignal(signal: StructuredSignal | null): string {
 
   switch (familyFromSignal(signal)) {
     case 'cap':
-      return 'le signal principal te demande de choisir plus franchement ton axe utile'
+      return 'il faut choisir plus franchement l axe qui merite vraiment tes ressources'
     case 'maturation':
       return 'quelque chose doit etre affine avant d etre expose ou decide'
     case 'rythme':
@@ -310,6 +322,60 @@ function priorityTemplate(family: AnnualFamily, year: string): PriorityTemplate 
   }
 }
 
+function buildPriorityTemplateForSelection(selection: PrioritySelection, year: string): PriorityTemplate {
+  const base = priorityTemplate(selection.family, year)
+
+  if (!selection.isRadical) {
+    return base
+  }
+
+  switch (selection.family) {
+    case 'maturation':
+      return {
+        ...base,
+        title: 'Stoppe l exposition precoce',
+        whyPriority: `En ${year}, montrer trop tot ce qui est encore en construction te ferait perdre en credibilite et en justesse.`,
+        realLife: 'Stoppe les annonces prematurees, refuse de presenter un projet encore flou, et coupe les prises de parole qui te forcent a afficher avant d etre prete.',
+      }
+    case 'rythme':
+      return {
+        ...base,
+        title: 'Stoppe l agitation reactive',
+        whyPriority: `Cette annee, la vraie progression passe par moins de reactions impulsives et plus de cadence choisie.`,
+        realLife: 'Stoppe les relances dans tous les sens, supprime une urgence artificielle, et refuse d ouvrir un nouveau front tant que le precedent n a pas prouve sa traction.',
+      }
+    case 'alignement':
+      return {
+        ...base,
+        title: 'Refuse les oui flous',
+        whyPriority: `En ${year}, chaque oui non aligne te retire de l energie sur ce qui devrait vraiment avancer.`,
+        realLife: 'Refuse une demande qui te sort de ton axe, coupe une collaboration tiede, et supprime un engagement que tu maintiens seulement pour rester disponible.',
+      }
+    case 'direction':
+      return {
+        ...base,
+        title: 'Supprime le bruit du cadre',
+        whyPriority: `Cette annee, ton cadre doit soutenir ton cap; s il reste encombre, tu perdras en lisibilite et en execution.`,
+        realLife: 'Supprime un rituel inutile, coupe un usage qui brouille ton attention, et refuse d empiler de nouveaux outils avant d avoir clarifie le cap.',
+      }
+    case 'cycle':
+      return {
+        ...base,
+        title: 'Coupe les chantiers sans preuve',
+        whyPriority: `En ${year}, ce qui ne montre ni traction ni resultat commence a couter plus qu a promettre.`,
+        realLife: 'Coupe un projet qui ne bouge pas, supprime une tache de maintien sans impact, et refuse d alimenter un chantier qui reste au stade de l intention.',
+      }
+    case 'cap':
+    default:
+      return {
+        ...base,
+        title: 'Coupe le secondaire',
+        whyPriority: `En ${year}, laisser ouverts des fronts tiedes te coute plus que ce qu ils t apportent; ta progression depend d un tri plus net.`,
+        realLife: 'Coupe un projet secondaire, refuse une opportunite non alignee, et supprime un engagement qui disperse ton attention sans renforcer ton axe principal.',
+      }
+  }
+}
+
 function buildPrioritySignals(
   openingSignal: StructuredSignal | null,
   prioritizedSignals: StructuredSignal[],
@@ -322,32 +388,36 @@ function buildPrioritySignals(
     const family = familyFromSignal(signal)
     if (!family || seenFamilies.has(family)) continue
     seenFamilies.add(family)
-    chosen.push({ signal, family })
-    if (chosen.length === 3) return chosen
-  }
-
-  for (const family of ['cap', 'rythme', 'cycle', 'alignement', 'direction', 'maturation'] as AnnualFamily[]) {
-    if (seenFamilies.has(family)) continue
-    seenFamilies.add(family)
-    chosen.push({ signal: null, family })
+    chosen.push({ signal, family, isRadical: false })
     if (chosen.length === 3) break
   }
 
-  return chosen
+  for (const family of ['cap', 'rythme', 'cycle', 'alignement', 'direction', 'maturation'] as AnnualFamily[]) {
+    if (chosen.length >= 3) break
+    if (seenFamilies.has(family)) continue
+    seenFamilies.add(family)
+    chosen.push({ signal: null, family, isRadical: false })
+    if (chosen.length === 3) break
+  }
+
+  return chosen.map((selection, index) => ({
+    ...selection,
+    isRadical: index === 0,
+  }))
 }
 
 function buildOrientation(
   year: string,
   priorities: PrioritySelection[],
 ): string {
-  const primary = priorities[0] ?? { signal: null, family: 'cap' as const }
+  const primary = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
   const secondary = priorities[1] ?? null
   const primaryTemplate = priorityTemplate(primary.family, year)
   const primaryEvidence = describeSignal(primary.signal)
 
   const sentences = [
     sentence(`En ${year}, l axe dominant est ${primaryTemplate.orientationAxis}: ${primaryTemplate.orientationMeaning}`),
-    sentence(`Le signal le plus net montre ${primaryEvidence}`),
+    sentence(`Ce qui ressort le plus cette annee, c est ${primaryEvidence}`),
   ]
 
   if (secondary) {
@@ -361,12 +431,12 @@ function buildOrientation(
 }
 
 function buildPriorityBlock(year: string, selection: PrioritySelection, index: number): string {
-  const template = priorityTemplate(selection.family, year)
+  const template = buildPriorityTemplateForSelection(selection, year)
   const evidence = describeSignal(selection.signal)
 
   return [
     `${index}. ${template.title}`,
-    `Pourquoi: ${sentence(`${template.whyPriority} Le signal d appui va dans ce sens: ${evidence}`)}`,
+    `Pourquoi: ${sentence(`${template.whyPriority} Cette priorite se confirme dans l annee par ${evidence}`)}`,
     `Dans la vraie vie: ${sentence(template.realLife)}`,
   ].join('\n')
 }
@@ -390,7 +460,7 @@ function buildPitfalls(year: string, priorities: PrioritySelection[]): string {
 }
 
 function buildTiming(year: string, priorities: PrioritySelection[]): string {
-  const first = priorities[0] ?? { signal: null, family: 'cap' as const }
+  const first = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
   const second = priorities[1] ?? first
   const third = priorities[2] ?? second
 
@@ -415,7 +485,7 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
   const openingSignal = input.openingSignal?.signal ?? prioritizedSignals[0] ?? null
   const year = extractRequestedYear(input.userMessage)
   const priorities = buildPrioritySignals(openingSignal, prioritizedSignals)
-  const primary = priorities[0] ?? { signal: null, family: 'cap' as const }
+  const primary = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
 
   return [
     `ORIENTATION ${year}`,
@@ -438,6 +508,9 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
 export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriorityValidation {
   const cleaned = normalize(text)
   const issues: string[] = []
+  const priorityBlocks = text
+    .split(/\n\n/)
+    .filter((block) => /^\d+\.\s+/m.test(block))
   const requiredHeadings = [
     /ORIENTATION\s+20\d{2}/i,
     /TES\s+3\s+PRIORITES\s+REELLES/i,
@@ -463,6 +536,15 @@ export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriority
 
   const priorityCount = (text.match(/^\d+\.\s+/gm) ?? []).length
   if (priorityCount !== 3) issues.push(`invalid_priority_count:${priorityCount}`)
+  if (!priorityBlocks.some((block) => RADICAL_PRIORITY_PATTERN.test(block))) {
+    issues.push('missing_radical_priority')
+  }
+
+  for (const word of FORBIDDEN_ANNUAL_WORDS) {
+    if (new RegExp(`\\b${word}\\b`, 'i').test(cleaned)) {
+      issues.push(`forbidden_word:${word}`)
+    }
+  }
 
   return {
     valid: issues.length === 0,

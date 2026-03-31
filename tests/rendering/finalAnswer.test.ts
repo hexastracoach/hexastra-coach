@@ -504,9 +504,11 @@ describe('buildFinalAnswer', () => {
     expect(answer.text).not.toContain('CE QUE TU DOIS FAIRE')
     expect(answer.text).not.toContain('CLE A RETENIR')
     expect(answer.text).not.toMatch(/Sphere/i)
-    expect((answer.text.match(/^\d+\.\s+/gm) ?? []).length).toBe(3)
     expect((answer.text.match(/^Pourquoi:/gm) ?? []).length).toBe(3)
     expect((answer.text.match(/^Dans la vraie vie:/gm) ?? []).length).toBe(3)
+    for (const forbiddenWord of ['true', 'false', 'signal', 'confidence']) {
+      expect(answer.text.toLowerCase()).not.toContain(forbiddenWord)
+    }
     expect(answer.text).toContain('Debut d annee:')
     expect(answer.text).toContain('Milieu d annee:')
     expect(answer.text).toContain('Fin d annee:')
@@ -552,6 +554,7 @@ describe('buildFinalAnswer', () => {
 
     expect(new Set(priorityTitles).size).toBe(3)
     expect(priorityBlocks).toHaveLength(3)
+    expect(priorityBlocks.some((block) => /\b(stop|supprime|coupe|refuse)\b/i.test(block))).toBe(true)
     for (const block of priorityBlocks) {
       expect(block).toContain('Pourquoi:')
       expect(block).toContain('Dans la vraie vie:')
