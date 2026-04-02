@@ -6,15 +6,16 @@ export type YearlyPriorityAnswerInput = {
   userMessage: string
   openingSignal: OpeningSignalSelection | null
   prioritizedSignals: StructuredSignal[]
-  focusAngle?: YearlyPriorityFocusAngle | null
+  focusAngle?: YearlyFocusAngle | null
 }
 
-export type YearlyPriorityFocusAngle =
-  | 'annual_priorities'
+export type YearlyFocusAngle =
   | 'concentration'
   | 'direction_choice'
   | 'stop_cut_remove'
   | 'energy_leak'
+
+export type YearlyPriorityFocusAngle = YearlyFocusAngle
 
 type AnnualFamily =
   | 'cap'
@@ -114,11 +115,19 @@ function normalizeIntentText(text: string): string {
     .trim()
 }
 
-export function detectYearlyPriorityFocusAngle(message: string): YearlyPriorityFocusAngle {
+export function detectYearlyFocusAngle(message: string): YearlyFocusAngle {
   const normalized = normalizeIntentText(message)
 
+  if (normalized.includes('concentrer') || normalized.includes('focus')) {
+    return 'concentration'
+  }
+
+  if (normalized.includes('axe') || normalized.includes('direction') || normalized.includes('choisir')) {
+    return 'direction_choice'
+  }
+
   if (
-    /(qu est ce que je dois arreter|que dois je arreter|quoi arreter|laisser tomber|arreter cette annee|arreter en 20\d{2}|supprimer|couper|refuser|stopper)/.test(
+    /(qu est ce que je dois arreter|que dois je arreter|quoi arreter|laisser tomber|supprimer|couper|refuser|stopper|arreter)/.test(
       normalized,
     )
   ) {
@@ -126,30 +135,31 @@ export function detectYearlyPriorityFocusAngle(message: string): YearlyPriorityF
   }
 
   if (
-    /(ou je perds mon energie|ou je perd mon energie|ce qui me disperse|ce qui me fait perdre du temps|fuite d energie|fuites d energie|ce qui me vide)/.test(
+    /(ou je perds mon energie|ou je perd mon energie|ce qui me disperse|ce qui me fait perdre du temps|fuite d energie|fuites d energie|ce qui me vide|energie|fatigue|epuise|epuisee)/.test(
       normalized,
     )
   ) {
     return 'energy_leak'
   }
 
-  if (
-    /(quel axe(?: je dois vraiment)? choisir|quel cap choisir|quelle direction prendre|quel axe prendre|quel cap prendre)/.test(
-      normalized,
-    )
-  ) {
-    return 'direction_choice'
-  }
+  return 'concentration'
+}
 
-  if (
-    /(sur quoi je dois me concentrer|sur quoi me concentrer|ou me concentrer|ou mettre mon energie|ou orienter mon energie|mettre mon energie|orienter mon energie)/.test(
-      normalized,
-    )
-  ) {
-    return 'concentration'
-  }
+export const detectYearlyPriorityFocusAngle = detectYearlyFocusAngle
 
-  return 'annual_priorities'
+function adaptPriorityLabel(base: string, angle: YearlyFocusAngle) {
+  switch (angle) {
+    case 'concentration':
+      return `Reduis a l essentiel : ${base}`
+    case 'direction_choice':
+      return `Choisis ton axe principal : ${base}`
+    case 'stop_cut_remove':
+      return `Arrete ce qui te freine : ${base}`
+    case 'energy_leak':
+      return `Protege ton energie : ${base}`
+    default:
+      return base
+  }
 }
 
 function sanitizeAnnualContent(text: string): string {
@@ -456,7 +466,7 @@ function priorityTemplate(family: AnnualFamily, year: string): PriorityTemplate 
   }
 }
 
-function focusAngleLead(angle: YearlyPriorityFocusAngle, year: string): string {
+function focusAngleLead(angle: YearlyFocusAngle, year: string): string {
   switch (angle) {
     case 'concentration':
       return `En ${year}, la bonne question n est pas quoi ajouter, mais ou concentrer tes moyens pour obtenir le plus d effet.`
@@ -466,9 +476,8 @@ function focusAngleLead(angle: YearlyPriorityFocusAngle, year: string): string {
       return `En ${year}, ta progression depend d abord de ce que tu arretes, refuses ou retires de ton champ.`
     case 'energy_leak':
       return `En ${year}, l enjeu n est pas d en faire plus, mais de stopper ce qui vide ton energie utile.`
-    case 'annual_priorities':
     default:
-      return `En ${year}, ton annee avance quand tu choisis mieux quoi renforcer et quoi laisser en arriere-plan.`
+      return `En ${year}, la progression la plus juste vient d une focalisation nette sur ce qui doit vraiment avancer.`
   }
 }
 
@@ -476,7 +485,7 @@ function applyFocusAngleToTemplate(
   template: PriorityTemplate,
   selection: PrioritySelection,
   year: string,
-  focusAngle: YearlyPriorityFocusAngle,
+  focusAngle: YearlyFocusAngle,
 ): PriorityTemplate {
   switch (focusAngle) {
     case 'concentration':
@@ -604,7 +613,6 @@ function applyFocusAngleToTemplate(
           return template
       }
 
-    case 'annual_priorities':
     default:
       return template
   }
@@ -613,7 +621,7 @@ function applyFocusAngleToTemplate(
 function buildFocusedPriorityTemplate(
   selection: PrioritySelection,
   year: string,
-  focusAngle: YearlyPriorityFocusAngle,
+  focusAngle: YearlyFocusAngle,
 ): PriorityTemplate {
   return applyFocusAngleToTemplate(buildPriorityTemplateForSelection(selection, year), selection, year, focusAngle)
 }
@@ -710,7 +718,7 @@ function buildPrioritySignals(
 function buildOrientation(
   year: string,
   priorities: PrioritySelection[],
-  focusAngle: YearlyPriorityFocusAngle,
+  focusAngle: YearlyFocusAngle,
 ): string {
   const primary = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
   const primaryTemplate = buildFocusedPriorityTemplate(primary, year, focusAngle)
@@ -729,13 +737,13 @@ function buildPriorityBlock(
   year: string,
   selection: PrioritySelection,
   index: number,
-  focusAngle: YearlyPriorityFocusAngle,
+  focusAngle: YearlyFocusAngle,
 ): string {
   const template = buildFocusedPriorityTemplate(selection, year, focusAngle)
   const evidence = describeSignal(selection.signal)
 
   return [
-    `${index}. ${template.title}`,
+    `${index}. ${adaptPriorityLabel(template.title, focusAngle)}`,
     `Pourquoi: ${sentence(`${template.whyPriority} Cette priorite se confirme dans l annee par ${evidence}`)}`,
     `Dans la vraie vie: ${sentence(template.realLife)}`,
   ].join('\n')
@@ -857,7 +865,7 @@ function buildImmediateAction(year: string, primary: PrioritySelection): string 
 
 function focusAngleImmediateAction(
   year: string,
-  focusAngle: YearlyPriorityFocusAngle,
+  focusAngle: YearlyFocusAngle,
 ): string | null {
   switch (focusAngle) {
     case 'concentration':
@@ -868,7 +876,6 @@ function focusAngleImmediateAction(
       return `Dans les 24 a 72 heures, liste trois choses a arreter, ferme-en une concretement, puis envoie le message qui officialise cet arret.`
     case 'energy_leak':
       return `Dans les 24 a 72 heures, note les trois situations qui te vident le plus, coupe-en une cette semaine, puis redeploie ce temps sur ce qui nourrit vraiment ton axe.`
-    case 'annual_priorities':
     default:
       return null
   }
@@ -877,7 +884,7 @@ function focusAngleImmediateAction(
 function buildImmediateActionWithAngle(
   year: string,
   primary: PrioritySelection,
-  focusAngle: YearlyPriorityFocusAngle,
+  focusAngle: YearlyFocusAngle,
 ): string {
   const angleSpecificAction = focusAngleImmediateAction(year, focusAngle)
   if (angleSpecificAction) return sentence(angleSpecificAction)
@@ -888,7 +895,7 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
   const prioritizedSignals = input.prioritizedSignals.slice(0, 8)
   const openingSignal = input.openingSignal?.signal ?? prioritizedSignals[0] ?? null
   const year = extractRequestedYear(input.userMessage)
-  const focusAngle = input.focusAngle ?? detectYearlyPriorityFocusAngle(input.userMessage)
+  const focusAngle = input.focusAngle ?? detectYearlyFocusAngle(input.userMessage)
   const priorities = buildPrioritySignals(openingSignal, prioritizedSignals)
   const primary = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
 

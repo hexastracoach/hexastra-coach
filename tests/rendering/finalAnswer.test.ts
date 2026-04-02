@@ -596,6 +596,56 @@ describe('buildFinalAnswer', () => {
     expect(answer.text).toContain('axe directeur')
   })
 
+  it('keeps the annual structure stable while changing the wording by focus angle', () => {
+    const sharedSignals = [
+      {
+        science: 'fusion' as const,
+        subCategory: 'annual_guidance',
+        sourceType: 'exact_data' as const,
+        value: { summary: 'clarifier ton cap, trier tes engagements et assumer un axe plus net' },
+      },
+      {
+        science: 'astrology' as const,
+        subCategory: 'astro_transits_current',
+        sourceType: 'exact_data' as const,
+        value: { summary: 'la traction existe mais elle doit etre lue avant d accelerer' },
+      },
+      {
+        science: 'human_design' as const,
+        subCategory: 'hd_current_transits',
+        sourceType: 'exact_data' as const,
+        value: { current_cycle: 'engager ton energie sur moins de fronts mais avec plus de nettete' },
+      },
+    ]
+
+    const concentrationAnswer = buildFinalAnswer({
+      userMessage: 'Sur quoi je dois me concentrer cette annee ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: null,
+      prioritizedSignals: sharedSignals,
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    const directionAnswer = buildFinalAnswer({
+      userMessage: 'Quel axe je dois vraiment choisir ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: null,
+      prioritizedSignals: sharedSignals,
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    for (const heading of ['ORIENTATION', 'TES 3 PRIORITES REELLES', 'CE QUI VA TE FREINER', 'TON TIMING', 'ACTION IMMEDIATE']) {
+      expect(concentrationAnswer.text).toContain(heading)
+      expect(directionAnswer.text).toContain(heading)
+    }
+
+    expect(concentrationAnswer.text).not.toBe(directionAnswer.text)
+    expect(concentrationAnswer.text).toContain('bloque deux plages de concentration')
+    expect(directionAnswer.text).toContain('axe directeur')
+    expect(concentrationAnswer.text).not.toContain('axe directeur')
+    expect(directionAnswer.text).not.toContain('bloque deux plages de concentration')
+  })
+
   it('strips boolean leakage from yearly priority content', () => {
     const answer = buildFinalAnswer({
       userMessage: 'Sur quoi je dois me concentrer cette annee ?',
@@ -869,8 +919,8 @@ describe('buildFinalAnswer', () => {
       knowledgePacket: makeMinimalKnowledgePacket(),
     })
 
-    expect(answer.text).toContain('1. Maturer avant d exposer')
-    expect(answer.text).toContain('2. Coupe le secondaire')
+    expect(answer.text).toContain('Maturer avant d exposer')
+    expect(answer.text).toMatch(/Ferme les fronts qui te vident|Coupe le secondaire/)
     expect(answer.text).not.toContain('Ne montre pas trop tot')
   })
 

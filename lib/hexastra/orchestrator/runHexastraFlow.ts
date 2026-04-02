@@ -381,6 +381,54 @@ function normalizeSelectionText(message: string) {
     .trim()
 }
 
+type YearlyFocusAngle =
+  | 'concentration'
+  | 'direction_choice'
+  | 'stop_cut_remove'
+  | 'energy_leak'
+
+function detectYearlyFocusAngle(message: string): YearlyFocusAngle {
+  const m = normalizeSelectionText(message)
+
+  if (m.includes('concentrer') || m.includes('focus')) return 'concentration'
+  if (m.includes('axe') || m.includes('direction') || m.includes('choisir')) return 'direction_choice'
+  if (m.includes('arreter') || m.includes('stop') || m.includes('laisser tomber')) return 'stop_cut_remove'
+  if (m.includes('energie') || m.includes('fatigue') || m.includes('epuise')) return 'energy_leak'
+
+  return 'concentration'
+}
+
+function buildYearlyFocusAngleDirective(angle: YearlyFocusAngle): string {
+  switch (angle) {
+    case 'concentration':
+      return [
+        '# YEARLY_FOCUS_ANGLE',
+        'Question nuance prioritaire: concentration.',
+        'Cadre la reponse annuelle autour de la focalisation, de l allocation des moyens et du choix de 1 a 2 priorites centrales.',
+      ].join('\n')
+    case 'direction_choice':
+      return [
+        '# YEARLY_FOCUS_ANGLE',
+        'Question nuance prioritaire: direction_choice.',
+        'Cadre la reponse annuelle autour du choix d axe, de l arbitrage entre options et de l elimination des directions concurrentes.',
+      ].join('\n')
+    case 'stop_cut_remove':
+      return [
+        '# YEARLY_FOCUS_ANGLE',
+        'Question nuance prioritaire: stop_cut_remove.',
+        'Cadre la reponse annuelle autour de ce qu il faut arreter, supprimer, refuser ou laisser tomber pour avancer.',
+      ].join('\n')
+    case 'energy_leak':
+      return [
+        '# YEARLY_FOCUS_ANGLE',
+        'Question nuance prioritaire: energy_leak.',
+        'Cadre la reponse annuelle autour des fuites d energie, de la fatigue utile a proteger et des drains a couper.',
+      ].join('\n')
+    default:
+      return ''
+  }
+}
+
 function asksForPractitionerMasterMenu(message: string) {
   const normalized = normalizeSelectionText(message)
   return (
@@ -3130,6 +3178,13 @@ export async function runHexastraFlow(input: {
 
     effectiveResponseMode = responseModeSelection.responseMode
     responseModeDirective = buildResponseModeDirective(effectiveResponseMode)
+    const yearlyFocusAngle: YearlyFocusAngle | null =
+      effectiveResponseMode === 'yearly_priority_answer'
+        ? detectYearlyFocusAngle(latestUserMessage)
+        : null
+    if (yearlyFocusAngle) {
+      responseModeDirective = `${responseModeDirective}\n\n${buildYearlyFocusAngleDirective(yearlyFocusAngle)}`
+    }
     const presentationStructuredSignals =
       responseModeSelection.orderedSignals && responseModeSelection.orderedSignals.length > 0
         ? responseModeSelection.orderedSignals
@@ -3145,6 +3200,7 @@ export async function runHexastraFlow(input: {
         isYearlyPriorityRequest && exactDataResolved
           ? 'exact-data-backed interpretive query'
           : universalClassif.requestKind,
+      yearlyFocusAngle,
       openingSource: responseModeSelection.dominantOpeningSource,
       openingScience: responseModeSelection.dominantOpeningScience ?? null,
       openingSubCategory: responseModeSelection.dominantOpeningSubCategory ?? null,
@@ -3394,6 +3450,7 @@ export async function runHexastraFlow(input: {
           openingSignal: responseModeSelection.openingSelection ?? null,
           prioritizedSignals: presentationStructuredSignals,
           knowledgePacket,
+          yearlyFocusAngle,
         })
         const profiledFinalAnswer = applyRenderProfile({
           answer: rawFinalAnswer,
@@ -4348,6 +4405,7 @@ export async function runHexastraFlow(input: {
           openingSignal: responseModeSelection.openingSelection ?? null,
           prioritizedSignals: presentationStructuredSignals,
           knowledgePacket,
+          yearlyFocusAngle,
         })
 
         rawMessage = fallbackYearlyAnswer.text

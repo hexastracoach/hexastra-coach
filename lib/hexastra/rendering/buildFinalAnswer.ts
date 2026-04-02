@@ -5,7 +5,8 @@ import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
 import { getFusionFallbackCopy } from '@/lib/hexastra/rendering/getFusionFallbackCopy'
 import {
   buildYearlyPriorityAnswer,
-  detectYearlyPriorityFocusAngle,
+  detectYearlyFocusAngle,
+  type YearlyFocusAngle,
 } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
 
 export type FinalAnswerInput = {
@@ -14,6 +15,7 @@ export type FinalAnswerInput = {
   openingSignal: OpeningSignalSelection | null
   prioritizedSignals: StructuredSignal[]
   knowledgePacket: KnowledgePacket
+  yearlyFocusAngle?: YearlyFocusAngle | null
 }
 
 export type FinalAnswer = {
@@ -558,7 +560,7 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
         userMessage: input.userMessage,
         openingSignal: input.openingSignal,
         prioritizedSignals: input.prioritizedSignals,
-        focusAngle: detectYearlyPriorityFocusAngle(input.userMessage),
+        focusAngle: input.yearlyFocusAngle ?? detectYearlyFocusAngle(input.userMessage),
       }),
     }
   }
