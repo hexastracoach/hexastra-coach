@@ -1052,6 +1052,17 @@ INTERDICTIONS ABSOLUES:
 - Ne pas utiliser de meta technique: true, false, signal, confidence, score, debug
 - Ne pas ajouter de phrase introductive ou de conclusion hors structure
 
+STYLE OBLIGATOIRE:
+- Phrases courtes. Maximum 15 mots par phrase.
+- Une idee par phrase.
+- Vocabulaire simple. Niveau 12 ans.
+- Eviter les mots abstraits.
+- Eviter les repetitions.
+- Eviter les phrases longues avec plusieurs virgules.
+
+OBJECTIF:
+Comprehensible des la premiere lecture, sans effort.
+
 CONTROLE FINAL AVANT ENVOI:
 - Verifier qu il y a exactement 3 priorites numerotees
 - Verifier qu il y a exactement 2 freins

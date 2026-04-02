@@ -264,6 +264,8 @@ describe('selectResponseModeSelection', () => {
     'quel axe je dois vraiment choisir ?',
     'quel cap choisir ?',
     'quelle direction prendre ?',
+    'qu est-ce que je dois arreter en 2026 ?',
+    'Qu’est-ce que je dois arrêter en 2026 ?',
     'ou je perds mon energie ?',
     'ou orienter mon energie ?',
     'ce que je dois laisser tomber',

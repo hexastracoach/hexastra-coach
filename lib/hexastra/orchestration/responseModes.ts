@@ -134,6 +134,8 @@ export function buildResponseModeDirective(mode: ResponseMode): string {
         '- CE QUI VA TE FREINER: exactement 2 pieges comportementaux precis et contextualises. Interdis les banalites floues et les peurs abstraites sans comportement observable.',
         '- TON TIMING: distingue debut / milieu / fin d annee si les signaux le permettent, et evite toute repetition plate.',
         '- ACTION IMMEDIATE: une action testable dans les 24 a 72h, observable et non vague.',
+        '- STYLE OBLIGATOIRE: phrases courtes. Maximum 15 mots par phrase. Une idee par phrase. Vocabulaire simple. Evite les mots abstraits, les repetitions et les phrases longues avec plusieurs virgules.',
+        '- OBJECTIF DE LECTURE: la reponse doit etre comprise en une seule lecture, sans effort.',
         '- Interdis les anciens blocs generiques CE QUI SE PASSE / POURQUOI CA BLOQUE / CE QUE TU DOIS FAIRE / CLE A RETENIR, et interdis toute section Sphere.',
         '- Interdis toute trace technique ou meta: true, false, signal, confidence, score, debugging, logique interne.',
         '- Structure obligatoire en 5 blocs, dans cet ordre exact :',

@@ -123,6 +123,39 @@ function countSentences(value: string | undefined): number {
     .filter(Boolean).length
 }
 
+function extractAnnualSentences(text: string): string[] {
+  return text
+    .split('\n')
+    .flatMap((line) => {
+      const trimmed = line.trim()
+      if (!trimmed) return []
+      if (/^(ORIENTATION\s+20\d{2}|TES\s+3\s+PRIORITES\s+REELLES|CE\s+QUI\s+VA\s+TE\s+FREINER|TON\s+TIMING|ACTION\s+IMMEDIATE)$/i.test(trimmed)) {
+        return []
+      }
+
+      const body = trimmed
+        .replace(/^\d+\.\s+/, '')
+        .replace(/^Pourquoi:\s+/, '')
+        .replace(/^Dans la vraie vie:\s+/, '')
+        .replace(/^Debut d annee:\s+/, '')
+        .replace(/^Milieu d annee:\s+/, '')
+        .replace(/^Fin d annee:\s+/, '')
+        .replace(/^-+\s+/, '')
+
+      return body
+        .split(/[.!?]+/)
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    })
+}
+
+function countWords(value: string): number {
+  return value
+    .split(/\s+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean).length
+}
+
 function makeMinimalKnowledgePacket(): KnowledgePacket {
   return {
     domainRoute: 'fusion',
@@ -558,9 +591,10 @@ describe('buildFinalAnswer', () => {
       knowledgePacket: makeMinimalKnowledgePacket(),
     })
 
-    expect(answer.text).toContain('ou concentrer tes moyens')
+    const lower = answer.text.toLowerCase()
+    expect(lower).toContain('ou concentrer tes moyens')
     expect(answer.text).toContain('Protege tes plages fortes')
-    expect(answer.text).toContain('bloque deux plages de concentration')
+    expect(lower).toContain('bloque deux plages de concentration')
   })
 
   it('adapts yearly priorities to a direction-choice angle', () => {
@@ -640,10 +674,46 @@ describe('buildFinalAnswer', () => {
     }
 
     expect(concentrationAnswer.text).not.toBe(directionAnswer.text)
-    expect(concentrationAnswer.text).toContain('bloque deux plages de concentration')
-    expect(directionAnswer.text).toContain('axe directeur')
-    expect(concentrationAnswer.text).not.toContain('axe directeur')
-    expect(directionAnswer.text).not.toContain('bloque deux plages de concentration')
+    expect(concentrationAnswer.text.toLowerCase()).toContain('bloque deux plages de concentration')
+    expect(directionAnswer.text.toLowerCase()).toContain('axe directeur')
+    expect(concentrationAnswer.text.toLowerCase()).not.toContain('axe directeur')
+    expect(directionAnswer.text.toLowerCase()).not.toContain('bloque deux plages de concentration')
+  })
+
+  it('keeps yearly priority wording short and easy to read', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Qu est-ce que je dois arreter en 2026 ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: null,
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: { summary: 'clarifier ton cap, trier tes engagements et couper les dispersions' },
+        },
+        {
+          science: 'astrology',
+          subCategory: 'astro_transits_current',
+          sourceType: 'exact_data',
+          value: { summary: 'la traction existe mais elle doit etre lue avant d accelerer' },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: 'engager ton energie sur moins de fronts mais avec plus de nettete' },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    const sentences = extractAnnualSentences(answer.text)
+    expect(sentences.length).toBeGreaterThan(8)
+    expect(sentences.every((sentence) => countWords(sentence) <= 20)).toBe(true)
+    expect(answer.text.toLowerCase()).not.toContain('concretement')
+    expect(answer.text.toLowerCase()).not.toContain('dans ce contexte')
+    expect(answer.text.toLowerCase()).not.toContain('il faut')
   })
 
   it('strips boolean leakage from yearly priority content', () => {
@@ -952,8 +1022,8 @@ describe('buildFinalAnswer', () => {
       knowledgePacket: makeMinimalKnowledgePacket(),
     })
 
-    expect(answer.text).toContain('- Garder des projets tiedes ouverts pour ne decevoir personne et finir par diluer ton axe principal.')
-    expect(answer.text).toContain('- Changer le decor, les outils ou l organisation sans changer la vraie decision de fond.')
+    expect(answer.text).toMatch(/- Garder des projets tiedes ouverts pour ne decevoir personne\.\s*Et finir par diluer ton axe principal\./)
+    expect(answer.text).toMatch(/- Changer le decor\.\s*Les outils ou l organisation sans changer la vraie decision de fond\./)
     expect(answer.text).not.toContain('Dire oui pour calmer la pression, rester agreable ou ne pas decevoir, puis avancer a vide.')
     expect(answer.text).toContain('Debut d annee: Trie et clarifie.')
     expect(answer.text).toContain('Milieu d annee: Engage-toi nettement.')

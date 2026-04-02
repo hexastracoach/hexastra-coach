@@ -54,7 +54,7 @@ const FORBIDDEN_ANNUAL_WORDS = ['true', 'false', 'vrai', 'faux', 'signal', 'conf
 const FORBIDDEN_ANNUAL_TECHNICAL_PATTERNS = [
   { key: 'solar_return', pattern: /\b(?:astro[_ ]?)?solar[_ ]return\b/gi },
   { key: 'lunar_return', pattern: /\b(?:astro[_ ]?)?lunar[_ ]return\b/gi },
-  { key: 'progressions', pattern: /\b(?:astro[_ ]?)?progressions?\b/gi },
+  { key: 'progressions', pattern: /\b(?:astro[_ ]?)?progressions\b/gi },
   { key: 'transits', pattern: /\b(?:astro[_ ]?)?transits?(?:[_ ](?:current|timing|energy))?\b/gi },
   { key: 'human_design_transits', pattern: /\b(?:hd[_ ]current[_ ]transits|human[_ ]design[_ ]transits)\b/gi },
   { key: 'numerology_cycles', pattern: /\b(?:numerology[_ ]cycles?|num[_ ]personal[_ ]year)\b/gi },
@@ -98,6 +98,7 @@ const ANNUAL_EVIDENCE_FILLER_WORDS = new Set([
   'une',
   'y',
 ])
+const ANNUAL_HEADING_PATTERN = /^(ORIENTATION\s+20\d{2}|TES\s+3\s+PRIORITES\s+REELLES|CE\s+QUI\s+VA\s+TE\s+FREINER|TON\s+TIMING|ACTION\s+IMMEDIATE)$/i
 
 function normalize(text: string): string {
   return (text || '')
@@ -173,6 +174,116 @@ function sanitizeAnnualContent(text: string): string {
   }
 
   return normalize(cleaned.replace(/\s*([,;:])\s*/g, '$1 '))
+}
+
+function simplifyText(text: string): string {
+  return (text || '')
+    .replace(/\bconcretement\b/gi, '')
+    .replace(/\bdans ce contexte\b/gi, '')
+    .replace(/\bil faut\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,;:.!?])/g, '$1')
+    .trim()
+}
+
+function wordCount(text: string): number {
+  return normalize(text)
+    .split(/\s+/)
+    .filter(Boolean).length
+}
+
+function chunkSentence(text: string, maxWords = 14): string[] {
+  const words = normalize(text).split(/\s+/).filter(Boolean)
+  if (words.length <= maxWords) return [normalize(text)]
+
+  const chunks: string[] = []
+  let start = 0
+
+  while (start < words.length) {
+    let end = Math.min(start + maxWords, words.length)
+    if (end < words.length) {
+      for (let cursor = end; cursor > start + 7; cursor -= 1) {
+        if (/^(et|mais|puis|car|donc|alors|quand|si)$/i.test(words[cursor - 1])) {
+          end = cursor - 1
+          break
+        }
+      }
+    }
+
+    chunks.push(words.slice(start, end).join(' '))
+    start = end
+  }
+
+  return chunks.filter(Boolean)
+}
+
+function capitalizeSentence(text: string): string {
+  const cleaned = normalize(text)
+  if (!cleaned) return ''
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+}
+
+function enforceShortSentences(text: string): string {
+  const normalized = simplifyText(text)
+    .replace(/[;]+/g, '. ')
+    .replace(/\s*,\s*/g, '. ')
+
+  const fragments = normalized
+    .split(/[.!?]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => entry.replace(/^(et|mais|puis|car|donc|alors)\s+/i, '').trim())
+    .filter(Boolean)
+
+  const sentences = fragments.flatMap((fragment) => chunkSentence(fragment))
+
+  return sentences
+    .map((sentencePart) => capitalizeSentence(sentencePart))
+    .filter(Boolean)
+    .join('. ')
+    .trim()
+}
+
+function formatAnnualBodyLine(text: string): string {
+  const simplified = enforceShortSentences(text)
+  return simplified ? `${simplified}.`.replace(/\.\./g, '.') : ''
+}
+
+function polishAnnualLine(line: string): string {
+  const trimmed = line.trim()
+  if (!trimmed) return ''
+  if (ANNUAL_HEADING_PATTERN.test(trimmed)) return trimmed
+
+  const prefixedPatterns = [
+    /^(\d+\.\s+)(.+)$/i,
+    /^(Pourquoi:\s+)(.+)$/i,
+    /^(Dans la vraie vie:\s+)(.+)$/i,
+    /^(Debut d annee:\s+)(.+)$/i,
+    /^(Milieu d annee:\s+)(.+)$/i,
+    /^(Fin d annee:\s+)(.+)$/i,
+    /^(-\s+)(.+)$/i,
+  ]
+
+  for (const pattern of prefixedPatterns) {
+    const match = trimmed.match(pattern)
+    if (!match) continue
+    const [, prefix, body] = match
+    const polishedBody = pattern.source.startsWith('^(\\d')
+      ? simplifyText(body)
+      : formatAnnualBodyLine(body)
+    return `${prefix}${polishedBody}`.trim()
+  }
+
+  return formatAnnualBodyLine(trimmed)
+}
+
+function polishYearlyPriorityAnswer(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => polishAnnualLine(line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function isMeaningfulAnnualEvidence(text: string): boolean {
@@ -899,7 +1010,7 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
   const priorities = buildPrioritySignals(openingSignal, prioritizedSignals)
   const primary = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
 
-  return [
+  const rawAnswer = [
     `ORIENTATION ${year}`,
     buildOrientation(year, priorities, focusAngle),
     '',
@@ -915,6 +1026,8 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
     'ACTION IMMEDIATE',
     buildImmediateActionWithAngle(year, primary, focusAngle),
   ].join('\n')
+
+  return polishYearlyPriorityAnswer(rawAnswer)
 }
 
 function extractPrioritySection(text: string): string {
