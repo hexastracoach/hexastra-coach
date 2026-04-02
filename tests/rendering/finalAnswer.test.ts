@@ -8,6 +8,7 @@ import { selectResponseModeSelection } from '@/lib/hexastra/orchestrator/selectR
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
 import {
   detectYearlyPriorityFocusAngle,
+  repairYearlyPriorityPitfalls,
   sanitizeYearlyPriorityRenderedText,
   validateYearlyPriorityAnswerFormat,
 } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
@@ -1203,6 +1204,42 @@ describe('buildFinalAnswer', () => {
     expect(validation.issues).not.toContain('missing_priority_simple_key')
     expect(validation.issues).not.toContain('missing_radical_priority')
     expect(validation.issues).not.toContain('invalid_action_count:0')
+  })
+
+  it('repairs a missing yearly pitfall section before validation fallback', () => {
+    const repaired = repairYearlyPriorityPitfalls([
+      'ORIENTATION 2026',
+      'En 2026, garde peu de fronts utiles.',
+      '',
+      'TES 3 PRIORITES REELLES',
+      '1. Garde un seul axe',
+      'Pourquoi: Cette annee, trop de fronts brouillent ton elan.',
+      'Dans la vraie vie: Termine un sujet avant d en ouvrir un autre.',
+      '',
+      '2. Trie tes oui',
+      'Pourquoi: Ton temps doit aller au plus utile.',
+      'Dans la vraie vie: Refuse une demande secondaire cette semaine.',
+      '',
+      '3. Consolide ce qui repond',
+      'Pourquoi: Les resultats viennent de ce qui tient deja.',
+      'Dans la vraie vie: Renforce ce qui avance deja.',
+      '',
+      'TON TIMING',
+      'Debut d annee: Trie et clarifie.',
+      'Milieu d annee: Renforce ce qui repond.',
+      'Fin d annee: Garde ce qui tient.',
+      '',
+      'ACTION IMMEDIATE',
+      'Action 1: Choisis un front principal pour les 72 prochaines heures.',
+    ].join('\n'), { userPlan: 'essentiel', focusAngle: 'concentration' })
+
+    const validation = validateYearlyPriorityAnswerFormat(repaired.text, { userPlan: 'essentiel' })
+
+    expect(repaired.injectedCount).toBeGreaterThanOrEqual(1)
+    expect(repaired.text).toContain('CE QUI VA TE FREINER')
+    expect(repaired.text).toMatch(/- Tu risques de te disperser/i)
+    expect(validation.valid).toBe(true)
+    expect(validation.issues).not.toContain('invalid_pitfall_count:0')
   })
 
   it('accepts essential yearly structure with a single immediate action', () => {

@@ -13,6 +13,7 @@ import {
   type SubcategoryScience,
   type ResponseType,
 } from './subcategoryTaxonomy'
+import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
 import { isYearlyPriorityQuestion } from '@/lib/hexastra/orchestration/yearlyPriorityRouting'
 
 /** A single detected subcategory match */
@@ -115,6 +116,10 @@ export function detectSubcategory(text: string): SubcategoryDetectionResult {
 
   if (isYearlyPriorityQuestion(normalized)) {
     addSyntheticMatch('annual_guidance', candidates, matchMap)
+  }
+
+  if (isCareerGuidanceQuery(normalized)) {
+    addSyntheticMatch('career_guidance', candidates, matchMap)
   }
 
   const mentionsHumanDesign = /\b(human design|design humain|hd)\b/.test(normalized)

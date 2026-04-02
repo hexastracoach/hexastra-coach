@@ -93,6 +93,7 @@ const HEXAGRAM_SUBCATS = new Set([
 
 const FUSION_SUBCATS = new Set([
   'annual_guidance',
+  'career_guidance',
   'lecture_fusionnee', 'compatibilite_fusion', 'decision_fusion', 'timing_fusion',
   'etat_emotionnel', 'lecture_generale',
 ])

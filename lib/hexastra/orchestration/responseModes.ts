@@ -18,6 +18,7 @@ export type ResponseMode =
   | 'yearly_priority_answer'
   | 'guided_exploration'
   | 'pedagogical_explanation'
+  | 'career_path_answer'
   | 'career_fit_answer'
   | 'fusion_answer'
   | 'concise_fusion_answer'
@@ -52,15 +53,23 @@ export type ResponseModeInput = {
  * 8. Fallback: resolved+reliable -> calculated_reading, else guided_exploration
  */
 export function selectResponseMode(input: ResponseModeInput): ResponseMode {
-  const { requestKind, exactDataResolved, exactDataReliable, isPedagogical, isFusionIntent, intent } = input
+  const {
+    requestKind,
+    subcategory,
+    exactDataResolved,
+    exactDataReliable,
+    isPedagogical,
+    isFusionIntent,
+    intent,
+  } = input
 
   // Conceptual question — never inject personal data
   if (isPedagogical || requestKind === 'clarification') {
     return 'pedagogical_explanation'
   }
 
-  if (intent === 'career_guidance') {
-    return 'career_fit_answer'
+  if (intent === 'career_guidance' || requestKind === 'career_orientation' || subcategory === 'career_guidance') {
+    return 'career_path_answer'
   }
   if (requestKind === 'yearly_priorities') {
     return 'yearly_priority_answer'
@@ -176,21 +185,25 @@ export function buildResponseModeDirective(mode: ResponseMode): string {
         "- N invente pas de donnees personnelles. Reponds a la question conceptuelle uniquement.",
       ].join('\n')
 
+    case 'career_path_answer':
     case 'career_fit_answer':
       return [
-        'MODE DE REPONSE: ORIENTATION PROFESSIONNELLE',
-        '- La question porte sur le metier, la vocation ou la voie professionnelle adaptee.',
-        '- Reste concret et utile: traduis les signaux en environnement de travail, role, mode de contribution et types de metiers compatibles.',
-        '- Ne fais pas une lecture globale de personnalite si la question demande une orientation metier.',
-        '- Structure obligatoire en 5 blocs, dans cet ordre exact :',
-        '1. Fonctionnement naturel au travail',
-        '2. Environnements favorables',
-        '3. Types de metiers compatibles',
-        '4. Types de metiers moins adaptes',
-        '5. Action concrete pour tester la bonne voie',
-        '- Priorise Human Design, astrologie vocationnelle, numerologie, enneagramme et Kua uniquement si ces donnees sont presentes.',
-        '- Traduis les donnees en axes metier concrets: autonomie vs cadre, relationnel vs analytique, execution vs leadership, stabilite vs variete, creatif vs operationnel vs strategique.',
-        "- N invente aucune profession ultra specifique si les signaux ne la soutiennent pas clairement; propose plutot des familles de roles ou d'environnements.",
+        '# CAREER_PATH_ANSWER_MODE - ORIENTATION PROFESSIONNELLE',
+        '- La question porte sur le metier, la voie ou le cadre professionnel qui convient vraiment.',
+        '- La reponse finale doit suivre EXACTEMENT ces 4 blocs, dans cet ordre :',
+        '1. CE QUI TE CORRESPOND NATURELLEMENT',
+        '2. LES ENVIRONNEMENTS OU METIERS ALIGNES',
+        '3. CE QUI VA TE BLOQUER',
+        '4. CE QUE TU PEUX FAIRE MAINTENANT',
+        '- CE QUI TE CORRESPOND NATURELLEMENT: 2 a 4 phrases maximum. Expliquer la dynamique dominante de travail sans jargon technique.',
+        '- LES ENVIRONNEMENTS OU METIERS ALIGNES: selon le plan, proposer 2 a 5 familles de metiers concretes. Pas de titre enfermant. Pas de liste abstraite.',
+        '- CE QUI VA TE BLOQUER: 1 a 2 points maximum. Toujours concrets et comportementaux.',
+        '- CE QUE TU PEUX FAIRE MAINTENANT: 1 action principale. 1 action secondaire optionnelle selon le plan. Les actions doivent etre testables tout de suite.',
+        '- ADAPTATION PAR PLAN: free = tres court, 2 a 3 pistes metier max, 1 seule action. essential = plus concret, 3 a 5 pistes, 1 a 2 actions simples. premium et praticien = plus precis, plus nuance, avec un leger sens du timing: quoi maintenant, quoi consolider ensuite.',
+        '- Ne cite jamais les labels techniques ni les disciplines sources. Interdiction de dire Human Design, numerologie, astrologie, enneagramme ou Kua.',
+        '- Ne propose jamais des metiers ultra specifiques ou fantaisistes. Reste sur des familles reelles: accompagnement, creation, coordination, analyse, relation, projet, autonomie.',
+        '- Interdis les phrases vagues du type tout est possible, tu es une personne unique, ou fais ce qui te passionne.',
+        '- Ton attendu: clair, simple, utile, concret, orientant. L utilisateur doit repartir avec une vraie direction, pas avec une lecture generique.',
       ].join('\n')
 
     case 'concise_fusion_answer':

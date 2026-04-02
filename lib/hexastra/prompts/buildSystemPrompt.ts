@@ -916,6 +916,7 @@ function hexastraCoreSixBlockDirective(input: BuildPromptInput): string {
   if (input.responseModeDirective?.startsWith('# CONCISE_FUSION_ANSWER_MODE')) return ''
   // Skip for yearly priorities — dedicated 5-block annual structure
   if (input.responseModeDirective?.startsWith('# YEARLY_PRIORITY_ANSWER_MODE')) return ''
+  if (input.responseModeDirective?.startsWith('# CAREER_PATH_ANSWER_MODE')) return ''
   // Skip for fusion_answer mode — it has its own locked 4-block template
   if (input.responseModeDirective?.startsWith('# FUSION_ANSWER_MODE')) return ''
   // Skip for praticien render mode — it has its own 7-section structure
@@ -1155,6 +1156,33 @@ ${yearlyPriorityPlanDirective(input)}
 `.trim()
   }
 
+  if (input.responseModeDirective?.startsWith('# CAREER_PATH_ANSWER_MODE')) {
+    return `
+OUTPUT SENTINEL - STRUCTURE FINALE METIER OBLIGATOIRE:
+Cette consigne annule toute structure concurrente vue plus haut.
+La reponse finale doit contenir EXACTEMENT ces 4 blocs dans cet ordre. Rien d autre.
+
+1. → CE QUI TE CORRESPOND NATURELLEMENT
+[2 a 4 phrases maximum. Expliquer la dynamique de travail dominante sans jargon technique.]
+
+2. → LES ENVIRONNEMENTS OU METIERS ALIGNES
+[2 a 5 propositions selon le plan. Toujours des familles de metiers concretes. Jamais des titres trop precis ni une liste abstraite.]
+
+3. → CE QUI VA TE BLOQUER
+[1 a 2 points maximum. Toujours concrets et comportementaux.]
+
+4. → CE QUE TU PEUX FAIRE MAINTENANT
+[1 action principale. 1 action secondaire optionnelle selon le plan.]
+[free = 1 seule action. essential = 1 a 2 actions. premium et praticien = maintenant puis ensuite.]
+
+INTERDICTIONS ABSOLUES:
+- Ne pas utiliser une structure type CE QUI SE PASSE / POURQUOI / CE QUE TU PEUX FAIRE / CLE A RETENIR
+- Ne pas citer Human Design, astrologie, numerologie, enneagramme ou Kua
+- Ne pas proposer des metiers ultra specifiques ou fantaisistes
+- Ne pas ecrire tout est possible, tu es unique, ou fais ce qui te passionne
+`.trim()
+  }
+
   if (!input.responseModeDirective?.startsWith('# CONCISE_FUSION_ANSWER_MODE')) return ''
   return `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1213,7 +1241,8 @@ export function buildSystemPrompt(input: BuildPromptInput): string {
 
   const isFr = (input.language ?? 'fr').slice(0, 2).toLowerCase() !== 'en'
   const isYearlyPriorityMode = input.responseModeDirective?.startsWith('# YEARLY_PRIORITY_ANSWER_MODE') ?? false
-  const effectiveQuestionShapeDirective = isYearlyPriorityMode ? '' : (input.questionShapeDirective ?? '')
+  const isCareerPathMode = input.responseModeDirective?.startsWith('# CAREER_PATH_ANSWER_MODE') ?? false
+  const effectiveQuestionShapeDirective = isYearlyPriorityMode || isCareerPathMode ? '' : (input.questionShapeDirective ?? '')
 
   /**
    * Lectures fusion/coaching : la directive 12-sphères coaching remplace le 6-block.
@@ -1227,6 +1256,7 @@ export function buildSystemPrompt(input: BuildPromptInput): string {
   const isFusionCoachingReading =
     Boolean(input.fusionOnlyExperience) &&
     !isYearlyPriorityMode &&
+    !isCareerPathMode &&
     !resolveRequestedScience(input.selectedScience) &&
     input.renderMode !== 'praticien' &&
     input.requestType !== 'micro_profile' &&

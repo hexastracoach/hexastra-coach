@@ -314,6 +314,23 @@ export const SUBCATEGORY_RETRIEVAL_MAP: Record<string, SubCategoryRetrievalConfi
     retrievalPriority: 92,
     allowFusionFallback: true,
   },
+  career_guidance: {
+    subCategory: 'career_guidance',
+    science: 'fusion',
+    vectorNamespaces: ['ks_fusion_globaux', 'fusion/career'],
+    scienceTags: ['global', 'transverse', 'human_design', 'astrolex', 'numerologie', 'enneagramme', 'kua'],
+    preferredTopK: 8,
+    exactDataHints: [
+      'cross_science_synthesis',
+      'career_context',
+      'work_style',
+      'vocation_axis',
+      'include_numerology_cycles',
+      'include_kua_directions',
+    ],
+    retrievalPriority: 90,
+    allowFusionFallback: true,
+  },
   fusion_decision: {
     subCategory: 'fusion_decision',
     science: 'fusion',

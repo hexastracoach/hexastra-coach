@@ -311,6 +311,121 @@ type SanitizeYearlyPriorityRenderedTextOptions = {
   userPlan?: UserPlan | null
 }
 
+export type RepairYearlyPriorityPitfallsOptions = {
+  userPlan?: UserPlan | null
+  focusAngle?: YearlyFocusAngle | null
+}
+
+function normalizePitfallBullet(line: string): string | null {
+  const cleaned = sanitizeAnnualContent(line.replace(/^\s*-\s*/, ''))
+  if (!cleaned) return null
+  return `- ${sentence(cleaned)}`
+}
+
+function buildDefaultYearlyPitfalls(focusAngle: YearlyFocusAngle): string[] {
+  switch (focusAngle) {
+    case 'concentration':
+      return [
+        'Tu risques de te disperser si tu gardes trop de choses ouvertes.',
+        'Tu risques de dire oui trop vite au lieu de proteger le bon front.',
+        'Tu risques de rester occupe sans faire avancer le principal.',
+      ]
+    case 'direction_choice':
+      return [
+        'Tu risques d hesiter trop longtemps au lieu de choisir.',
+        'Tu risques de rouvrir des options qui brouillent ton cap.',
+        'Tu risques de changer d axe des qu une autre option apparait.',
+      ]
+    case 'stop_cut_remove':
+      return [
+        'Tu risques de garder un sujet mort pour ne pas fermer la porte.',
+        'Tu risques de repousser la coupure claire et de payer le prix en silence.',
+        'Tu risques de maintenir le secondaire par habitude.',
+      ]
+    case 'energy_leak':
+      return [
+        'Tu risques de perdre de l energie si tu avances sans priorite claire.',
+        'Tu risques de laisser des drains repetes prendre ta meilleure energie.',
+        'Tu risques de remplir ton agenda avant de proteger ton axe utile.',
+      ]
+    case 'execution_push':
+      return [
+        'Tu risques de trop preparer au lieu de sortir un premier pas concret.',
+        'Tu risques de lancer beaucoup et de finir trop peu.',
+        'Tu risques d attendre le bon moment parfait au lieu d avancer.',
+      ]
+    default:
+      return [
+        'Tu risques de te disperser si tu gardes trop de choses ouvertes.',
+        'Tu risques de perdre de l energie si tu avances sans priorite claire.',
+        'Tu risques d hesiter trop longtemps au lieu de choisir.',
+      ]
+  }
+}
+
+export function repairYearlyPriorityPitfalls(
+  text: string,
+  options?: RepairYearlyPriorityPitfallsOptions,
+): { text: string; injectedCount: number } {
+  let normalizedText = (text || '').replace(/\r\n?/g, '\n').trim()
+  if (!normalizedText) {
+    return { text: normalizedText, injectedCount: 0 }
+  }
+
+  const userPlan = resolveYearlyUserPlan(options?.userPlan)
+  const focusAngle = options?.focusAngle ?? 'concentration'
+  const minPitfalls = resolveYearlyValidationProfile(userPlan).minPitfalls
+  const defaultPitfalls = buildDefaultYearlyPitfalls(focusAngle).map((line) => normalizePitfallBullet(line)).filter(Boolean) as string[]
+  const pitfallSectionPattern = /(^CE QUI VA TE FREINER\b[^\n]*\n?)([\s\S]*?)(?=^\s*TON TIMING\b|^\s*ACTION IMMEDIATE\b|$)/im
+  const pitfallMatch = normalizedText.match(pitfallSectionPattern)
+
+  const existingBullets = (() => {
+    if (!pitfallMatch) return [] as string[]
+
+    const content = pitfallMatch[2] ?? ''
+    const candidateLines = content
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((line) => !ANNUAL_HEADING_PATTERN.test(line))
+
+    return candidateLines
+      .map((line) => normalizePitfallBullet(line))
+      .filter(Boolean) as string[]
+  })()
+
+  const dedupedPitfalls = [...new Set(existingBullets.map((line) => line.toLowerCase()))]
+  const repairedPitfalls = existingBullets.filter((line, index) => dedupedPitfalls.indexOf(line.toLowerCase()) === index)
+  let injectedCount = 0
+
+  for (const fallback of defaultPitfalls) {
+    if (repairedPitfalls.length >= minPitfalls) break
+    if (repairedPitfalls.some((line) => line.toLowerCase() === fallback.toLowerCase())) continue
+    repairedPitfalls.push(fallback)
+    injectedCount += 1
+  }
+
+  if (pitfallMatch) {
+    const repairedSection = `${pitfallMatch[1]}${repairedPitfalls.join('\n')}\n`
+    normalizedText = normalizedText.replace(pitfallSectionPattern, repairedSection)
+  } else if (repairedPitfalls.length > 0) {
+    const sectionBlock = `CE QUI VA TE FREINER\n${repairedPitfalls.join('\n')}\n\n`
+    if (/^\s*TON TIMING\b/im.test(normalizedText)) {
+      normalizedText = normalizedText.replace(/^\s*TON TIMING\b/im, `${sectionBlock}TON TIMING`)
+    } else if (/^\s*ACTION IMMEDIATE\b/im.test(normalizedText)) {
+      normalizedText = normalizedText.replace(/^\s*ACTION IMMEDIATE\b/im, `${sectionBlock}ACTION IMMEDIATE`)
+    } else {
+      normalizedText = `${normalizedText}\n\n${sectionBlock.trim()}`
+    }
+    injectedCount = repairedPitfalls.length
+  }
+
+  return {
+    text: normalizedText.replace(/\n{3,}/g, '\n\n').trim(),
+    injectedCount,
+  }
+}
+
 function trimImmediateActionsToMax(text: string, maxActions: number): string {
   if (maxActions < 1) return text
 

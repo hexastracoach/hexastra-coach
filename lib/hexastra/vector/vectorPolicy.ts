@@ -83,7 +83,12 @@ export function shouldUseVectorEnrichment(input: VectorPolicyInput): VectorPolic
     }
   }
 
-  if (requestKind === 'interpretation' || requestKind === 'guidance' || requestKind === 'clarification') {
+  if (
+    requestKind === 'career_orientation' ||
+    requestKind === 'interpretation' ||
+    requestKind === 'guidance' ||
+    requestKind === 'clarification'
+  ) {
     return {
       shouldEnrich: true,
       reason: `VECTOR_ENRICHMENT_ENABLED: ${requestKind} request - depth enrichment appropriate`,

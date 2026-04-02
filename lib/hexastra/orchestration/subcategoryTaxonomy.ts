@@ -490,6 +490,23 @@ export const SUBCATEGORY_ENTRIES: SubcategoryEntry[] = [
     ],
   },
   {
+    key: 'career_guidance',
+    science: 'hexastra_fusion',
+    responseType: 'fusion_reading',
+    weight: 8,
+    patterns: [
+      /\bquel(?:s)? (?:sont )?les? metiers? que je peu[xt] faire\b/i,
+      /\bquels? metiers? me correspond(?:ent)?\b/i,
+      /\bdans quoi je pourrais travailler\b/i,
+      /\bquel travail me convient\b/i,
+      /\bquelle voie pro est faite pour moi\b/i,
+      /\bdans quel domaine je peux reussir\b/i,
+      /\bquel boulot est aligne pour moi\b/i,
+      /\bquel metier est fait pour moi\b/i,
+      /\bquel metier me correspond\b/i,
+    ],
+  },
+  {
     key: 'lecture_fusionnee',
     science: 'hexastra_fusion',
     responseType: 'fusion_reading',

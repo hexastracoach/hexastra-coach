@@ -43,6 +43,7 @@ const SUBCATEGORY_LABELS: Record<string, { fr: string; en: string }> = {
   definition_hd:      { fr: 'définition Human Design', en: 'Human Design definition' },
   transits_hd:        { fr: 'transits Human Design', en: 'Human Design transits' },
   annual_guidance:    { fr: 'priorites annuelles', en: 'annual priorities' },
+  career_guidance:    { fr: 'orientation professionnelle', en: 'career guidance' },
   nombre_kua:         { fr: 'nombre Kua', en: 'Kua number' },
   direction_kua:      { fr: 'directions Kua', en: 'Kua directions' },
   orientation_habitat: { fr: 'orientation habitat', en: 'home orientation' },

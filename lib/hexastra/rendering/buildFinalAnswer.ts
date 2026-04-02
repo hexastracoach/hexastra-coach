@@ -9,6 +9,7 @@ import {
   detectYearlyFocusAngle,
   type YearlyFocusAngle,
 } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
+import { buildCareerPathAnswer } from '@/lib/hexastra/rendering/buildCareerPathAnswer'
 
 export type FinalAnswerInput = {
   userMessage: string
@@ -563,6 +564,17 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
         openingSignal: input.openingSignal,
         prioritizedSignals: input.prioritizedSignals,
         focusAngle: input.yearlyFocusAngle ?? detectYearlyFocusAngle(input.userMessage),
+        userPlan: input.userPlan ?? 'premium',
+      }),
+    }
+  }
+
+  if (input.responseMode === 'career_path_answer' || input.responseMode === 'career_fit_answer') {
+    return {
+      text: buildCareerPathAnswer({
+        userMessage: input.userMessage,
+        openingSignal: input.openingSignal,
+        prioritizedSignals: input.prioritizedSignals,
         userPlan: input.userPlan ?? 'premium',
       }),
     }

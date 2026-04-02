@@ -34,6 +34,13 @@ describe('classifyMessage — astrology exact', () => {
     expect(result.science).toBe('astrology')
     expect(result.requestKind).toBe('synthesis')
   })
+  it('detects natural career wording as career guidance instead of unknown', () => {
+    const result = classifyMessage('quel sont les metier que je peut faire ?')
+    expect(result.domainRoute).toBe('career')
+    expect(result.subcategory).toBe('career_guidance')
+    expect(result.requestKind).toBe('career_orientation')
+    expect(result.needsExactData).toBe(true)
+  })
 })
 
 // ─── Human Design ─────────────────────────────────────────────────────────────
@@ -94,8 +101,17 @@ describe('classifyMessage — interpretation', () => {
   it('detects career guidance routing for "quel metier est fait pour moi"', () => {
     const result = classifyMessage('quel métier est fait pour moi ?')
     expect(result.domainRoute).toBe('career')
-    expect(result.requestKind).toBe('guidance')
+    expect(result.subcategory).toBe('career_guidance')
+    expect(result.requestKind).toBe('career_orientation')
     expect(result.needsInterpretation).toBe(true)
+  })
+
+  it('detects natural career wording as career guidance instead of unknown', () => {
+    const result = classifyMessage('quel sont les metier que je peut faire ?')
+    expect(result.domainRoute).toBe('career')
+    expect(result.subcategory).toBe('career_guidance')
+    expect(result.requestKind).toBe('career_orientation')
+    expect(result.needsExactData).toBe(true)
   })
 })
 

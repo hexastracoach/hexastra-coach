@@ -5,6 +5,10 @@ import {
   selectResponseMode as selectLegacyResponseMode,
   type ResponseMode,
 } from '@/lib/hexastra/orchestration/responseModes'
+import {
+  hasCareerPathTerms,
+  isCareerGuidanceQuery,
+} from '@/lib/hexastra/orchestration/careerGuidance'
 import type { PrioritizedStructuredSignal } from '@/lib/hexastra/retrieval/prioritizeStructuredSignals'
 import type { RetrievalPlan } from '@/lib/hexastra/retrieval/retrievalPlanBuilder'
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
@@ -153,6 +157,20 @@ export function selectResponseModeSelection(args: {
     )
   }
 
+  const normalizedIntent = normalize(args.intent ?? '')
+  const isCareerFallback =
+    (normalizedIntent === 'work_money' || normalizedIntent === 'career_guidance') &&
+    (isCareerGuidanceQuery(args.userMessage) || hasCareerPathTerms(args.userMessage))
+
+  if (
+    isCareerFallback &&
+    responseMode !== 'career_path_answer' &&
+    responseMode !== 'career_fit_answer'
+  ) {
+    responseMode = 'career_path_answer'
+    reasoningTags.push('career_path_fallback')
+  }
+
   if (responseMode === 'concise_fusion_answer') {
     if (isGlobalCurrent) {
       reasoningTags.push('global_current_fusion_mode')
@@ -171,7 +189,7 @@ export function selectResponseModeSelection(args: {
     }
   }
 
-  if (responseMode === 'career_fit_answer') {
+  if (responseMode === 'career_fit_answer' || responseMode === 'career_path_answer') {
     reasoningTags.push('career_guidance_mode')
   }
 

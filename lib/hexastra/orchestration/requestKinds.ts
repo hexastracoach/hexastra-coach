@@ -6,7 +6,7 @@
  * whether vector enrichment is appropriate.
  *
  * Priority order:
- *   exact_fact > exact_profile > synthesis > interpretation > guidance > clarification > mixed > unknown
+ *   exact_fact > exact_profile > yearly_priorities > career_orientation > synthesis > interpretation > guidance > clarification > mixed > unknown
  */
 
 import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
@@ -18,6 +18,7 @@ export type RequestKind =
   | 'exact_fact'        // "quelles sont mes planètes ?" / "quel est mon ascendant ?"
   | 'exact_profile'     // "quel est mon profil HD ?" / "quel est mon type ?"
   | 'yearly_priorities' // guidance annuelle interpretee a partir des exact data fusion
+  | 'career_orientation' // orientation metier / environnement professionnel
   | 'interpretation'    // "ça dit quoi sur moi ?" / "explique-moi mon profil 3/5"
   | 'synthesis'         // "fais-moi une lecture complète" / "qui suis-je ?"
   | 'comparison'        // "est-ce mieux X ou Y ?" — unused for now, reserved
@@ -158,14 +159,13 @@ export function classifyRequestKind(message: string, subcategory?: string | null
 
   if (isYearlyPriorityQuestion(message) || subcategory === 'annual_guidance') return 'yearly_priorities'
 
+  if (isCareerGuidanceQuery(message) || subcategory === 'career_guidance') return 'career_orientation'
+
   // synthesis: full portrait / complete reading
   if (matchesAny(message, SYNTHESIS_PATTERNS)) return 'synthesis'
 
   // interpretation: meaning / explanation
   if (matchesAny(message, INTERPRETATION_PATTERNS)) return 'interpretation'
-
-  // career guidance behaves like a guided interpretive request
-  if (isCareerGuidanceQuery(message)) return 'guidance'
 
   // guidance: what to do, how to act
   if (matchesAny(message, GUIDANCE_PATTERNS)) return 'guidance'
@@ -195,6 +195,7 @@ export function requestKindNeedsExactData(kind: RequestKind): boolean {
     kind === 'exact_fact' ||
     kind === 'exact_profile' ||
     kind === 'yearly_priorities' ||
+    kind === 'career_orientation' ||
     kind === 'synthesis' ||
     kind === 'mixed'
   )
@@ -206,6 +207,7 @@ export function requestKindNeedsExactData(kind: RequestKind): boolean {
 export function requestKindNeedsInterpretation(kind: RequestKind): boolean {
   return (
     kind === 'yearly_priorities' ||
+    kind === 'career_orientation' ||
     kind === 'interpretation' ||
     kind === 'synthesis' ||
     kind === 'guidance' ||

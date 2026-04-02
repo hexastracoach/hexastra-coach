@@ -152,6 +152,7 @@ import { applyRenderProfile, buildRenderProfileText } from '@/lib/hexastra/rende
 import { applyShiloStyle } from '@/lib/hexastra/rendering/applyShiloStyle'
 import {
   detectYearlyFocusAngle,
+  repairYearlyPriorityPitfalls,
   sanitizeYearlyPriorityRenderedText,
   validateYearlyPriorityAnswerFormat,
   type YearlyFocusAngle,
@@ -3415,7 +3416,8 @@ export async function runHexastraFlow(input: {
       (isHumanDesignExact && exactDataResolved) ||
       (isYearlyPriorityRequest && exactDataResolved) ||
       userIntent === 'career_guidance' ||
-      effectiveResponseMode === 'career_fit_answer'
+      effectiveResponseMode === 'career_fit_answer' ||
+      effectiveResponseMode === 'career_path_answer'
 
     if (isYearlyPriorityRequest && exactDataResolved) {
       flowLog('info', 'YEARLY_PRIORITY_LLM_RENDER_FORCED', {
@@ -4393,14 +4395,28 @@ export async function runHexastraFlow(input: {
     if (effectiveResponseMode === 'yearly_priority_answer') {
       const yearlyPriorityValidationRaw = applySentinel(rawMessage)
       const yearlyPriorityValidationPlan = normalizeUserPlan(plan)
-      const yearlyPriorityValidationTarget = sanitizeYearlyPriorityRenderedText(yearlyPriorityValidationRaw, {
+      const yearlyPrioritySanitizedTarget = sanitizeYearlyPriorityRenderedText(yearlyPriorityValidationRaw, {
         userPlan: yearlyPriorityValidationPlan,
       })
-      if (yearlyPriorityValidationTarget !== yearlyPriorityValidationRaw) {
-        rawMessage = yearlyPriorityValidationTarget
+      const yearlyPriorityRepair = repairYearlyPriorityPitfalls(yearlyPrioritySanitizedTarget, {
+        userPlan: yearlyPriorityValidationPlan,
+        focusAngle: yearlyFocusAngle,
+      })
+      const yearlyPriorityValidationTarget = yearlyPriorityRepair.text
+      if (yearlyPrioritySanitizedTarget !== yearlyPriorityValidationRaw) {
+        rawMessage = yearlyPrioritySanitizedTarget
         flowLog('info', 'YEARLY_PRIORITY_TECHNICAL_TOKENS_STRIPPED', {
           userPlan: yearlyPriorityValidationPlan,
           responseMode: effectiveResponseMode,
+        })
+      }
+      if (yearlyPriorityValidationTarget !== yearlyPrioritySanitizedTarget) {
+        rawMessage = yearlyPriorityValidationTarget
+        flowLog('info', yearlyPriorityRepair.injectedCount > 0 ? 'YEARLY_PRIORITY_DEFAULT_PITFALLS_INJECTED' : 'YEARLY_PRIORITY_PITFALL_SECTION_REPAIRED', {
+          userPlan: yearlyPriorityValidationPlan,
+          responseMode: effectiveResponseMode,
+          injectedCount: yearlyPriorityRepair.injectedCount,
+          focusAngle: yearlyFocusAngle,
         })
       }
       const yearlyPriorityValidation = validateYearlyPriorityAnswerFormat(yearlyPriorityValidationTarget, {
