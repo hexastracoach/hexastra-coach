@@ -1028,9 +1028,9 @@ function yearlyPriorityPlanDirective(input: BuildPromptInput): string {
 - TON ATTENDU: ultra simple. Ultra lisible. Impact immediat.
 - ORIENTATION: 2 a 3 phrases maximum, tres simples.
 - TA LIGNE DIRECTRICE [ANNEE]: 3 mots ou 3 verbes tres simples.
-- Chaque priorite: titre court obligatoire. Pourquoi et Dans la vraie vie sont optionnels si la priorite est deja claire.
-- Pourquoi: explique juste la cause utile. Pas de nuance longue.
-- Dans la vraie vie: 1 exemple suffit si c est clair.
+- Chaque priorite: titre court seulement. Reste teaser et direct.
+- Evite Pourquoi detaille et Dans la vraie vie detaille sur ce plan.
+- Va a l essentiel. Donne juste l idee qui frappe.
 - Cle simple: optionnelle.
 - CE QUI VA TE FREINER: 2 points maximum, tres courts.
 - TON TIMING: 1 phrase courte par phase.
@@ -1044,10 +1044,12 @@ function yearlyPriorityPlanDirective(input: BuildPromptInput): string {
 - TA LIGNE DIRECTRICE [ANNEE]: 1 phrase courte et claire.
 - Chaque priorite: titre court, Pourquoi et Dans la vraie vie. Garde la lecture simple.
 - Pourquoi: 1 phrase claire ou 2 phrases tres courtes maximum.
-- Dans la vraie vie: 1 a 2 exemples concrets. Pas de surcharge.
+- Dans la vraie vie: 1 a 2 exemples concrets. Travail, temps, relation ou energie. Pas de surcharge.
 - Cle simple: optionnelle.
 - Priorite radicale: optionnelle si elle ne vient pas naturellement.
 - Montrer aussi ce qui marche deja quand c est utile.
+- Utilise des verbes simples: choisir, couper, garder, finir, proteger, renforcer.
+- Evite les formules abstraites comme maitrise, expansion, equilibre personnel ou energie propice.
 - CE QUI VA TE FREINER: 2 a 3 points concrets maximum.
 - TON TIMING: un peu developpe, mais lisible en une lecture.
 - ACTION IMMEDIATE: donne 1 a 2 actions maximum.

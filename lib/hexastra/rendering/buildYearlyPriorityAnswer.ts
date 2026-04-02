@@ -135,7 +135,7 @@ const YEARLY_PLAN_STYLES: Record<UserPlan, YearlyPlanStyle> = {
     keySentences: 1,
     showSimpleKey: false,
     pitfallSentences: 1,
-    pitfallCount: 2,
+    pitfallCount: 1,
     timingSentences: 1,
     actionCount: 1,
   },
@@ -1211,6 +1211,40 @@ function buildOrientationPlanTail(
   }
 }
 
+function buildFreeOrientationSupport(focusAngle: YearlyFocusAngle): string {
+  switch (focusAngle) {
+    case 'concentration':
+      return 'Garde le bon front. Coupe le reste.'
+    case 'direction_choice':
+      return 'Choisis une voie claire. Laisse le reste attendre.'
+    case 'stop_cut_remove':
+      return 'Ferme un poids mort. Garde de la place.'
+    case 'energy_leak':
+      return 'Coupe un drain net. Recupere ton energie.'
+    case 'execution_push':
+      return 'Finis un pas simple. Recommence vite.'
+    default:
+      return 'Choisis mieux. Coupe le reste.'
+  }
+}
+
+function buildEssentialOrientationSupport(focusAngle: YearlyFocusAngle): string {
+  switch (focusAngle) {
+    case 'concentration':
+      return 'Mets plus de temps sur ce qui avance deja. Arrete d ouvrir du secondaire.'
+    case 'direction_choice':
+      return 'Choisis un axe clair. Laisse les autres options en pause.'
+    case 'stop_cut_remove':
+      return 'Coupe ce qui ne sert plus. Garde seulement ce qui tient.'
+    case 'energy_leak':
+      return 'Ferme les drains repetes. Protege le temps qui te sert vraiment.'
+    case 'execution_push':
+      return 'Termine un pas visible. Evite de trop preparer.'
+    default:
+      return 'Garde le bon axe. Laisse le reste apres.'
+  }
+}
+
 function buildPriorityWhyTail(
   userPlan: UserPlan,
   focusAngle: YearlyFocusAngle,
@@ -1221,15 +1255,15 @@ function buildPriorityWhyTail(
   if (userPlan === 'essentiel') {
     switch (focusAngle) {
       case 'concentration':
-        return 'Ce qui repond deja doit prendre plus de place.'
+        return 'Mets plus de temps sur ce qui avance deja.'
       case 'direction_choice':
-        return 'Le reste doit perdre du poids.'
+        return 'Laisse les autres options en pause.'
       case 'stop_cut_remove':
-        return 'Ce que tu retires te redonne de la place.'
+        return 'Ce que tu retires te rend du temps clair.'
       case 'energy_leak':
-        return 'Ce que tu coupes te rend plus disponible.'
+        return 'Ce que tu coupes te rend de l energie utile.'
       case 'execution_push':
-        return 'Ce que tu termines nourrit l elan.'
+        return 'Ce que tu termines relance ton elan.'
       default:
         return null
     }
@@ -1265,15 +1299,15 @@ function buildPriorityRealLifeTail(
     case 'essentiel':
       switch (focusAngle) {
         case 'concentration':
-          return 'Garde le bon front.'
+          return 'Garde un seul front ouvert.'
         case 'direction_choice':
-          return 'Le reste attend.'
+          return 'Laisse deux options en pause.'
         case 'stop_cut_remove':
-          return 'Officialise l arret.'
+          return 'Ferme-le pour de vrai.'
         case 'energy_leak':
-          return 'Recupere du temps utile.'
+          return 'Recupere du temps et du calme.'
         case 'execution_push':
-          return 'Recommence vite.'
+          return 'Sors un pas visible.'
         default:
           return null
       }
@@ -1630,6 +1664,20 @@ function buildOrientation(
         ? 'Les resultats viennent quand ton energie revient au bon endroit.'
         : 'Les resultats viennent quand ton axe devient plus visible.'
 
+  if (userPlan === 'free') {
+    return limitAnnualSentences(
+      [focusAngleLead(focusAngle, year, userPlan), buildFreeOrientationSupport(focusAngle)].join(' '),
+      YEARLY_PLAN_STYLES[userPlan].orientationSentences,
+    )
+  }
+
+  if (userPlan === 'essentiel') {
+    return limitAnnualSentences(
+      [focusAngleLead(focusAngle, year, userPlan), buildEssentialOrientationSupport(focusAngle)].join(' '),
+      YEARLY_PLAN_STYLES[userPlan].orientationSentences,
+    )
+  }
+
   return limitAnnualSentences(
     [
       focusAngleLead(focusAngle, year, userPlan),
@@ -1662,6 +1710,10 @@ function buildPriorityBlock(
     [template.realLife, buildPriorityRealLifeTail(userPlan, focusAngle)].filter(Boolean).join(' '),
     style.realLifeSentences,
   )
+
+  if (userPlan === 'free') {
+    return `${index}. ${sentence(adaptPriorityLabel(template.title, focusAngle)).replace(/[.]$/, '')}`
+  }
 
   return [
     `${index}. ${adaptPriorityLabel(template.title, focusAngle)}`,
