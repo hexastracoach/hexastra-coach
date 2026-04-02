@@ -14,6 +14,7 @@ export type YearlyFocusAngle =
   | 'direction_choice'
   | 'stop_cut_remove'
   | 'energy_leak'
+  | 'execution_push'
 
 export type YearlyPriorityFocusAngle = YearlyFocusAngle
 
@@ -119,6 +120,14 @@ function normalizeIntentText(text: string): string {
 export function detectYearlyFocusAngle(message: string): YearlyFocusAngle {
   const normalized = normalizeIntentText(message)
 
+  if (
+    /(comment avancer|comment accelerer|passer au niveau superieur|arreter de stagner|sortir de la stagnation|passer a l action|enfin passer a l action|me remettre en mouvement|debloquer l execution)/.test(
+      normalized,
+    )
+  ) {
+    return 'execution_push'
+  }
+
   if (normalized.includes('concentrer') || normalized.includes('focus')) {
     return 'concentration'
   }
@@ -158,6 +167,8 @@ function adaptPriorityLabel(base: string, angle: YearlyFocusAngle) {
       return `Arrete ce qui te freine : ${base}`
     case 'energy_leak':
       return `Protege ton energie : ${base}`
+    case 'execution_push':
+      return `Passe en execution : ${base}`
     default:
       return base
   }
@@ -587,8 +598,27 @@ function focusAngleLead(angle: YearlyFocusAngle, year: string): string {
       return `En ${year}, ta progression depend d abord de ce que tu arretes, refuses ou retires de ton champ.`
     case 'energy_leak':
       return `En ${year}, l enjeu n est pas d en faire plus, mais de stopper ce qui vide ton energie utile.`
+    case 'execution_push':
+      return `En ${year}, tu progresses quand tu transformes enfin le cap en gestes repetes et visibles.`
     default:
       return `En ${year}, la progression la plus juste vient d une focalisation nette sur ce qui doit vraiment avancer.`
+  }
+}
+
+function buildGuidingLine(year: string, focusAngle: YearlyFocusAngle): string {
+  switch (focusAngle) {
+    case 'concentration':
+      return `TA LIGNE DIRECTRICE ${year} : Reduis. Concentre. Avance.`
+    case 'direction_choice':
+      return `TA LIGNE DIRECTRICE ${year} : Choisis. Coupe. Tiens le cap.`
+    case 'stop_cut_remove':
+      return `TA LIGNE DIRECTRICE ${year} : Trie. Coupe. Stabilise.`
+    case 'energy_leak':
+      return `TA LIGNE DIRECTRICE ${year} : Protege ton energie. Concentre-la. Agis.`
+    case 'execution_push':
+      return `TA LIGNE DIRECTRICE ${year} : Lance. Execute. Consolide.`
+    default:
+      return `TA LIGNE DIRECTRICE ${year} : Clarifie. Choisis. Avance.`
   }
 }
 
@@ -719,6 +749,46 @@ function applyFocusAngleToTemplate(
             title: selection.isRadical ? 'Ferme les fronts qui te vident' : 'Trie ce qui te draine',
             whyPriority: `En ${year}, tant que des projets froids restent ouverts, ils continuent de te prendre de l energie de fond meme quand tu ne les traites pas.`,
             realLife: 'Ferme un front qui te suit mentalement depuis trop longtemps, coupe un projet sans elan, et retire un engagement qui te vide sans renforcer ton axe.',
+          }
+        default:
+          return template
+      }
+
+    case 'execution_push':
+      switch (selection.family) {
+        case 'cap':
+          return {
+            ...template,
+            title: selection.isRadical ? 'Coupe puis avance' : 'Pousse ce qui repond',
+            orientationAxis: 'execution claire et progression visible',
+            orientationMeaning: 'l annee te demande moins d intention et plus d avancee mesurable sur un axe deja choisi',
+            whyPriority: `En ${year}, ta progression depend de ce que tu fais avancer chaque semaine, pas de ce que tu gardes seulement en tete.`,
+            realLife: 'Choisis un chantier central, sors un livrable visible, et mesure ce qui avance vraiment au lieu de tout preparer en meme temps.',
+          }
+        case 'rythme':
+          return {
+            ...template,
+            title: 'Accelere sur traction',
+            orientationAxis: 'execution reguliere et acceleration utile',
+            orientationMeaning: 'tu avances mieux quand tu renforces ce qui repond deja au lieu de repartir de zero',
+            whyPriority: `Cette annee, l elan vient d une cadence tenue, pas d un gros sprint suivi d une coupure.`,
+            realLife: 'Mets ton meilleur temps sur un sujet qui reagit deja, fais un pas visible, puis recommence la semaine suivante.',
+          }
+        case 'cycle':
+          return {
+            ...template,
+            title: 'Passe du potentiel au resultat',
+            orientationAxis: 'resultats visibles et base plus solide',
+            orientationMeaning: 'l annee recompense ce qui devient concret, utile et tenable',
+            whyPriority: `En ${year}, rester au stade du potentiel te bloque plus que le manque d idees.`,
+            realLife: 'Termine une etape claire, montre une preuve de progression, et ferme ce qui reste toujours au stade du projet.',
+          }
+        case 'alignement':
+          return {
+            ...template,
+            title: 'Garde ton elan pour l utile',
+            whyPriority: `Cette annee, tu avances quand ton energie sert l execution au lieu de partir dans des oui secondaires.`,
+            realLife: 'Retire une sollicitation parasite, garde ton energie pour un sujet central, et protege le temps de production reel.',
           }
         default:
           return template
@@ -987,6 +1057,8 @@ function focusAngleImmediateAction(
       return `Dans les 24 a 72 heures, liste trois choses a arreter, ferme-en une concretement, puis envoie le message qui officialise cet arret.`
     case 'energy_leak':
       return `Dans les 24 a 72 heures, note les trois situations qui te vident le plus, coupe-en une cette semaine, puis redeploie ce temps sur ce qui nourrit vraiment ton axe.`
+    case 'execution_push':
+      return `Dans les 24 a 72 heures, choisis un livrable simple, termine-le, puis fixe le prochain pas avant la fin de la semaine.`
     default:
       return null
   }
@@ -1012,6 +1084,7 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
 
   const rawAnswer = [
     `ORIENTATION ${year}`,
+    buildGuidingLine(year, focusAngle),
     buildOrientation(year, priorities, focusAngle),
     '',
     'TES 3 PRIORITES REELLES',

@@ -23,6 +23,10 @@ export type RetrievalProviderFilters = {
   scienceTags?: string[]
 }
 
+type VectorSkipReason =
+  | 'VECTOR_SKIPPED_NON_BLOCKING'
+  | 'VECTOR_DISABLED_FOR_ANNUAL_GUIDANCE'
+
 type ApiContentBlock = {
   type: string
   text?: string
@@ -167,6 +171,24 @@ async function searchVectorStore(args: {
   })
 }
 
+function logNonBlockingVectorSkip(args: {
+  reason: VectorSkipReason
+  status: number
+  domainRoute?: DomainRoute
+  query: string
+  providerFilters?: RetrievalProviderFilters
+}) {
+  console.info(`[vectorSearch] ${args.reason}`, {
+    status: args.status,
+    domainRoute: args.domainRoute ?? null,
+    queryPreview: args.query.slice(0, 140),
+    hasProviderFilters: Boolean(
+      (args.providerFilters?.vectorNamespaces?.length ?? 0) > 0 ||
+      (args.providerFilters?.scienceTags?.length ?? 0) > 0,
+    ),
+  })
+}
+
 export async function retrieveKnowledge({
   query,
   plan,
@@ -198,7 +220,8 @@ export async function retrieveKnowledge({
     const requestBody: Record<string, unknown> = {
       query: buildDomainBiasedQuery(query, domainRoute),
       max_num_results: topK,
-      reranking: { ranker: 'auto' },
+      ranking_options: { ranker: 'auto' },
+      rewrite_query: true,
     }
     const providerMetadataFilter = buildProviderMetadataFilter(providerFilters)
 
@@ -229,9 +252,18 @@ export async function retrieveKnowledge({
     }
 
     if (!effectiveResponse.ok) {
-      console.warn(
-        `[vectorSearch] API error ${effectiveResponse.status} - skipping retrieval`,
-      )
+      const reason: VectorSkipReason =
+        domainRoute === 'fusion' && /\b(?:annual_cycle|strategic_priority|include_solar_return)\b/i.test(query)
+          ? 'VECTOR_DISABLED_FOR_ANNUAL_GUIDANCE'
+          : 'VECTOR_SKIPPED_NON_BLOCKING'
+
+      logNonBlockingVectorSkip({
+        reason,
+        status: effectiveResponse.status,
+        domainRoute,
+        query,
+        providerFilters,
+      })
       return []
     }
 

@@ -269,6 +269,8 @@ describe('selectResponseModeSelection', () => {
     'ou je perds mon energie ?',
     'ou orienter mon energie ?',
     'ce que je dois laisser tomber',
+    'comment avancer cette annee ?',
+    'Comment avancer cette année ?',
   ])('keeps yearly strategic variants out of concise_fusion_answer: %s', (query) => {
     const classification = classifyMessage(query)
     const userIntent = classifyUserIntent(query)

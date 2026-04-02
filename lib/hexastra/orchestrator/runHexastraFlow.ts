@@ -150,7 +150,11 @@ import { runKsPipeline, type KsPipelineOutput } from '@/lib/hexastra/orchestrato
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
 import { applyRenderProfile, buildRenderProfileText } from '@/lib/hexastra/rendering/applyRenderProfile'
 import { applyShiloStyle } from '@/lib/hexastra/rendering/applyShiloStyle'
-import { validateYearlyPriorityAnswerFormat } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
+import {
+  detectYearlyFocusAngle,
+  validateYearlyPriorityAnswerFormat,
+  type YearlyFocusAngle,
+} from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
 import { normalizeUserPlan } from '@/lib/hexastra/rendering/normalizeUserPlan'
 import { selectRenderProfile } from '@/lib/hexastra/rendering/selectRenderProfile'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
@@ -381,23 +385,6 @@ function normalizeSelectionText(message: string) {
     .trim()
 }
 
-type YearlyFocusAngle =
-  | 'concentration'
-  | 'direction_choice'
-  | 'stop_cut_remove'
-  | 'energy_leak'
-
-function detectYearlyFocusAngle(message: string): YearlyFocusAngle {
-  const m = normalizeSelectionText(message)
-
-  if (m.includes('concentrer') || m.includes('focus')) return 'concentration'
-  if (m.includes('axe') || m.includes('direction') || m.includes('choisir')) return 'direction_choice'
-  if (m.includes('arreter') || m.includes('stop') || m.includes('laisser tomber')) return 'stop_cut_remove'
-  if (m.includes('energie') || m.includes('fatigue') || m.includes('epuise')) return 'energy_leak'
-
-  return 'concentration'
-}
-
 function buildYearlyFocusAngleDirective(angle: YearlyFocusAngle): string {
   switch (angle) {
     case 'concentration':
@@ -423,6 +410,12 @@ function buildYearlyFocusAngleDirective(angle: YearlyFocusAngle): string {
         '# YEARLY_FOCUS_ANGLE',
         'Question nuance prioritaire: energy_leak.',
         'Cadre la reponse annuelle autour des fuites d energie, de la fatigue utile a proteger et des drains a couper.',
+      ].join('\n')
+    case 'execution_push':
+      return [
+        '# YEARLY_FOCUS_ANGLE',
+        'Question nuance prioritaire: execution_push.',
+        'Cadre la reponse annuelle autour de l execution, du passage a l action, de l acceleration utile et des preuves concretes de progression.',
       ].join('\n')
     default:
       return ''

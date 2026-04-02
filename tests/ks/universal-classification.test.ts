@@ -155,6 +155,7 @@ describe('classifyMessage - yearly priorities', () => {
     'quelle direction prendre ?',
     'ou je perds mon energie ?',
     'ou orienter mon energie ?',
+    'comment avancer cette annee ?',
   ])('routes close yearly strategic variants to annual guidance: %s', (query) => {
     const result = classifyMessage(query)
 

@@ -45,6 +45,11 @@ const STRATEGIC_PRIORITY_PATTERNS: RegExp[] = [
   /\bou je perd[s]? mon energie\b/,
   /\bce qui me disperse\b/,
   /\bce qui me fait perdre du temps\b/,
+  /\bcomment (?:avancer|accelerer)(?: cette annee)?\b/,
+  /\bcomment passer au niveau superieur\b/,
+  /\bcomment enfin passer a l action\b/,
+  /\bcomment arreter de stagner\b/,
+  /\bpasser a l action\b/,
 ]
 
 const STANDALONE_STRATEGIC_PATTERNS: RegExp[] = [
@@ -61,6 +66,11 @@ const STANDALONE_STRATEGIC_PATTERNS: RegExp[] = [
   /\bce que je dois laisser tomber\b/,
   /\bsur quoi (?:(?:je|tu|on) dois )?(?:me )?concentrer\b/,
   /\bou mettre (?:mon|ma|mes)? ?energie\b/,
+  /\bcomment (?:avancer|accelerer)\b/,
+  /\bcomment passer au niveau superieur\b/,
+  /\bcomment enfin passer a l action\b/,
+  /\bcomment arreter de stagner\b/,
+  /\bpasser a l action\b/,
 ]
 
 export function isYearlyPriorityQuestion(message: string): boolean {

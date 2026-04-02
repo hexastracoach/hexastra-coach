@@ -3,6 +3,15 @@ import type { BirthProfile, PractitionerUsageHex, UserMemoryRecord } from '@/lib
 import type { PlanKey } from '@/lib/plans'
 import { readUserMemory } from '@/lib/hexastra/memory/userMemory'
 import { mapDbPlanToPlanKey } from '@/lib/permissions/plan'
+import { getDefaultSubject } from '@/lib/hexastra/data/readingSubjectService'
+import { logger } from '@/lib/utils/logger'
+
+export type BirthDataSource =
+  | 'frontend_payload'
+  | 'reading_subject'
+  | 'default_profile'
+  | 'supabase_profile'
+  | 'none'
 
 export type HexastraUserContext = {
   userId: string | null
@@ -14,6 +23,8 @@ export type HexastraUserContext = {
   memory: UserMemoryRecord | null
   journeyEnabled: boolean
   profileRow: Record<string, unknown> | null
+  birthDataSource?: BirthDataSource
+  readingSubjectId?: string | null
 }
 
 function normalizeProfileBirth(row: Record<string, unknown> | null): BirthProfile | null {
@@ -38,6 +49,35 @@ function normalizeProfileBirth(row: Record<string, unknown> | null): BirthProfil
   return birth.firstName || birth.date || birth.place ? birth : null
 }
 
+function hasMeaningfulBirthData(birth: BirthProfile | null | undefined): birth is BirthProfile {
+  if (!birth) return false
+
+  return Boolean(
+    birth.firstName ||
+    birth.date ||
+    birth.birthDateISO ||
+    birth.time ||
+    birth.place ||
+    birth.country ||
+    birth.gender ||
+    birth.lat !== undefined ||
+    birth.lon !== undefined,
+  )
+}
+
+function toBirthProfileFromResolvedSubject(subject: Awaited<ReturnType<typeof getDefaultSubject>>): BirthProfile | null {
+  if (!subject) return null
+
+  return {
+    firstName: subject.firstName,
+    date: subject.birthData.birthDate,
+    time: subject.birthData.birthTime ?? undefined,
+    place: subject.birthData.birthPlace,
+    lat: subject.birthData.birthLat,
+    lon: subject.birthData.birthLng,
+  }
+}
+
 export async function buildUserContext({
   supabase,
   user,
@@ -54,6 +94,7 @@ export async function buildUserContext({
   practitionerUsage: PractitionerUsageHex
 }): Promise<HexastraUserContext> {
   let profileRow: Record<string, unknown> | null = null
+  let resolvedSubject: Awaited<ReturnType<typeof getDefaultSubject>> | null = null
 
   if (supabase && user?.id) {
     try {
@@ -61,6 +102,21 @@ export async function buildUserContext({
       profileRow = (data as Record<string, unknown> | null) ?? null
     } catch {
       profileRow = null
+    }
+  }
+
+  if (user?.id) {
+    try {
+      resolvedSubject = await getDefaultSubject(user.id)
+    } catch (readingSubjectError) {
+      logger.warn('BIRTH_DATA_READING_SUBJECT_UNAVAILABLE', {
+        userId: user.id,
+        error:
+          readingSubjectError instanceof Error
+            ? readingSubjectError.message
+            : String(readingSubjectError),
+      })
+      resolvedSubject = null
     }
   }
 
@@ -80,15 +136,35 @@ export async function buildUserContext({
     'fr'
 
   const profileBirth = normalizeProfileBirth(profileRow)
-  const mergedBirth = birthData ?? profileBirth
+  const readingSubjectBirth = toBirthProfileFromResolvedSubject(resolvedSubject)
+  const frontendBirth = hasMeaningfulBirthData(birthData) ? birthData : null
 
-  console.log('[BIRTH_DATA] buildUserContext', {
+  const lockedBirthSource: BirthDataSource =
+    frontendBirth
+      ? 'frontend_payload'
+      : resolvedSubject?.source === 'reading_subject'
+        ? 'reading_subject'
+        : resolvedSubject?.source === 'default_profile'
+          ? 'default_profile'
+          : profileBirth
+            ? 'supabase_profile'
+            : 'none'
+
+  const mergedBirth =
+    frontendBirth ??
+    readingSubjectBirth ??
+    profileBirth ??
+    null
+
+  logger.info('BIRTH_DATA_SOURCE_LOCKED', {
     userId: user?.id ?? null,
-    sourceUsed: birthData ? 'frontend_payload' : (profileBirth ? 'supabase_profile' : 'none'),
-    hasFrontendBirth: !!birthData,
-    hasProfileBirth: !!profileBirth,
-    profileBirthHasLat: profileBirth?.lat !== undefined,
-    mergedBirthDate: mergedBirth?.date ?? null,
+    source: lockedBirthSource,
+    hasFrontendBirth: Boolean(frontendBirth),
+    hasReadingSubjectBirth: Boolean(readingSubjectBirth),
+    hasProfileBirth: Boolean(profileBirth),
+    readingSubjectSource: resolvedSubject?.source ?? null,
+    readingSubjectId: resolvedSubject?.subjectId ?? null,
+    mergedBirthDate: mergedBirth?.date ?? mergedBirth?.birthDateISO ?? null,
     mergedBirthPlace: mergedBirth?.place ?? null,
     mergedBirthHasLat: mergedBirth?.lat !== undefined,
   })
@@ -111,5 +187,7 @@ export async function buildUserContext({
     memory,
     journeyEnabled,
     profileRow,
+    birthDataSource: lockedBirthSource,
+    readingSubjectId: resolvedSubject?.subjectId ?? null,
   }
 }

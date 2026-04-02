@@ -156,6 +156,17 @@ function countWords(value: string): number {
     .filter(Boolean).length
 }
 
+function extractAnnualSection(text: string, heading: string, nextHeading?: string): string {
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapedNextHeading = nextHeading?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(
+    `${escapedHeading}\\s*\\n([\\s\\S]*?)(?:\\n\\s*${escapedNextHeading ?? '$'}|$)`,
+    'i',
+  )
+
+  return text.match(pattern)?.[1]?.trim() ?? ''
+}
+
 function makeMinimalKnowledgePacket(): KnowledgePacket {
   return {
     domainRoute: 'fusion',
@@ -531,6 +542,7 @@ describe('buildFinalAnswer', () => {
     })
 
     expect(answer.text).toContain('ORIENTATION 2026')
+    expect(answer.text).toContain('TA LIGNE DIRECTRICE 2026')
     expect(answer.text).toContain('TES 3 PRIORITES REELLES')
     expect(answer.text).toContain('CE QUI VA TE FREINER')
     expect(answer.text).toContain('TON TIMING')
@@ -561,6 +573,7 @@ describe('buildFinalAnswer', () => {
     expect(detectYearlyPriorityFocusAngle('Quel axe je dois vraiment choisir ?')).toBe('direction_choice')
     expect(detectYearlyPriorityFocusAngle('Qu est-ce que je dois arreter en 2026 ?')).toBe('stop_cut_remove')
     expect(detectYearlyPriorityFocusAngle('Ou je perds mon energie ?')).toBe('energy_leak')
+    expect(detectYearlyPriorityFocusAngle('Comment avancer cette annee ?')).toBe('execution_push')
   })
 
   it('adapts yearly priorities to a concentration angle', () => {
@@ -628,6 +641,40 @@ describe('buildFinalAnswer', () => {
     expect(answer.text).toContain('une direction claire')
     expect(answer.text).toContain('Choisis puis coupe')
     expect(answer.text).toContain('axe directeur')
+  })
+
+  it('adapts yearly priorities to an execution-push angle', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Comment avancer cette annee ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: null,
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: { summary: 'clarifier ton cap, trier tes engagements et assumer un axe plus net' },
+        },
+        {
+          science: 'astrology',
+          subCategory: 'astro_transits_current',
+          sourceType: 'exact_data',
+          value: { summary: 'la traction existe mais elle doit etre lue avant d accelerer' },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: 'engager ton energie sur moins de fronts mais avec plus de nettete' },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    const lower = answer.text.toLowerCase()
+    expect(lower).toContain('lance. execute. consolide')
+    expect(lower).toContain('gestes repetes et visibles')
+    expect(lower).toContain('choisis un livrable simple')
   })
 
   it('keeps the annual structure stable while changing the wording by focus angle', () => {
@@ -714,6 +761,68 @@ describe('buildFinalAnswer', () => {
     expect(answer.text.toLowerCase()).not.toContain('concretement')
     expect(answer.text.toLowerCase()).not.toContain('dans ce contexte')
     expect(answer.text.toLowerCase()).not.toContain('il faut')
+  })
+
+  it('keeps yearly angles structurally identical but visibly different in wording and action', () => {
+    const sharedSignals = [
+      {
+        science: 'fusion' as const,
+        subCategory: 'annual_guidance',
+        sourceType: 'exact_data' as const,
+        value: { summary: 'clarifier ton cap, trier tes engagements et assumer un axe plus net' },
+      },
+      {
+        science: 'astrology' as const,
+        subCategory: 'astro_transits_current',
+        sourceType: 'exact_data' as const,
+        value: { summary: 'la traction existe mais elle doit etre lue avant d accelerer' },
+      },
+      {
+        science: 'human_design' as const,
+        subCategory: 'hd_current_transits',
+        sourceType: 'exact_data' as const,
+        value: { current_cycle: 'engager ton energie sur moins de fronts mais avec plus de nettete' },
+      },
+    ]
+
+    const queries = [
+      'Sur quoi je dois me concentrer cette annee ?',
+      'Quel axe je dois vraiment choisir ?',
+      'Qu est-ce que je dois arreter en 2026 ?',
+      'Ou je perds mon energie en ce moment ?',
+      'Comment avancer cette annee ?',
+    ]
+
+    const answers = queries.map((query) =>
+      buildFinalAnswer({
+        userMessage: query,
+        responseMode: 'yearly_priority_answer',
+        openingSignal: null,
+        prioritizedSignals: sharedSignals,
+        knowledgePacket: makeMinimalKnowledgePacket(),
+      }).text,
+    )
+
+    for (const answer of answers) {
+      for (const heading of ['ORIENTATION', 'TES 3 PRIORITES REELLES', 'CE QUI VA TE FREINER', 'TON TIMING', 'ACTION IMMEDIATE']) {
+        expect(answer).toContain(heading)
+      }
+    }
+
+    const uniqueTexts = new Set(answers)
+    const uniqueActions = new Set(
+      answers.map((answer) => extractAnnualSection(answer, 'ACTION IMMEDIATE')),
+    )
+    const uniqueDirectives = new Set(
+      answers.map((answer) => {
+        const lines = answer.split('\n').map((line) => line.trim()).filter(Boolean)
+        return lines.find((line) => /TA LIGNE DIRECTRICE 20\d{2}/i.test(line)) ?? ''
+      }),
+    )
+
+    expect(uniqueTexts.size).toBe(queries.length)
+    expect(uniqueActions.size).toBe(queries.length)
+    expect(uniqueDirectives.size).toBe(queries.length)
   })
 
   it('strips boolean leakage from yearly priority content', () => {

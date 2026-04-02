@@ -99,6 +99,7 @@ describe('Hexastra Fusion', () => {
   it('direction strategique sans annee explicite', () => expectPrimary('quelle direction prendre ?', 'annual_guidance', 'hexastra_fusion'))
   it('dispersion strategique sans annee explicite', () => expectPrimary('ou je perds mon energie ?', 'annual_guidance', 'hexastra_fusion'))
   it('orientation energetique sans annee explicite', () => expectPrimary('ou orienter mon energie ?', 'annual_guidance', 'hexastra_fusion'))
+  it('execution annuelle', () => expectPrimary('comment avancer cette annee ?', 'annual_guidance', 'hexastra_fusion'))
   it('lecture fusionnée', () => expectPrimary('lecture fusionnée hexastra', 'lecture_fusionnee', 'hexastra_fusion'))
   it('timing fusion', () => expectPrimary('meilleur moment pour lancer mon projet', 'timing_fusion', 'hexastra_fusion'))
   it('décision fusion', () => expectPrimary('aide-moi à décider entre deux options', 'decision_fusion', 'hexastra_fusion'))
