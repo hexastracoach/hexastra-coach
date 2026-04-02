@@ -79,14 +79,14 @@ type YearlyValidationProfile = {
 
 const FORBIDDEN_ANNUAL_WORDS = ['true', 'false', 'vrai', 'faux', 'signal', 'confidence'] as const
 const FORBIDDEN_ANNUAL_TECHNICAL_PATTERNS = [
-  { key: 'solar_return', pattern: /\b(?:astro[_ ]?)?solar[_ ]return\b/gi },
-  { key: 'lunar_return', pattern: /\b(?:astro[_ ]?)?lunar[_ ]return\b/gi },
-  { key: 'progressions', pattern: /\b(?:astro[_ ]?)?progressions\b/gi },
-  { key: 'transits', pattern: /\b(?:astro[_ ]?)?transits?(?:[_ ](?:current|timing|energy))?\b/gi },
-  { key: 'human_design_transits', pattern: /\b(?:hd[_ ]current[_ ]transits|human[_ ]design[_ ]transits)\b/gi },
-  { key: 'numerology_cycles', pattern: /\b(?:numerology[_ ]cycles?|num[_ ]personal[_ ]year)\b/gi },
-  { key: 'kua_directions', pattern: /\b(?:kua[_ ]directions?|kua[_ ]annual[_ ]influence|kua[_ ]favorable[_ ]directions)\b/gi },
-  { key: 'iso_date', pattern: /\b20\d{2}-\d{2}-\d{2}\b/g },
+  { key: 'solar_return', pattern: /\b(?:astro[_ ]?)?solar[_ ]return\b/gi, replacement: 'la dynamique annuelle' },
+  { key: 'lunar_return', pattern: /\b(?:astro[_ ]?)?lunar[_ ]return\b/gi, replacement: 'la dynamique du moment' },
+  { key: 'progressions', pattern: /\b(?:astro[_ ]?)?progressions?\b/gi, replacement: 'les evolutions de fond' },
+  { key: 'transits', pattern: /\b(?:astro[_ ]?)?transits?(?:[_ ](?:current|timing|energy))?\b/gi, replacement: 'les mouvements de l annee' },
+  { key: 'human_design_transits', pattern: /\b(?:hd[_ ]current[_ ]transits|human[_ ]design[_ ]transits)\b/gi, replacement: 'les mouvements de ton energie' },
+  { key: 'numerology_cycles', pattern: /\b(?:numerology[_ ]cycles?|num[_ ]personal[_ ]year)\b/gi, replacement: 'le cycle en cours' },
+  { key: 'kua_directions', pattern: /\b(?:kua[_ ]directions?|kua[_ ]annual[_ ]influence|kua[_ ]favorable[_ ]directions)\b/gi, replacement: 'les repères de ton cadre' },
+  { key: 'iso_date', pattern: /\b20\d{2}-\d{2}-\d{2}\b/g, replacement: 'cette periode' },
 ] as const
 const RADICAL_PRIORITY_PATTERN = /\b(stop|supprime|coupe|refuse)\b/i
 const RADICAL_FAMILY_PRIORITY: AnnualFamily[] = ['cap', 'alignement', 'cycle', 'direction']
@@ -176,7 +176,7 @@ const YEARLY_PLAN_STYLES: Record<UserPlan, YearlyPlanStyle> = {
 
 const YEARLY_VALIDATION_PROFILES: Record<UserPlan, YearlyValidationProfile> = {
   free: {
-    requireWhy: true,
+    requireWhy: false,
     requireRealLife: false,
     requireSimpleKey: false,
     requireRadicalPriority: false,
@@ -300,11 +300,26 @@ function sanitizeAnnualContent(text: string): string {
     .replace(/\bconfidence\b/gi, 'fiabilite')
     .replace(/\bsignal\b/gi, 'point cle')
 
-  for (const { pattern } of FORBIDDEN_ANNUAL_TECHNICAL_PATTERNS) {
-    cleaned = cleaned.replace(pattern, ' ')
+  for (const { pattern, replacement } of FORBIDDEN_ANNUAL_TECHNICAL_PATTERNS) {
+    cleaned = cleaned.replace(pattern, replacement)
   }
 
   return normalize(cleaned.replace(/\s*([,;:])\s*/g, '$1 '))
+}
+
+export function sanitizeYearlyPriorityRenderedText(text: string): string {
+  return (text || '')
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim()
+      if (!trimmed) return ''
+      if (ANNUAL_HEADING_PATTERN.test(trimmed)) return trimmed
+      return sanitizeAnnualContent(trimmed)
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function simplifyText(text: string): string {
@@ -1884,7 +1899,7 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
     buildImmediateActionWithAngle(year, primary, focusAngle, userPlan),
   ].join('\n')
 
-  return polishYearlyPriorityAnswer(rawAnswer)
+  return sanitizeYearlyPriorityRenderedText(polishYearlyPriorityAnswer(rawAnswer))
 }
 
 function extractPrioritySection(text: string): string {

@@ -152,6 +152,7 @@ import { applyRenderProfile, buildRenderProfileText } from '@/lib/hexastra/rende
 import { applyShiloStyle } from '@/lib/hexastra/rendering/applyShiloStyle'
 import {
   detectYearlyFocusAngle,
+  sanitizeYearlyPriorityRenderedText,
   validateYearlyPriorityAnswerFormat,
   type YearlyFocusAngle,
 } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
@@ -4390,8 +4391,16 @@ export async function runHexastraFlow(input: {
     }
 
     if (effectiveResponseMode === 'yearly_priority_answer') {
-      const yearlyPriorityValidationTarget = applySentinel(rawMessage)
+      const yearlyPriorityValidationRaw = applySentinel(rawMessage)
+      const yearlyPriorityValidationTarget = sanitizeYearlyPriorityRenderedText(yearlyPriorityValidationRaw)
       const yearlyPriorityValidationPlan = normalizeUserPlan(plan)
+      if (yearlyPriorityValidationTarget !== yearlyPriorityValidationRaw) {
+        rawMessage = yearlyPriorityValidationTarget
+        flowLog('info', 'YEARLY_PRIORITY_TECHNICAL_TOKENS_STRIPPED', {
+          userPlan: yearlyPriorityValidationPlan,
+          responseMode: effectiveResponseMode,
+        })
+      }
       const yearlyPriorityValidation = validateYearlyPriorityAnswerFormat(yearlyPriorityValidationTarget, {
         userPlan: yearlyPriorityValidationPlan,
       })

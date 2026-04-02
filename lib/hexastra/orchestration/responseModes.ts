@@ -144,6 +144,7 @@ export function buildResponseModeDirective(mode: ResponseMode): string {
         '- Ne jamais donner au plan free ou essential une densite, une nuance ou un niveau d analyse de type premium ou praticien.',
         '- Interdis les anciens blocs generiques CE QUI SE PASSE / POURQUOI CA BLOQUE / CE QUE TU DOIS FAIRE / CLE A RETENIR, et interdis toute section Sphere.',
         '- Interdis toute trace technique ou meta: true, false, signal, confidence, score, debugging, logique interne.',
+        '- Ne cite jamais les labels techniques bruts: transits, progressions, solar return, lunar return, human design transits, numerology cycles, kua directions.',
         '- Structure obligatoire en 5 blocs, dans cet ordre exact :',
         '1. Orientation dominante de l annee',
         '2. Trois priorites concretes',

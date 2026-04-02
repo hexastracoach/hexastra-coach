@@ -8,6 +8,7 @@ import { selectResponseModeSelection } from '@/lib/hexastra/orchestrator/selectR
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
 import {
   detectYearlyPriorityFocusAngle,
+  sanitizeYearlyPriorityRenderedText,
   validateYearlyPriorityAnswerFormat,
 } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
 import { buildExactDataRequestFromRetrievalPlan } from '@/lib/hexastra/retrieval/exactDataHintMapper'
@@ -1195,6 +1196,63 @@ describe('buildFinalAnswer', () => {
     expect(validation.issues).not.toContain('invalid_action_count:0')
   })
 
+  it('accepts a free yearly structure without why or real-life details', () => {
+    const validation = validateYearlyPriorityAnswerFormat([
+      'ORIENTATION 2026',
+      'En 2026, garde peu de fronts.',
+      '',
+      'TES 3 PRIORITES REELLES',
+      '1. Garde un seul axe',
+      '',
+      '2. Trie tes oui',
+      '',
+      '3. Avance sur ce qui repond',
+      '',
+      'CE QUI VA TE FREINER',
+      '- Dire oui trop vite.',
+      '',
+      'TON TIMING',
+      'Debut d annee: Trie.',
+      'Milieu d annee: Renforce.',
+      'Fin d annee: Garde.',
+      '',
+      'ACTION IMMEDIATE',
+      'Choisis un seul front pour les 72 prochaines heures.',
+    ].join('\n'), { userPlan: 'free' })
+
+    expect(validation.valid).toBe(true)
+    expect(validation.issues).not.toContain('missing_priority_why')
+    expect(validation.issues).not.toContain('missing_priority_real_life')
+  })
+
+  it('keeps essential stricter than free when yearly priorities omit why', () => {
+    const validation = validateYearlyPriorityAnswerFormat([
+      'ORIENTATION 2026',
+      'En 2026, garde peu de fronts.',
+      '',
+      'TES 3 PRIORITES REELLES',
+      '1. Garde un seul axe',
+      '',
+      '2. Trie tes oui',
+      '',
+      '3. Avance sur ce qui repond',
+      '',
+      'CE QUI VA TE FREINER',
+      '- Dire oui trop vite.',
+      '',
+      'TON TIMING',
+      'Debut d annee: Trie.',
+      'Milieu d annee: Renforce.',
+      'Fin d annee: Garde.',
+      '',
+      'ACTION IMMEDIATE',
+      'Choisis un seul front pour les 72 prochaines heures.',
+    ].join('\n'), { userPlan: 'essentiel' })
+
+    expect(validation.valid).toBe(false)
+    expect(validation.issues).toContain('missing_priority_why')
+  })
+
   it('keeps premium validation stricter than essential on the same lighter yearly shape', () => {
     const premiumValidation = validateYearlyPriorityAnswerFormat([
       'ORIENTATION 2026',
@@ -1232,6 +1290,42 @@ describe('buildFinalAnswer', () => {
         ['missing_radical_priority', 'invalid_pitfall_count:1', 'invalid_action_count:0'].includes(issue),
       ),
     ).toBe(true)
+  })
+
+  it('strips annual technical tokens like transits, progressions and solar return before validation', () => {
+    const sanitized = sanitizeYearlyPriorityRenderedText([
+      'ORIENTATION 2026',
+      'TA LIGNE DIRECTRICE 2026: Solar return, transits, avance.',
+      '',
+      'TES 3 PRIORITES REELLES',
+      '1. Garde un seul axe',
+      'Pourquoi: Tes transits et progressions montrent un tri net.',
+      'Dans la vraie vie: Coupe un sujet secondaire.',
+      '',
+      '2. Trie tes oui',
+      'Pourquoi: Le solar_return pousse a choisir.',
+      'Dans la vraie vie: Refuse une demande secondaire.',
+      '',
+      '3. Consolide ce qui repond',
+      'Pourquoi: Le human_design_transits aide a mieux viser.',
+      'Dans la vraie vie: Renforce ce qui avance deja.',
+      '',
+      'CE QUI VA TE FREINER',
+      '- Suivre des transits au lieu d agir.',
+      '',
+      'TON TIMING',
+      'Debut d annee: Observe les lunar return et trie.',
+      'Milieu d annee: Utilise les progressions pour corriger.',
+      'Fin d annee: Garde la bonne direction sans parler de kua_directions.',
+      '',
+      'ACTION IMMEDIATE',
+      'Action 1: Coupe une fuite et avance cette periode.',
+    ].join('\n'))
+
+    expect(sanitized).not.toMatch(/\b(?:transits?|progressions?|solar[_ ]return|lunar[_ ]return|human[_ ]design[_ ]transits|numerology[_ ]cycles|kua[_ ]directions)\b/i)
+    expect(sanitized).toContain('les mouvements de l annee')
+    expect(sanitized).toContain('les evolutions de fond')
+    expect(sanitized).toContain('la dynamique annuelle')
   })
 
   it('prefers a naturally radical family over a first maturation item', () => {

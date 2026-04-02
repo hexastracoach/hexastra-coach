@@ -1028,7 +1028,7 @@ function yearlyPriorityPlanDirective(input: BuildPromptInput): string {
 - TON ATTENDU: ultra simple. Ultra lisible. Impact immediat.
 - ORIENTATION: 2 a 3 phrases maximum, tres simples.
 - TA LIGNE DIRECTRICE [ANNEE]: 3 mots ou 3 verbes tres simples.
-- Chaque priorite: titre court, Pourquoi en 1 phrase simple. Dans la vraie vie peut rester tres court.
+- Chaque priorite: titre court obligatoire. Pourquoi et Dans la vraie vie sont optionnels si la priorite est deja claire.
 - Pourquoi: explique juste la cause utile. Pas de nuance longue.
 - Dans la vraie vie: 1 exemple suffit si c est clair.
 - Cle simple: optionnelle.
@@ -1119,6 +1119,7 @@ INTERDICTIONS ABSOLUES:
 - Ne pas utiliser: CLE A RETENIR
 - Ne pas utiliser: SPHERE ou SPHERES
 - Ne pas utiliser de meta technique: true, false, signal, confidence, score, debug
+- Ne pas citer les labels techniques bruts: transits, progressions, solar return, lunar return, human design transits, numerology cycles, kua directions
 - Ne pas ajouter de phrase introductive ou de conclusion hors structure
 
 STYLE OBLIGATOIRE:
