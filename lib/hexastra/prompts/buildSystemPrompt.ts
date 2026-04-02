@@ -1024,44 +1024,59 @@ function yearlyPriorityPlanDirective(input: BuildPromptInput): string {
   switch (input.plan) {
     case 'free':
       return `PLAN ACTIF: FREE.
-- ORIENTATION: 3 phrases maximum, tres simples.
+- LONGUEUR CIBLE: tres courte. Coupe tout detail non utile.
+- TON ATTENDU: ultra simple. Ultra lisible. Impact immediat.
+- ORIENTATION: 2 a 3 phrases maximum, tres simples.
 - TA LIGNE DIRECTRICE [ANNEE]: 3 mots ou 3 verbes tres simples.
-- Chaque priorite: titre court, Pourquoi en 1 phrase simple, Dans la vraie vie en 2 exemples simples, Cle simple en 1 phrase.
-- CE QUI VA TE FREINER: 3 points maximum, tres courts.
-- TON TIMING: 1 a 2 phrases courtes par phase.
-- ACTION IMMEDIATE: 2 actions ultra simples, faisables tout de suite.
-- Sensation attendue: wow simple, comprehension immediate.`
+- Chaque priorite: titre court, Pourquoi en 1 phrase simple. Dans la vraie vie peut rester tres court.
+- Pourquoi: explique juste la cause utile. Pas de nuance longue.
+- Dans la vraie vie: 1 exemple suffit si c est clair.
+- Cle simple: optionnelle.
+- CE QUI VA TE FREINER: 2 points maximum, tres courts.
+- TON TIMING: 1 phrase courte par phase.
+- ACTION IMMEDIATE: 1 action ultra simple, faisable tout de suite.
+- Sensation attendue: je comprends vite.`
     case 'essential':
       return `PLAN ACTIF: ESSENTIAL.
+- LONGUEUR CIBLE: courte a moyenne. Une seule lecture doit suffire.
+- TON ATTENDU: simple, clair, utile, concret.
 - ORIENTATION: 3 a 4 phrases simples.
 - TA LIGNE DIRECTRICE [ANNEE]: 1 phrase courte et claire.
-- Chaque priorite: un peu plus expliquee, avec logique concrete, 2 exemples simples et une Cle simple.
+- Chaque priorite: titre court, Pourquoi et Dans la vraie vie. Garde la lecture simple.
+- Pourquoi: 1 phrase claire ou 2 phrases tres courtes maximum.
+- Dans la vraie vie: 1 a 2 exemples concrets. Pas de surcharge.
+- Cle simple: optionnelle.
+- Priorite radicale: optionnelle si elle ne vient pas naturellement.
 - Montrer aussi ce qui marche deja quand c est utile.
-- CE QUI VA TE FREINER: 3 points concrets maximum.
+- CE QUI VA TE FREINER: 2 a 3 points concrets maximum.
 - TON TIMING: un peu developpe, mais lisible en une lecture.
-- ACTION IMMEDIATE: 2 gestes simples, deja organisables.`
+- ACTION IMMEDIATE: 1 geste simple et net, deja organisable.`
     case 'practitioner':
       return `PLAN ACTIF: PRATICIEN.
+- LONGUEUR CIBLE: moyenne a dense, sans perdre la clarte.
+- TON ATTENDU: strategique, differencie, exploitable en accompagnement.
 - Rester simple, mais plus dense et plus precis.
 - TA LIGNE DIRECTRICE [ANNEE]: phrase courte avec logique implicite.
 - Priorites: lecture plus differenciee, non generique, avec logique de decision et d accompagnement.
-- Pourquoi: lecture fine du mecanisme.
+- Pourquoi: lecture fine du mecanisme, des patterns et des arbitrages.
 - Dans la vraie vie: au moins 2 exemples concrets par priorite, sans jargon.
 - Cle simple: une phrase memoire par priorite.
 - CE QUI VA TE FREINER: 4 patterns comportementaux et dynamiques.
-- TON TIMING: phases nettes avec bascules et arbitrages.
+- TON TIMING: phases nettes avec bascules, arbitrages et points de vigilance.
 - ACTION IMMEDIATE: 3 actions, en protocole concret, exploitable en accompagnement.`
     case 'premium':
     default:
       return `PLAN ACTIF: PREMIUM.
+- LONGUEUR CIBLE: moyenne. Plus de nuance sans alourdir.
+- TON ATTENDU: simple, mais plus intelligent et plus personnalise.
 - Rester tres clair, mais plus structurant et plus fin.
 - TA LIGNE DIRECTRICE [ANNEE]: phrase strategique simple.
 - Priorites: plus precises, avec notion de choix, d arbitrage et de consequence.
-- Pourquoi: lecture de situation, pas formule generique.
+- Pourquoi: lecture de situation, avec cause, choix et consequence si utile.
 - Dans la vraie vie: au moins 2 exemples concrets et vrais choix.
 - Cle simple: une phrase courte qui reste en tete.
 - CE QUI VA TE FREINER: 4 freins concrets maximum.
-- TON TIMING: dynamique, avec evolution visible dans l annee.
+- TON TIMING: dynamique, avec evolution visible dans l annee et moments de correction.
 - ACTION IMMEDIATE: 3 actions claires, simples, mais strategiques.`
   }
 }
@@ -1082,19 +1097,20 @@ La reponse finale doit contenir EXACTEMENT ces 5 blocs dans cet ordre. Rien d au
 [Juste sous ce titre, ajoute une ligne visible: TA LIGNE DIRECTRICE [ANNEE]. Cette ligne doit etre tres courte, memorisable et adaptee au plan.]
 
 2. TES 3 PRIORITES REELLES
-[Exactement 3 priorites. Chacune contient: un titre court, Pourquoi:, Dans la vraie vie:, Cle simple:. Au moins une priorite doit couper, arreter, supprimer ou refuser.]
-[Pourquoi: 1 a 2 phrases courtes. Dans la vraie vie: au moins 2 exemples concrets. Cle simple: 1 phrase memoire.]
+[Exactement 3 priorites. Chacune contient au minimum: un titre court, Pourquoi:, Dans la vraie vie:.]
+[Les plans enrichis peuvent ajouter Cle simple. La priorite radicale devient obligatoire seulement sur les plans enrichis.]
+[Pourquoi: 1 a 2 phrases courtes. Dans la vraie vie: des exemples concrets. Cle simple: 1 phrase memoire si le plan le demande.]
 
 3. CE QUI VA TE FREINER
-[3 a 4 freins comportementaux, precis, reconnaissables, non generiques.]
+[2 a 4 freins comportementaux, precis, reconnaissables, non generiques selon le plan.]
 
 4. TON TIMING
 [Trois sous-parties visibles: Debut d annee, Milieu d annee, Fin d annee. Chaque phase a un role different.]
 [Debut: quoi faire et quoi eviter. Milieu: quoi renforcer et quoi corriger. Fin: quoi garder et quoi laisser tomber.]
 
 5. ACTION IMMEDIATE
-[2 a 3 actions concretes, mesurables, faisables dans les 24 a 72h.]
-[Format visible: Action 1:, Action 2:, Action 3:.]
+[1 a 3 actions concretes, mesurables, faisables dans les 24 a 72h selon le plan.]
+[Format visible conseille: Action 1:, Action 2:, Action 3:.]
 
 INTERDICTIONS ABSOLUES:
 - Ne pas utiliser: CE QUI SE PASSE
@@ -1116,12 +1132,18 @@ STYLE OBLIGATOIRE:
 OBJECTIF:
 Comprehensible des la premiere lecture, sans effort.
 
+ALIGNEMENT PLAN:
+- Free: tres court, impact immediat, peu de texte.
+- Essential: clair, utile, actionnable en une lecture.
+- Premium: plus nuance, plus choix, plus precision.
+- Praticien: plus strategique, plus differencie, utilisable en accompagnement.
+
 CONTROLE FINAL AVANT ENVOI:
 - Verifier qu il y a exactement 3 priorites numerotees
-- Verifier qu il y a 3 ou 4 freins
-- Verifier qu il y a 2 ou 3 actions immediates
-- Verifier qu au moins une priorite est radicale
-- Verifier que chaque priorite contient Pourquoi, Dans la vraie vie et Cle simple
+- Verifier qu il y a entre 2 et 4 freins selon le plan
+- Verifier qu il y a entre 1 et 3 actions immediates selon le plan
+- Verifier que chaque priorite contient Pourquoi et Dans la vraie vie
+- Verifier Cle simple et la priorite radicale seulement si le plan les demande
 - Verifier que chaque bloc aide une decision ou une action concrete
 
 ${yearlyPriorityPlanDirective(input)}

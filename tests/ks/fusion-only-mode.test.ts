@@ -175,6 +175,21 @@ describe('fusion-only mode', () => {
       messages: [{ role: 'user', content: 'Sur quoi je dois me concentrer cette annee ?' }],
     })
 
+    const essentialPrompt = buildSystemPrompt({
+      plan: 'essential',
+      mode: 'libre_avance',
+      language: 'fr',
+      contextType: 'general',
+      practitionerUsage: null,
+      requestType: 'chat',
+      domainRoute: 'fusion',
+      flowStep: 'analysis',
+      analysisMode: 'hexastra_fusion',
+      fusionOnlyExperience: true,
+      responseModeDirective: buildResponseModeDirective('yearly_priority_answer'),
+      messages: [{ role: 'user', content: 'Sur quoi je dois me concentrer cette annee ?' }],
+    })
+
     const practitionerPrompt = buildSystemPrompt({
       plan: 'practitioner',
       mode: 'praticien',
@@ -190,10 +205,41 @@ describe('fusion-only mode', () => {
       messages: [{ role: 'user', content: 'Sur quoi je dois me concentrer cette annee ?' }],
     })
 
+    const premiumPrompt = buildSystemPrompt({
+      plan: 'premium',
+      mode: 'libre_approfondi',
+      language: 'fr',
+      contextType: 'general',
+      practitionerUsage: null,
+      requestType: 'chat',
+      domainRoute: 'fusion',
+      flowStep: 'analysis',
+      analysisMode: 'hexastra_fusion',
+      fusionOnlyExperience: true,
+      responseModeDirective: buildResponseModeDirective('yearly_priority_answer'),
+      messages: [{ role: 'user', content: 'Sur quoi je dois me concentrer cette annee ?' }],
+    })
+
     expect(freePrompt).toContain('PLAN ACTIF: FREE.')
+    expect(freePrompt).toContain('LONGUEUR CIBLE: tres courte')
+    expect(freePrompt).toContain('TON ATTENDU: ultra simple')
+    expect(freePrompt).toContain('je comprends vite')
     expect(freePrompt).toContain('TA LIGNE DIRECTRICE [ANNEE]')
     expect(freePrompt).toContain('3 mots ou 3 verbes tres simples')
-    expect(freePrompt).toContain('Cle simple en 1 phrase')
+    expect(freePrompt).toContain('Cle simple: optionnelle')
+    expect(essentialPrompt).toContain('PLAN ACTIF: ESSENTIAL.')
+    expect(essentialPrompt).toContain('LONGUEUR CIBLE: courte a moyenne')
+    expect(essentialPrompt).toContain('Une seule lecture doit suffire')
+    expect(essentialPrompt).toContain('1 a 2 exemples concrets')
+    expect(essentialPrompt).toContain('Cle simple: optionnelle')
+    expect(essentialPrompt).toContain('Priorite radicale: optionnelle')
+    expect(essentialPrompt).toContain('ACTION IMMEDIATE: 1 geste simple')
+    expect(premiumPrompt).toContain('PLAN ACTIF: PREMIUM.')
+    expect(premiumPrompt).toContain('LONGUEUR CIBLE: moyenne')
+    expect(premiumPrompt).toContain('plus nuance')
+    expect(premiumPrompt).toContain('cause, choix et consequence')
+    expect(practitionerPrompt).toContain('LONGUEUR CIBLE: moyenne a dense')
+    expect(practitionerPrompt).toContain('strategique, differencie, exploitable en accompagnement')
     expect(practitionerPrompt).toContain('PLAN ACTIF: PRATICIEN.')
     expect(practitionerPrompt).toContain('logique de decision et d accompagnement')
     expect(practitionerPrompt).toContain('4 patterns comportementaux')

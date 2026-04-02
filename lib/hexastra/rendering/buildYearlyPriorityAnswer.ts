@@ -58,10 +58,23 @@ type YearlyPlanStyle = {
   whySentences: number
   realLifeSentences: number
   keySentences: number
+  showSimpleKey: boolean
   pitfallSentences: number
   pitfallCount: number
   timingSentences: number
   actionCount: number
+}
+
+type YearlyValidationProfile = {
+  requireWhy: boolean
+  requireRealLife: boolean
+  requireSimpleKey: boolean
+  requireRadicalPriority: boolean
+  requireNumberedActions: boolean
+  minPitfalls: number
+  maxPitfalls: number
+  minActions: number
+  maxActions: number
 }
 
 const FORBIDDEN_ANNUAL_WORDS = ['true', 'false', 'vrai', 'faux', 'signal', 'confidence'] as const
@@ -116,30 +129,33 @@ const ANNUAL_HEADING_PATTERN = /^(ORIENTATION\s+20\d{2}|TES\s+3\s+PRIORITES\s+RE
 const DEFAULT_YEARLY_USER_PLAN: UserPlan = 'premium'
 const YEARLY_PLAN_STYLES: Record<UserPlan, YearlyPlanStyle> = {
   free: {
+    orientationSentences: 2,
+    whySentences: 1,
+    realLifeSentences: 1,
+    keySentences: 1,
+    showSimpleKey: false,
+    pitfallSentences: 1,
+    pitfallCount: 2,
+    timingSentences: 1,
+    actionCount: 1,
+  },
+  essentiel: {
     orientationSentences: 3,
     whySentences: 1,
     realLifeSentences: 2,
     keySentences: 1,
+    showSimpleKey: false,
     pitfallSentences: 1,
-    pitfallCount: 3,
+    pitfallCount: 2,
     timingSentences: 2,
-    actionCount: 2,
-  },
-  essentiel: {
-    orientationSentences: 4,
-    whySentences: 2,
-    realLifeSentences: 2,
-    keySentences: 1,
-    pitfallSentences: 1,
-    pitfallCount: 3,
-    timingSentences: 2,
-    actionCount: 2,
+    actionCount: 1,
   },
   premium: {
     orientationSentences: 4,
     whySentences: 2,
     realLifeSentences: 2,
     keySentences: 1,
+    showSimpleKey: true,
     pitfallSentences: 2,
     pitfallCount: 4,
     timingSentences: 2,
@@ -150,10 +166,58 @@ const YEARLY_PLAN_STYLES: Record<UserPlan, YearlyPlanStyle> = {
     whySentences: 2,
     realLifeSentences: 2,
     keySentences: 1,
+    showSimpleKey: true,
     pitfallSentences: 2,
     pitfallCount: 4,
     timingSentences: 3,
     actionCount: 3,
+  },
+}
+
+const YEARLY_VALIDATION_PROFILES: Record<UserPlan, YearlyValidationProfile> = {
+  free: {
+    requireWhy: true,
+    requireRealLife: false,
+    requireSimpleKey: false,
+    requireRadicalPriority: false,
+    requireNumberedActions: false,
+    minPitfalls: 1,
+    maxPitfalls: 3,
+    minActions: 1,
+    maxActions: 1,
+  },
+  essentiel: {
+    requireWhy: true,
+    requireRealLife: true,
+    requireSimpleKey: false,
+    requireRadicalPriority: false,
+    requireNumberedActions: false,
+    minPitfalls: 1,
+    maxPitfalls: 3,
+    minActions: 1,
+    maxActions: 1,
+  },
+  premium: {
+    requireWhy: true,
+    requireRealLife: true,
+    requireSimpleKey: true,
+    requireRadicalPriority: true,
+    requireNumberedActions: true,
+    minPitfalls: 3,
+    maxPitfalls: 4,
+    minActions: 2,
+    maxActions: 3,
+  },
+  praticien: {
+    requireWhy: true,
+    requireRealLife: true,
+    requireSimpleKey: true,
+    requireRadicalPriority: true,
+    requireNumberedActions: true,
+    minPitfalls: 3,
+    maxPitfalls: 4,
+    minActions: 2,
+    maxActions: 3,
   },
 }
 
@@ -1553,8 +1617,12 @@ function buildPriorityBlock(
     `${index}. ${adaptPriorityLabel(template.title, focusAngle)}`,
     `Pourquoi: ${sentence(whyText)}`,
     `Dans la vraie vie: ${sentence(realLifeText)}`,
-    `Cle simple: ${sentence(limitAnnualSentences(buildPrioritySimpleKey(selection, focusAngle), style.keySentences))}`,
-  ].join('\n')
+    style.showSimpleKey
+      ? `Cle simple: ${sentence(limitAnnualSentences(buildPrioritySimpleKey(selection, focusAngle), style.keySentences))}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 function pitfallVarietyKey(family: AnnualFamily): string {
@@ -1827,6 +1895,41 @@ function extractPrioritySection(text: string): string {
   return match?.[1]?.trim() ?? ''
 }
 
+function extractPriorityBlocks(text: string): string[] {
+  const section = extractPrioritySection(text)
+  if (!section) return []
+
+  const lines = section.split('\n')
+  const blocks: string[] = []
+  let current: string[] = []
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line) {
+      if (current.length > 0) current.push('')
+      continue
+    }
+
+    if (/^\d+[.)]\s+/.test(line)) {
+      if (current.length > 0) {
+        blocks.push(current.join('\n').trim())
+      }
+      current = [line]
+      continue
+    }
+
+    if (current.length > 0) {
+      current.push(line)
+    }
+  }
+
+  if (current.length > 0) {
+    blocks.push(current.join('\n').trim())
+  }
+
+  return blocks.filter(Boolean)
+}
+
 function extractAnnualSection(text: string, heading: string, nextHeading?: string): string {
   const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const escapedNextHeading = nextHeading?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -1857,16 +1960,27 @@ function normalizeYearlyPriorityTextForValidation(text: string): string {
     .join('\n')
 }
 
-export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriorityValidation {
+type ValidateYearlyPriorityAnswerOptions = {
+  userPlan?: UserPlan | null
+}
+
+function resolveYearlyValidationProfile(userPlan?: UserPlan | null): YearlyValidationProfile {
+  return YEARLY_VALIDATION_PROFILES[resolveYearlyUserPlan(userPlan)]
+}
+
+export function validateYearlyPriorityAnswerFormat(
+  text: string,
+  options?: ValidateYearlyPriorityAnswerOptions,
+): YearlyPriorityValidation {
   const normalizedText = normalizeYearlyPriorityTextForValidation(text)
   const cleaned = normalize(normalizedText)
   const issues: string[] = []
+  const userPlan = resolveYearlyUserPlan(options?.userPlan)
+  const validationProfile = resolveYearlyValidationProfile(userPlan)
   const prioritySection = extractPrioritySection(normalizedText)
   const pitfallSection = extractAnnualSection(normalizedText, 'CE QUI VA TE FREINER', 'TON TIMING')
   const actionSection = extractAnnualSection(normalizedText, 'ACTION IMMEDIATE')
-  const priorityBlocks = prioritySection
-    .split(/\n\s*\n/)
-    .filter((block) => /^\s*\d+[.)]\s+/m.test(block))
+  const priorityBlocks = extractPriorityBlocks(normalizedText)
   const requiredHeadings = [
     /ORIENTATION\s+20\d{2}\b/i,
     /TES\s+3\s+PRIORITES\s+REELLES\b/i,
@@ -1893,19 +2007,33 @@ export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriority
   const priorityCount = (prioritySection.match(PRIORITY_LINE_PATTERN) ?? []).length
   const pitfallCount = (pitfallSection.match(/^\s*-\s+/gm) ?? []).length
   const actionCount = (actionSection.match(/^\s*Action\s+\d+:\s+/gim) ?? []).length
+  const pitfallHasContent = Boolean(normalize(pitfallSection))
+  const actionHasContent = Boolean(normalize(actionSection))
   if (priorityCount !== 3) issues.push(`invalid_priority_count:${priorityCount}`)
-  if (pitfallCount < 3 || pitfallCount > 4) issues.push(`invalid_pitfall_count:${pitfallCount}`)
-  if (actionCount < 2 || actionCount > 3) issues.push(`invalid_action_count:${actionCount}`)
-  if (!priorityBlocks.some((block) => RADICAL_PRIORITY_PATTERN.test(block))) {
+  if (
+    pitfallCount > validationProfile.maxPitfalls ||
+    (pitfallCount < validationProfile.minPitfalls && !(userPlan === 'essentiel' && pitfallHasContent))
+  ) {
+    issues.push(`invalid_pitfall_count:${pitfallCount}`)
+  }
+  if (
+    actionCount > validationProfile.maxActions ||
+    (validationProfile.requireNumberedActions
+      ? actionCount < validationProfile.minActions
+      : actionCount < validationProfile.minActions && !actionHasContent)
+  ) {
+    issues.push(`invalid_action_count:${actionCount}`)
+  }
+  if (validationProfile.requireRadicalPriority && !priorityBlocks.some((block) => RADICAL_PRIORITY_PATTERN.test(block))) {
     issues.push('missing_radical_priority')
   }
-  if (!priorityBlocks.every((block) => /Pourquoi:/i.test(block))) {
+  if (validationProfile.requireWhy && !priorityBlocks.every((block) => /Pourquoi:/i.test(block))) {
     issues.push('missing_priority_why')
   }
-  if (!priorityBlocks.every((block) => /Dans la vraie vie:/i.test(block))) {
+  if (validationProfile.requireRealLife && !priorityBlocks.every((block) => /Dans la vraie vie:/i.test(block))) {
     issues.push('missing_priority_real_life')
   }
-  if (!priorityBlocks.every((block) => /Cle simple:/i.test(block))) {
+  if (validationProfile.requireSimpleKey && !priorityBlocks.every((block) => /Cle simple:/i.test(block))) {
     issues.push('missing_priority_simple_key')
   }
 

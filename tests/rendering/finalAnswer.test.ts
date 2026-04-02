@@ -781,16 +781,27 @@ describe('buildFinalAnswer', () => {
     expect(premiumAnswer).toContain('TA LIGNE DIRECTRICE 2026: Reduis tes fronts pour faire grandir ce qui repond deja.')
     expect(practitionerAnswer).toContain('TA LIGNE DIRECTRICE 2026: Coupe le bruit pour donner du poids a ce qui')
     expect(practitionerAnswer).toContain('Avance deja.')
+    expect(freeAnswer).not.toContain('Cle simple:')
+    expect(essentialAnswer).not.toContain('Cle simple:')
+    expect(premiumAnswer).toContain('Cle simple:')
+    expect(practitionerAnswer).toContain('Cle simple:')
 
     const freeAction = extractAnnualSection(freeAnswer, 'ACTION IMMEDIATE')
     const essentialAction = extractAnnualSection(essentialAnswer, 'ACTION IMMEDIATE')
     const premiumAction = extractAnnualSection(premiumAnswer, 'ACTION IMMEDIATE')
     const practitionerAction = extractAnnualSection(practitionerAnswer, 'ACTION IMMEDIATE')
+    const freeWordCount = countWords(freeAnswer)
+    const essentialWordCount = countWords(essentialAnswer)
+    const premiumWordCount = countWords(premiumAnswer)
+    const practitionerWordCount = countWords(practitionerAnswer)
 
-    expect((freeAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(2)
-    expect((essentialAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(2)
+    expect((freeAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(1)
+    expect((essentialAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(1)
     expect((premiumAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(3)
     expect((practitionerAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(3)
+    expect(freeWordCount).toBeLessThan(essentialWordCount)
+    expect(premiumWordCount).toBeGreaterThan(essentialWordCount)
+    expect(practitionerWordCount).toBeGreaterThanOrEqual(premiumWordCount)
     expect(new Set([freeAction, essentialAction, premiumAction, practitionerAction]).size).toBeGreaterThanOrEqual(2)
   })
 
@@ -1146,6 +1157,81 @@ describe('buildFinalAnswer', () => {
     expect(validation.priorityCount).toBe(3)
     expect(validation.issues).not.toContain('missing_heading:/TES\\s+3\\s+PRIORITES\\s+REELLES\\b/i')
     expect(validation.issues).not.toContain('missing_heading:/ACTION\\s+IMMEDIATE\\b/i')
+  })
+
+  it('accepts a lighter yearly structure for essential without premium-only requirements', () => {
+    const validation = validateYearlyPriorityAnswerFormat([
+      'ORIENTATION 2026',
+      'En 2026, tu avances mieux quand tu gardes peu de fronts.',
+      '',
+      'TES 3 PRIORITES REELLES',
+      '1. Garde un seul axe',
+      'Pourquoi: Cette annee, trop d options diluent ton elan.',
+      'Dans la vraie vie: Termine un chantier avant d en ouvrir un autre.',
+      '',
+      '2. Trie tes oui',
+      'Pourquoi: Ton temps doit aller au plus utile.',
+      'Dans la vraie vie: Refuse une demande secondaire cette semaine.',
+      '',
+      '3. Consolide ce qui repond',
+      'Pourquoi: Les resultats viennent de ce qui tient deja.',
+      'Dans la vraie vie: Renforce ce qui marche au lieu de repartir de zero.',
+      '',
+      'CE QUI VA TE FREINER',
+      '- Dire oui trop vite.',
+      '',
+      'TON TIMING',
+      'Debut d annee: Trie et clarifie.',
+      'Milieu d annee: Renforce ce qui repond.',
+      'Fin d annee: Garde ce qui tient.',
+      '',
+      'ACTION IMMEDIATE',
+      'Choisis un seul front principal pour les 72 prochaines heures.',
+    ].join('\n'), { userPlan: 'essentiel' })
+
+    expect(validation.valid).toBe(true)
+    expect(validation.issues).not.toContain('missing_priority_simple_key')
+    expect(validation.issues).not.toContain('missing_radical_priority')
+    expect(validation.issues).not.toContain('invalid_action_count:0')
+  })
+
+  it('keeps premium validation stricter than essential on the same lighter yearly shape', () => {
+    const premiumValidation = validateYearlyPriorityAnswerFormat([
+      'ORIENTATION 2026',
+      'En 2026, tu avances mieux quand tu gardes peu de fronts.',
+      '',
+      'TES 3 PRIORITES REELLES',
+      '1. Garde un seul axe',
+      'Pourquoi: Cette annee, trop d options diluent ton elan.',
+      'Dans la vraie vie: Termine un chantier avant d en ouvrir un autre.',
+      '',
+      '2. Trie tes oui',
+      'Pourquoi: Ton temps doit aller au plus utile.',
+      'Dans la vraie vie: Refuse une demande secondaire cette semaine.',
+      '',
+      '3. Consolide ce qui repond',
+      'Pourquoi: Les resultats viennent de ce qui tient deja.',
+      'Dans la vraie vie: Renforce ce qui marche au lieu de repartir de zero.',
+      '',
+      'CE QUI VA TE FREINER',
+      '- Dire oui trop vite.',
+      '',
+      'TON TIMING',
+      'Debut d annee: Trie et clarifie.',
+      'Milieu d annee: Renforce ce qui repond.',
+      'Fin d annee: Garde ce qui tient.',
+      '',
+      'ACTION IMMEDIATE',
+      'Choisis un seul front principal pour les 72 prochaines heures.',
+    ].join('\n'), { userPlan: 'premium' })
+
+    expect(premiumValidation.valid).toBe(false)
+    expect(premiumValidation.issues).toContain('missing_priority_simple_key')
+    expect(
+      premiumValidation.issues.some((issue) =>
+        ['missing_radical_priority', 'invalid_pitfall_count:1', 'invalid_action_count:0'].includes(issue),
+      ),
+    ).toBe(true)
   })
 
   it('prefers a naturally radical family over a first maturation item', () => {

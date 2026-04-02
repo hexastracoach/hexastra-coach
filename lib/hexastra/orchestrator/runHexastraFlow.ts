@@ -4391,7 +4391,10 @@ export async function runHexastraFlow(input: {
 
     if (effectiveResponseMode === 'yearly_priority_answer') {
       const yearlyPriorityValidationTarget = applySentinel(rawMessage)
-      const yearlyPriorityValidation = validateYearlyPriorityAnswerFormat(yearlyPriorityValidationTarget)
+      const yearlyPriorityValidationPlan = normalizeUserPlan(plan)
+      const yearlyPriorityValidation = validateYearlyPriorityAnswerFormat(yearlyPriorityValidationTarget, {
+        userPlan: yearlyPriorityValidationPlan,
+      })
       if (!yearlyPriorityValidation.valid) {
         const fallbackYearlyAnswer = buildFinalAnswer({
           userMessage: latestUserMessage,
@@ -4400,7 +4403,7 @@ export async function runHexastraFlow(input: {
           prioritizedSignals: presentationStructuredSignals,
           knowledgePacket,
           yearlyFocusAngle,
-          userPlan: normalizeUserPlan(plan),
+          userPlan: yearlyPriorityValidationPlan,
         })
 
         rawMessage = fallbackYearlyAnswer.text
@@ -4410,6 +4413,7 @@ export async function runHexastraFlow(input: {
         flowLog('warn', 'YEARLY_PRIORITY_RENDER_STRUCTURE_FALLBACK', {
           issues: yearlyPriorityValidation.issues,
           priorityCount: yearlyPriorityValidation.priorityCount,
+          userPlan: yearlyPriorityValidationPlan,
           responseMode: effectiveResponseMode,
           usedDeterministicFinalAnswer,
         })
@@ -4417,6 +4421,7 @@ export async function runHexastraFlow(input: {
         flowLog('info', 'YEARLY_PRIORITY_RENDER_VALIDATED', {
           responseMode: effectiveResponseMode,
           priorityCount: yearlyPriorityValidation.priorityCount,
+          userPlan: yearlyPriorityValidationPlan,
           usedDeterministicFinalAnswer,
         })
       }
