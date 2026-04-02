@@ -41,7 +41,7 @@ export type YearlyPriorityValidation = {
   priorityCount: number
 }
 
-const FORBIDDEN_ANNUAL_WORDS = ['true', 'false', 'signal', 'confidence'] as const
+const FORBIDDEN_ANNUAL_WORDS = ['true', 'false', 'vrai', 'faux', 'signal', 'confidence'] as const
 const RADICAL_PRIORITY_PATTERN = /\b(stop|supprime|coupe|refuse)\b/i
 const RADICAL_FAMILY_PRIORITY: AnnualFamily[] = ['cap', 'alignement', 'cycle', 'direction']
 
@@ -52,11 +52,12 @@ function normalize(text: string): string {
 }
 
 function sanitizeAnnualContent(text: string): string {
-  return normalize(text)
-    .replace(/\btrue\b/gi, 'vrai')
-    .replace(/\bfalse\b/gi, 'faux')
-    .replace(/\bconfidence\b/gi, 'fiabilite')
-    .replace(/\bsignal\b/gi, 'point cle')
+  return normalize(
+    normalize(text)
+      .replace(/\b(?:true|false|vrai|faux)\b/gi, '')
+      .replace(/\bconfidence\b/gi, 'fiabilite')
+      .replace(/\bsignal\b/gi, 'point cle'),
+  )
 }
 
 function sentence(value: string | null | undefined): string {
@@ -82,8 +83,12 @@ function flattenScalarTexts(value: unknown, limit = 6, bucket: string[] = []): s
     return bucket
   }
 
-  if (typeof value === 'number' || typeof value === 'boolean') {
+  if (typeof value === 'number') {
     bucket.push(String(value))
+    return bucket
+  }
+
+  if (typeof value === 'boolean') {
     return bucket
   }
 
@@ -129,7 +134,8 @@ function stringifyCandidate(value: unknown): string | null {
   if (unwrapped) return sanitizeAnnualContent(unwrapped)
 
   if (typeof value === 'string') return sanitizeAnnualContent(value)
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'boolean') return null
 
   if (Array.isArray(value)) {
     const parts = flattenScalarTexts(value, 4)
@@ -586,10 +592,19 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
   ].join('\n')
 }
 
+function extractPrioritySection(text: string): string {
+  const match = text.match(
+    /TES\s+3\s+PRIORITES\s+REELLES\s*([\s\S]*?)(?:\n\s*CE\s+QUI\s+VA\s+TE\s+FREINER|$)/i,
+  )
+
+  return match?.[1]?.trim() ?? ''
+}
+
 export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriorityValidation {
   const cleaned = normalize(text)
   const issues: string[] = []
-  const priorityBlocks = text
+  const prioritySection = extractPrioritySection(text)
+  const priorityBlocks = prioritySection
     .split(/\n\n/)
     .filter((block) => /^\d+\.\s+/m.test(block))
   const requiredHeadings = [
@@ -615,7 +630,7 @@ export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriority
     if (pattern.test(cleaned)) issues.push(`disallowed_block:${pattern.source}`)
   }
 
-  const priorityCount = (text.match(/^\d+\.\s+/gm) ?? []).length
+  const priorityCount = (prioritySection.match(/^\d+\.\s+/gm) ?? []).length
   if (priorityCount !== 3) issues.push(`invalid_priority_count:${priorityCount}`)
   if (!priorityBlocks.some((block) => RADICAL_PRIORITY_PATTERN.test(block))) {
     issues.push('missing_radical_priority')

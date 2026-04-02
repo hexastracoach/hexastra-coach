@@ -509,6 +509,7 @@ describe('buildFinalAnswer', () => {
     for (const forbiddenWord of ['true', 'false', 'signal', 'confidence']) {
       expect(answer.text.toLowerCase()).not.toContain(forbiddenWord)
     }
+    expect(answer.text).not.toMatch(/\b(?:vrai|faux)\b/i)
     expect(answer.text).toContain('Debut d annee:')
     expect(answer.text).toContain('Milieu d annee:')
     expect(answer.text).toContain('Fin d annee:')
@@ -517,6 +518,63 @@ describe('buildFinalAnswer', () => {
     const validation = validateYearlyPriorityAnswerFormat(answer.text)
     expect(validation.valid).toBe(true)
     expect(validation.priorityCount).toBe(3)
+  })
+
+  it('strips boolean leakage from yearly priority content', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Sur quoi je dois me concentrer cette annee ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: {
+        signal: {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: {
+            summary: true,
+            details: {
+              note: 'clarifier tes engagements prioritaires',
+            },
+          },
+        },
+        orderedSignals: [],
+        dominantOpeningSource: 'exact_data',
+        dominantOpeningScience: 'fusion',
+        dominantOpeningSubCategory: 'annual_guidance',
+        reasoningTags: ['yearly_priority_override'],
+      },
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: {
+            summary: true,
+            details: {
+              note: 'clarifier tes engagements prioritaires',
+            },
+          },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: false, summary: 'engager ton energie sur moins de fronts' },
+        },
+        {
+          science: 'numerology',
+          subCategory: 'num_personal_year',
+          sourceType: 'exact_data',
+          value: { yearly: { personalYearNumber: 8, activated: true } },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text.toLowerCase()).not.toContain(' true ')
+    expect(answer.text.toLowerCase()).not.toContain(' false ')
+    expect(answer.text.toLowerCase()).not.toContain(' vrai ')
+    expect(answer.text.toLowerCase()).not.toContain(' faux ')
+    expect(answer.text).not.toMatch(/\b(?:true|false|vrai|faux)\b/i)
   })
 
   it('keeps the three yearly priorities distinct and concretely grounded', () => {
@@ -580,6 +638,44 @@ describe('buildFinalAnswer', () => {
 
     expect(validation.valid).toBe(false)
     expect(validation.issues.join(' ')).toMatch(/disallowed_block/)
+  })
+
+  it('counts only the three visible priorities inside the annual priority block', () => {
+    const validation = validateYearlyPriorityAnswerFormat([
+      'ORIENTATION 2026',
+      'En 2026, l axe dominant est tri strategique et structuration du cap.',
+      '',
+      'TES 3 PRIORITES REELLES',
+      '1. Coupe le secondaire',
+      'Pourquoi: En 2026, laisser ouverts des fronts tiedes te coute plus qu il ne t aide.',
+      'Dans la vraie vie: Coupe un projet secondaire et refuse une opportunite non alignee.',
+      '',
+      '2. Nettoyer tes oui',
+      'Pourquoi: Cette annee, ton energie doit aller sur moins de fronts mais de meilleure qualite.',
+      'Dans la vraie vie: Refuse une demande non alignee et garde un seul oui fort.',
+      '',
+      '3. Consolider ce qui tient',
+      'Pourquoi: En 2026, les resultats viennent de ce qui tient deja dans le reel.',
+      'Dans la vraie vie: Termine un chantier utile avant d en ouvrir un autre.',
+      '',
+      'CE QUI VA TE FREINER',
+      '- Dire oui a des opportunites non alignees.',
+      '- Changer le decor sans changer la vraie decision de fond.',
+      '',
+      'TON TIMING',
+      'Debut d annee: Trie et clarifie.',
+      'Milieu d annee: Engage-toi nettement.',
+      'Fin d annee: Consolide les resultats.',
+      '',
+      'ACTION IMMEDIATE',
+      'Dans les 24 a 72 heures, ferme un engagement secondaire.',
+      '',
+      '1. Ceci est une numerotation parasite hors du bloc des priorites.',
+      '2. Elle ne doit pas etre comptee par le validateur.',
+    ].join('\n'))
+
+    expect(validation.priorityCount).toBe(3)
+    expect(validation.issues).not.toContain('invalid_priority_count:5')
   })
 
   it('prefers a naturally radical family over a first maturation item', () => {
