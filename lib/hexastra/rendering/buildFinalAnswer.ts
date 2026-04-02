@@ -1,6 +1,7 @@
 import type { KnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
 import type { OpeningSignalSelection } from '@/lib/hexastra/orchestrator/selectOpeningSignal'
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
+import type { UserPlan } from '@/lib/hexastra/rendering/selectRenderProfile'
 import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
 import { getFusionFallbackCopy } from '@/lib/hexastra/rendering/getFusionFallbackCopy'
 import {
@@ -16,6 +17,7 @@ export type FinalAnswerInput = {
   prioritizedSignals: StructuredSignal[]
   knowledgePacket: KnowledgePacket
   yearlyFocusAngle?: YearlyFocusAngle | null
+  userPlan?: UserPlan | null
 }
 
 export type FinalAnswer = {
@@ -561,6 +563,7 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
         openingSignal: input.openingSignal,
         prioritizedSignals: input.prioritizedSignals,
         focusAngle: input.yearlyFocusAngle ?? detectYearlyFocusAngle(input.userMessage),
+        userPlan: input.userPlan ?? 'premium',
       }),
     }
   }

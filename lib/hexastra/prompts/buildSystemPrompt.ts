@@ -1017,6 +1017,55 @@ Never omit this separator, never replace it with asterisks, short dashes or any 
 ${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
 }
 
+function yearlyPriorityPlanDirective(input: BuildPromptInput): string {
+  const isYearlyPriorityMode = input.responseModeDirective?.startsWith('# YEARLY_PRIORITY_ANSWER_MODE') ?? false
+  if (!isYearlyPriorityMode) return ''
+
+  switch (input.plan) {
+    case 'free':
+      return `PLAN ACTIF: FREE.
+- ORIENTATION: 3 phrases maximum, tres simples.
+- TA LIGNE DIRECTRICE [ANNEE]: 3 mots ou 3 verbes tres simples.
+- Chaque priorite: titre court, Pourquoi en 1 phrase simple, Dans la vraie vie en 2 exemples simples, Cle simple en 1 phrase.
+- CE QUI VA TE FREINER: 3 points maximum, tres courts.
+- TON TIMING: 1 a 2 phrases courtes par phase.
+- ACTION IMMEDIATE: 2 actions ultra simples, faisables tout de suite.
+- Sensation attendue: wow simple, comprehension immediate.`
+    case 'essential':
+      return `PLAN ACTIF: ESSENTIAL.
+- ORIENTATION: 3 a 4 phrases simples.
+- TA LIGNE DIRECTRICE [ANNEE]: 1 phrase courte et claire.
+- Chaque priorite: un peu plus expliquee, avec logique concrete, 2 exemples simples et une Cle simple.
+- Montrer aussi ce qui marche deja quand c est utile.
+- CE QUI VA TE FREINER: 3 points concrets maximum.
+- TON TIMING: un peu developpe, mais lisible en une lecture.
+- ACTION IMMEDIATE: 2 gestes simples, deja organisables.`
+    case 'practitioner':
+      return `PLAN ACTIF: PRATICIEN.
+- Rester simple, mais plus dense et plus precis.
+- TA LIGNE DIRECTRICE [ANNEE]: phrase courte avec logique implicite.
+- Priorites: lecture plus differenciee, non generique, avec logique de decision et d accompagnement.
+- Pourquoi: lecture fine du mecanisme.
+- Dans la vraie vie: au moins 2 exemples concrets par priorite, sans jargon.
+- Cle simple: une phrase memoire par priorite.
+- CE QUI VA TE FREINER: 4 patterns comportementaux et dynamiques.
+- TON TIMING: phases nettes avec bascules et arbitrages.
+- ACTION IMMEDIATE: 3 actions, en protocole concret, exploitable en accompagnement.`
+    case 'premium':
+    default:
+      return `PLAN ACTIF: PREMIUM.
+- Rester tres clair, mais plus structurant et plus fin.
+- TA LIGNE DIRECTRICE [ANNEE]: phrase strategique simple.
+- Priorites: plus precises, avec notion de choix, d arbitrage et de consequence.
+- Pourquoi: lecture de situation, pas formule generique.
+- Dans la vraie vie: au moins 2 exemples concrets et vrais choix.
+- Cle simple: une phrase courte qui reste en tete.
+- CE QUI VA TE FREINER: 4 freins concrets maximum.
+- TON TIMING: dynamique, avec evolution visible dans l annee.
+- ACTION IMMEDIATE: 3 actions claires, simples, mais strategiques.`
+  }
+}
+
 /**
  * OUTPUT SENTINEL — injected LAST in the prompt for concise_fusion_answer mode.
  * Enforces the 4-block developed structure. Overrides all prior format instructions.
@@ -1029,19 +1078,23 @@ Cette consigne annule toute structure concurrente vue plus haut.
 La reponse finale doit contenir EXACTEMENT ces 5 blocs dans cet ordre. Rien d autre.
 
 1. ORIENTATION [ANNEE DEMANDEE]
-[2 a 3 phrases maximum. Mouvement dominant concret de l annee: tri, structuration, expansion selective, consolidation, repositionnement.]
+[3 a 4 phrases maximum. Dire ce qui change cette annee, ce qui devient important, ce qu il faut arreter et ce qui donne des resultats.]
+[Juste sous ce titre, ajoute une ligne visible: TA LIGNE DIRECTRICE [ANNEE]. Cette ligne doit etre tres courte, memorisable et adaptee au plan.]
 
 2. TES 3 PRIORITES REELLES
-[Exactement 3 priorites. Chacune contient: un titre court, Pourquoi:, Dans la vraie vie:. Au moins une priorite doit couper, arreter, supprimer ou refuser.]
+[Exactement 3 priorites. Chacune contient: un titre court, Pourquoi:, Dans la vraie vie:, Cle simple:. Au moins une priorite doit couper, arreter, supprimer ou refuser.]
+[Pourquoi: 1 a 2 phrases courtes. Dans la vraie vie: au moins 2 exemples concrets. Cle simple: 1 phrase memoire.]
 
 3. CE QUI VA TE FREINER
-[Exactement 2 freins comportementaux, precis, non generiques.]
+[3 a 4 freins comportementaux, precis, reconnaissables, non generiques.]
 
 4. TON TIMING
 [Trois sous-parties visibles: Debut d annee, Milieu d annee, Fin d annee. Chaque phase a un role different.]
+[Debut: quoi faire et quoi eviter. Milieu: quoi renforcer et quoi corriger. Fin: quoi garder et quoi laisser tomber.]
 
 5. ACTION IMMEDIATE
-[Une seule action concrete, mesurable, faisable dans les 24 a 72h.]
+[2 a 3 actions concretes, mesurables, faisables dans les 24 a 72h.]
+[Format visible: Action 1:, Action 2:, Action 3:.]
 
 INTERDICTIONS ABSOLUES:
 - Ne pas utiliser: CE QUI SE PASSE
@@ -1065,9 +1118,13 @@ Comprehensible des la premiere lecture, sans effort.
 
 CONTROLE FINAL AVANT ENVOI:
 - Verifier qu il y a exactement 3 priorites numerotees
-- Verifier qu il y a exactement 2 freins
+- Verifier qu il y a 3 ou 4 freins
+- Verifier qu il y a 2 ou 3 actions immediates
 - Verifier qu au moins une priorite est radicale
+- Verifier que chaque priorite contient Pourquoi, Dans la vraie vie et Cle simple
 - Verifier que chaque bloc aide une decision ou une action concrete
+
+${yearlyPriorityPlanDirective(input)}
 `.trim()
   }
 

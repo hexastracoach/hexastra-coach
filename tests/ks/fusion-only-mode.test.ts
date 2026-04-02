@@ -152,8 +152,51 @@ describe('fusion-only mode', () => {
     expect(prompt).toContain('OUTPUT SENTINEL - STRUCTURE FINALE ANNUELLE OBLIGATOIRE')
     expect(prompt).toContain('Ne pas utiliser: CE QUI SE PASSE')
     expect(prompt).toContain('Debut d annee')
+    expect(prompt).toContain('Cle simple')
+    expect(prompt).toContain('Action 1:')
     expect(prompt).not.toContain('STRUCTURE DE SORTIE â€” PLAN PREMIUM')
     expect(prompt).not.toContain('◆ 1. Sphère centrale')
     expect(prompt).not.toContain('# QUESTION_SHAPE:')
+  })
+
+  it('injects plan-specific yearly priority instructions into the annual prompt', () => {
+    const freePrompt = buildSystemPrompt({
+      plan: 'free',
+      mode: 'libre',
+      language: 'fr',
+      contextType: 'general',
+      practitionerUsage: null,
+      requestType: 'chat',
+      domainRoute: 'fusion',
+      flowStep: 'analysis',
+      analysisMode: 'hexastra_fusion',
+      fusionOnlyExperience: true,
+      responseModeDirective: buildResponseModeDirective('yearly_priority_answer'),
+      messages: [{ role: 'user', content: 'Sur quoi je dois me concentrer cette annee ?' }],
+    })
+
+    const practitionerPrompt = buildSystemPrompt({
+      plan: 'practitioner',
+      mode: 'praticien',
+      language: 'fr',
+      contextType: 'general',
+      practitionerUsage: 'self',
+      requestType: 'chat',
+      domainRoute: 'fusion',
+      flowStep: 'analysis',
+      analysisMode: 'hexastra_fusion',
+      fusionOnlyExperience: true,
+      responseModeDirective: buildResponseModeDirective('yearly_priority_answer'),
+      messages: [{ role: 'user', content: 'Sur quoi je dois me concentrer cette annee ?' }],
+    })
+
+    expect(freePrompt).toContain('PLAN ACTIF: FREE.')
+    expect(freePrompt).toContain('TA LIGNE DIRECTRICE [ANNEE]')
+    expect(freePrompt).toContain('3 mots ou 3 verbes tres simples')
+    expect(freePrompt).toContain('Cle simple en 1 phrase')
+    expect(practitionerPrompt).toContain('PLAN ACTIF: PRATICIEN.')
+    expect(practitionerPrompt).toContain('logique de decision et d accompagnement')
+    expect(practitionerPrompt).toContain('4 patterns comportementaux')
+    expect(practitionerPrompt).toContain('protocole concret')
   })
 })

@@ -137,9 +137,11 @@ function extractAnnualSentences(text: string): string[] {
         .replace(/^\d+\.\s+/, '')
         .replace(/^Pourquoi:\s+/, '')
         .replace(/^Dans la vraie vie:\s+/, '')
+        .replace(/^Cle simple:\s+/, '')
         .replace(/^Debut d annee:\s+/, '')
         .replace(/^Milieu d annee:\s+/, '')
         .replace(/^Fin d annee:\s+/, '')
+        .replace(/^Action\s+\d+:\s+/, '')
         .replace(/^-+\s+/, '')
 
       return body
@@ -554,6 +556,9 @@ describe('buildFinalAnswer', () => {
     expect(answer.text).not.toMatch(/Sphere/i)
     expect((answer.text.match(/^Pourquoi:/gm) ?? []).length).toBe(3)
     expect((answer.text.match(/^Dans la vraie vie:/gm) ?? []).length).toBe(3)
+    expect((answer.text.match(/^Cle simple:/gm) ?? []).length).toBe(3)
+    expect((answer.text.match(/^\-\s+/gm) ?? []).length).toBeGreaterThanOrEqual(3)
+    expect((answer.text.match(/^Action\s+\d+:/gm) ?? []).length).toBeGreaterThanOrEqual(2)
     for (const forbiddenWord of ['true', 'false', 'signal', 'confidence']) {
       expect(answer.text.toLowerCase()).not.toContain(forbiddenWord)
     }
@@ -607,7 +612,8 @@ describe('buildFinalAnswer', () => {
     const lower = answer.text.toLowerCase()
     expect(lower).toContain('ou concentrer tes moyens')
     expect(answer.text).toContain('Protege tes plages fortes')
-    expect(lower).toContain('bloque deux plages de concentration')
+    expect(lower).toContain('choisis un seul front central')
+    expect(lower).toContain('bloque deux creneaux fixes')
   })
 
   it('adapts yearly priorities to a direction-choice angle', () => {
@@ -640,7 +646,7 @@ describe('buildFinalAnswer', () => {
 
     expect(answer.text).toContain('une direction claire')
     expect(answer.text).toContain('Choisis puis coupe')
-    expect(answer.text).toContain('axe directeur')
+    expect(answer.text).toContain('Ecris ton axe en une phrase claire')
   })
 
   it('adapts yearly priorities to an execution-push angle', () => {
@@ -672,7 +678,7 @@ describe('buildFinalAnswer', () => {
     })
 
     const lower = answer.text.toLowerCase()
-    expect(lower).toContain('lance. execute. consolide')
+    expect(lower).toContain('transforme ton cap en preuves concretes')
     expect(lower).toContain('gestes repetes et visibles')
     expect(lower).toContain('choisis un livrable simple')
   })
@@ -721,10 +727,71 @@ describe('buildFinalAnswer', () => {
     }
 
     expect(concentrationAnswer.text).not.toBe(directionAnswer.text)
-    expect(concentrationAnswer.text.toLowerCase()).toContain('bloque deux plages de concentration')
-    expect(directionAnswer.text.toLowerCase()).toContain('axe directeur')
-    expect(concentrationAnswer.text.toLowerCase()).not.toContain('axe directeur')
-    expect(directionAnswer.text.toLowerCase()).not.toContain('bloque deux plages de concentration')
+    expect(concentrationAnswer.text.toLowerCase()).toContain('choisis un seul front central')
+    expect(directionAnswer.text.toLowerCase()).toContain('ecris ton axe en une phrase claire')
+    expect(concentrationAnswer.text.toLowerCase()).not.toContain('ecris ton axe en une phrase claire')
+    expect(directionAnswer.text.toLowerCase()).not.toContain('choisis un seul front central')
+  })
+
+  it('adapts yearly_priority_answer to the user plan while keeping the same structure', () => {
+    const sharedSignals = [
+      {
+        science: 'fusion' as const,
+        subCategory: 'annual_guidance',
+        sourceType: 'exact_data' as const,
+        value: { summary: 'clarifier ton cap, trier tes engagements et assumer un axe plus net' },
+      },
+      {
+        science: 'astrology' as const,
+        subCategory: 'astro_transits_current',
+        sourceType: 'exact_data' as const,
+        value: { summary: 'la traction existe mais elle doit etre lue avant d accelerer' },
+      },
+      {
+        science: 'human_design' as const,
+        subCategory: 'hd_current_transits',
+        sourceType: 'exact_data' as const,
+        value: { current_cycle: 'engager ton energie sur moins de fronts mais avec plus de nettete' },
+      },
+    ]
+
+    const buildAnnualAnswerForPlan = (userPlan: 'free' | 'essentiel' | 'premium' | 'praticien') =>
+      buildFinalAnswer({
+        userMessage: 'Sur quoi je dois me concentrer cette annee ?',
+        responseMode: 'yearly_priority_answer',
+        openingSignal: null,
+        prioritizedSignals: sharedSignals,
+        knowledgePacket: makeMinimalKnowledgePacket(),
+        userPlan,
+      }).text
+
+    const freeAnswer = buildAnnualAnswerForPlan('free')
+    const essentialAnswer = buildAnnualAnswerForPlan('essentiel')
+    const premiumAnswer = buildAnnualAnswerForPlan('premium')
+    const practitionerAnswer = buildAnnualAnswerForPlan('praticien')
+
+    for (const answer of [freeAnswer, essentialAnswer, premiumAnswer, practitionerAnswer]) {
+      for (const heading of ['ORIENTATION', 'TES 3 PRIORITES REELLES', 'CE QUI VA TE FREINER', 'TON TIMING', 'ACTION IMMEDIATE']) {
+        expect(answer).toContain(heading)
+      }
+    }
+
+    expect(freeAnswer).toContain('TA LIGNE DIRECTRICE 2026: Reduis. Concentre. Avance.')
+    expect(essentialAnswer).toContain('TA LIGNE DIRECTRICE 2026: Garde peu de fronts. Fais avancer le bon.')
+    expect(premiumAnswer).toContain('TA LIGNE DIRECTRICE 2026: Reduis tes fronts pour faire grandir ce qui repond deja.')
+    expect(practitionerAnswer).toContain('TA LIGNE DIRECTRICE 2026: Coupe le bruit pour donner du poids a ce qui')
+    expect(practitionerAnswer).toContain('Avance deja.')
+
+    const freeAction = extractAnnualSection(freeAnswer, 'ACTION IMMEDIATE')
+    const essentialAction = extractAnnualSection(essentialAnswer, 'ACTION IMMEDIATE')
+    const premiumAction = extractAnnualSection(premiumAnswer, 'ACTION IMMEDIATE')
+    const practitionerAction = extractAnnualSection(practitionerAnswer, 'ACTION IMMEDIATE')
+
+    expect((freeAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(2)
+    expect((essentialAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(2)
+    expect((premiumAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(3)
+    expect((practitionerAction.match(/^Action\s+\d+:/gm) ?? []).length).toBe(3)
+    expect(new Set([freeAction, essentialAction, premiumAction, practitionerAction]).size).toBeGreaterThanOrEqual(2)
   })
 
   it('keeps yearly priority wording short and easy to read', () => {
@@ -971,6 +1038,7 @@ describe('buildFinalAnswer', () => {
     for (const block of priorityBlocks) {
       expect(block).toContain('Pourquoi:')
       expect(block).toContain('Dans la vraie vie:')
+      expect(block).toContain('Cle simple:')
     }
   })
 
@@ -1004,26 +1072,31 @@ describe('buildFinalAnswer', () => {
       '1. Coupe le secondaire',
       'Pourquoi: En 2026, laisser ouverts des fronts tiedes te coute plus qu il ne t aide.',
       'Dans la vraie vie: Coupe un projet secondaire et refuse une opportunite non alignee.',
+      'Cle simple: Moins de fronts donne plus d elan.',
       '',
       '2. Nettoyer tes oui',
       'Pourquoi: Cette annee, ton energie doit aller sur moins de fronts mais de meilleure qualite.',
       'Dans la vraie vie: Refuse une demande non alignee et garde un seul oui fort.',
+      'Cle simple: Chaque oui secondaire brouille ton axe.',
       '',
       '3. Consolider ce qui tient',
       'Pourquoi: En 2026, les resultats viennent de ce qui tient deja dans le reel.',
       'Dans la vraie vie: Termine un chantier utile avant d en ouvrir un autre.',
+      'Cle simple: Ce qui tient merite plus de place.',
       '',
       'CE QUI VA TE FREINER',
       '- Dire oui a des opportunites non alignees.',
       '- Changer le decor sans changer la vraie decision de fond.',
+      '- Commencer plein de choses sans en finir une seule.',
       '',
       'TON TIMING',
-      'Debut d annee: Trie et clarifie.',
-      'Milieu d annee: Engage-toi nettement.',
-      'Fin d annee: Consolide les resultats.',
+      'Debut d annee: Trie et clarifie. Evite les nouveaux fronts.',
+      'Milieu d annee: Engage-toi nettement. Corrige la dispersion.',
+      'Fin d annee: Consolide les resultats. Laisse tomber le secondaire.',
       '',
       'ACTION IMMEDIATE',
-      'Dans les 24 a 72 heures, ferme un engagement secondaire.',
+      'Action 1: Ferme un engagement secondaire.',
+      'Action 2: Bloque deux creneaux sur ton front principal.',
       '',
       '1. Ceci est une numerotation parasite hors du bloc des priorites.',
       '2. Elle ne doit pas etre comptee par le validateur.',
@@ -1042,26 +1115,31 @@ describe('buildFinalAnswer', () => {
       '1. Coupe le secondaire',
       'Pourquoi: En 2026, laisser ouverts des fronts tiedes te coute plus qu ils ne t apportent.',
       'Dans la vraie vie: Coupe un projet secondaire et refuse une opportunite non alignee.',
+      'Cle simple: Moins de fronts donne plus d elan.',
       '',
       '2. Nettoyer tes oui',
       'Pourquoi: Cette annee, ton energie doit aller sur moins de fronts mais avec plus de nettete.',
       'Dans la vraie vie: Refuse une demande non alignee et garde un seul oui fort.',
+      'Cle simple: Chaque oui secondaire brouille ton axe.',
       '',
       '3. Consolider ce qui tient',
       'Pourquoi: En 2026, les resultats viennent de ce qui tient deja dans le reel.',
       'Dans la vraie vie: Termine un chantier utile avant d en ouvrir un autre.',
+      'Cle simple: Ce qui tient merite plus de place.',
       '',
       '### CE QUI VA TE FREINER',
       '- Dire oui a des opportunites non alignees.',
       '- Changer le decor sans changer la vraie decision de fond.',
+      '- Commencer plein de choses sans en finir une seule.',
       '',
       '## TON TIMING',
-      'Début d’année: Trie et clarifie.',
-      'Milieu d’année: Engage-toi nettement.',
-      'Fin d’année: Consolide les resultats.',
+      'Début d’année: Trie et clarifie. Evite les nouveaux fronts.',
+      'Milieu d’année: Engage-toi nettement. Corrige la dispersion.',
+      'Fin d’année: Consolide les resultats. Laisse tomber le secondaire.',
       '',
       '**ACTION IMMÉDIATE**',
-      'Dans les 24 a 72 heures, ferme un engagement secondaire.',
+      'Action 1: Ferme un engagement secondaire.',
+      'Action 2: Bloque deux creneaux sur ton front principal.',
     ].join('\r\n'))
 
     expect(validation.valid).toBe(true)
@@ -1131,11 +1209,11 @@ describe('buildFinalAnswer', () => {
       knowledgePacket: makeMinimalKnowledgePacket(),
     })
 
-    expect(answer.text).toMatch(/- Garder des projets tiedes ouverts pour ne decevoir personne\.\s*Et finir par diluer ton axe principal\./)
+    expect(answer.text).toMatch(/- Garder des projets tiedes ouverts pour ne decevoir personne\.\s*(Et\s+)?finir par diluer ton axe principal\./i)
     expect(answer.text).toMatch(/- Changer le decor\.\s*Les outils ou l organisation sans changer la vraie decision de fond\./)
     expect(answer.text).not.toContain('Dire oui pour calmer la pression, rester agreable ou ne pas decevoir, puis avancer a vide.')
-    expect(answer.text).toContain('Debut d annee: Trie et clarifie.')
-    expect(answer.text).toContain('Milieu d annee: Engage-toi nettement.')
-    expect(answer.text).toContain('Fin d annee: Fixe le cadre.')
+    expect(answer.text).toContain('Debut d annee: Fais le tri')
+    expect(answer.text).toContain('Milieu d annee: Renforce ce qui repond')
+    expect(answer.text).toContain('Fin d annee: Garde ce qui tient')
   })
 })

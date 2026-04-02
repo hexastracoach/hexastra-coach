@@ -1,5 +1,6 @@
 import type { OpeningSignalSelection } from '@/lib/hexastra/orchestrator/selectOpeningSignal'
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
+import type { UserPlan } from '@/lib/hexastra/rendering/selectRenderProfile'
 import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
 
 export type YearlyPriorityAnswerInput = {
@@ -7,6 +8,7 @@ export type YearlyPriorityAnswerInput = {
   openingSignal: OpeningSignalSelection | null
   prioritizedSignals: StructuredSignal[]
   focusAngle?: YearlyFocusAngle | null
+  userPlan?: UserPlan | null
 }
 
 export type YearlyFocusAngle =
@@ -49,6 +51,17 @@ export type YearlyPriorityValidation = {
   valid: boolean
   issues: string[]
   priorityCount: number
+}
+
+type YearlyPlanStyle = {
+  orientationSentences: number
+  whySentences: number
+  realLifeSentences: number
+  keySentences: number
+  pitfallSentences: number
+  pitfallCount: number
+  timingSentences: number
+  actionCount: number
 }
 
 const FORBIDDEN_ANNUAL_WORDS = ['true', 'false', 'vrai', 'faux', 'signal', 'confidence'] as const
@@ -100,6 +113,49 @@ const ANNUAL_EVIDENCE_FILLER_WORDS = new Set([
   'y',
 ])
 const ANNUAL_HEADING_PATTERN = /^(ORIENTATION\s+20\d{2}|TES\s+3\s+PRIORITES\s+REELLES|CE\s+QUI\s+VA\s+TE\s+FREINER|TON\s+TIMING|ACTION\s+IMMEDIATE)$/i
+const DEFAULT_YEARLY_USER_PLAN: UserPlan = 'premium'
+const YEARLY_PLAN_STYLES: Record<UserPlan, YearlyPlanStyle> = {
+  free: {
+    orientationSentences: 3,
+    whySentences: 1,
+    realLifeSentences: 2,
+    keySentences: 1,
+    pitfallSentences: 1,
+    pitfallCount: 3,
+    timingSentences: 2,
+    actionCount: 2,
+  },
+  essentiel: {
+    orientationSentences: 4,
+    whySentences: 2,
+    realLifeSentences: 2,
+    keySentences: 1,
+    pitfallSentences: 1,
+    pitfallCount: 3,
+    timingSentences: 2,
+    actionCount: 2,
+  },
+  premium: {
+    orientationSentences: 4,
+    whySentences: 2,
+    realLifeSentences: 2,
+    keySentences: 1,
+    pitfallSentences: 2,
+    pitfallCount: 4,
+    timingSentences: 2,
+    actionCount: 3,
+  },
+  praticien: {
+    orientationSentences: 4,
+    whySentences: 2,
+    realLifeSentences: 2,
+    keySentences: 1,
+    pitfallSentences: 2,
+    pitfallCount: 4,
+    timingSentences: 3,
+    actionCount: 3,
+  },
+}
 
 function normalize(text: string): string {
   return (text || '')
@@ -255,6 +311,24 @@ function enforceShortSentences(text: string): string {
     .trim()
 }
 
+function resolveYearlyUserPlan(value: UserPlan | null | undefined): UserPlan {
+  return value ?? DEFAULT_YEARLY_USER_PLAN
+}
+
+function splitAnnualSentences(text: string): string[] {
+  return normalize(text)
+    .split(/[.!?]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+function limitAnnualSentences(text: string, maxSentences: number): string {
+  return splitAnnualSentences(text)
+    .slice(0, maxSentences)
+    .join('. ')
+    .trim()
+}
+
 function formatAnnualBodyLine(text: string): string {
   const simplified = enforceShortSentences(text)
   return simplified ? `${simplified}.`.replace(/\.\./g, '.') : ''
@@ -266,12 +340,15 @@ function polishAnnualLine(line: string): string {
   if (ANNUAL_HEADING_PATTERN.test(trimmed)) return trimmed
 
   const prefixedPatterns = [
+    /^(TA LIGNE DIRECTRICE\s+20\d{2}:\s+)(.+)$/i,
     /^(\d+\.\s+)(.+)$/i,
     /^(Pourquoi:\s+)(.+)$/i,
     /^(Dans la vraie vie:\s+)(.+)$/i,
+    /^(Cle simple:\s+)(.+)$/i,
     /^(Debut d annee:\s+)(.+)$/i,
     /^(Milieu d annee:\s+)(.+)$/i,
     /^(Fin d annee:\s+)(.+)$/i,
+    /^(Action\s+\d+:\s+)(.+)$/i,
     /^(-\s+)(.+)$/i,
   ]
 
@@ -588,37 +665,116 @@ function priorityTemplate(family: AnnualFamily, year: string): PriorityTemplate 
   }
 }
 
-function focusAngleLead(angle: YearlyFocusAngle, year: string): string {
+function focusAngleLead(angle: YearlyFocusAngle, year: string, userPlan: UserPlan): string {
   switch (angle) {
     case 'concentration':
-      return `En ${year}, la bonne question n est pas quoi ajouter, mais ou concentrer tes moyens pour obtenir le plus d effet.`
+      return userPlan === 'free'
+        ? `En ${year}, avance sur moins de fronts.`
+        : userPlan === 'essentiel'
+          ? `En ${year}, le vrai gain vient de moins de fronts et de plus de tenue.`
+          : userPlan === 'praticien'
+            ? `En ${year}, la progression vient d une concentration nette sur ce qui prend deja du poids.`
+            : `En ${year}, la bonne question n est pas quoi ajouter, mais ou concentrer tes moyens pour obtenir le plus d effet.`
     case 'direction_choice':
-      return `En ${year}, tu avances quand une direction claire prend le dessus sur les options concurrentes.`
+      return userPlan === 'free'
+        ? `En ${year}, tu avances si tu choisis une direction claire.`
+        : userPlan === 'essentiel'
+          ? `En ${year}, une bonne decision vaut plus que trois options ouvertes.`
+          : userPlan === 'praticien'
+            ? `En ${year}, l avancee depend d un axe clair qui gouverne enfin tes choix et tes renoncements.`
+            : `En ${year}, tu avances quand une direction claire prend le dessus sur les options concurrentes.`
     case 'stop_cut_remove':
-      return `En ${year}, ta progression depend d abord de ce que tu arretes, refuses ou retires de ton champ.`
+      return userPlan === 'free'
+        ? `En ${year}, tu avances d abord en retirant ce qui te freine.`
+        : userPlan === 'essentiel'
+          ? `En ${year}, enlever le secondaire te redonne de la place pour l essentiel.`
+          : userPlan === 'praticien'
+            ? `En ${year}, ce que tu retires conditionne directement ce que tu peux porter proprement ensuite.`
+            : `En ${year}, ta progression depend d abord de ce que tu arretes, refuses ou retires de ton champ.`
     case 'energy_leak':
-      return `En ${year}, l enjeu n est pas d en faire plus, mais de stopper ce qui vide ton energie utile.`
+      return userPlan === 'free'
+        ? `En ${year}, tu avances si tu coupes ce qui te vide.`
+        : userPlan === 'essentiel'
+          ? `En ${year}, ton energie revient quand tu fermes les drains repetitifs.`
+          : userPlan === 'praticien'
+            ? `En ${year}, l enjeu central est de retirer les drains repetes qui prennent du poids sur ton axe utile.`
+            : `En ${year}, l enjeu n est pas d en faire plus, mais de stopper ce qui vide ton energie utile.`
     case 'execution_push':
-      return `En ${year}, tu progresses quand tu transformes enfin le cap en gestes repetes et visibles.`
+      return userPlan === 'free'
+        ? `En ${year}, tu avances si tu termines enfin ce que tu lances.`
+        : userPlan === 'essentiel'
+          ? `En ${year}, ton elan revient quand tu passes du projet au pas concret.`
+          : userPlan === 'praticien'
+            ? `En ${year}, la progression passe par une execution suivie, des preuves simples et un rythme qui tient.`
+            : `En ${year}, tu progresses quand tu transformes enfin le cap en gestes repetes et visibles.`
     default:
       return `En ${year}, la progression la plus juste vient d une focalisation nette sur ce qui doit vraiment avancer.`
   }
 }
 
-function buildGuidingLine(year: string, focusAngle: YearlyFocusAngle): string {
-  switch (focusAngle) {
-    case 'concentration':
-      return `TA LIGNE DIRECTRICE ${year} : Reduis. Concentre. Avance.`
-    case 'direction_choice':
-      return `TA LIGNE DIRECTRICE ${year} : Choisis. Coupe. Tiens le cap.`
-    case 'stop_cut_remove':
-      return `TA LIGNE DIRECTRICE ${year} : Trie. Coupe. Stabilise.`
-    case 'energy_leak':
-      return `TA LIGNE DIRECTRICE ${year} : Protege ton energie. Concentre-la. Agis.`
-    case 'execution_push':
-      return `TA LIGNE DIRECTRICE ${year} : Lance. Execute. Consolide.`
+function buildGuidingLine(year: string, focusAngle: YearlyFocusAngle, userPlan: UserPlan): string {
+  switch (userPlan) {
+    case 'free':
+      switch (focusAngle) {
+        case 'concentration':
+          return `TA LIGNE DIRECTRICE ${year} : Reduis. Concentre. Avance.`
+        case 'direction_choice':
+          return `TA LIGNE DIRECTRICE ${year} : Choisis. Coupe. Tiens le cap.`
+        case 'stop_cut_remove':
+          return `TA LIGNE DIRECTRICE ${year} : Trie. Coupe. Stabilise.`
+        case 'energy_leak':
+          return `TA LIGNE DIRECTRICE ${year} : Protege. Coupe. Respire.`
+        case 'execution_push':
+          return `TA LIGNE DIRECTRICE ${year} : Lance. Termine. Recommence.`
+        default:
+          return `TA LIGNE DIRECTRICE ${year} : Clarifie. Choisis. Avance.`
+      }
+    case 'essentiel':
+      switch (focusAngle) {
+        case 'concentration':
+          return `TA LIGNE DIRECTRICE ${year} : Garde peu de fronts. Fais avancer le bon.`
+        case 'direction_choice':
+          return `TA LIGNE DIRECTRICE ${year} : Choisis un axe. Aligne le reste dessus.`
+        case 'stop_cut_remove':
+          return `TA LIGNE DIRECTRICE ${year} : Retire ce qui freine. Garde ce qui tient.`
+        case 'energy_leak':
+          return `TA LIGNE DIRECTRICE ${year} : Coupe les fuites. Garde ton energie utile.`
+        case 'execution_push':
+          return `TA LIGNE DIRECTRICE ${year} : Avance par pas nets. Termine avant d ajouter.`
+        default:
+          return `TA LIGNE DIRECTRICE ${year} : Clarifie ton axe. Fais-le avancer.`
+      }
+    case 'praticien':
+      switch (focusAngle) {
+        case 'concentration':
+          return `TA LIGNE DIRECTRICE ${year} : Coupe le bruit pour donner du poids a ce qui avance deja.`
+        case 'direction_choice':
+          return `TA LIGNE DIRECTRICE ${year} : Une direction claire vaut mieux que trois axes sous-alimentes.`
+        case 'stop_cut_remove':
+          return `TA LIGNE DIRECTRICE ${year} : Ce que tu retires cette annee conditionne ce que tu peux vraiment porter.`
+        case 'energy_leak':
+          return `TA LIGNE DIRECTRICE ${year} : La recuperation vient d abord du tri de tes drains repetitifs.`
+        case 'execution_push':
+          return `TA LIGNE DIRECTRICE ${year} : L elan vient d une execution suivie, pas d une relance ponctuelle.`
+        default:
+          return `TA LIGNE DIRECTRICE ${year} : Donne du poids a ce qui repond. Coupe le reste.`
+      }
+    case 'premium':
     default:
-      return `TA LIGNE DIRECTRICE ${year} : Clarifie. Choisis. Avance.`
+      switch (focusAngle) {
+        case 'concentration':
+          return `TA LIGNE DIRECTRICE ${year} : Reduis tes fronts pour faire grandir ce qui repond deja.`
+        case 'direction_choice':
+          return `TA LIGNE DIRECTRICE ${year} : Choisis une direction forte, puis retire les axes concurrents.`
+        case 'stop_cut_remove':
+          return `TA LIGNE DIRECTRICE ${year} : Coupe le secondaire pour redonner du poids a l essentiel.`
+        case 'energy_leak':
+          return `TA LIGNE DIRECTRICE ${year} : Protege ton energie pour la remettre au service de ton vrai cap.`
+        case 'execution_push':
+          return `TA LIGNE DIRECTRICE ${year} : Transforme ton cap en preuves concretes, semaine apres semaine.`
+        default:
+          return `TA LIGNE DIRECTRICE ${year} : Clarifie ton axe, puis fais converger tes moyens.`
+      }
   }
 }
 
@@ -896,22 +1052,482 @@ function buildPrioritySignals(
   }))
 }
 
+function buildOrientationPlanTail(
+  userPlan: UserPlan,
+  focusAngle: YearlyFocusAngle,
+  primaryEvidence: string,
+): string | null {
+  switch (userPlan) {
+    case 'essentiel':
+      switch (focusAngle) {
+        case 'concentration':
+          return 'Ce qui marche deja doit prendre plus de place.'
+        case 'direction_choice':
+          return 'Le reste doit redevenir secondaire.'
+        case 'stop_cut_remove':
+          return 'Ce que tu retires te rend plus disponible.'
+        case 'energy_leak':
+          return 'Ce que tu coupes te rend plus nette.'
+        case 'execution_push':
+          return 'Ce que tu termines nourrit la suite.'
+        default:
+          return null
+      }
+    case 'premium':
+      return primaryEvidence ? `Un point revient deja: ${primaryEvidence}` : null
+    case 'praticien': {
+      const practitionerTail =
+        focusAngle === 'concentration'
+          ? 'Si tout reste ouvert, rien ne prend vraiment de poids.'
+          : focusAngle === 'direction_choice'
+            ? 'Sans arbitrage, tes ressources restent divisees.'
+            : focusAngle === 'stop_cut_remove'
+              ? 'Ce que tu gardes par inertie continue de te couter.'
+              : focusAngle === 'energy_leak'
+                ? 'Chaque drain repete retire du poids a ton axe utile.'
+                : 'Sans cadence visible, l elan retombe vite.'
+
+      return primaryEvidence
+        ? `Un point revient deja: ${primaryEvidence}. ${practitionerTail}`
+        : practitionerTail
+    }
+    case 'free':
+    default:
+      return null
+  }
+}
+
+function buildPriorityWhyTail(
+  userPlan: UserPlan,
+  focusAngle: YearlyFocusAngle,
+  evidence: string,
+): string | null {
+  if (userPlan === 'free') return null
+
+  if (userPlan === 'essentiel') {
+    switch (focusAngle) {
+      case 'concentration':
+        return 'Ce qui repond deja doit prendre plus de place.'
+      case 'direction_choice':
+        return 'Le reste doit perdre du poids.'
+      case 'stop_cut_remove':
+        return 'Ce que tu retires te redonne de la place.'
+      case 'energy_leak':
+        return 'Ce que tu coupes te rend plus disponible.'
+      case 'execution_push':
+        return 'Ce que tu termines nourrit l elan.'
+      default:
+        return null
+    }
+  }
+
+  const evidenceTail = evidence ? `Un point revient deja: ${evidence}.` : ''
+
+  if (userPlan === 'praticien') {
+    const practitionerTail =
+      focusAngle === 'concentration'
+        ? 'Si tu ne concentres pas tes moyens, tout reste sous-alimente.'
+        : focusAngle === 'direction_choice'
+          ? 'Sans arbitrage, tu multiplies les fronts faibles.'
+          : focusAngle === 'stop_cut_remove'
+            ? 'Le maintien passif te coute plus que la coupure claire.'
+            : focusAngle === 'energy_leak'
+              ? 'Un drain repete finit par diriger ton annee a ta place.'
+              : 'Sans preuve concrete, l execution retombe dans l intention.'
+
+    return [evidenceTail, practitionerTail].filter(Boolean).join(' ')
+  }
+
+  return evidenceTail || null
+}
+
+function buildPriorityRealLifeTail(
+  userPlan: UserPlan,
+  focusAngle: YearlyFocusAngle,
+): string | null {
+  switch (userPlan) {
+    case 'free':
+      return null
+    case 'essentiel':
+      switch (focusAngle) {
+        case 'concentration':
+          return 'Garde le bon front.'
+        case 'direction_choice':
+          return 'Le reste attend.'
+        case 'stop_cut_remove':
+          return 'Officialise l arret.'
+        case 'energy_leak':
+          return 'Recupere du temps utile.'
+        case 'execution_push':
+          return 'Recommence vite.'
+        default:
+          return null
+      }
+    case 'premium':
+      switch (focusAngle) {
+        case 'concentration':
+          return 'Protege ton meilleur temps.'
+        case 'direction_choice':
+          return 'Fais converger ton agenda.'
+        case 'stop_cut_remove':
+          return 'Fais-le clairement.'
+        case 'energy_leak':
+          return 'Redeploie ce temps.'
+        case 'execution_push':
+          return 'Montre une preuve simple.'
+        default:
+          return null
+      }
+    case 'praticien':
+      switch (focusAngle) {
+        case 'concentration':
+          return 'Observe ce qui prend du poids. Puis coupe le reste.'
+        case 'direction_choice':
+          return 'Teste l axe retenu une semaine. Puis mesure sa traction.'
+        case 'stop_cut_remove':
+          return 'Nomme la coupure. Puis retire le maintien passif.'
+        case 'energy_leak':
+          return 'Repere le drain. Puis redeploie cette marge sur le bon front.'
+        case 'execution_push':
+          return 'Sors une preuve. Puis fixe tout de suite la suite.'
+        default:
+          return null
+      }
+    default:
+      return null
+  }
+}
+
+function buildPrioritySimpleKey(
+  selection: PrioritySelection,
+  focusAngle: YearlyFocusAngle,
+): string {
+  switch (focusAngle) {
+    case 'concentration':
+      switch (selection.family) {
+        case 'cap':
+          return 'Moins de fronts donne plus d elan.'
+        case 'rythme':
+          return 'Ton meilleur temps vaut plus que ta disponibilite totale.'
+        case 'alignement':
+          return 'Chaque oui secondaire brouille ton axe.'
+        default:
+          return 'Ce qui compte a besoin de plus de place.'
+      }
+    case 'direction_choice':
+      switch (selection.family) {
+        case 'cap':
+        case 'direction':
+          return 'Une bonne direction simplifie le reste.'
+        case 'alignement':
+          return 'Tes oui doivent suivre ton axe.'
+        default:
+          return 'Choisir clarifie plus que reflechir encore.'
+      }
+    case 'stop_cut_remove':
+      switch (selection.family) {
+        case 'cap':
+        case 'cycle':
+          return 'Ce que tu retires te fait avancer.'
+        case 'alignement':
+          return 'Couper un drain vaut mieux qu ajouter un effort.'
+        default:
+          return 'L arret juste redonne de la place.'
+      }
+    case 'energy_leak':
+      switch (selection.family) {
+        case 'alignement':
+        case 'rythme':
+          return 'Ton energie revient quand tu fermes les drains repetes.'
+        default:
+          return 'Ce qui te vide ne doit plus diriger ton annee.'
+      }
+    case 'execution_push':
+      switch (selection.family) {
+        case 'cap':
+        case 'cycle':
+          return 'Ce que tu termines change vraiment l annee.'
+        case 'rythme':
+          return 'Un pas visible vaut mieux qu un grand plan.'
+        default:
+          return 'L action repetee cree l elan.'
+      }
+    default:
+      return 'Ce qui est clair devient plus facile a porter.'
+  }
+}
+
+function buildExtraPitfalls(
+  focusAngle: YearlyFocusAngle,
+  year: string,
+): string[] {
+  switch (focusAngle) {
+    case 'concentration':
+      return [
+        sentence(`En ${year}, dire oui trop vite a chaque nouvelle demande.`),
+        sentence('Rester occupe toute la journee sans finir une seule chose utile.'),
+      ]
+    case 'direction_choice':
+      return [
+        sentence(`En ${year}, changer d axe des qu une option plus seduisante apparait.`),
+        sentence('Demander encore un avis quand la vraie decision est deja la.'),
+      ]
+    case 'stop_cut_remove':
+      return [
+        sentence(`En ${year}, garder un sujet mort juste pour ne pas fermer la porte.`),
+        sentence('Reporter la coupure claire et continuer a payer le prix en silence.'),
+      ]
+    case 'energy_leak':
+      return [
+        sentence(`En ${year}, laisser ton agenda se remplir avant de proteger ton energie.`),
+        sentence('Passer du temps sur des urgences qui ne t apportent rien de solide.'),
+      ]
+    case 'execution_push':
+      return [
+        sentence(`En ${year}, preparer encore alors qu un premier test peut sortir maintenant.`),
+        sentence('Attendre le bon moment parfait au lieu de finir un pas simple.'),
+      ]
+    default:
+      return [
+        sentence(`En ${year}, disperser ton temps sur trop de fronts moyens.`),
+        sentence('Confondre occupation et progression reelle.'),
+      ]
+  }
+}
+
+function buildTimingDirective(
+  phase: 'start' | 'middle' | 'end',
+  focusAngle: YearlyFocusAngle,
+): string {
+  if (phase === 'start') {
+    switch (focusAngle) {
+      case 'concentration':
+        return 'Fais le tri. Evite les nouveaux fronts.'
+      case 'direction_choice':
+        return 'Choisis ton axe. Evite les options concurrentes.'
+      case 'stop_cut_remove':
+        return 'Ferme le secondaire. Evite de maintenir par habitude.'
+      case 'energy_leak':
+        return 'Repere les drains. Evite les oui reflexes.'
+      case 'execution_push':
+        return 'Lance un pas simple. Evite de trop preparer.'
+      default:
+        return 'Clarifie ton axe. Evite la dispersion.'
+    }
+  }
+
+  if (phase === 'middle') {
+    switch (focusAngle) {
+      case 'concentration':
+        return 'Renforce ce qui repond. Corrige la dispersion.'
+      case 'direction_choice':
+        return 'Renforce l axe choisi. Corrige les demi-choix.'
+      case 'stop_cut_remove':
+        return 'Tiens les coupures. Corrige les retours en arriere.'
+      case 'energy_leak':
+        return 'Protege ton energie. Corrige les pertes repetitives.'
+      case 'execution_push':
+        return 'Accelere sur preuve. Corrige les lenteurs inutiles.'
+      default:
+        return 'Renforce ce qui avance. Corrige le reste.'
+    }
+  }
+
+  switch (focusAngle) {
+    case 'concentration':
+      return 'Garde ce qui tient. Laisse tomber le bruit.'
+    case 'direction_choice':
+      return 'Garde la bonne direction. Laisse tomber les detours.'
+    case 'stop_cut_remove':
+      return 'Garde la place creee. Laisse tomber les vieux retours.'
+    case 'energy_leak':
+      return 'Garde l energie recuperee. Laisse tomber les drains.'
+    case 'execution_push':
+      return 'Garde ce qui produit. Laisse tomber ce qui stagne.'
+    default:
+      return 'Garde ce qui marche. Laisse tomber le reste.'
+  }
+}
+
+function buildImmediateActionSteps(
+  focusAngle: YearlyFocusAngle,
+  userPlan: UserPlan,
+): string[] {
+  const actionCount = YEARLY_PLAN_STYLES[userPlan].actionCount
+
+  const byAngle: Record<YearlyFocusAngle, string[]> = {
+    concentration: [
+      'Choisis un seul front central pour les 72 prochaines heures.',
+      'Bloque deux creneaux fixes pour ce front cette semaine.',
+      'Coupe une demande secondaire avant vendredi.',
+    ],
+    direction_choice: [
+      'Ecris ton axe en une phrase claire aujourd hui.',
+      'Passe tes projets ouverts contre cette phrase demain.',
+      'Ralentis ou coupe le chantier le moins aligne.',
+    ],
+    stop_cut_remove: [
+      'Liste trois choses a arreter dans les 24 heures.',
+      'Ferme-en une concretement cette semaine.',
+      'Envoie le message qui officialise cet arret.',
+    ],
+    energy_leak: [
+      'Note les trois situations qui te vident le plus.',
+      'Coupe la plus lourde cette semaine.',
+      'Redeploie ce temps sur un sujet qui te nourrit.',
+    ],
+    execution_push: [
+      'Choisis un livrable simple a finir en 72 heures.',
+      'Refais ce meme type de pas la semaine prochaine.',
+      'Supprime une habitude qui retarde le passage a l action.',
+    ],
+  }
+
+  return byAngle[focusAngle].slice(0, actionCount)
+}
+
+function buildPitfallTail(userPlan: UserPlan, family: AnnualFamily): string | null {
+  if (userPlan === 'free' || userPlan === 'essentiel') return null
+
+  if (userPlan === 'praticien') {
+    switch (pitfallVarietyKey(family)) {
+      case 'selection':
+        return 'Tu gardes de la presence partout. Tu perds du poids nulle part.'
+      case 'cadre':
+        return 'Tu optimises le decor. Tu reportes l arbitrage.'
+      case 'consolidation':
+        return 'Tu entretiens le potentiel. Tu retardes la preuve.'
+      case 'cadence':
+        return 'Tu reponds au bruit. Tu nourris peu la traction.'
+      case 'exposition':
+      default:
+        return 'Tu exposes avant maturite. Tu reviens ensuite corriger sous tension.'
+    }
+  }
+
+  switch (pitfallVarietyKey(family)) {
+    case 'selection':
+      return 'Tu restes occupe. Tu n avances plus.'
+    case 'cadre':
+      return 'Tu changes l outil. Pas la decision.'
+    case 'consolidation':
+      return 'Tu relances trop. Tu ne mesures rien.'
+    case 'cadence':
+      return 'Tu reagis vite. Tu n executes pas vraiment.'
+    case 'exposition':
+    default:
+      return 'Tu montres trop tot. Puis tu corriges sous pression.'
+  }
+}
+
+function buildTimingTail(
+  userPlan: UserPlan,
+  focusAngle: YearlyFocusAngle,
+  phase: 'start' | 'middle' | 'end',
+): string | null {
+  if (userPlan === 'free') return null
+
+  if (userPlan === 'essentiel') {
+    if (phase === 'start') {
+      switch (focusAngle) {
+        case 'concentration':
+          return 'Garde peu de fronts.'
+        case 'direction_choice':
+          return 'Vois ce que tu veux vraiment garder.'
+        case 'stop_cut_remove':
+          return 'Liste ce que tu retires.'
+        case 'energy_leak':
+          return 'Repere ce qui te vide.'
+        case 'execution_push':
+          return 'Choisis un terrain simple.'
+        default:
+          return null
+      }
+    }
+
+    if (phase === 'middle') {
+      switch (focusAngle) {
+        case 'concentration':
+          return 'Donne plus de place a ce qui marche.'
+        case 'direction_choice':
+          return 'Aligne tes choix sur l axe retenu.'
+        case 'stop_cut_remove':
+          return 'Confirme les vraies coupures.'
+        case 'energy_leak':
+          return 'Remets ton energie au bon endroit.'
+        case 'execution_push':
+          return 'Fais un pas visible.'
+        default:
+          return null
+      }
+    }
+
+    switch (focusAngle) {
+      case 'concentration':
+        return 'Stabilise le bon rythme.'
+      case 'direction_choice':
+        return 'Tiens la direction choisie.'
+      case 'stop_cut_remove':
+        return 'Ne rouvre pas le secondaire.'
+      case 'energy_leak':
+        return 'Garde la marge recuperee.'
+      case 'execution_push':
+        return 'Consolide ce qui a bouge.'
+      default:
+        return null
+    }
+  }
+
+  if (userPlan === 'praticien') {
+    switch (phase) {
+      case 'start':
+        return 'Ne relance rien par reflexe.'
+      case 'middle':
+        return 'Renforce seulement ce qui repond.'
+      case 'end':
+      default:
+        return 'Ferme ce qui ne tient pas.'
+    }
+  }
+
+  return null
+}
+
 function buildOrientation(
   year: string,
   priorities: PrioritySelection[],
   focusAngle: YearlyFocusAngle,
+  userPlan: UserPlan,
 ): string {
   const primary = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
   const primaryTemplate = buildFocusedPriorityTemplate(primary, year, focusAngle)
   const primaryEvidence = describeSignal(primary.signal)
+  const secondary = priorities[1] ?? primary
+  const stopSentence =
+    secondary.family === 'alignement' || secondary.family === 'cap'
+      ? 'Arrete de garder ouverts les fronts tiedes.'
+      : secondary.family === 'rythme'
+        ? 'Arrete de reagir a tout dans la minute.'
+        : 'Arrete de nourrir ce qui ne tient pas.'
+  const resultSentence =
+    focusAngle === 'execution_push'
+      ? 'Les resultats viennent de gestes simples et repetes.'
+      : focusAngle === 'energy_leak'
+        ? 'Les resultats viennent quand ton energie revient au bon endroit.'
+        : 'Les resultats viennent quand ton axe devient plus visible.'
 
-  const sentences = [
-    sentence(focusAngleLead(focusAngle, year)),
-    sentence(`Le mouvement dominant prend la forme de ${primaryTemplate.orientationAxis}: ${primaryTemplate.orientationMeaning}`),
-    sentence(`Concretement, ${primaryEvidence}`),
-  ]
-
-  return sentences.slice(0, 3).join(' ')
+  return limitAnnualSentences(
+    [
+      focusAngleLead(focusAngle, year, userPlan),
+      `Le mouvement dominant prend la forme de ${primaryTemplate.orientationAxis}: ${primaryTemplate.orientationMeaning}`,
+      buildOrientationPlanTail(userPlan, focusAngle, primaryEvidence),
+      stopSentence,
+      resultSentence,
+    ]
+      .filter(Boolean)
+      .join(' '),
+    YEARLY_PLAN_STYLES[userPlan].orientationSentences,
+  )
 }
 
 function buildPriorityBlock(
@@ -919,14 +1535,25 @@ function buildPriorityBlock(
   selection: PrioritySelection,
   index: number,
   focusAngle: YearlyFocusAngle,
+  userPlan: UserPlan,
 ): string {
   const template = buildFocusedPriorityTemplate(selection, year, focusAngle)
   const evidence = describeSignal(selection.signal)
+  const style = YEARLY_PLAN_STYLES[userPlan]
+  const whyText = limitAnnualSentences(
+    [template.whyPriority, buildPriorityWhyTail(userPlan, focusAngle, evidence)].filter(Boolean).join(' '),
+    style.whySentences,
+  )
+  const realLifeText = limitAnnualSentences(
+    [template.realLife, buildPriorityRealLifeTail(userPlan, focusAngle)].filter(Boolean).join(' '),
+    style.realLifeSentences,
+  )
 
   return [
     `${index}. ${adaptPriorityLabel(template.title, focusAngle)}`,
-    `Pourquoi: ${sentence(`${template.whyPriority} Cette priorite se confirme dans l annee par ${evidence}`)}`,
-    `Dans la vraie vie: ${sentence(template.realLife)}`,
+    `Pourquoi: ${sentence(whyText)}`,
+    `Dans la vraie vie: ${sentence(realLifeText)}`,
+    `Cle simple: ${sentence(limitAnnualSentences(buildPrioritySimpleKey(selection, focusAngle), style.keySentences))}`,
   ].join('\n')
 }
 
@@ -947,24 +1574,34 @@ function pitfallVarietyKey(family: AnnualFamily): string {
   }
 }
 
-function buildPitfalls(year: string, priorities: PrioritySelection[]): string {
+function buildPitfalls(
+  year: string,
+  priorities: PrioritySelection[],
+  focusAngle: YearlyFocusAngle,
+  userPlan: UserPlan,
+): string {
   const pitfalls: string[] = []
   const seenVarietyKeys = new Set<string>()
+  const style = YEARLY_PLAN_STYLES[userPlan]
 
   for (const selection of priorities) {
     const varietyKey = pitfallVarietyKey(selection.family)
     if (seenVarietyKeys.has(varietyKey)) continue
     seenVarietyKeys.add(varietyKey)
-    pitfalls.push(sentence(priorityTemplate(selection.family, year).pitfall))
-    if (pitfalls.length === 2) break
+    const pitfallText = limitAnnualSentences(
+      [priorityTemplate(selection.family, year).pitfall, buildPitfallTail(userPlan, selection.family)]
+        .filter(Boolean)
+        .join(' '),
+      style.pitfallSentences,
+    )
+    pitfalls.push(sentence(pitfallText))
+    if (pitfalls.length === style.pitfallCount) break
   }
 
-  const completedPitfalls = pitfalls.length >= 2
-    ? pitfalls
-    : [
-        ...pitfalls,
-        sentence('Te remettre a traiter comme urgents des sujets qui ne servent ni ton cap, ni ton rythme, ni ta consolidation.'),
-      ].slice(0, 2)
+  const completedPitfalls = [
+    ...pitfalls,
+    ...buildExtraPitfalls(focusAngle, year),
+  ].slice(0, style.pitfallCount)
 
   return completedPitfalls.map((entry) => `- ${entry}`).join('\n')
 }
@@ -1023,7 +1660,7 @@ function timingLead(phase: 'start' | 'middle' | 'end', family: AnnualFamily): st
   }
 }
 
-function buildTiming(year: string, priorities: PrioritySelection[]): string {
+function buildTiming(year: string, priorities: PrioritySelection[], focusAngle: YearlyFocusAngle, userPlan: UserPlan): string {
   const first = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
   const second = priorities[1] ?? first
   const third = priorities[2] ?? second
@@ -1031,11 +1668,29 @@ function buildTiming(year: string, priorities: PrioritySelection[]): string {
   const firstTemplate = priorityTemplate(first.family, year)
   const secondTemplate = priorityTemplate(second.family, year)
   const thirdTemplate = priorityTemplate(third.family, year)
+  const style = YEARLY_PLAN_STYLES[userPlan]
+
+  const buildTimingLine = (
+    label: string,
+    phase: 'start' | 'middle' | 'end',
+    family: AnnualFamily,
+    detail: string,
+  ) => {
+    const compactText = [
+      buildTimingDirective(phase, focusAngle),
+      userPlan === 'free' ? null : detail,
+      buildTimingTail(userPlan, focusAngle, phase),
+    ]
+      .filter(Boolean)
+      .join(' ')
+
+    return `${label}: ${sentence(limitAnnualSentences(compactText, style.timingSentences))}`
+  }
 
   return [
-    `Debut d annee: ${sentence(`${timingLead('start', first.family)}. ${firstTemplate.timingStart}`)}`,
-    `Milieu d annee: ${sentence(`${timingLead('middle', second.family)}. ${secondTemplate.timingMiddle}`)}`,
-    `Fin d annee: ${sentence(`${timingLead('end', third.family)}. ${thirdTemplate.timingEnd}`)}`,
+    buildTimingLine('Debut d annee', 'start', first.family, firstTemplate.timingStart),
+    buildTimingLine('Milieu d annee', 'middle', second.family, secondTemplate.timingMiddle),
+    buildTimingLine('Fin d annee', 'end', third.family, thirdTemplate.timingEnd),
   ].join('\n')
 }
 
@@ -1047,7 +1702,59 @@ function buildImmediateAction(year: string, primary: PrioritySelection): string 
 function focusAngleImmediateAction(
   year: string,
   focusAngle: YearlyFocusAngle,
+  userPlan: UserPlan,
 ): string | null {
+  if (userPlan === 'free') {
+    switch (focusAngle) {
+      case 'concentration':
+        return 'Dans les 24 a 72 heures, choisis un seul sujet et bloque un creneau pour lui.'
+      case 'direction_choice':
+        return 'Dans les 24 a 72 heures, ecris ton axe et coupe un sujet secondaire.'
+      case 'stop_cut_remove':
+        return 'Dans les 24 a 72 heures, liste trois arrets et ferme-en un.'
+      case 'energy_leak':
+        return 'Dans les 24 a 72 heures, repere ta plus grosse fuite et coupe-la.'
+      case 'execution_push':
+        return 'Dans les 24 a 72 heures, termine un pas simple et visible.'
+      default:
+        return null
+    }
+  }
+
+  if (userPlan === 'essentiel') {
+    switch (focusAngle) {
+      case 'concentration':
+        return 'Dans les 24 a 72 heures, choisis deux priorites maximum. Bloque un creneau net pour la premiere.'
+      case 'direction_choice':
+        return 'Dans les 24 a 72 heures, ecris ton axe en une phrase. Ralentis le chantier le moins aligne.'
+      case 'stop_cut_remove':
+        return 'Dans les 24 a 72 heures, liste trois arrets. Ferme-en un. Envoie le message utile.'
+      case 'energy_leak':
+        return 'Dans les 24 a 72 heures, note trois drains. Coupe-en un. Redeploie ce temps sur le bon front.'
+      case 'execution_push':
+        return 'Dans les 24 a 72 heures, choisis un livrable court. Termine-le. Fixe ensuite le prochain pas.'
+      default:
+        return null
+    }
+  }
+
+  if (userPlan === 'praticien') {
+    switch (focusAngle) {
+      case 'concentration':
+        return 'Dans les 24 a 72 heures, nomme ton front prioritaire. Coupe un front concurrent. Verrouille deux plages de travail protegées.'
+      case 'direction_choice':
+        return 'Dans les 24 a 72 heures, formule l axe directeur. Passe chaque chantier contre ce filtre. Retire celui qui dilue le plus la direction.'
+      case 'stop_cut_remove':
+        return 'Dans les 24 a 72 heures, nomme trois arrets. Officialise le premier. Supprime ensuite le maintien passif qui lui restait accroche.'
+      case 'energy_leak':
+        return 'Dans les 24 a 72 heures, identifie le drain principal. Coupe-le. Redeploie aussitot cette marge sur le front qui compte.'
+      case 'execution_push':
+        return 'Dans les 24 a 72 heures, sors une preuve simple. Mesure-la. Fixe ensuite la prochaine preuve avant la fin de semaine.'
+      default:
+        return null
+    }
+  }
+
   switch (focusAngle) {
     case 'concentration':
       return `Dans les 24 a 72 heures, choisis un seul chantier central, bloque deux plages de concentration pour lui, et reporte explicitement une demande secondaire.`
@@ -1068,10 +1775,16 @@ function buildImmediateActionWithAngle(
   year: string,
   primary: PrioritySelection,
   focusAngle: YearlyFocusAngle,
+  userPlan: UserPlan,
 ): string {
-  const angleSpecificAction = focusAngleImmediateAction(year, focusAngle)
-  if (angleSpecificAction) return sentence(angleSpecificAction)
-  return buildImmediateAction(year, primary)
+  const baseActions = buildImmediateActionSteps(focusAngle, userPlan)
+  const fallbackAction = focusAngleImmediateAction(year, focusAngle, userPlan) ?? buildImmediateAction(year, primary)
+  const actions = baseActions.length > 0 ? baseActions : [fallbackAction]
+
+  return actions
+    .slice(0, YEARLY_PLAN_STYLES[userPlan].actionCount)
+    .map((action, index) => `Action ${index + 1}: ${sentence(limitAnnualSentences(action, 1))}`)
+    .join('\n')
 }
 
 export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): string {
@@ -1079,25 +1792,28 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
   const openingSignal = input.openingSignal?.signal ?? prioritizedSignals[0] ?? null
   const year = extractRequestedYear(input.userMessage)
   const focusAngle = input.focusAngle ?? detectYearlyFocusAngle(input.userMessage)
+  const userPlan = resolveYearlyUserPlan(input.userPlan)
   const priorities = buildPrioritySignals(openingSignal, prioritizedSignals)
   const primary = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
 
   const rawAnswer = [
     `ORIENTATION ${year}`,
-    buildGuidingLine(year, focusAngle),
-    buildOrientation(year, priorities, focusAngle),
+    buildGuidingLine(year, focusAngle, userPlan),
+    buildOrientation(year, priorities, focusAngle, userPlan),
     '',
     'TES 3 PRIORITES REELLES',
-    priorities.map((selection, index) => buildPriorityBlock(year, selection, index + 1, focusAngle)).join('\n\n'),
+    priorities
+      .map((selection, index) => buildPriorityBlock(year, selection, index + 1, focusAngle, userPlan))
+      .join('\n\n'),
     '',
     'CE QUI VA TE FREINER',
-    buildPitfalls(year, priorities),
+    buildPitfalls(year, priorities, focusAngle, userPlan),
     '',
     'TON TIMING',
-    buildTiming(year, priorities),
+    buildTiming(year, priorities, focusAngle, userPlan),
     '',
     'ACTION IMMEDIATE',
-    buildImmediateActionWithAngle(year, primary, focusAngle),
+    buildImmediateActionWithAngle(year, primary, focusAngle, userPlan),
   ].join('\n')
 
   return polishYearlyPriorityAnswer(rawAnswer)
@@ -1109,6 +1825,17 @@ function extractPrioritySection(text: string): string {
   )
 
   return match?.[1]?.trim() ?? ''
+}
+
+function extractAnnualSection(text: string, heading: string, nextHeading?: string): string {
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapedNextHeading = nextHeading?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const pattern = new RegExp(
+    `${escapedHeading}\\s*\\n([\\s\\S]*?)(?:\\n\\s*${escapedNextHeading ?? '$'}|$)`,
+    'i',
+  )
+
+  return text.match(pattern)?.[1]?.trim() ?? ''
 }
 
 function normalizeYearlyPriorityTextForValidation(text: string): string {
@@ -1135,6 +1862,8 @@ export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriority
   const cleaned = normalize(normalizedText)
   const issues: string[] = []
   const prioritySection = extractPrioritySection(normalizedText)
+  const pitfallSection = extractAnnualSection(normalizedText, 'CE QUI VA TE FREINER', 'TON TIMING')
+  const actionSection = extractAnnualSection(normalizedText, 'ACTION IMMEDIATE')
   const priorityBlocks = prioritySection
     .split(/\n\s*\n/)
     .filter((block) => /^\s*\d+[.)]\s+/m.test(block))
@@ -1162,9 +1891,22 @@ export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriority
   }
 
   const priorityCount = (prioritySection.match(PRIORITY_LINE_PATTERN) ?? []).length
+  const pitfallCount = (pitfallSection.match(/^\s*-\s+/gm) ?? []).length
+  const actionCount = (actionSection.match(/^\s*Action\s+\d+:\s+/gim) ?? []).length
   if (priorityCount !== 3) issues.push(`invalid_priority_count:${priorityCount}`)
+  if (pitfallCount < 3 || pitfallCount > 4) issues.push(`invalid_pitfall_count:${pitfallCount}`)
+  if (actionCount < 2 || actionCount > 3) issues.push(`invalid_action_count:${actionCount}`)
   if (!priorityBlocks.some((block) => RADICAL_PRIORITY_PATTERN.test(block))) {
     issues.push('missing_radical_priority')
+  }
+  if (!priorityBlocks.every((block) => /Pourquoi:/i.test(block))) {
+    issues.push('missing_priority_why')
+  }
+  if (!priorityBlocks.every((block) => /Dans la vraie vie:/i.test(block))) {
+    issues.push('missing_priority_real_life')
+  }
+  if (!priorityBlocks.every((block) => /Cle simple:/i.test(block))) {
+    issues.push('missing_priority_simple_key')
   }
 
   for (const word of FORBIDDEN_ANNUAL_WORDS) {

@@ -3444,6 +3444,7 @@ export async function runHexastraFlow(input: {
           prioritizedSignals: presentationStructuredSignals,
           knowledgePacket,
           yearlyFocusAngle,
+          userPlan: renderUserPlan,
         })
         const profiledFinalAnswer = applyRenderProfile({
           answer: rawFinalAnswer,
@@ -4399,6 +4400,7 @@ export async function runHexastraFlow(input: {
           prioritizedSignals: presentationStructuredSignals,
           knowledgePacket,
           yearlyFocusAngle,
+          userPlan: normalizeUserPlan(plan),
         })
 
         rawMessage = fallbackYearlyAnswer.text
