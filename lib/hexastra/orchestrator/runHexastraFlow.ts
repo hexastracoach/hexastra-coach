@@ -4392,8 +4392,10 @@ export async function runHexastraFlow(input: {
 
     if (effectiveResponseMode === 'yearly_priority_answer') {
       const yearlyPriorityValidationRaw = applySentinel(rawMessage)
-      const yearlyPriorityValidationTarget = sanitizeYearlyPriorityRenderedText(yearlyPriorityValidationRaw)
       const yearlyPriorityValidationPlan = normalizeUserPlan(plan)
+      const yearlyPriorityValidationTarget = sanitizeYearlyPriorityRenderedText(yearlyPriorityValidationRaw, {
+        userPlan: yearlyPriorityValidationPlan,
+      })
       if (yearlyPriorityValidationTarget !== yearlyPriorityValidationRaw) {
         rawMessage = yearlyPriorityValidationTarget
         flowLog('info', 'YEARLY_PRIORITY_TECHNICAL_TOKENS_STRIPPED', {

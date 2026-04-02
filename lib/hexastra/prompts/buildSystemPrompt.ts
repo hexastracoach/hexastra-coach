@@ -1050,7 +1050,9 @@ function yearlyPriorityPlanDirective(input: BuildPromptInput): string {
 - Montrer aussi ce qui marche deja quand c est utile.
 - CE QUI VA TE FREINER: 2 a 3 points concrets maximum.
 - TON TIMING: un peu developpe, mais lisible en une lecture.
-- ACTION IMMEDIATE: 1 geste simple et net, deja organisable.`
+- ACTION IMMEDIATE: donne 1 a 2 actions maximum.
+- Jamais plus de 2 actions.
+- Reste simple et direct.`
     case 'practitioner':
       return `PLAN ACTIF: PRATICIEN.
 - LONGUEUR CIBLE: moyenne a dense, sans perdre la clarte.

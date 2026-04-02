@@ -148,7 +148,7 @@ const YEARLY_PLAN_STYLES: Record<UserPlan, YearlyPlanStyle> = {
     pitfallSentences: 1,
     pitfallCount: 2,
     timingSentences: 2,
-    actionCount: 1,
+    actionCount: 2,
   },
   premium: {
     orientationSentences: 4,
@@ -195,7 +195,7 @@ const YEARLY_VALIDATION_PROFILES: Record<UserPlan, YearlyValidationProfile> = {
     minPitfalls: 1,
     maxPitfalls: 3,
     minActions: 1,
-    maxActions: 1,
+    maxActions: 2,
   },
   premium: {
     requireWhy: true,
@@ -307,8 +307,36 @@ function sanitizeAnnualContent(text: string): string {
   return normalize(cleaned.replace(/\s*([,;:])\s*/g, '$1 '))
 }
 
-export function sanitizeYearlyPriorityRenderedText(text: string): string {
-  return (text || '')
+type SanitizeYearlyPriorityRenderedTextOptions = {
+  userPlan?: UserPlan | null
+}
+
+function trimImmediateActionsToMax(text: string, maxActions: number): string {
+  if (maxActions < 1) return text
+
+  const normalizedText = (text || '').replace(/\r\n?/g, '\n')
+  const headingMatch = normalizedText.match(/(^ACTION\s+IMMEDIATE\b[^\n]*\n?)([\s\S]*)$/im)
+  if (!headingMatch) return text
+
+  const sectionContent = headingMatch[2] ?? ''
+  const actionBlockPattern = /^\s*Action\s+\d+:\s+[\s\S]*?(?=^\s*Action\s+\d+:\s+|$)/gim
+  const actionBlocks = sectionContent.match(actionBlockPattern) ?? []
+  if (actionBlocks.length <= maxActions) return text
+
+  const sectionWithoutActions = normalize(sectionContent.replace(actionBlockPattern, '').trim())
+  const trimmedSection = [...actionBlocks.slice(0, maxActions), sectionWithoutActions]
+    .filter(Boolean)
+    .join('\n')
+    .trim()
+
+  return `${normalizedText.slice(0, headingMatch.index)}${headingMatch[1]}${trimmedSection}`.trim()
+}
+
+export function sanitizeYearlyPriorityRenderedText(
+  text: string,
+  options?: SanitizeYearlyPriorityRenderedTextOptions,
+): string {
+  const sanitized = (text || '')
     .replace(/\r\n?/g, '\n')
     .split('\n')
     .map((line) => {
@@ -320,6 +348,13 @@ export function sanitizeYearlyPriorityRenderedText(text: string): string {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+
+  const userPlan = resolveYearlyUserPlan(options?.userPlan)
+  if (userPlan === 'essentiel') {
+    return trimImmediateActionsToMax(sanitized, 2)
+  }
+
+  return sanitized
 }
 
 function simplifyText(text: string): string {
@@ -1899,7 +1934,7 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
     buildImmediateActionWithAngle(year, primary, focusAngle, userPlan),
   ].join('\n')
 
-  return sanitizeYearlyPriorityRenderedText(polishYearlyPriorityAnswer(rawAnswer))
+  return sanitizeYearlyPriorityRenderedText(polishYearlyPriorityAnswer(rawAnswer), { userPlan })
 }
 
 function extractPrioritySection(text: string): string {
