@@ -6,7 +6,10 @@ import { buildKnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledge
 import type { KnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
 import { selectResponseModeSelection } from '@/lib/hexastra/orchestrator/selectResponseMode'
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
-import { validateYearlyPriorityAnswerFormat } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
+import {
+  detectYearlyPriorityFocusAngle,
+  validateYearlyPriorityAnswerFormat,
+} from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
 import { buildExactDataRequestFromRetrievalPlan } from '@/lib/hexastra/retrieval/exactDataHintMapper'
 import { prioritizeStructuredSignals } from '@/lib/hexastra/retrieval/prioritizeStructuredSignals'
 import { buildRetrievalPlanFromQuery } from '@/lib/hexastra/retrieval/retrievalPlanBuilder'
@@ -520,6 +523,79 @@ describe('buildFinalAnswer', () => {
     expect(validation.priorityCount).toBe(3)
   })
 
+  it('detects yearly priority focus angles from natural questions', () => {
+    expect(detectYearlyPriorityFocusAngle('Sur quoi je dois me concentrer cette annee ?')).toBe('concentration')
+    expect(detectYearlyPriorityFocusAngle('Quel axe je dois vraiment choisir ?')).toBe('direction_choice')
+    expect(detectYearlyPriorityFocusAngle('Qu est-ce que je dois arreter en 2026 ?')).toBe('stop_cut_remove')
+    expect(detectYearlyPriorityFocusAngle('Ou je perds mon energie ?')).toBe('energy_leak')
+  })
+
+  it('adapts yearly priorities to a concentration angle', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Sur quoi je dois me concentrer cette annee ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: null,
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: { summary: 'clarifier ton cap, trier tes engagements et assumer un axe plus net' },
+        },
+        {
+          science: 'astrology',
+          subCategory: 'astro_transits_current',
+          sourceType: 'exact_data',
+          value: { summary: 'la traction existe mais elle doit etre lue avant d accelerer' },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: 'engager ton energie sur moins de fronts mais avec plus de nettete' },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).toContain('ou concentrer tes moyens')
+    expect(answer.text).toContain('Protege tes plages fortes')
+    expect(answer.text).toContain('bloque deux plages de concentration')
+  })
+
+  it('adapts yearly priorities to a direction-choice angle', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Quel axe je dois vraiment choisir ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: null,
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: { summary: 'clarifier ton cap, trier tes engagements et assumer un axe plus net' },
+        },
+        {
+          science: 'astrology',
+          subCategory: 'astro_transits_current',
+          sourceType: 'exact_data',
+          value: { summary: 'la traction existe mais elle doit etre lue avant d accelerer' },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: 'engager ton energie sur moins de fronts mais avec plus de nettete' },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).toContain('une direction claire')
+    expect(answer.text).toContain('Choisis puis coupe')
+    expect(answer.text).toContain('axe directeur')
+  })
+
   it('strips boolean leakage from yearly priority content', () => {
     const answer = buildFinalAnswer({
       userMessage: 'Sur quoi je dois me concentrer cette annee ?',
@@ -575,6 +651,56 @@ describe('buildFinalAnswer', () => {
     expect(answer.text.toLowerCase()).not.toContain(' vrai ')
     expect(answer.text.toLowerCase()).not.toContain(' faux ')
     expect(answer.text).not.toMatch(/\b(?:true|false|vrai|faux)\b/i)
+  })
+
+  it('strips technical exact-data tokens and iso dates from yearly priority content', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'Quel cap choisir en 2026 ?',
+      responseMode: 'yearly_priority_answer',
+      openingSignal: {
+        signal: {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: {
+            summary: 'solar_return',
+          },
+        },
+        orderedSignals: [],
+        dominantOpeningSource: 'exact_data',
+        dominantOpeningScience: 'fusion',
+        dominantOpeningSubCategory: 'annual_guidance',
+        reasoningTags: ['yearly_priority_override'],
+      },
+      prioritizedSignals: [
+        {
+          science: 'fusion',
+          subCategory: 'annual_guidance',
+          sourceType: 'exact_data',
+          value: {
+            summary: 'solar_return',
+          },
+        },
+        {
+          science: 'human_design',
+          subCategory: 'hd_current_transits',
+          sourceType: 'exact_data',
+          value: { current_cycle: 'human_design_transits' },
+        },
+        {
+          science: 'kua',
+          subCategory: 'kua_annual_influence',
+          sourceType: 'exact_data',
+          value: { annualInfluence: '2026-04-02' },
+        },
+      ],
+      knowledgePacket: makeMinimalKnowledgePacket(),
+    })
+
+    expect(answer.text).not.toMatch(/\b(?:solar_return|lunar_return|progressions|transits|human_design_transits|numerology_cycles|kua_directions)\b/i)
+    expect(answer.text).not.toMatch(/\b20\d{2}-\d{2}-\d{2}\b/)
+    expect(answer.text).toContain('ORIENTATION 2026')
+    expect(validateYearlyPriorityAnswerFormat(answer.text).valid).toBe(true)
   })
 
   it('keeps the three yearly priorities distinct and concretely grounded', () => {
@@ -676,6 +802,43 @@ describe('buildFinalAnswer', () => {
 
     expect(validation.priorityCount).toBe(3)
     expect(validation.issues).not.toContain('invalid_priority_count:5')
+  })
+
+  it('validates the displayed yearly structure with markdown accents and CRLF', () => {
+    const validation = validateYearlyPriorityAnswerFormat([
+      '## ORIENTATION 2026',
+      'En 2026, l axe dominant est tri strategique et structuration du cap.',
+      '',
+      '**TES 3 PRIORITÉS RÉELLES**',
+      '1. Coupe le secondaire',
+      'Pourquoi: En 2026, laisser ouverts des fronts tiedes te coute plus qu ils ne t apportent.',
+      'Dans la vraie vie: Coupe un projet secondaire et refuse une opportunite non alignee.',
+      '',
+      '2. Nettoyer tes oui',
+      'Pourquoi: Cette annee, ton energie doit aller sur moins de fronts mais avec plus de nettete.',
+      'Dans la vraie vie: Refuse une demande non alignee et garde un seul oui fort.',
+      '',
+      '3. Consolider ce qui tient',
+      'Pourquoi: En 2026, les resultats viennent de ce qui tient deja dans le reel.',
+      'Dans la vraie vie: Termine un chantier utile avant d en ouvrir un autre.',
+      '',
+      '### CE QUI VA TE FREINER',
+      '- Dire oui a des opportunites non alignees.',
+      '- Changer le decor sans changer la vraie decision de fond.',
+      '',
+      '## TON TIMING',
+      'Début d’année: Trie et clarifie.',
+      'Milieu d’année: Engage-toi nettement.',
+      'Fin d’année: Consolide les resultats.',
+      '',
+      '**ACTION IMMÉDIATE**',
+      'Dans les 24 a 72 heures, ferme un engagement secondaire.',
+    ].join('\r\n'))
+
+    expect(validation.valid).toBe(true)
+    expect(validation.priorityCount).toBe(3)
+    expect(validation.issues).not.toContain('missing_heading:/TES\\s+3\\s+PRIORITES\\s+REELLES\\b/i')
+    expect(validation.issues).not.toContain('missing_heading:/ACTION\\s+IMMEDIATE\\b/i')
   })
 
   it('prefers a naturally radical family over a first maturation item', () => {

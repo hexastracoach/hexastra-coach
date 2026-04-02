@@ -3,7 +3,10 @@ import type { OpeningSignalSelection } from '@/lib/hexastra/orchestrator/selectO
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
 import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
 import { getFusionFallbackCopy } from '@/lib/hexastra/rendering/getFusionFallbackCopy'
-import { buildYearlyPriorityAnswer } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
+import {
+  buildYearlyPriorityAnswer,
+  detectYearlyPriorityFocusAngle,
+} from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
 
 export type FinalAnswerInput = {
   userMessage: string
@@ -555,6 +558,7 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
         userMessage: input.userMessage,
         openingSignal: input.openingSignal,
         prioritizedSignals: input.prioritizedSignals,
+        focusAngle: detectYearlyPriorityFocusAngle(input.userMessage),
       }),
     }
   }

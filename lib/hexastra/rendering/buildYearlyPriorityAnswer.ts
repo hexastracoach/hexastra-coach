@@ -6,7 +6,15 @@ export type YearlyPriorityAnswerInput = {
   userMessage: string
   openingSignal: OpeningSignalSelection | null
   prioritizedSignals: StructuredSignal[]
+  focusAngle?: YearlyPriorityFocusAngle | null
 }
+
+export type YearlyPriorityFocusAngle =
+  | 'annual_priorities'
+  | 'concentration'
+  | 'direction_choice'
+  | 'stop_cut_remove'
+  | 'energy_leak'
 
 type AnnualFamily =
   | 'cap'
@@ -42,8 +50,53 @@ export type YearlyPriorityValidation = {
 }
 
 const FORBIDDEN_ANNUAL_WORDS = ['true', 'false', 'vrai', 'faux', 'signal', 'confidence'] as const
+const FORBIDDEN_ANNUAL_TECHNICAL_PATTERNS = [
+  { key: 'solar_return', pattern: /\b(?:astro[_ ]?)?solar[_ ]return\b/gi },
+  { key: 'lunar_return', pattern: /\b(?:astro[_ ]?)?lunar[_ ]return\b/gi },
+  { key: 'progressions', pattern: /\b(?:astro[_ ]?)?progressions?\b/gi },
+  { key: 'transits', pattern: /\b(?:astro[_ ]?)?transits?(?:[_ ](?:current|timing|energy))?\b/gi },
+  { key: 'human_design_transits', pattern: /\b(?:hd[_ ]current[_ ]transits|human[_ ]design[_ ]transits)\b/gi },
+  { key: 'numerology_cycles', pattern: /\b(?:numerology[_ ]cycles?|num[_ ]personal[_ ]year)\b/gi },
+  { key: 'kua_directions', pattern: /\b(?:kua[_ ]directions?|kua[_ ]annual[_ ]influence|kua[_ ]favorable[_ ]directions)\b/gi },
+  { key: 'iso_date', pattern: /\b20\d{2}-\d{2}-\d{2}\b/g },
+] as const
 const RADICAL_PRIORITY_PATTERN = /\b(stop|supprime|coupe|refuse)\b/i
 const RADICAL_FAMILY_PRIORITY: AnnualFamily[] = ['cap', 'alignement', 'cycle', 'direction']
+const PRIORITY_LINE_PATTERN = /^\s*\d+[.)]\s+/gm
+const ANNUAL_EVIDENCE_FILLER_WORDS = new Set([
+  'a',
+  'an',
+  'annee',
+  'by',
+  'c',
+  'ca',
+  'ce',
+  'ces',
+  'cette',
+  'dans',
+  'de',
+  'des',
+  'du',
+  'en',
+  'est',
+  'et',
+  'il',
+  'la',
+  'le',
+  'les',
+  'l',
+  'mon',
+  'ma',
+  'mes',
+  'par',
+  'pour',
+  'sur',
+  'the',
+  'this',
+  'un',
+  'une',
+  'y',
+])
 
 function normalize(text: string): string {
   return (text || '')
@@ -51,13 +104,85 @@ function normalize(text: string): string {
     .trim()
 }
 
+function normalizeIntentText(text: string): string {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+export function detectYearlyPriorityFocusAngle(message: string): YearlyPriorityFocusAngle {
+  const normalized = normalizeIntentText(message)
+
+  if (
+    /(qu est ce que je dois arreter|que dois je arreter|quoi arreter|laisser tomber|arreter cette annee|arreter en 20\d{2}|supprimer|couper|refuser|stopper)/.test(
+      normalized,
+    )
+  ) {
+    return 'stop_cut_remove'
+  }
+
+  if (
+    /(ou je perds mon energie|ou je perd mon energie|ce qui me disperse|ce qui me fait perdre du temps|fuite d energie|fuites d energie|ce qui me vide)/.test(
+      normalized,
+    )
+  ) {
+    return 'energy_leak'
+  }
+
+  if (
+    /(quel axe(?: je dois vraiment)? choisir|quel cap choisir|quelle direction prendre|quel axe prendre|quel cap prendre)/.test(
+      normalized,
+    )
+  ) {
+    return 'direction_choice'
+  }
+
+  if (
+    /(sur quoi je dois me concentrer|sur quoi me concentrer|ou me concentrer|ou mettre mon energie|ou orienter mon energie|mettre mon energie|orienter mon energie)/.test(
+      normalized,
+    )
+  ) {
+    return 'concentration'
+  }
+
+  return 'annual_priorities'
+}
+
 function sanitizeAnnualContent(text: string): string {
-  return normalize(
-    normalize(text)
-      .replace(/\b(?:true|false|vrai|faux)\b/gi, '')
-      .replace(/\bconfidence\b/gi, 'fiabilite')
-      .replace(/\bsignal\b/gi, 'point cle'),
-  )
+  let cleaned = normalize(text)
+    .replace(/\b(?:true|false|vrai|faux)\b/gi, ' ')
+    .replace(/\bconfidence\b/gi, 'fiabilite')
+    .replace(/\bsignal\b/gi, 'point cle')
+
+  for (const { pattern } of FORBIDDEN_ANNUAL_TECHNICAL_PATTERNS) {
+    cleaned = cleaned.replace(pattern, ' ')
+  }
+
+  return normalize(cleaned.replace(/\s*([,;:])\s*/g, '$1 '))
+}
+
+function isMeaningfulAnnualEvidence(text: string): boolean {
+  const normalized = normalize(text)
+    .toLowerCase()
+    .replace(/[’']/g, ' ')
+
+  if (!normalized) return false
+
+  const informativeTokens = normalized
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .filter((token) => !ANNUAL_EVIDENCE_FILLER_WORDS.has(token))
+
+  return informativeTokens.length >= 2 || normalized.length >= 28
+}
+
+function sanitizeAnnualEvidence(text: string): string | null {
+  const cleaned = sanitizeAnnualContent(text)
+  return isMeaningfulAnnualEvidence(cleaned) ? cleaned : null
 }
 
 function sentence(value: string | null | undefined): string {
@@ -131,15 +256,17 @@ function findByPaths(value: unknown, paths: string[]): unknown {
 
 function stringifyCandidate(value: unknown): string | null {
   const unwrapped = unwrapDisplayText(value)
-  if (unwrapped) return sanitizeAnnualContent(unwrapped)
+  if (unwrapped) return sanitizeAnnualEvidence(unwrapped)
 
-  if (typeof value === 'string') return sanitizeAnnualContent(value)
-  if (typeof value === 'number') return String(value)
+  if (typeof value === 'string') return sanitizeAnnualEvidence(value)
+  if (typeof value === 'number') return sanitizeAnnualEvidence(String(value))
   if (typeof value === 'boolean') return null
 
   if (Array.isArray(value)) {
     const parts = flattenScalarTexts(value, 4)
-    return parts.length > 0 ? parts.join(', ') : null
+      .map((entry) => sanitizeAnnualEvidence(entry))
+      .filter((entry): entry is string => Boolean(entry))
+    return parts.length > 0 ? sanitizeAnnualEvidence(parts.join(', ')) : null
   }
 
   return null
@@ -329,6 +456,168 @@ function priorityTemplate(family: AnnualFamily, year: string): PriorityTemplate 
   }
 }
 
+function focusAngleLead(angle: YearlyPriorityFocusAngle, year: string): string {
+  switch (angle) {
+    case 'concentration':
+      return `En ${year}, la bonne question n est pas quoi ajouter, mais ou concentrer tes moyens pour obtenir le plus d effet.`
+    case 'direction_choice':
+      return `En ${year}, tu avances quand une direction claire prend le dessus sur les options concurrentes.`
+    case 'stop_cut_remove':
+      return `En ${year}, ta progression depend d abord de ce que tu arretes, refuses ou retires de ton champ.`
+    case 'energy_leak':
+      return `En ${year}, l enjeu n est pas d en faire plus, mais de stopper ce qui vide ton energie utile.`
+    case 'annual_priorities':
+    default:
+      return `En ${year}, ton annee avance quand tu choisis mieux quoi renforcer et quoi laisser en arriere-plan.`
+  }
+}
+
+function applyFocusAngleToTemplate(
+  template: PriorityTemplate,
+  selection: PrioritySelection,
+  year: string,
+  focusAngle: YearlyPriorityFocusAngle,
+): PriorityTemplate {
+  switch (focusAngle) {
+    case 'concentration':
+      switch (selection.family) {
+        case 'cap':
+          return {
+            ...template,
+            orientationAxis: 'concentration strategique et allocation nette des moyens',
+            orientationMeaning: 'ce qui doit avancer cette annee demande moins de fronts ouverts et plus de ressources concentrees au bon endroit',
+            ...(selection.isRadical ? {} : { title: 'Concentre le principal' }),
+            whyPriority: `En ${year}, ta progression vient moins du volume que de la concentration de tes moyens sur ce qui repond deja dans le reel.`,
+            realLife: 'Reduis le nombre de sujets actifs, protege un chantier central, et reserve ton meilleur temps a ce qui produit deja le plus de traction.',
+          }
+        case 'rythme':
+          return {
+            ...template,
+            title: 'Protege tes plages fortes',
+            whyPriority: `Cette annee, te concentrer ne veut pas dire en faire plus, mais defendre les moments ou ton attention produit vraiment quelque chose.`,
+            realLife: 'Bloque des plages sans interruption, traite les urgences apres le bloc central, et evite de casser ton elan toutes les trente minutes.',
+          }
+        case 'alignement':
+          return {
+            ...template,
+            title: 'Garde ton energie pour le bon oui',
+            whyPriority: `En ${year}, la concentration depend aussi de ce que tu acceptes de ne plus porter quand cela mange ton energie sans renforcer l essentiel.`,
+            realLife: 'Repousse une sollicitation secondaire, garde un seul engagement fort, et coupe ce qui consomme sans faire avancer.',
+          }
+        default:
+          return template
+      }
+
+    case 'direction_choice':
+      switch (selection.family) {
+        case 'cap':
+          return {
+            ...template,
+            title: selection.isRadical ? 'Choisis puis coupe' : 'Nommer le cap',
+            orientationAxis: 'direction claire et arbitrage strategique',
+            orientationMeaning: 'tu avances quand une ligne directrice nette gouverne tes choix et fait tomber les options concurrentes',
+            whyPriority: `En ${year}, ton probleme n est pas un manque d options mais un manque d arbitrage clair sur celle qui doit structurer tes decisions.`,
+            realLife: 'Formule ton axe en une phrase, compare chaque projet a cette phrase, et retire ce qui ouvre une direction concurrente.',
+          }
+        case 'direction':
+          return {
+            ...template,
+            title: 'Choisis une ligne directrice',
+            orientationAxis: 'ligne directrice claire et cadre coherent',
+            orientationMeaning: 'la clarte vient d un axe assume, puis d un cadre qui le soutient dans le reel',
+            whyPriority: `Cette priorite compte en ${year} parce qu une bonne direction doit devenir visible dans ton agenda, ton cadre et tes arbitrages de semaine.`,
+            realLife: 'Choisis un axe central, fais converger ton temps avec lui, et retire les decisions qui entretiennent encore le flou.',
+          }
+        case 'alignement':
+          return {
+            ...template,
+            title: 'Aligne tes oui sur ce cap',
+            whyPriority: `En ${year}, ton cap restera theorique si tes oui, tes rendez-vous et tes efforts partent encore dans plusieurs directions a la fois.`,
+            realLife: 'Dis oui seulement a ce qui renforce l axe retenu, ralentis le reste, et coupe les demandes qui reouvrent l indecision.',
+          }
+        case 'rythme':
+          return {
+            ...template,
+            title: 'Mets ton temps au service d un axe',
+            whyPriority: `Cette annee, ta cadence doit servir une direction choisie, pas seulement repondre a ce qui crie le plus fort.`,
+            realLife: 'Place tes meilleurs creneaux sur le cap retenu, puis traite le secondaire apres au lieu de l inverse.',
+          }
+        default:
+          return template
+      }
+
+    case 'stop_cut_remove':
+      switch (selection.family) {
+        case 'cap':
+          return {
+            ...template,
+            orientationAxis: 'soustraction strategique et tri net',
+            orientationMeaning: 'ce qui doit avancer cette annee a besoin de place reelle, pas d une accumulation de fronts tiedes',
+            ...(selection.isRadical ? {} : { title: 'Ferme les fronts tiedes' }),
+            whyPriority: `En ${year}, enlever ce qui n a plus d elan est plus utile que d ajouter un nouveau plan de progression.`,
+            realLife: 'Ferme un projet qui stagne, retire un engagement de maintien, et laisse tomber ce qui occupe de la place sans produire de vrai mouvement.',
+          }
+        case 'alignement':
+          return {
+            ...template,
+            title: 'Refuse ce qui te draine',
+            whyPriority: `Cette annee, chaque oui par inertie te coute du temps, de l energie et de la disponibilite pour ce qui merite encore d avancer.`,
+            realLife: 'Refuse une demande qui n est plus alignee, coupe une collaboration tiede, et retire une obligation que tu maintiens uniquement par habitude.',
+          }
+        case 'cycle':
+          return {
+            ...template,
+            title: selection.isRadical ? 'Coupe les chantiers sans preuve' : 'Arrete ce qui ne tient pas',
+            whyPriority: `En ${year}, ce qui ne montre ni resultat, ni traction, ni base solide doit cesser de monopoliser ton energie.`,
+            realLife: 'Arrete un chantier qui reste au stade de l intention, supprime une tache de maintien sans impact, et renonce a relancer ce qui n a pas de preuve de vie.',
+          }
+        default:
+          return template
+      }
+
+    case 'energy_leak':
+      switch (selection.family) {
+        case 'alignement':
+          return {
+            ...template,
+            title: selection.isRadical ? 'Refuse ce qui te vide' : 'Repere les fuites d energie',
+            orientationAxis: 'reprise en main des fuites d energie',
+            orientationMeaning: 'ta clarte revient quand tu cesses d alimenter ce qui te vide sans nourrir ton axe',
+            whyPriority: `En ${year}, tu recuperes plus d energie en coupant les drains repetitifs qu en cherchant a te motiver davantage.`,
+            realLife: 'Observe ce qui te laisse vide apres coup, retire un oui reflexe, et garde ton energie pour les engagements qui te rendent plus nette au lieu de te brouiller.',
+          }
+        case 'rythme':
+          return {
+            ...template,
+            title: selection.isRadical ? 'Stoppe la dispersion reactive' : 'Ralentis les fuites de temps',
+            whyPriority: `Cette annee, une partie de ta fatigue vient de la dispersion micro-reactive plus que de la charge utile elle-meme.`,
+            realLife: 'Coupe les relances inutiles, limite les changements de contexte, et arrete de traiter comme urgents des sujets qui ne meritaient meme pas ton attention.',
+          }
+        case 'cap':
+          return {
+            ...template,
+            title: selection.isRadical ? 'Ferme les fronts qui te vident' : 'Trie ce qui te draine',
+            whyPriority: `En ${year}, tant que des projets froids restent ouverts, ils continuent de te prendre de l energie de fond meme quand tu ne les traites pas.`,
+            realLife: 'Ferme un front qui te suit mentalement depuis trop longtemps, coupe un projet sans elan, et retire un engagement qui te vide sans renforcer ton axe.',
+          }
+        default:
+          return template
+      }
+
+    case 'annual_priorities':
+    default:
+      return template
+  }
+}
+
+function buildFocusedPriorityTemplate(
+  selection: PrioritySelection,
+  year: string,
+  focusAngle: YearlyPriorityFocusAngle,
+): PriorityTemplate {
+  return applyFocusAngleToTemplate(buildPriorityTemplateForSelection(selection, year), selection, year, focusAngle)
+}
+
 function buildPriorityTemplateForSelection(selection: PrioritySelection, year: string): PriorityTemplate {
   const base = priorityTemplate(selection.family, year)
 
@@ -421,29 +710,28 @@ function buildPrioritySignals(
 function buildOrientation(
   year: string,
   priorities: PrioritySelection[],
+  focusAngle: YearlyPriorityFocusAngle,
 ): string {
   const primary = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
-  const secondary = priorities[1] ?? null
-  const primaryTemplate = priorityTemplate(primary.family, year)
+  const primaryTemplate = buildFocusedPriorityTemplate(primary, year, focusAngle)
   const primaryEvidence = describeSignal(primary.signal)
 
   const sentences = [
-    sentence(`En ${year}, l axe dominant est ${primaryTemplate.orientationAxis}: ${primaryTemplate.orientationMeaning}`),
-    sentence(`Ce qui ressort le plus cette annee, c est ${primaryEvidence}`),
+    sentence(focusAngleLead(focusAngle, year)),
+    sentence(`Le mouvement dominant prend la forme de ${primaryTemplate.orientationAxis}: ${primaryTemplate.orientationMeaning}`),
+    sentence(`Concretement, ${primaryEvidence}`),
   ]
-
-  if (secondary) {
-    const secondaryTemplate = priorityTemplate(secondary.family, year)
-    sentences.push(
-      sentence(`Le second mouvement utile de l annee passe par ${secondaryTemplate.orientationAxis}, pas par l empilement de nouveaux fronts`),
-    )
-  }
 
   return sentences.slice(0, 3).join(' ')
 }
 
-function buildPriorityBlock(year: string, selection: PrioritySelection, index: number): string {
-  const template = buildPriorityTemplateForSelection(selection, year)
+function buildPriorityBlock(
+  year: string,
+  selection: PrioritySelection,
+  index: number,
+  focusAngle: YearlyPriorityFocusAngle,
+): string {
+  const template = buildFocusedPriorityTemplate(selection, year, focusAngle)
   const evidence = describeSignal(selection.signal)
 
   return [
@@ -567,19 +855,49 @@ function buildImmediateAction(year: string, primary: PrioritySelection): string 
   return sentence(template.immediateAction)
 }
 
+function focusAngleImmediateAction(
+  year: string,
+  focusAngle: YearlyPriorityFocusAngle,
+): string | null {
+  switch (focusAngle) {
+    case 'concentration':
+      return `Dans les 24 a 72 heures, choisis un seul chantier central, bloque deux plages de concentration pour lui, et reporte explicitement une demande secondaire.`
+    case 'direction_choice':
+      return `Dans les 24 a 72 heures, ecris ton axe directeur en une phrase, compare-lui tes trois chantiers ouverts, puis coupe celui qui l affaiblit.`
+    case 'stop_cut_remove':
+      return `Dans les 24 a 72 heures, liste trois choses a arreter, ferme-en une concretement, puis envoie le message qui officialise cet arret.`
+    case 'energy_leak':
+      return `Dans les 24 a 72 heures, note les trois situations qui te vident le plus, coupe-en une cette semaine, puis redeploie ce temps sur ce qui nourrit vraiment ton axe.`
+    case 'annual_priorities':
+    default:
+      return null
+  }
+}
+
+function buildImmediateActionWithAngle(
+  year: string,
+  primary: PrioritySelection,
+  focusAngle: YearlyPriorityFocusAngle,
+): string {
+  const angleSpecificAction = focusAngleImmediateAction(year, focusAngle)
+  if (angleSpecificAction) return sentence(angleSpecificAction)
+  return buildImmediateAction(year, primary)
+}
+
 export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): string {
   const prioritizedSignals = input.prioritizedSignals.slice(0, 8)
   const openingSignal = input.openingSignal?.signal ?? prioritizedSignals[0] ?? null
   const year = extractRequestedYear(input.userMessage)
+  const focusAngle = input.focusAngle ?? detectYearlyPriorityFocusAngle(input.userMessage)
   const priorities = buildPrioritySignals(openingSignal, prioritizedSignals)
   const primary = priorities[0] ?? { signal: null, family: 'cap' as const, isRadical: false }
 
   return [
     `ORIENTATION ${year}`,
-    buildOrientation(year, priorities),
+    buildOrientation(year, priorities, focusAngle),
     '',
     'TES 3 PRIORITES REELLES',
-    priorities.map((selection, index) => buildPriorityBlock(year, selection, index + 1)).join('\n\n'),
+    priorities.map((selection, index) => buildPriorityBlock(year, selection, index + 1, focusAngle)).join('\n\n'),
     '',
     'CE QUI VA TE FREINER',
     buildPitfalls(year, priorities),
@@ -588,31 +906,51 @@ export function buildYearlyPriorityAnswer(input: YearlyPriorityAnswerInput): str
     buildTiming(year, priorities),
     '',
     'ACTION IMMEDIATE',
-    buildImmediateAction(year, primary),
+    buildImmediateActionWithAngle(year, primary, focusAngle),
   ].join('\n')
 }
 
 function extractPrioritySection(text: string): string {
   const match = text.match(
-    /TES\s+3\s+PRIORITES\s+REELLES\s*([\s\S]*?)(?:\n\s*CE\s+QUI\s+VA\s+TE\s+FREINER|$)/i,
+    /TES\s+3\s+PRIORITES\s+REELLES\b\s*:?\s*([\s\S]*?)(?:\n\s*CE\s+QUI\s+VA\s+TE\s+FREINER\b|$)/i,
   )
 
   return match?.[1]?.trim() ?? ''
 }
 
+function normalizeYearlyPriorityTextForValidation(text: string): string {
+  return (text || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .split('\n')
+    .map((line) =>
+      line
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[*_`~]+/g, '')
+        .replace(/^\s*#{1,6}\s*/, '')
+        .replace(/^\s*>\s*/, '')
+        .replace(/^\s*[-+]\s+(?=(?:ORIENTATION|TES|CE|TON|ACTION)\b)/i, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
+    .join('\n')
+}
+
 export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriorityValidation {
-  const cleaned = normalize(text)
+  const normalizedText = normalizeYearlyPriorityTextForValidation(text)
+  const cleaned = normalize(normalizedText)
   const issues: string[] = []
-  const prioritySection = extractPrioritySection(text)
+  const prioritySection = extractPrioritySection(normalizedText)
   const priorityBlocks = prioritySection
-    .split(/\n\n/)
-    .filter((block) => /^\d+\.\s+/m.test(block))
+    .split(/\n\s*\n/)
+    .filter((block) => /^\s*\d+[.)]\s+/m.test(block))
   const requiredHeadings = [
-    /ORIENTATION\s+20\d{2}/i,
-    /TES\s+3\s+PRIORITES\s+REELLES/i,
-    /CE\s+QUI\s+VA\s+TE\s+FREINER/i,
-    /TON\s+TIMING/i,
-    /ACTION\s+IMMEDIATE/i,
+    /ORIENTATION\s+20\d{2}\b/i,
+    /TES\s+3\s+PRIORITES\s+REELLES\b/i,
+    /CE\s+QUI\s+VA\s+TE\s+FREINER\b/i,
+    /TON\s+TIMING\b/i,
+    /ACTION\s+IMMEDIATE\b/i,
   ]
   const disallowedPatterns = [
     /CE QUI SE PASSE/i,
@@ -630,7 +968,7 @@ export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriority
     if (pattern.test(cleaned)) issues.push(`disallowed_block:${pattern.source}`)
   }
 
-  const priorityCount = (prioritySection.match(/^\d+\.\s+/gm) ?? []).length
+  const priorityCount = (prioritySection.match(PRIORITY_LINE_PATTERN) ?? []).length
   if (priorityCount !== 3) issues.push(`invalid_priority_count:${priorityCount}`)
   if (!priorityBlocks.some((block) => RADICAL_PRIORITY_PATTERN.test(block))) {
     issues.push('missing_radical_priority')
@@ -639,6 +977,13 @@ export function validateYearlyPriorityAnswerFormat(text: string): YearlyPriority
   for (const word of FORBIDDEN_ANNUAL_WORDS) {
     if (new RegExp(`\\b${word}\\b`, 'i').test(cleaned)) {
       issues.push(`forbidden_word:${word}`)
+    }
+  }
+
+  for (const { key, pattern } of FORBIDDEN_ANNUAL_TECHNICAL_PATTERNS) {
+    const normalizedPattern = new RegExp(pattern.source, pattern.flags.replace('g', ''))
+    if (normalizedPattern.test(cleaned)) {
+      issues.push(`forbidden_token:${key}`)
     }
   }
 

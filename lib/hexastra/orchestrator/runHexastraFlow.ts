@@ -4339,7 +4339,8 @@ export async function runHexastraFlow(input: {
     }
 
     if (effectiveResponseMode === 'yearly_priority_answer') {
-      const yearlyPriorityValidation = validateYearlyPriorityAnswerFormat(rawMessage)
+      const yearlyPriorityValidationTarget = applySentinel(rawMessage)
+      const yearlyPriorityValidation = validateYearlyPriorityAnswerFormat(yearlyPriorityValidationTarget)
       if (!yearlyPriorityValidation.valid) {
         const fallbackYearlyAnswer = buildFinalAnswer({
           userMessage: latestUserMessage,
