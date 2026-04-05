@@ -254,7 +254,6 @@ export function buildResponseModeDirective(mode: ResponseMode): string {
         '- Ton attendu: clair, simple, utile, concret, orientant. L utilisateur doit repartir avec une vraie direction, pas avec une lecture generique.',
       ].join('\n')
 
-    case 'concise_fusion_answer':
       return [
         '# CONCISE_FUSION_ANSWER_MODE — STRUCTURE DE LECTURE DÉVELOPPÉE',
         '',
