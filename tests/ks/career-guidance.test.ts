@@ -10,6 +10,7 @@ import { buildRetrievalPlanFromQuery } from '@/lib/hexastra/retrieval/retrievalP
 import { buildFusionContext } from '@/lib/hexastra/orchestrator/buildFusionContext'
 import { arbitrateFusionSignals } from '@/lib/hexastra/orchestrator/arbitrateFusionSignals'
 import { buildFinalAnswer } from '@/lib/hexastra/rendering/buildFinalAnswer'
+import { postValidateCareerPathAnswer } from '@/lib/hexastra/rendering/postValidateCareerPathAnswer'
 import { selectResponseModeSelection } from '@/lib/hexastra/orchestrator/selectResponseMode'
 import { buildSystemPrompt } from '@/lib/hexastra/prompts/buildSystemPrompt'
 import type { KnowledgePacket } from '@/lib/hexastra/orchestrator/buildKnowledgePacket'
@@ -108,6 +109,40 @@ function makeCareerSignals() {
       sourceType: 'exact_data',
       value: {
         lifePath: { number: 7 },
+        expression: { value: 3 },
+      },
+    },
+  ]
+}
+
+function makeCreativeMovementSignals() {
+  return [
+    {
+      science: 'human_design',
+      subCategory: 'type_hd',
+      sourceType: 'exact_data',
+      value: {
+        type_hd: 'Manifestor',
+        strategie_hd: 'Informer',
+        hdDefinedCenters: ['Gorge'],
+      },
+    },
+    {
+      science: 'astrology',
+      subCategory: 'vocation_astro',
+      sourceType: 'exact_data',
+      value: {
+        venus: 'Lion',
+        mars: 'Sagittaire',
+        sun: 'Lion',
+      },
+    },
+    {
+      science: 'numerology',
+      subCategory: 'num_life_path',
+      sourceType: 'exact_data',
+      value: {
+        lifePath: { number: 3 },
         expression: { value: 3 },
       },
     },
@@ -334,6 +369,106 @@ describe('career guidance rendering safety', () => {
     expect(essentialAnswer.text.length).toBeGreaterThan(freeAnswer.text.length)
     expect(essentialAnswer.text).not.toMatch(/Human Design|numerologie|astrologie|Projecteur|Capricorne/i)
   })
+
+  it('varies the aligned career families for different profiles', () => {
+    const analyticalAnswer = buildFinalAnswer({
+      userMessage: 'quel metier je peux faire ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'essentiel',
+    })
+
+    const creativeAnswer = buildFinalAnswer({
+      userMessage: 'quel metier je peux faire ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCreativeMovementSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'essentiel',
+    })
+
+    const analyticalAligned = extractSection(
+      analyticalAnswer.text,
+      '→ LES ENVIRONNEMENTS OU METIERS ALIGNES',
+      '→ CE QUI VA TE BLOQUER',
+    )
+    const creativeAligned = extractSection(
+      creativeAnswer.text,
+      '→ LES ENVIRONNEMENTS OU METIERS ALIGNES',
+      '→ CE QUI VA TE BLOQUER',
+    )
+
+    expect(analyticalAligned).not.toBe(creativeAligned)
+    expect(analyticalAligned).toMatch(/clarifies|cadre|methode|priorites|relation client/i)
+    expect(creativeAligned).toMatch(/idee|visible|message|terrain|lancement/i)
+  })
+
+  it('increases density across plans while keeping the structure stable', () => {
+    const freeAnswer = buildFinalAnswer({
+      userMessage: 'quels metiers me correspondent ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'free',
+    })
+
+    const essentialAnswer = buildFinalAnswer({
+      userMessage: 'quels metiers me correspondent ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'essentiel',
+    })
+
+    const premiumAnswer = buildFinalAnswer({
+      userMessage: 'quels metiers me correspondent ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'premium',
+    })
+
+    const practitionerAnswer = buildFinalAnswer({
+      userMessage: 'quels metiers me correspondent ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'praticien',
+    })
+
+    expect(freeAnswer.text).toContain('→ CE QUI TE CORRESPOND NATURELLEMENT')
+    expect(essentialAnswer.text).toContain('→ LES ENVIRONNEMENTS OU METIERS ALIGNES')
+    expect(premiumAnswer.text).toContain('Metiers alignes:')
+    expect(practitionerAnswer.text).toContain('Terrain naturel:')
+    expect(practitionerAnswer.text).toContain('Vigilance pro:')
+    expect(freeAnswer.text.length).toBeLessThan(essentialAnswer.text.length)
+    expect(essentialAnswer.text.length).toBeLessThan(premiumAnswer.text.length)
+    expect(premiumAnswer.text.length).toBeLessThanOrEqual(practitionerAnswer.text.length)
+  })
+
+  it('keeps career answers free of technical jargon and vague formulas', () => {
+    const answer = buildFinalAnswer({
+      userMessage: 'dans quoi je pourrais travailler ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'premium',
+    })
+
+    expect(answer.text).not.toMatch(
+      /Human Design|astrologie|numerologie|enneagramme|Kua|Projecteur|Manifestor|Capricorne|Vierge|Sagittaire/i,
+    )
+    expect(answer.text).not.toMatch(
+      /tout est possible|tu es fait pour aider les autres|tu es une personne unique/i,
+    )
+  })
 })
 
 describe('career guidance prompt isolation', () => {
@@ -360,5 +495,140 @@ describe('career guidance prompt isolation', () => {
     expect(prompt).toContain('LES ENVIRONNEMENTS OU METIERS ALIGNES')
     expect(prompt).not.toContain('STRUCTURE DE SORTIE Ã¢â‚¬â€ PLAN PREMIUM')
     expect(prompt).not.toContain('# QUESTION_SHAPE:')
+  })
+})
+
+describe('career guidance post validation', () => {
+  it('corrects forbidden phrases without triggering a fallback', () => {
+    const fallbackText = buildFinalAnswer({
+      userMessage: 'quel metier je peux faire ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'essentiel',
+    }).text
+
+    const llmText = [
+      '→ CE QUI TE CORRESPOND NATURELLEMENT',
+      'Tu peux faire beaucoup de choses.',
+      '',
+      '→ LES ENVIRONNEMENTS OU METIERS ALIGNES',
+      '- communication',
+      '- accompagnement',
+      '- coordination',
+      '',
+      '→ CE QUI VA TE BLOQUER',
+      '- rester trop longtemps dans le flou.',
+      '',
+      '→ CE QUE TU PEUX FAIRE MAINTENANT',
+      '- teste un terrain simple cette semaine.',
+    ].join('\n')
+
+    const result = postValidateCareerPathAnswer(llmText, {
+      userPlan: 'essentiel',
+      fallbackText,
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.corrected).toBe(true)
+    expect(result.fallbackRecommended).toBe(false)
+    expect(result.text).not.toMatch(/tu peux faire beaucoup de choses/i)
+    expect(result.text).toMatch(/idee claire et comprehensible|presence aide quelqu un a avancer ou decider/i)
+  })
+
+  it('adds a missing block automatically instead of falling back', () => {
+    const fallbackText = buildFinalAnswer({
+      userMessage: 'quels metiers me correspondent ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'essentiel',
+    }).text
+
+    const llmText = [
+      '→ CE QUI TE CORRESPOND NATURELLEMENT',
+      'Tu avances mieux quand tu clarifies une situation.',
+      '',
+      '→ LES ENVIRONNEMENTS OU METIERS ALIGNES',
+      '- role ou tu clarifies et aides a choisir',
+      '- cadre ou tu mets de l ordre dans un projet',
+      '- poste ou tu rends une situation plus lisible',
+      '',
+      '→ CE QUE TU PEUX FAIRE MAINTENANT',
+      '- compare deux roles reels cette semaine.',
+    ].join('\n')
+
+    const result = postValidateCareerPathAnswer(llmText, {
+      userPlan: 'essentiel',
+      fallbackText,
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.fallbackRecommended).toBe(false)
+    expect(result.text).toContain('→ CE QUI VA TE BLOQUER')
+    expect(result.correctedSections).toContain('blocked')
+  })
+
+  it('lightly enriches overly generic career families without a direct fallback', () => {
+    const fallbackText = buildFinalAnswer({
+      userMessage: 'dans quoi je pourrais travailler ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'premium',
+    }).text
+
+    const llmText = [
+      '→ CE QUI TE CORRESPOND NATURELLEMENT',
+      'Tu es fait pour aider les autres.',
+      '',
+      '→ LES ENVIRONNEMENTS OU METIERS ALIGNES',
+      '- communication',
+      '- accompagnement',
+      '- coordination',
+      '- communication',
+      '',
+      '→ CE QUI VA TE BLOQUER',
+      '- rester dans un travail trop flou.',
+      '',
+      '→ CE QUE TU PEUX FAIRE MAINTENANT',
+      '- teste un role court.',
+      '- garde ce qui marche.',
+    ].join('\n')
+
+    const result = postValidateCareerPathAnswer(llmText, {
+      userPlan: 'premium',
+      fallbackText,
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.fallbackRecommended).toBe(false)
+    expect(result.text).not.toMatch(/tu es fait pour aider les autres|communication\b|accompagnement\b/i)
+    expect(result.text).toMatch(/role ou tu rends une idee claire et comprehensible/i)
+    expect(result.text).toMatch(/cadre ou ta presence aide quelqu un a avancer ou decider/i)
+  })
+
+  it('leaves an already correct career answer untouched', () => {
+    const correctText = buildFinalAnswer({
+      userMessage: 'quelle voie pro est faite pour moi ?',
+      responseMode: 'career_path_answer',
+      openingSignal: null,
+      prioritizedSignals: makeCareerSignals(),
+      knowledgePacket: makeKnowledgePacket(),
+      userPlan: 'premium',
+    }).text
+
+    const result = postValidateCareerPathAnswer(correctText, {
+      userPlan: 'premium',
+      fallbackText: correctText,
+    })
+
+    expect(result.valid).toBe(true)
+    expect(result.corrected).toBe(false)
+    expect(result.fallbackRecommended).toBe(false)
+    expect(result.text).toBe(correctText)
   })
 })

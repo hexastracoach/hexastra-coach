@@ -157,6 +157,7 @@ import {
   validateYearlyPriorityAnswerFormat,
   type YearlyFocusAngle,
 } from '@/lib/hexastra/rendering/buildYearlyPriorityAnswer'
+import { postValidateCareerPathAnswer } from '@/lib/hexastra/rendering/postValidateCareerPathAnswer'
 import { normalizeUserPlan } from '@/lib/hexastra/rendering/normalizeUserPlan'
 import { selectRenderProfile } from '@/lib/hexastra/rendering/selectRenderProfile'
 import { resolveVectorSkip } from '@/lib/hexastra/vector/vectorPolicy'
@@ -4449,6 +4450,58 @@ export async function runHexastraFlow(input: {
           responseMode: effectiveResponseMode,
           priorityCount: yearlyPriorityValidation.priorityCount,
           userPlan: yearlyPriorityValidationPlan,
+          usedDeterministicFinalAnswer,
+        })
+      }
+    }
+
+    if (effectiveResponseMode === 'career_path_answer' || effectiveResponseMode === 'career_fit_answer') {
+      const careerValidationPlan = normalizeUserPlan(plan)
+      const careerValidationRaw = applySentinel(rawMessage)
+      const fallbackCareerAnswer = buildFinalAnswer({
+        userMessage: latestUserMessage,
+        responseMode: effectiveResponseMode,
+        openingSignal: responseModeSelection.openingSelection ?? null,
+        prioritizedSignals: presentationStructuredSignals,
+        knowledgePacket,
+        userPlan: careerValidationPlan,
+      })
+      const careerPostValidation = postValidateCareerPathAnswer(careerValidationRaw, {
+        userPlan: careerValidationPlan,
+        fallbackText: fallbackCareerAnswer.text,
+      })
+
+      flowLog('info', 'CAREER_POST_VALIDATION_APPLIED', {
+        responseMode: effectiveResponseMode,
+        userPlan: careerValidationPlan,
+        corrected: careerPostValidation.corrected,
+        valid: careerPostValidation.valid,
+        qualityScore: careerPostValidation.qualityScore,
+        issues: careerPostValidation.issues,
+      })
+
+      if (careerPostValidation.corrected && !careerPostValidation.fallbackRecommended) {
+        rawMessage = careerPostValidation.text
+        flowLog('info', 'CAREER_LIGHT_CORRECTION_APPLIED', {
+          responseMode: effectiveResponseMode,
+          userPlan: careerValidationPlan,
+          qualityScore: careerPostValidation.qualityScore,
+          correctedSections: careerPostValidation.correctedSections,
+          issues: careerPostValidation.issues,
+        })
+      }
+
+      if (careerPostValidation.fallbackRecommended) {
+        rawMessage = fallbackCareerAnswer.text
+        usedLocalFallback = true
+        fallbackType = 'career_path_renderer'
+
+        flowLog('warn', 'CAREER_FALLBACK_TRIGGERED', {
+          responseMode: effectiveResponseMode,
+          userPlan: careerValidationPlan,
+          qualityScore: careerPostValidation.qualityScore,
+          correctedSections: careerPostValidation.correctedSections,
+          issues: careerPostValidation.issues,
           usedDeterministicFinalAnswer,
         })
       }
