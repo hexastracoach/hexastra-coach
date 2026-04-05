@@ -8,6 +8,7 @@ import {
 import {
   hasCareerPathTerms,
   isCareerGuidanceQuery,
+  isCareerOrientationPrompt,
 } from '@/lib/hexastra/orchestration/careerGuidance'
 import type { PrioritizedStructuredSignal } from '@/lib/hexastra/retrieval/prioritizeStructuredSignals'
 import type { RetrievalPlan } from '@/lib/hexastra/retrieval/retrievalPlanBuilder'
@@ -158,9 +159,13 @@ export function selectResponseModeSelection(args: {
   }
 
   const normalizedIntent = normalize(args.intent ?? '')
+  const hasCareerPromptSignal = isCareerOrientationPrompt(args.userMessage)
   const isCareerFallback =
-    (normalizedIntent === 'work_money' || normalizedIntent === 'career_guidance') &&
-    (isCareerGuidanceQuery(args.userMessage) || hasCareerPathTerms(args.userMessage))
+    args.requestKind === 'career_orientation' ||
+    args.subcategory === 'career_guidance' ||
+    hasCareerPromptSignal ||
+    ((normalizedIntent === 'work_money' || normalizedIntent === 'career_guidance') &&
+      (isCareerGuidanceQuery(args.userMessage) || hasCareerPathTerms(args.userMessage)))
 
   if (
     isCareerFallback &&

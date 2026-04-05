@@ -1,5 +1,6 @@
 import type { OpeningSignalSelection } from '@/lib/hexastra/orchestrator/selectOpeningSignal'
 import type { StructuredSignal } from '@/lib/hexastra/retrieval/structuredSignalBuilder'
+import { normalizeUserPlan } from '@/lib/hexastra/rendering/normalizeUserPlan'
 import type { UserPlan } from '@/lib/hexastra/rendering/selectRenderProfile'
 import { unwrapDisplayText } from '@/lib/hexastra/utils/unwrapDisplayValue'
 
@@ -434,15 +435,34 @@ function trimImmediateActionsToMax(text: string, maxActions: number): string {
   if (!headingMatch) return text
 
   const sectionContent = headingMatch[2] ?? ''
-  const actionBlockPattern = /^\s*Action\s+\d+:\s+[\s\S]*?(?=^\s*Action\s+\d+:\s+|$)/gim
-  const actionBlocks = sectionContent.match(actionBlockPattern) ?? []
-  if (actionBlocks.length <= maxActions) return text
+  const sectionLines = sectionContent.split('\n')
+  const actionLinePattern = /^\s*(?:Action\s+\d+:\s+|-\s+|\d+[.)]\s+)/i
+  let actionCount = 0
+  let originalActionCount = 0
+  const trimmedLines: string[] = []
 
-  const sectionWithoutActions = normalize(sectionContent.replace(actionBlockPattern, '').trim())
-  const trimmedSection = [...actionBlocks.slice(0, maxActions), sectionWithoutActions]
-    .filter(Boolean)
-    .join('\n')
-    .trim()
+  for (const line of sectionLines) {
+    const trimmed = line.trim()
+
+    if (!trimmed) {
+      if (trimmedLines.length > 0 && trimmedLines[trimmedLines.length - 1] !== '') {
+        trimmedLines.push('')
+      }
+      continue
+    }
+
+    if (actionLinePattern.test(trimmed)) {
+      originalActionCount += 1
+      if (actionCount >= maxActions) continue
+      actionCount += 1
+    }
+
+    trimmedLines.push(line.trimEnd())
+  }
+
+  if (originalActionCount <= maxActions) return text
+
+  const trimmedSection = trimmedLines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
 
   return `${normalizedText.slice(0, headingMatch.index)}${headingMatch[1]}${trimmedSection}`.trim()
 }
@@ -541,7 +561,7 @@ function enforceShortSentences(text: string): string {
 }
 
 function resolveYearlyUserPlan(value: UserPlan | null | undefined): UserPlan {
-  return value ?? DEFAULT_YEARLY_USER_PLAN
+  return normalizeUserPlan(value ?? DEFAULT_YEARLY_USER_PLAN)
 }
 
 function splitAnnualSentences(text: string): string[] {
@@ -2229,7 +2249,10 @@ export function validateYearlyPriorityAnswerFormat(
   if (priorityCount !== 3) issues.push(`invalid_priority_count:${priorityCount}`)
   if (
     pitfallCount > validationProfile.maxPitfalls ||
-    (pitfallCount < validationProfile.minPitfalls && !(userPlan === 'essentiel' && pitfallHasContent))
+    (
+      pitfallCount < validationProfile.minPitfalls &&
+      !((userPlan === 'free' || userPlan === 'essentiel') && pitfallHasContent)
+    )
   ) {
     issues.push(`invalid_pitfall_count:${pitfallCount}`)
   }

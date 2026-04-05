@@ -9,7 +9,7 @@
  *   exact_fact > exact_profile > yearly_priorities > career_orientation > synthesis > interpretation > guidance > clarification > mixed > unknown
  */
 
-import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
+import { isCareerOrientationPrompt } from '@/lib/hexastra/orchestration/careerGuidance'
 import { isYearlyPriorityQuestion } from '@/lib/hexastra/orchestration/yearlyPriorityRouting'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ export function classifyRequestKind(message: string, subcategory?: string | null
 
   if (isYearlyPriorityQuestion(message) || subcategory === 'annual_guidance') return 'yearly_priorities'
 
-  if (isCareerGuidanceQuery(message) || subcategory === 'career_guidance') return 'career_orientation'
+  if (isCareerOrientationPrompt(message) || subcategory === 'career_guidance') return 'career_orientation'
 
   // synthesis: full portrait / complete reading
   if (matchesAny(message, SYNTHESIS_PATTERNS)) return 'synthesis'

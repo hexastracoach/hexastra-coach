@@ -171,7 +171,10 @@ describe('career guidance routing', () => {
     'quels metiers me correspondent ?',
     'dans quoi je pourrais travailler ?',
     'dans quoi travailler ?',
+    'dans quel domaine je peux reussir ?',
+    'quel type de metier est fait pour moi ?',
     'quel travail me convient ?',
+    'quel travail me conviendrait ?',
     'quelle voie pro est faite pour moi ?',
   ])('classifies natural career wording as career orientation: %s', (query) => {
     const classification = classifyMessage(query)
@@ -215,6 +218,24 @@ describe('career guidance routing', () => {
       plan: 'essential',
       intent: 'work_money',
       retrievalPlan: buildRetrievalPlanFromQuery('dans quoi travailler ?', {
+        hasBirthData: true,
+        domainRoute: 'career',
+      }),
+      structuredSignals: [],
+    })
+
+    expect(selection.responseMode).toBe('career_path_answer')
+    expect(selection.responseMode).not.toBe('concise_fusion_answer')
+  })
+
+  it('keeps a typo-tolerant work_money query on the dedicated career path mode', () => {
+    const selection = selectResponseModeSelection({
+      userMessage: 'quel sont les metier que je peut faire ?',
+      requestKind: 'unknown',
+      subcategory: null,
+      plan: 'essential',
+      intent: 'work_money',
+      retrievalPlan: buildRetrievalPlanFromQuery('quel sont les metier que je peut faire ?', {
         hasBirthData: true,
         domainRoute: 'career',
       }),

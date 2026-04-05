@@ -1,4 +1,4 @@
-import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
+import { isCareerOrientationPrompt } from '@/lib/hexastra/orchestration/careerGuidance'
 import { isYearlyPriorityQuestion } from '@/lib/hexastra/orchestration/yearlyPriorityRouting'
 
 export type UserIntent =
@@ -213,7 +213,7 @@ export function classifyUserIntent(
   if (IDENTITY_PATTERNS.some((p) => p.test(normalized))) return 'identity'
   if (TIMING_PATTERNS.some((p) => p.test(normalized))) return 'timing'
   if (BLOCAGE_PRO_PATTERNS.some((p) => p.test(normalized))) return 'blocage'
-  if (isCareerGuidanceQuery(normalized)) return 'career_guidance'
+  if (isCareerOrientationPrompt(normalized)) return 'career_guidance'
   if (WORK_MONEY_PATTERNS.some((p) => p.test(normalized))) return 'work_money'
   if (BLOCAGE_PATTERNS.some((p) => p.test(normalized))) return 'blocage'
   if (LIFE_PERIOD_PATTERNS.some((p) => p.test(normalized))) return 'life_period'

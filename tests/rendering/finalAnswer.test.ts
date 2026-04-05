@@ -1348,6 +1348,47 @@ describe('buildFinalAnswer', () => {
     expect((sanitized.match(/^Action\s+\d+:/gm) ?? []).length).toBe(2)
     expect(sanitized).not.toContain('Action 3:')
     expect(validation.valid).toBe(true)
+    expect(validation.issues).not.toContain('invalid_action_count:3')
+  })
+
+  it('trims essential yearly bullet actions to two before validation', () => {
+    const sanitized = sanitizeYearlyPriorityRenderedText([
+      'ORIENTATION 2026',
+      'En 2026, garde peu de fronts utiles.',
+      '',
+      'TES 3 PRIORITES REELLES',
+      '1. Garde un seul axe',
+      'Pourquoi: Cette annee, trop de fronts brouillent ton elan.',
+      'Dans la vraie vie: Termine un sujet avant d en ouvrir un autre.',
+      '',
+      '2. Trie tes oui',
+      'Pourquoi: Ton temps doit aller au plus utile.',
+      'Dans la vraie vie: Refuse une demande secondaire cette semaine.',
+      '',
+      '3. Consolide ce qui repond',
+      'Pourquoi: Les resultats viennent de ce qui tient deja.',
+      'Dans la vraie vie: Renforce ce qui avance deja.',
+      '',
+      'CE QUI VA TE FREINER',
+      '- Dire oui trop vite.',
+      '',
+      'TON TIMING',
+      'Debut d annee: Trie et clarifie.',
+      'Milieu d annee: Renforce ce qui repond.',
+      'Fin d annee: Garde ce qui tient.',
+      '',
+      'ACTION IMMEDIATE',
+      '- Choisis un front principal pour les 72 prochaines heures.',
+      '- Coupe une distraction avant vendredi.',
+      '- Ouvre un nouveau chantier lundi prochain.',
+    ].join('\n'), { userPlan: 'essentiel' })
+
+    const validation = validateYearlyPriorityAnswerFormat(sanitized, { userPlan: 'essentiel' })
+
+    expect((extractAnnualSection(sanitized, 'ACTION IMMEDIATE').match(/^\s*-\s+/gm) ?? []).length).toBe(2)
+    expect(sanitized).not.toContain('Ouvre un nouveau chantier lundi prochain.')
+    expect(validation.valid).toBe(true)
+    expect(validation.issues).not.toContain('invalid_action_count:3')
   })
 
   it('accepts a free yearly structure without why or real-life details', () => {
@@ -1377,6 +1418,34 @@ describe('buildFinalAnswer', () => {
     expect(validation.valid).toBe(true)
     expect(validation.issues).not.toContain('missing_priority_why')
     expect(validation.issues).not.toContain('missing_priority_real_life')
+  })
+
+  it('accepts a free yearly structure with one short pitfall sentence', () => {
+    const validation = validateYearlyPriorityAnswerFormat([
+      'ORIENTATION 2026',
+      'En 2026, garde peu de fronts.',
+      '',
+      'TES 3 PRIORITES REELLES',
+      '1. Garde un seul axe',
+      '',
+      '2. Trie tes oui',
+      '',
+      '3. Avance sur ce qui repond',
+      '',
+      'CE QUI VA TE FREINER',
+      'Dire oui trop vite.',
+      '',
+      'TON TIMING',
+      'Debut d annee: Trie.',
+      'Milieu d annee: Renforce.',
+      'Fin d annee: Garde.',
+      '',
+      'ACTION IMMEDIATE',
+      'Choisis un seul front pour les 72 prochaines heures.',
+    ].join('\n'), { userPlan: 'free' })
+
+    expect(validation.valid).toBe(true)
+    expect(validation.issues).not.toContain('invalid_pitfall_count:0')
   })
 
   it('keeps essential stricter than free when yearly priorities omit why', () => {

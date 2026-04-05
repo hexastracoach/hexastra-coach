@@ -13,7 +13,7 @@ import {
   type SubcategoryScience,
   type ResponseType,
 } from './subcategoryTaxonomy'
-import { isCareerGuidanceQuery } from '@/lib/hexastra/orchestration/careerGuidance'
+import { isCareerOrientationPrompt } from '@/lib/hexastra/orchestration/careerGuidance'
 import { isYearlyPriorityQuestion } from '@/lib/hexastra/orchestration/yearlyPriorityRouting'
 
 /** A single detected subcategory match */
@@ -118,7 +118,7 @@ export function detectSubcategory(text: string): SubcategoryDetectionResult {
     addSyntheticMatch('annual_guidance', candidates, matchMap)
   }
 
-  if (isCareerGuidanceQuery(normalized)) {
+  if (isCareerOrientationPrompt(normalized)) {
     addSyntheticMatch('career_guidance', candidates, matchMap)
   }
 

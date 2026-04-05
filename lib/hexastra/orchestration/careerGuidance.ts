@@ -23,7 +23,11 @@ export const CAREER_GUIDANCE_KEYWORDS = [
   'quelle voie pro me correspond',
   'quelle voie pro est faite pour moi',
   'dans quel domaine je peux reussir',
+  'dans quel domaine je pourrais reussir',
   'quel boulot est aligne pour moi',
+  'quel type de metier est fait pour moi',
+  'quel travail me conviendrait',
+  'quel type de poste me convient',
   'orientation professionnelle',
   'voie professionnelle',
   'dans quoi suis je bon au travail',
@@ -45,7 +49,11 @@ const CAREER_GUIDANCE_PATTERNS: RegExp[] = [
   /\bquelle voie pro me correspond\b/i,
   /\bquelle voie pro est faite pour moi\b/i,
   /\bdans quel domaine je peux reussir\b/i,
+  /\bdans quel domaine je pourrais reussir\b/i,
   /\bquel boulot est aligne pour moi\b/i,
+  /\bquel type de metier est fait pour moi\b/i,
+  /\bquel travail me conviendrait\b/i,
+  /\bquel type de poste me convient\b/i,
   /\b(orientation|voie) professionnelle\b/i,
   /\bdans quoi suis[- ]?je bon au travail\b/i,
   /\b(trouver|quelle est) ma vocation( professionnelle)?\b/i,
@@ -61,4 +69,20 @@ export function hasCareerPathTerms(text: string): boolean {
   return /\b(metier|metiers|travail|job|boulot|voie pro|voie professionnelle|carriere|domaine)\b/i.test(
     normalized,
   )
+}
+
+export function isCareerOrientationPrompt(text: string): boolean {
+  const normalized = normalize(text)
+  if (isCareerGuidanceQuery(normalized)) return true
+
+  const hasCareerNoun =
+    /\b(metier|metiers|travail|travailler|job|boulot|voie|carriere|profession|poste|domaine)\b/i.test(
+      normalized,
+    )
+  const hasOrientationFrame =
+    /\b(quel|quels|quelle|quelles|dans quoi|dans quel|quel type|quelle voie|me correspond|me convient|me conviendrait|est fait pour moi|faite pour moi|je peux faire|je pourrais travailler|je peux reussir|je pourrais reussir|est aligne pour moi)\b/i.test(
+      normalized,
+    )
+
+  return hasCareerNoun && hasOrientationFrame
 }
