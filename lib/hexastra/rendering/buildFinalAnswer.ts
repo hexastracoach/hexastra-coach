@@ -28,6 +28,12 @@ export type FinalAnswer = {
     explanation?: string
     action?: string
     key?: string
+    currentPlay?: string
+    hiddenLogic?: string
+    tension?: string
+    trajectory?: string
+    lever?: string
+    actionNow?: string
   }
 }
 
@@ -523,6 +529,104 @@ function buildActionText(
     .join(' ')
 }
 
+function buildTensionText(
+  primary: StructuredSignal | null,
+  secondary: StructuredSignal | null,
+  responseMode: string,
+): string {
+  const lead = primary ?? secondary
+  if (!lead) {
+    return sentence(
+      'le point de tension apparait quand tu traites tout au meme niveau au lieu de nommer ce qui compte vraiment',
+    )
+  }
+
+  switch (lead.subCategory) {
+    case 'fusion_decision':
+      return sentence(
+        "le point de tension est la: tu peux vouloir une reponse nette avant d'avoir clarifie l'essentiel",
+      )
+    case 'fusion_blockage':
+      return sentence(
+        'le point de tension est concret: tu pousses encore la ou quelque chose resiste deja',
+      )
+    case 'timing_fusion':
+    case 'astro_transits_current':
+    case 'astro_transits_timing':
+    case 'astro_progressions':
+    case 'astro_solar_return':
+      return sentence(
+        responseMode === 'timing_strategic_response'
+          ? 'le point de tension vient du rythme: tu peux accelerer trop tot ou attendre trop longtemps'
+          : "le point de tension vient du rythme: une part de toi veut aller plus vite que ce qui est pret",
+      )
+    case 'hd_type':
+    case 'hd_strategy':
+    case 'hd_current_transits':
+    case 'hd_current_cycle':
+      return sentence(
+        "le point de tension apparait quand tu essaies d'initier sous pression au lieu de repondre a ce qui est vivant",
+      )
+    case 'num_personal_year':
+      return sentence(
+        "le point de tension apparait si tu veux ouvrir trop de choses alors que l'annee demande surtout de consolider",
+      )
+    default:
+      return sentence(
+        'le point de tension apparait la ou tu gardes plusieurs fronts ouverts alors qu un seul demande ton vrai poids',
+      )
+  }
+}
+
+function buildTrajectoryText(
+  primary: StructuredSignal | null,
+  secondary: StructuredSignal | null,
+  responseMode: string,
+): string {
+  const lead = primary ?? secondary
+  if (!lead) {
+    return sentence(
+      "si rien ne change, tu risques surtout d'user ton energie dans des demi-choix et des efforts peu lisibles",
+    )
+  }
+
+  switch (lead.subCategory) {
+    case 'fusion_decision':
+      return sentence(
+        "si rien ne change, tu vas prolonger l'hesitation et perdre de la force dans des choix partiels",
+      )
+    case 'fusion_blockage':
+      return sentence(
+        "si rien ne change, la friction va prendre plus de place que le mouvement et user ton elan",
+      )
+    case 'timing_fusion':
+    case 'astro_transits_current':
+    case 'astro_transits_timing':
+    case 'astro_progressions':
+    case 'astro_solar_return':
+      return sentence(
+        responseMode === 'timing_strategic_response'
+          ? "si rien ne change, tu risques de confondre urgence et bon moment, puis de regretter le geste trop vite pose"
+          : 'si rien ne change, la pression va monter sans te donner plus de clarte sur le bon geste',
+      )
+    case 'hd_type':
+    case 'hd_strategy':
+    case 'hd_current_transits':
+    case 'hd_current_cycle':
+      return sentence(
+        "si rien ne change, tu risques de donner ton energie a des contextes qui ne te repondent pas vraiment",
+      )
+    case 'num_personal_year':
+      return sentence(
+        'si rien ne change, tu peux te disperser dans du neuf alors que les resultats sont du cote de ce qui tient deja',
+      )
+    default:
+      return sentence(
+        'si rien ne change, tu vas surtout tourner autour du sujet sans prendre l appui qui changerait vraiment la suite',
+      )
+  }
+}
+
 function buildKeyText(primary: StructuredSignal | null, responseMode: string): string {
   if (!primary) {
     return sentence(`la clarte vient quand tu suis le signal principal au lieu de tout traiter au meme niveau`)
@@ -556,6 +660,17 @@ function buildKeyText(primary: StructuredSignal | null, responseMode: string): s
   }
 }
 
+function buildLeverText(primary: StructuredSignal | null, responseMode: string): string {
+  const key = buildKeyText(primary, responseMode)
+  const normalizedKey = normalize(key).replace(/[.!?]+$/g, '')
+
+  if (/^la bascule/i.test(normalizedKey)) {
+    return sentence(normalizedKey)
+  }
+
+  return sentence(`la bascule commence quand tu vois que ${normalizedKey}`)
+}
+
 export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
   if (input.responseMode === 'yearly_priority_answer') {
     return {
@@ -586,6 +701,53 @@ export function buildFinalAnswer(input: FinalAnswerInput): FinalAnswer {
   const primaryActionSignal = explanationSignals[0] ?? openingSignal ?? null
   const secondaryActionSignal =
     explanationSignals.find((signal) => signal !== primaryActionSignal) ?? null
+
+  if (input.responseMode !== 'direct_answer' && input.responseMode !== 'calculated_reading') {
+    const sections = {
+      currentPlay: buildOpeningText(
+        input.responseMode,
+        input.openingSignal,
+        prioritizedSignals,
+        input.knowledgePacket,
+      ),
+      hiddenLogic: buildExplanationText(openingSignal, prioritizedSignals, input.responseMode),
+      tension: buildTensionText(primaryActionSignal, secondaryActionSignal, input.responseMode),
+      trajectory: buildTrajectoryText(primaryActionSignal, secondaryActionSignal, input.responseMode),
+      lever: buildLeverText(primaryActionSignal, input.responseMode),
+      actionNow: buildActionText(primaryActionSignal, secondaryActionSignal, input.responseMode),
+    }
+
+    return {
+      text: [
+        '-> 1. CE QUI EST EN TRAIN DE SE JOUER',
+        sections.currentPlay,
+        '',
+        '-> 2. LA LOGIQUE CACHEE',
+        sections.hiddenLogic,
+        '',
+        '-> 3. LE POINT DE TENSION',
+        sections.tension,
+        '',
+        '-> 4. LA TRAJECTOIRE SI RIEN NE CHANGE',
+        sections.trajectory,
+        '',
+        '-> 5. LE LEVIER DE BASCULE',
+        sections.lever,
+        '',
+        '-> 6. CE QUE TU PEUX FAIRE MAINTENANT',
+        sections.actionNow,
+      ].join('\n'),
+      sections: {
+        opening: sections.currentPlay,
+        explanation: [sections.hiddenLogic, sections.tension, sections.trajectory]
+          .filter(Boolean)
+          .join(' '),
+        action: sections.actionNow,
+        key: sections.lever,
+        ...sections,
+      },
+    }
+  }
 
   const sections = {
     opening: buildOpeningText(

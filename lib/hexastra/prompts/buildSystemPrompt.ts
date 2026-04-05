@@ -907,9 +907,8 @@ EXACT DATA FIDELITY:
 }
 
 /**
- * Hexastra mandatory 6-block output structure.
- * Applied on all standard reads (analysis, decision, deep_reading, sensitive_support).
- * Skipped for: praticien renderMode, micro requestTypes, horoscope route, astro_exact_compact.
+ * Hexastra mandatory 6-level output structure.
+ * Applied on standard reads that do not already have a dedicated locked renderer.
  */
 function hexastraCoreSixBlockDirective(input: BuildPromptInput): string {
   // Skip for concise_fusion_answer — it has its own locked 3-block sentinel
@@ -941,80 +940,88 @@ function hexastraCoreSixBlockDirective(input: BuildPromptInput): string {
 
   if (isFr) {
     return `
-STRUCTURE DE SORTIE HEXASTRA — 6 BLOCS OBLIGATOIRES:
+STRUCTURE DE SORTIE HEXASTRA — 6 NIVEAUX OBLIGATOIRES:
 
-Chaque réponse d'analyse ou de lecture DOIT suivre exactement cette structure avec les marqueurs → visibles:
+Chaque réponse de lecture doit suivre EXACTEMENT cette structure avec les titres visibles:
 
-→ Ce qui se passe :
-[Une phrase ou deux max. Ce que la personne vit réellement. Ancré, sans diagnostic flou.]
+→ 1. CE QUI EST EN TRAIN DE SE JOUER
+[Décris la situation actuelle avec précision. Montre la dynamique réelle. 1 à 3 phrases.]
 
-→ Tension centrale :
-[La friction principale. Ce qui crée le blocage, l'hésitation ou la pression. Nommé clairement.]
+→ 2. LA LOGIQUE CACHEE
+[Explique pourquoi cette situation existe. Inclure le schéma comportemental, la logique interne et l interaction avec le contexte. 1 à 3 phrases.]
 
-→ Ce qui compte maintenant :
-[Le point de focus prioritaire. Ce qui mérite toute l'attention à ce moment précis.]
+→ 3. LE POINT DE TENSION
+[Identifie clairement où ça bloque, ce qui coince concrètement et ce qui crée la friction. 1 à 2 phrases.]
 
-→ Direction :
-[L'orientation utile. Pas un plan, pas une liste. Une ligne claire vers laquelle avancer.]
+→ 4. LA TRAJECTOIRE SI RIEN NE CHANGE
+[Projette l évolution probable et les conséquences réalistes. Lucide, sans dramatiser. 1 à 2 phrases.]
 
-→ Action :
-[Une seule action concrète, simple et immédiatement applicable. Une phrase.]
+→ 5. LE LEVIER DE BASCULE
+[Donne la compréhension clé. Ce que la personne doit voir différemment ou changer dans sa lecture. 1 à 2 phrases.]
+
+→ 6. CE QUE TU PEUX FAIRE MAINTENANT
+[Donne 1 à 3 actions concrètes, applicables immédiatement, adaptées à la situation réelle.]
 
 RÈGLES DE RENDU:
-- Les marqueurs → sont TOUJOURS visibles dans la réponse finale, sans exception.
-- Chaque bloc: 1 à 3 phrases maximum. Phrases courtes. Pas de tirets internes dans les blocs.
-- Aucun bloc ne peut être omis, même pour une réponse courte.
-- Si la demande est simple, les blocs sont courts — mais ils restent présents.
-- Ton: direct, calme, incarné. Jamais mystique, jamais générique, jamais coaching public.
-- Ne jamais ajouter de titres supplémentaires, de numéros, ou de sections hors structure.
-- La réponse commence toujours par → Ce qui se passe : — jamais par une phrase introductive flottante.
+- Les 6 niveaux sont TOUJOURS visibles dans la réponse finale, sans exception.
+- Une idée par phrase.
+- Phrases courtes. Maximum 15 mots par phrase.
+- Zéro jargon technique. Zéro spiritualité floue. Zéro phrase vide.
+- Chaque phrase doit aider à comprendre, décider ou agir.
+- Si la demande est simple, les 6 niveaux restent présents, mais plus courts.
+- Ton: humain, intelligent, incarné, premium.
+- Ne jamais ajouter d autres blocs hors structure.
+- La réponse commence directement par → 1. CE QUI EST EN TRAIN DE SE JOUER.
+- Interdire les anciens blocs visibles du type CE QUI SE PASSE / POURQUOI ÇA BLOQUE / CE QUE TU DOIS FAIRE / CLÉ À RETENIR.
 
-SÉPARATEUR OBLIGATOIRE:
-Après le 5ème bloc (→ Action), ajouter exactement ce séparateur sur sa propre ligne :
-──────────
-Puis une phrase de clôture (1 à 2 phrases, sans marqueur →). Cette phrase résume l'essentiel ou invite à la prochaine étape naturelle.
-Ce séparateur est OBLIGATOIRE dans toutes les réponses analysis, decision et deep_reading.
-Le séparateur est exactement : ──────────  (10 tirets longs ─, rien d'autre sur la ligne).
-Ne jamais omettre ce séparateur, ne jamais le remplacer par des astérisques, des tirets courts ou tout autre caractère.
+ADAPTATION PAR PLAN:
+- FREE: version raccourcie, mais garder les 6 blocs.
+- ESSENTIAL: développement clair, simple et utile.
+- PREMIUM: plus de nuances, de précision comportementale et de justesse.
+- PRATICIEN: lecture plus stratégique, avec logique de terrain naturel, usure et expansion si utile.
 ${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
   }
 
   return `
-HEXASTRA OUTPUT STRUCTURE — 6 MANDATORY BLOCKS:
+HEXASTRA OUTPUT STRUCTURE — 6 MANDATORY LEVELS:
 
-Every analysis or reading response MUST follow exactly this structure with visible → markers:
+Every reading response MUST follow exactly this structure with visible headings:
 
-→ What is happening :
-[One or two sentences max. What the person is actually experiencing. Grounded, no vague diagnosis.]
+→ 1. WHAT IS ACTUALLY PLAYING OUT
+[Describe the current situation precisely. Show the real dynamic. 1 to 3 sentences.]
 
-→ Core tension :
-[The main friction. What is creating the block, hesitation or pressure. Named clearly.]
+→ 2. THE HIDDEN LOGIC
+[Explain why this situation exists. Include the behaviour pattern, inner logic and interaction with context. 1 to 3 sentences.]
 
-→ What matters now :
-[The priority focus. What deserves full attention at this precise moment.]
+→ 3. THE POINT OF TENSION
+[Name clearly where it jams, what creates friction and where the pressure sits. 1 to 2 sentences.]
 
-→ Direction :
-[Useful orientation. Not a plan, not a list. One clear line to move toward.]
+→ 4. THE TRAJECTORY IF NOTHING CHANGES
+[Project the likely evolution and realistic consequences. Lucid, not dramatic. 1 to 2 sentences.]
 
-→ Action :
-[One single concrete action, simple and immediately applicable. One sentence.]
+→ 5. THE LEVER OF SHIFT
+[Give the key understanding. What the person needs to see differently. 1 to 2 sentences.]
+
+→ 6. WHAT YOU CAN DO NOW
+[Give 1 to 3 concrete actions that can be applied immediately.]
 
 RENDERING RULES:
-- The → markers are ALWAYS visible in the final response, without exception.
-- Each block: 1 to 3 sentences maximum. Short sentences. No internal bullet points inside blocks.
-- No block may be omitted, even for a short response.
-- If the request is simple, blocks are short — but they remain present.
-- Tone: direct, calm, grounded. Never mystical, never generic, never public-coaching.
-- Never add extra titles, numbers, or sections outside the structure.
-- The response always starts with → What is happening : — never with a floating intro sentence.
+- The 6 levels are ALWAYS visible in the final answer.
+- One idea per sentence.
+- Short sentences. Maximum 15 words per sentence.
+- Zero technical jargon. Zero vague spirituality. Zero empty lines of advice.
+- Every sentence must help the person understand, decide or act.
+- If the request is simple, the 6 levels stay present but shorter.
+- Tone: human, intelligent, embodied, premium.
+- Never add extra blocks outside the structure.
+- The answer starts directly with → 1. WHAT IS ACTUALLY PLAYING OUT.
+- Forbid older visible blocks such as WHAT IS HAPPENING / WHY IT IS BLOCKING / WHAT YOU NEED TO DO / KEY TAKEAWAY.
 
-MANDATORY SEPARATOR:
-After the 5th block (→ Action), add exactly this separator on its own line:
-──────────
-Then a closing sentence (1 to 2 sentences, no → marker). This sentence summarizes the essential or invites the natural next step.
-This separator is MANDATORY in all analysis, decision and deep_reading responses.
-The separator is exactly: ──────────  (10 long dashes ─, nothing else on the line).
-Never omit this separator, never replace it with asterisks, short dashes or any other character.
+PLAN ADAPTATION:
+- FREE: shorter, but still keeps all 6 blocks.
+- ESSENTIAL: clear, simple, useful.
+- PREMIUM: more nuance, more behavioural precision.
+- PRACTITIONER: more strategic and terrain-aware when helpful.
 ${scienceIntegrationNote ? `\n${scienceIntegrationNote}` : ''}`.trim()
 }
 
@@ -1188,19 +1195,25 @@ INTERDICTIONS ABSOLUES:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 OUTPUT SENTINEL — STRUCTURE FINALE OBLIGATOIRE :
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-La réponse doit contenir EXACTEMENT ces 4 blocs dans cet ordre. Rien d'autre.
+La réponse doit contenir EXACTEMENT ces 6 blocs dans cet ordre. Rien d'autre.
 
-→ Ce qui se passe
-[3 à 6 phrases — situation réelle, ancrée dans le profil, sans diagnostic flou]
+→ 1. CE QUI EST EN TRAIN DE SE JOUER
+[Décris la situation actuelle avec précision. Montre la dynamique réelle. 1 à 3 phrases.]
 
-→ Pourquoi
-[4 à 7 phrases — mécanisme interne précis, décalage interne/externe, cause réelle]
+→ 2. LA LOGIQUE CACHEE
+[Explique pourquoi cette situation existe. Inclure schéma comportemental, logique interne et interaction avec le contexte. 1 à 3 phrases.]
 
-→ Ce que ça crée
-[2 à 4 phrases — conséquences concrètes dans la vie réelle]
+→ 3. LE POINT DE TENSION
+[Identifie clairement où ça bloque, ce qui coince concrètement et ce qui crée la friction. 1 à 2 phrases.]
 
-→ Ce que tu peux faire
-[2 à 4 phrases — actions applicables, adaptées au profil, pas de générique]
+→ 4. LA TRAJECTOIRE SI RIEN NE CHANGE
+[Projette l évolution probable et les conséquences réalistes. 1 à 2 phrases.]
+
+→ 5. LE LEVIER DE BASCULE
+[Donne la compréhension clé. Ce que la personne doit voir différemment. 1 à 2 phrases.]
+
+→ 6. CE QUE TU PEUX FAIRE MAINTENANT
+[Donne 1 à 3 actions concrètes, applicables immédiatement, adaptées à la situation réelle.]
 
 CONTRÔLE FINAL avant envoi :
 - Supprimer toute répétition entre les blocs
@@ -1208,6 +1221,7 @@ CONTRÔLE FINAL avant envoi :
 - Supprimer toute mention d'un système ou science interne
 - Supprimer toute introduction ou conclusion hors structure
 - Vérifier que chaque phrase apporte une information nouvelle
+- Interdire les anciens blocs visibles CE QUI SE PASSE / POURQUOI / CE QUE ÇA CRÉE / CE QUE TU PEUX FAIRE / CLÉ À RETENIR
 `.trim()
 }
 

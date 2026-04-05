@@ -96,6 +96,54 @@ export function selectResponseMode(input: ResponseModeInput): ResponseMode {
 }
 
 export function buildResponseModeDirective(mode: ResponseMode): string {
+  if (mode === 'concise_fusion_answer') {
+    return [
+      '# CONCISE_FUSION_ANSWER_MODE - LECTURE HEXASTRA EN 6 NIVEAUX',
+      '',
+      'Cette regle definit la structure et la densite obligatoires. Elle annule tout format concurrent.',
+      '',
+      'STRUCTURE OBLIGATOIRE - 6 NIVEAUX DANS CET ORDRE EXACT :',
+      '',
+      '-> 1. CE QUI EST EN TRAIN DE SE JOUER',
+      '[Decris la situation actuelle avec precision. Montre la dynamique reelle. 1 a 3 phrases.]',
+      '',
+      '-> 2. LA LOGIQUE CACHEE',
+      '[Explique pourquoi cette situation existe. Inclure schema comportemental, logique interne et interaction avec le contexte. 1 a 3 phrases.]',
+      '',
+      '-> 3. LE POINT DE TENSION',
+      '[Identifie ou ca bloque, ce qui coince concretement et ce qui cree la friction. 1 a 2 phrases.]',
+      '',
+      '-> 4. LA TRAJECTOIRE SI RIEN NE CHANGE',
+      '[Projette l evolution probable et les consequences realistes. Lucide, sans dramatiser. 1 a 2 phrases.]',
+      '',
+      '-> 5. LE LEVIER DE BASCULE',
+      '[Donne la comprehension cle. Ce que la personne doit voir differemment. 1 a 2 phrases.]',
+      '',
+      '-> 6. CE QUE TU PEUX FAIRE MAINTENANT',
+      '[Donne 1 a 3 actions concretes, applicables immediatement, adaptees a la situation reelle.]',
+      '',
+      'REGLE DE STYLE - OBLIGATOIRE :',
+      '- Une idee par phrase.',
+      '- Maximum 15 mots par phrase.',
+      '- Zero jargon technique.',
+      '- Zero spiritualite floue.',
+      '- Zero phrase vide.',
+      '- Chaque phrase doit aider a comprendre, decider ou agir.',
+      '',
+      'INTERDICTIONS ABSOLUES :',
+      '- Ne pas utiliser les anciens blocs visibles CE QUI SE PASSE / POURQUOI / CE QUE CA CREE / CE QUE TU PEUX FAIRE / CLE A RETENIR.',
+      '- Ne pas produire un simple conseil court.',
+      '- Ne pas empiler des phrases generiques applicables a tout le monde.',
+      '- Ne pas mentionner les sciences ou modules internes.',
+      '',
+      'RAPPEL PLAN :',
+      '- FREE: plus court, mais garde les 6 blocs.',
+      '- ESSENTIAL: clair, concret, utile en une lecture.',
+      '- PREMIUM: plus nuance et plus precision comportementale.',
+      '- PRATICIEN: plus strategique, plus projete, plus terrain.',
+    ].join('\n')
+  }
+
   switch (mode) {
     case 'direct_answer':
       return [

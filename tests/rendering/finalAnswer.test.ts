@@ -204,10 +204,14 @@ describe('buildFinalAnswer', () => {
   it('renders a clear global current-state answer', () => {
     const answer = buildRenderedCase('decision_current_state')
 
-    expect(answer.text).toContain('-> Ce qui se passe')
-    expect(answer.text).toContain('-> Pourquoi')
-    expect(answer.text).toContain('-> Ce que tu peux faire')
-    expect(answer.text).toContain('-> Cle a retenir')
+    expect(answer.text).toContain('-> 1. CE QUI EST EN TRAIN DE SE JOUER')
+    expect(answer.text).toContain('-> 2. LA LOGIQUE CACHEE')
+    expect(answer.text).toContain('-> 3. LE POINT DE TENSION')
+    expect(answer.text).toContain('-> 4. LA TRAJECTOIRE SI RIEN NE CHANGE')
+    expect(answer.text).toContain('-> 5. LE LEVIER DE BASCULE')
+    expect(answer.text).toContain('-> 6. CE QUE TU PEUX FAIRE MAINTENANT')
+    expect(answer.text).not.toContain('-> Ce qui se passe')
+    expect(answer.text).not.toContain('-> Cle a retenir')
     expect(answer.sections?.opening).toMatch(/Actuellement|En ce moment|bouge|ressort/i)
     expect(countSentences(answer.sections?.opening)).toBeLessThanOrEqual(2)
   })

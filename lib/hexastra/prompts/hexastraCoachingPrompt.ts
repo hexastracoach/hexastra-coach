@@ -111,6 +111,44 @@ Simple, direct, human language — zero jargon.
 // ── Directives de sortie par plan ────────────────────────────────────────────
 
 function buildFreeOutputDirective(isFr: boolean): string {
+  return isFr
+    ? `
+STRUCTURE DE SORTIE - PLAN FREE (6 blocs obligatoires) :
+
+Construis mentalement les 12 spheres, puis rends une lecture simple et directe en 6 niveaux.
+
+-> 1. CE QUI EST EN TRAIN DE SE JOUER
+-> 2. LA LOGIQUE CACHEE
+-> 3. LE POINT DE TENSION
+-> 4. LA TRAJECTOIRE SI RIEN NE CHANGE
+-> 5. LE LEVIER DE BASCULE
+-> 6. CE QUE TU PEUX FAIRE MAINTENANT
+
+REGLES :
+- 1 phrase courte par bloc si possible.
+- Pas de jargon. Pas de science citee.
+- Effet immediat. Lecture simple. Comprehension rapide.
+- 1 action claire dans le dernier bloc.
+`.trim()
+    : `
+OUTPUT STRUCTURE - FREE PLAN (6 mandatory blocks):
+
+Build the 12 spheres internally, then return a simple direct reading in 6 levels.
+
+-> 1. WHAT IS ACTUALLY PLAYING OUT
+-> 2. THE HIDDEN LOGIC
+-> 3. THE POINT OF TENSION
+-> 4. THE TRAJECTORY IF NOTHING CHANGES
+-> 5. THE LEVER OF SHIFT
+-> 6. WHAT YOU CAN DO NOW
+
+RULES:
+- 1 short sentence per block whenever possible.
+- No jargon. No science named.
+- Immediate impact. Fast understanding.
+- 1 clear action in the last block.
+`.trim()
+
   if (isFr) {
     return `
 STRUCTURE DE SORTIE — PLAN FREE (4 blocs obligatoires) :
@@ -161,6 +199,44 @@ RULES:
 }
 
 function buildEssentialOutputDirective(isFr: boolean): string {
+  return isFr
+    ? `
+STRUCTURE DE SORTIE - PLAN ESSENTIAL (6 blocs obligatoires) :
+
+Construit la lecture en 6 niveaux, claire et utile en une lecture.
+
+-> 1. CE QUI EST EN TRAIN DE SE JOUER
+-> 2. LA LOGIQUE CACHEE
+-> 3. LE POINT DE TENSION
+-> 4. LA TRAJECTOIRE SI RIEN NE CHANGE
+-> 5. LE LEVIER DE BASCULE
+-> 6. CE QUE TU PEUX FAIRE MAINTENANT
+
+REGLES :
+- 1 a 2 phrases utiles par bloc.
+- Verbes simples. Exemples concrets. Zero abstraction inutile.
+- Pas de jargon. Pas de science citee.
+- Le dernier bloc doit donner 1 a 2 actions vraiment applicables.
+`.trim()
+    : `
+OUTPUT STRUCTURE - ESSENTIAL PLAN (6 mandatory blocks):
+
+Build the reading in 6 levels, clear and useful in one pass.
+
+-> 1. WHAT IS ACTUALLY PLAYING OUT
+-> 2. THE HIDDEN LOGIC
+-> 3. THE POINT OF TENSION
+-> 4. THE TRAJECTORY IF NOTHING CHANGES
+-> 5. THE LEVER OF SHIFT
+-> 6. WHAT YOU CAN DO NOW
+
+RULES:
+- 1 to 2 useful sentences per block.
+- Simple verbs. Concrete examples. No useless abstraction.
+- No jargon. No science named.
+- The last block must give 1 to 2 truly applicable actions.
+`.trim()
+
   if (isFr) {
     return `
 STRUCTURE DE SORTIE — PLAN ESSENTIAL (4 blocs + 6 sphères) :
@@ -241,6 +317,44 @@ RULES:
 }
 
 function buildPremiumOutputDirective(isFr: boolean): string {
+  return isFr
+    ? `
+STRUCTURE DE SORTIE - PLAN PREMIUM (6 blocs obligatoires) :
+
+Construit une lecture en 6 niveaux, plus fine, plus precise, mais toujours lisible.
+
+-> 1. CE QUI EST EN TRAIN DE SE JOUER
+-> 2. LA LOGIQUE CACHEE
+-> 3. LE POINT DE TENSION
+-> 4. LA TRAJECTOIRE SI RIEN NE CHANGE
+-> 5. LE LEVIER DE BASCULE
+-> 6. CE QUE TU PEUX FAIRE MAINTENANT
+
+REGLES :
+- 1 a 3 phrases par bloc selon ce qui est utile.
+- Montrer les nuances, les choix et les consequences.
+- Garder le langage simple, direct et incarne.
+- Le dernier bloc doit proposer 1 a 3 actions concretes.
+`.trim()
+    : `
+OUTPUT STRUCTURE - PREMIUM PLAN (6 mandatory blocks):
+
+Build a 6-level reading that is more nuanced and more precise while staying easy to read.
+
+-> 1. WHAT IS ACTUALLY PLAYING OUT
+-> 2. THE HIDDEN LOGIC
+-> 3. THE POINT OF TENSION
+-> 4. THE TRAJECTORY IF NOTHING CHANGES
+-> 5. THE LEVER OF SHIFT
+-> 6. WHAT YOU CAN DO NOW
+
+RULES:
+- 1 to 3 sentences per block when useful.
+- Show nuance, choices and consequences.
+- Keep the language simple, direct and embodied.
+- The last block should propose 1 to 3 concrete actions.
+`.trim()
+
   if (isFr) {
     return `
 STRUCTURE DE SORTIE — PLAN PREMIUM (4 blocs + 12 sphères complètes) :
@@ -313,6 +427,44 @@ RULES:
 }
 
 function buildPractitionerOutputDirective(isFr: boolean): string {
+  return isFr
+    ? `
+STRUCTURE DE SORTIE - PLAN PRATICIEN (6 blocs obligatoires) :
+
+Construit une lecture en 6 niveaux, plus strategique, exploitable en accompagnement, sans perdre la clarte.
+
+-> 1. CE QUI EST EN TRAIN DE SE JOUER
+-> 2. LA LOGIQUE CACHEE
+-> 3. LE POINT DE TENSION
+-> 4. LA TRAJECTOIRE SI RIEN NE CHANGE
+-> 5. LE LEVIER DE BASCULE
+-> 6. CE QUE TU PEUX FAIRE MAINTENANT
+
+REGLES :
+- Montrer la logique du terrain naturel, du terrain d usure et du terrain d expansion si utile.
+- Lecture plus strategique, mais toujours simple a comprendre.
+- Pas de jargon. Pas de science citee.
+- Le dernier bloc doit donner des actions directement exploitables.
+`.trim()
+    : `
+OUTPUT STRUCTURE - PRACTITIONER PLAN (6 mandatory blocks):
+
+Build a 6-level reading that is more strategic and usable in accompaniment, while staying clear.
+
+-> 1. WHAT IS ACTUALLY PLAYING OUT
+-> 2. THE HIDDEN LOGIC
+-> 3. THE POINT OF TENSION
+-> 4. THE TRAJECTORY IF NOTHING CHANGES
+-> 5. THE LEVER OF SHIFT
+-> 6. WHAT YOU CAN DO NOW
+
+RULES:
+- Show the logic of natural terrain, wear terrain and expansion terrain when useful.
+- More strategic, but still simple to understand.
+- No jargon. No science named.
+- The last block must give actions that can be used directly.
+`.trim()
+
   if (isFr) {
     return `
 STRUCTURE DE SORTIE — PLAN PRATICIEN (12 sphères + approfondissement) :

@@ -3457,7 +3457,11 @@ export async function runHexastraFlow(input: {
 
         let styledFinalAnswer = profiledFinalAnswer
 
-        if (profiledFinalAnswer.sections) {
+        if (
+          profiledFinalAnswer.sections &&
+          !profiledFinalAnswer.sections.currentPlay &&
+          !profiledFinalAnswer.sections.hiddenLogic
+        ) {
           try {
             const styledSections = applyShiloStyle({
               opening: profiledFinalAnswer.sections.opening ?? '',

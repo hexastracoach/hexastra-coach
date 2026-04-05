@@ -96,6 +96,31 @@ describe('fusion-only mode', () => {
     expect(prompt).not.toContain('Il est permis de nommer publiquement Human Design')
   })
 
+  it('injects the 6-level Hexastra structure for standard fusion readings', () => {
+    const prompt = buildSystemPrompt({
+      plan: 'premium',
+      mode: 'libre_approfondi',
+      language: 'fr',
+      contextType: 'general',
+      practitionerUsage: null,
+      requestType: 'chat',
+      domainRoute: 'fusion',
+      flowStep: 'analysis',
+      analysisMode: 'hexastra_fusion',
+      fusionOnlyExperience: true,
+      responseModeDirective: buildResponseModeDirective('concise_fusion_answer'),
+      messages: [{ role: 'user', content: 'Je veux comprendre ce que je vis en ce moment.' }],
+    })
+
+    expect(prompt).toContain('CE QUI EST EN TRAIN DE SE JOUER')
+    expect(prompt).toContain('LA LOGIQUE CACHEE')
+    expect(prompt).toContain('LE POINT DE TENSION')
+    expect(prompt).toContain('LA TRAJECTOIRE SI RIEN NE CHANGE')
+    expect(prompt).toContain('LE LEVIER DE BASCULE')
+    expect(prompt).toContain('CE QUE TU PEUX FAIRE MAINTENANT')
+    expect(prompt).not.toContain('STRUCTURE OBLIGATOIRE â€” 4 BLOCS DANS CET ORDRE EXACT')
+  })
+
   it('allows a science-specific Hexastra framing when the science is explicitly requested', () => {
     const prompt = buildSystemPrompt({
       plan: 'premium',

@@ -203,6 +203,19 @@ describe('buildResponseModeDirective', () => {
   it('pedagogical_explanation directive mentions EXPLICATION PEDAGOGIQUE', () => {
     expect(buildResponseModeDirective('pedagogical_explanation')).toContain('EXPLICATION PEDAGOGIQUE')
   })
+
+  it('concise_fusion_answer directive enforces the 6-level reading structure', () => {
+    const directive = buildResponseModeDirective('concise_fusion_answer')
+
+    expect(directive).toContain('LECTURE HEXASTRA EN 6 NIVEAUX')
+    expect(directive).toContain('CE QUI EST EN TRAIN DE SE JOUER')
+    expect(directive).toContain('LA LOGIQUE CACHEE')
+    expect(directive).toContain('LE POINT DE TENSION')
+    expect(directive).toContain('LA TRAJECTOIRE SI RIEN NE CHANGE')
+    expect(directive).toContain('LE LEVIER DE BASCULE')
+    expect(directive).toContain('CE QUE TU PEUX FAIRE MAINTENANT')
+    expect(directive).toContain('FREE: plus court, mais garde les 6 blocs')
+  })
 })
 
 describe('yearly priority response mode', () => {

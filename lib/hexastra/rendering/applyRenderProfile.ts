@@ -9,6 +9,12 @@ export type ApplyRenderProfileInput = {
       explanation?: string
       action?: string
       key?: string
+      currentPlay?: string
+      hiddenLogic?: string
+      tension?: string
+      trajectory?: string
+      lever?: string
+      actionNow?: string
     }
   }
   profile: RenderProfile
@@ -111,6 +117,19 @@ function buildSectionLimits(format: RenderFormat) {
   }
 }
 
+function buildSixBlockLimits(format: RenderFormat) {
+  switch (format) {
+    case 'concise':
+      return { currentPlay: 1, hiddenLogic: 1, tension: 1, trajectory: 1, lever: 1, actionNow: 1 }
+    case 'enriched':
+      return { currentPlay: 1, hiddenLogic: 2, tension: 1, trajectory: 1, lever: 1, actionNow: 1 }
+    case 'storytelling':
+      return { currentPlay: 2, hiddenLogic: 2, tension: 2, trajectory: 1, lever: 1, actionNow: 2 }
+    case 'deep':
+      return { currentPlay: 2, hiddenLogic: 3, tension: 2, trajectory: 2, lever: 2, actionNow: 2 }
+  }
+}
+
 function buildTitles(profile: RenderProfile) {
   switch (profile.tone) {
     case 'direct':
@@ -148,6 +167,39 @@ function buildTitles(profile: RenderProfile) {
 function profileSections(sections: FinalAnswer['sections'], profile: RenderProfile): AnswerSections | null {
   if (!sections) return null
 
+  if (
+    sections.currentPlay ||
+    sections.hiddenLogic ||
+    sections.tension ||
+    sections.trajectory ||
+    sections.lever ||
+    sections.actionNow
+  ) {
+    const limits = buildSixBlockLimits(profile.format)
+    const currentPlay = limitSentences(
+      profile.includeNarrativeOpening ? sections.currentPlay : stripNarrativeOpening(sections.currentPlay),
+      limits.currentPlay,
+    )
+    const hiddenLogic = limitSentences(sections.hiddenLogic, limits.hiddenLogic)
+    const tension = limitSentences(sections.tension, limits.tension)
+    const trajectory = limitSentences(sections.trajectory, limits.trajectory)
+    const lever = limitSentences(sections.lever, limits.lever)
+    const actionNow = limitSentences(sections.actionNow, limits.actionNow)
+
+    return {
+      opening: currentPlay,
+      explanation: [hiddenLogic, tension, trajectory].filter(Boolean).join(' ') || undefined,
+      action: actionNow,
+      key: lever,
+      currentPlay,
+      hiddenLogic,
+      tension,
+      trajectory,
+      lever,
+      actionNow,
+    }
+  }
+
   const limits = buildSectionLimits(profile.format)
   const openingSource = profile.includeNarrativeOpening
     ? sections.opening
@@ -171,6 +223,33 @@ export function buildRenderProfileText(args: {
 
   if (!sections) {
     return args.fallbackText ?? ''
+  }
+
+  if (
+    sections.currentPlay ||
+    sections.hiddenLogic ||
+    sections.tension ||
+    sections.trajectory ||
+    sections.lever ||
+    sections.actionNow
+  ) {
+    const blocks: Array<{ title: string; content: string | undefined }> = [
+      { title: '-> 1. CE QUI EST EN TRAIN DE SE JOUER', content: sections.currentPlay },
+      { title: '-> 2. LA LOGIQUE CACHEE', content: sections.hiddenLogic },
+      { title: '-> 3. LE POINT DE TENSION', content: sections.tension },
+      { title: '-> 4. LA TRAJECTOIRE SI RIEN NE CHANGE', content: sections.trajectory },
+      { title: '-> 5. LE LEVIER DE BASCULE', content: sections.lever },
+      { title: '-> 6. CE QUE TU PEUX FAIRE MAINTENANT', content: sections.actionNow },
+    ]
+
+    return blocks
+      .filter((block) => normalize(block.content ?? '').length > 0)
+      .flatMap((block, index) =>
+        index === 0
+          ? [block.title, normalize(block.content ?? '')]
+          : ['', block.title, normalize(block.content ?? '')],
+      )
+      .join('\n')
   }
 
   const titles = buildTitles(safeProfile)

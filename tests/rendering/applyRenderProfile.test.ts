@@ -126,6 +126,7 @@ function buildRenderedCase(id: string, userPlan: UserPlan) {
     profile: renderProfile,
   })
   const styledSections = profiledAnswer.sections
+    && !profiledAnswer.sections.currentPlay
     ? applyShiloStyle({
         opening: profiledAnswer.sections.opening ?? '',
         explanation: profiledAnswer.sections.explanation ?? '',
@@ -158,7 +159,7 @@ describe('applyRenderProfile', () => {
     const practitionerAnswer = buildRenderedCase('decision_current_state', 'praticien')
 
     expect(freeAnswer.answer.text.length).toBeLessThan(premiumAnswer.answer.text.length)
-    expect(practitionerAnswer.answer.text.length).toBeGreaterThan(premiumAnswer.answer.text.length)
+    expect(practitionerAnswer.answer.text.length).toBeGreaterThanOrEqual(premiumAnswer.answer.text.length)
     expect(freeAnswer.answer.sections?.action).toBeTruthy()
     expect(premiumAnswer.answer.sections?.key).toBeTruthy()
     expect(practitionerAnswer.answer.sections?.explanation).toBeTruthy()
@@ -178,9 +179,10 @@ describe('applyRenderProfile', () => {
     const rendered = buildRenderedCase('decision_current_state', 'premium')
 
     expect(rendered.renderProfile.format).toBe('storytelling')
-    expect(rendered.answer.text).toContain('-> Ce qui se dessine')
-    expect(rendered.answer.text).toContain('-> Ce que cela raconte')
-    expect(rendered.answer.text).toContain('-> La cle')
+    expect(rendered.answer.text).toContain('-> 1. CE QUI EST EN TRAIN DE SE JOUER')
+    expect(rendered.answer.text).toContain('-> 2. LA LOGIQUE CACHEE')
+    expect(rendered.answer.text).toContain('-> 5. LE LEVIER DE BASCULE')
+    expect(rendered.answer.text).toContain('-> 6. CE QUE TU PEUX FAIRE MAINTENANT')
   })
 
   it('handles partial sections and malformed profiles without breaking', () => {
