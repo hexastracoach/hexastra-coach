@@ -626,7 +626,7 @@ export default function ChatPageClient() {
       const baseId = Date.now()
 
       return blocks
-        .map((block, index) => {
+        .map((block, index): Msg | null => {
           const content = formatAssistantReply(block, {
             intent: ((data?.metadata ?? {}) as ChatApiMetadata).intentDetected,
             userMessage: requestMessage,
@@ -644,7 +644,7 @@ export default function ChatPageClient() {
             isReading,
           }
         })
-        .filter((message): message is Msg => Boolean(message))
+        .filter((message): message is Msg => message !== null)
     },
     [formatAssistantReply],
   )
