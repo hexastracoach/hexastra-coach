@@ -45,10 +45,19 @@ export async function GET(request: NextRequest) {
   const { data: userData, error: userError } = await supabase.auth.getUser()
   if (!userError && userData.user) {
     try {
+      const metadata = userData.user.user_metadata as Record<string, unknown>
+      const firstName = typeof metadata.first_name === 'string' ? metadata.first_name.trim() : ''
+      const lastName = typeof metadata.last_name === 'string' ? metadata.last_name.trim() : ''
+      const fullName =
+        (typeof metadata.full_name === 'string' && metadata.full_name.trim()) ||
+        [firstName, lastName].filter(Boolean).join(' ') ||
+        (typeof metadata.name === 'string' && metadata.name.trim()) ||
+        null
+
       await getOrCreateProfile({
         id: userData.user.id,
         email: userData.user.email,
-        full_name: (userData.user.user_metadata as any)?.full_name ?? null,
+        full_name: fullName,
       })
     } catch (profileError) {
       logger.error('auth/callback: getOrCreateProfile failed', { profileError })

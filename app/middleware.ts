@@ -10,8 +10,6 @@ const PUBLIC_PATHS = [
   '/pricing',
   '/chat',
   '/auth',
-  '/auth/login',
-  '/auth/signup',
   '/auth/callback',
 ]
 
@@ -125,8 +123,8 @@ export async function middleware(req: NextRequest) {
 
   if (needsAuth && !user) {
 
-    const loginUrl = new URL('/auth/login', req.url)
-    loginUrl.searchParams.set('redirect', pathname)
+    const loginUrl = new URL('/auth', req.url)
+    loginUrl.searchParams.set('next', pathname)
 
     return NextResponse.redirect(loginUrl)
   }

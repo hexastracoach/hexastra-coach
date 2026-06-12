@@ -63,7 +63,7 @@ export const maxDuration = 120
 const _cache      = getChatCache()
 const _rateLimiter = getRateLimiter()
 
-type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien'
+type DbPlan = 'free' | 'essential' | 'essentiel' | 'premium' | 'practitioner' | 'praticien'
 type UsageFeature = 'chat_api'
 type ChatResponsePayload = Record<string, unknown> & {
   message?: string

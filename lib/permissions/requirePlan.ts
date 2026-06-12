@@ -10,7 +10,9 @@ export async function requirePlan(req: NextRequest, requirement: Requirement) {
 
   const userId = req.headers.get('x-hx-user-id');
   if (!userId) {
-    return NextResponse.redirect(new URL('/auth/login', req.url));
+    const loginUrl = new URL('/auth', req.url);
+    loginUrl.searchParams.set('next', req.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   const plan = await getUserPlan(userId);

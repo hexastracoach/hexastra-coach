@@ -5,10 +5,9 @@ import { randomUUID } from 'crypto'
 import { planFromPriceKey, StripePriceKey } from '@/lib/billing/stripePlans'
 import { logger } from '@/lib/utils/logger'
 import { validateEnv } from '@/lib/utils/env'
+import type { DbPlan } from '@/lib/permissions/plan'
 
 export const runtime = 'nodejs'
-
-type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien'
 
 const STRIPE_EVENTS_HANDLED = new Set([
   'checkout.session.completed',

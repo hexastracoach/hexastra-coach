@@ -15,9 +15,12 @@ export async function POST() {
     return unauthorized('Unauthorized')
   }
 
+  const firstName = typeof user.user_metadata?.first_name === 'string' ? user.user_metadata.first_name.trim() : ''
+  const lastName = typeof user.user_metadata?.last_name === 'string' ? user.user_metadata.last_name.trim() : ''
   const fullName =
-    (user.user_metadata?.full_name as string | undefined) ||
-    (user.user_metadata?.name as string | undefined) ||
+    (typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()) ||
+    [firstName, lastName].filter(Boolean).join(' ') ||
+    (typeof user.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
     ''
 
   try {

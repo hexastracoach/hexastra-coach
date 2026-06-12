@@ -7,11 +7,17 @@ export const STRIPE_PRICE_MAP: Record<StripePriceKey, string | undefined> = {
   essentiel_monthly:
     process.env.STRIPE_PRICE_ESSENTIAL_MONTHLY ??
     process.env.STRIPE_PRICE_ESSENTIEL_MONTHLY ??
+    process.env.STRIPE_PRICE_ESSENTIAL ??
+    process.env.STRIPE_PRICE_ESSENTIEL ??
     process.env.STRIPE_ESSENTIEL_MONTHLY,
-  premium_monthly: process.env.STRIPE_PRICE_PREMIUM_MONTHLY,
+  premium_monthly:
+    process.env.STRIPE_PRICE_PREMIUM_MONTHLY ??
+    process.env.STRIPE_PRICE_PREMIUM,
   praticien_monthly:
     process.env.STRIPE_PRICE_PRACTITIONER_MONTHLY ??
-    process.env.STRIPE_PRICE_PRATICIEN_MONTHLY,
+    process.env.STRIPE_PRICE_PRATICIEN_MONTHLY ??
+    process.env.STRIPE_PRICE_PRACTITIONER ??
+    process.env.STRIPE_PRICE_PRATICIEN,
 }
 
 export function planFromPriceKey(priceKey?: string | null): PlanKey {

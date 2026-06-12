@@ -1,11 +1,17 @@
 import type { PlanKey } from '@/types/subscription';
 
-export type DbPlan = 'free' | 'essentiel' | 'premium' | 'praticien';
+export type DbPlan =
+  | 'free'
+  | 'essential'
+  | 'essentiel'
+  | 'premium'
+  | 'practitioner'
+  | 'praticien';
 
 export function mapDbPlanToPlanKey(plan: unknown): PlanKey {
-  if (plan === 'essentiel') return 'essential';
+  if (plan === 'essential' || plan === 'essentiel') return 'essential';
   if (plan === 'premium') return 'premium';
-  if (plan === 'praticien') return 'practitioner';
+  if (plan === 'practitioner' || plan === 'praticien') return 'practitioner';
   return 'free';
 }
 
