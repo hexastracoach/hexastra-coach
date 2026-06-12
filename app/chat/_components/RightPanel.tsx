@@ -129,7 +129,7 @@ const collapseBtn: React.CSSProperties = {
   height: 40,
   borderRadius: 14,
   border: `1px solid ${DS.line}`,
-  background: 'rgba(255,255,255,0.84)',
+  background: 'rgba(226,233,192,0.055)',
   color: DS.text,
   boxShadow: DS.shadowSoft,
 }
@@ -137,22 +137,22 @@ const infoCard: React.CSSProperties = {
   border: `1px solid ${DS.line}`,
   borderRadius: 18,
   padding: '12px 14px',
-  background: '#ffffff',
+  background: 'rgba(226,233,192,0.055)',
 }
 const promptBtn: React.CSSProperties = {
   border: `1px solid ${DS.line}`,
   borderRadius: 18,
   padding: '14px 14px',
-  background: '#ffffff',
+  background: 'rgba(226,233,192,0.055)',
   textAlign: 'left',
   cursor: 'pointer',
-  boxShadow: '0 6px 18px rgba(16,24,20,0.04)',
+  boxShadow: '0 12px 28px rgba(0,0,0,0.16)',
 }
 const lastReadingBtn: React.CSSProperties = {
-  border: '1px solid rgba(25,195,125,0.12)',
+  border: '1px solid rgba(122,169,92,0.24)',
   borderRadius: 16,
   padding: '12px 14px',
-  background: 'rgba(25,195,125,0.06)',
+  background: 'rgba(122,169,92,0.095)',
   color: DS.textSoft,
   textAlign: 'left',
   cursor: 'pointer',

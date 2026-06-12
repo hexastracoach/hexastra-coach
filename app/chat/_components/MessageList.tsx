@@ -19,6 +19,9 @@ export default function MessageList({ messages, isTyping, lastUserMessage, onRet
   const visibleMessages = messages.filter((message) => message.content !== '__loading_micro__')
   const loadingMessages = useMemo(() => getLoadingMessages(lang), [lang])
   const [loadingIndex, setLoadingIndex] = useState(0)
+  const typingText = lang.startsWith('en')
+    ? 'Coach is reading what is moving'
+    : 'Coach regarde ce qui se joue'
 
   useEffect(() => {
     if (!bottomRef.current) return
@@ -56,7 +59,9 @@ export default function MessageList({ messages, isTyping, lastUserMessage, onRet
           </div>
           <div className="hx-chat-typing-copy">
             <div className="hx-chat-typing-label">Hexastra</div>
-            <div className="hx-chat-typing-text">{loadingMessages[loadingIndex]}</div>
+            <div className="hx-chat-typing-text" title={loadingMessages[loadingIndex]}>
+              {typingText}
+            </div>
           </div>
           <div className="hx-chat-typing-dots" aria-hidden="true">
             <span />

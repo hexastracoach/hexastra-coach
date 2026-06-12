@@ -103,6 +103,14 @@ const INTENT_COLORS: Record<UserIntentKey, string> = {
   inner_state: 'text-violet-400',
 }
 
+const INTENT_COMPACT_LABELS: Record<UserIntentKey, { fr: string; en: string }> = {
+  understand_situation: { fr: 'Comprendre', en: 'Understand' },
+  make_decision: { fr: 'Décider', en: 'Decide' },
+  relationships: { fr: 'Relation', en: 'Relation' },
+  money_work: { fr: 'Travail', en: 'Work' },
+  inner_state: { fr: 'Énergie', en: 'Energy' },
+}
+
 export default function LeftSidebar({
   readings,
   userInitials = 'HX',
@@ -149,7 +157,7 @@ export default function LeftSidebar({
       {/* Intent navigation */}
       <div className="px-3 py-3">
         <p className="mb-2 px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-          {isEnglish ? 'What do you need?' : 'Qu\'avez-vous besoin ?'}
+          {isEnglish ? 'Explore' : 'Explorer'}
         </p>
         <div className="space-y-0.5">
           {SIDEBAR_INTENTS.map((intent) => {
@@ -171,7 +179,7 @@ export default function LeftSidebar({
                   <Icon />
                 </span>
                 <span className={`truncate text-[12.5px] font-medium transition-colors ${isActive ? 'text-slate-100' : 'text-slate-500 group-hover:text-slate-300'}`}>
-                  {isEnglish ? intent.labelEn : intent.label}
+                  {isEnglish ? INTENT_COMPACT_LABELS[intent.key].en : INTENT_COMPACT_LABELS[intent.key].fr}
                 </span>
                 {isActive && (
                   <span className={`ml-auto h-1.5 w-1.5 shrink-0 rounded-full ${colorClass.replace('text-', 'bg-')}`} />

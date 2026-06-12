@@ -34,6 +34,7 @@ import { generateSuggestions } from '@/lib/hexastra/suggestions/generateSuggesti
 import { getMenuForMode } from '@/lib/hexastra/menus/getMenuForMode'
 import { getModeForPlan } from '@/lib/hexastra/config/planModeMap'
 import { getPlanQuotaLimit, getPlanResponseDepth, getQuotaState } from '@/lib/hexastra/orchestration/planContracts'
+import { buildReadingPlanContract } from '@/lib/hexastra/orchestration/readingPlanContract'
 import { buildNormalizedInput } from '@/lib/hexastra/orchestration/normalizeInput'
 import { evaluateOrchestration } from '@/lib/hexastra/orchestration/evaluateOrchestration'
 import type { ExecutionPlan, OrchestrationTrace } from '@/lib/hexastra/orchestration/types'
@@ -44,6 +45,10 @@ import {
   sanitizeFusionOnlySelectionKey,
 } from '@/lib/hexastra/fusionOnly'
 import {
+  callN8nChatWebhook,
+  isN8nChatEnabled,
+} from '@/lib/n8n/chatWebhook'
+import {
   buildQuotaUpgradeDecision,
   buildSmartPricingSessionState,
 } from '@/lib/monetization/smartPricing'
@@ -53,6 +58,7 @@ import {
 // Fallback automatique vers mémoire si Redis échoue au runtime.
 // Voir lib/system/providerFactory.ts pour la logique de sélection.
 export const runtime = 'nodejs'
+export const maxDuration = 120
 
 const _cache      = getChatCache()
 const _rateLimiter = getRateLimiter()
@@ -80,6 +86,37 @@ const REQUIRED_ENV = {
   NEXT_PUBLIC_SUPABASE_URL: {},
   NEXT_PUBLIC_SUPABASE_ANON_KEY: {},
   SUPABASE_SERVICE_ROLE_KEY: {},
+}
+
+function normalizePlanKey(value: unknown): PlanKey | null {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+
+  if (normalized === 'free' || normalized === 'gratuit') return 'free'
+  if (normalized === 'essential' || normalized === 'essentiel') return 'essential'
+  if (normalized === 'premium') return 'premium'
+  if (normalized === 'practitioner' || normalized === 'praticien') return 'practitioner'
+
+  return null
+}
+
+function getTemporaryAccessOverridePlan(): PlanKey | null {
+  const raw =
+    process.env.HEXASTRA_ACCESS_OVERRIDE?.trim() ||
+    process.env.NEXT_PUBLIC_HEXASTRA_ACCESS_OVERRIDE?.trim() ||
+    ''
+  const normalized = raw.toLowerCase()
+
+  if (!normalized || normalized === '0' || normalized === 'false' || normalized === 'off') return null
+  const plan = normalizePlanKey(normalized)
+  if (plan) return plan
+  if (normalized === 'practitioner' || normalized === 'all' || normalized === 'true') return 'practitioner'
+
+  return null
+}
+
+function getTemporaryRequestPlan(bodyRecord: Record<string, unknown>): PlanKey | null {
+  if (!getTemporaryAccessOverridePlan()) return null
+  return normalizePlanKey(bodyRecord.debugPlan)
 }
 
 function normalizeText(value: string): string {
@@ -465,11 +502,12 @@ function looksAlreadyStructured(text: string) {
  * La normalisation du message (lowercase + trim) assure que deux messages
  * identiques à la casse près partagent le même slot de cache.
  */
-function buildCacheKey(userId: string | null, message: string, birthData?: unknown): string {
+function buildCacheKey(userId: string | null, plan: PlanKey, message: string, birthData?: unknown): string {
   const uid = userId ?? 'guest'
+  const planKey = plan || 'free'
   const msg = message.trim().toLowerCase()
   const bd  = birthData ? JSON.stringify(birthData) : ''
-  return createHash('sha256').update(`${uid}::${msg}::${bd}`).digest('hex')
+  return createHash('sha256').update(`${uid}::${planKey}::${msg}::${bd}`).digest('hex')
 }
 
 /**
@@ -814,6 +852,11 @@ function detectLanguageFromText(text: string): SupportedLanguage | null {
 }
 
 async function resolveEffectivePlan(_req: NextRequest): Promise<{ plan: PlanKey; userId: string | null }> {
+  const temporaryPlan = getTemporaryAccessOverridePlan()
+  if (temporaryPlan) {
+    return { plan: temporaryPlan, userId: null }
+  }
+
   try {
     const supabase = await createSupabaseServer()
     const {
@@ -837,6 +880,16 @@ async function resolveEffectivePlan(_req: NextRequest): Promise<{ plan: PlanKey;
 
 async function enforceDailyQuota(params: { req: NextRequest; userId: string | null; plan: PlanKey; feature: UsageFeature }) {
   const { req, userId, plan, feature } = params
+  if (getTemporaryAccessOverridePlan()) {
+    return {
+      blocked: false as const,
+      used: 0,
+      limit: null,
+      remaining: null,
+      resetAt: null,
+      windowStartedAt: null,
+    }
+  }
 
   const limit = getPlanQuotaLimit(plan)
   if (limit === null) {
@@ -922,32 +975,11 @@ export async function POST(req: NextRequest) {
 
   try {
     failureStage = 'validate_env'
-    validateEnv(REQUIRED_ENV)
-
-    // ── Rate limiting (BLOC 4) ──────────────────────────────────────────────
-    // Vérifié AVANT le parsing du body et l'auth pour rejeter rapidement.
-    // Sujet : userId préféré (plus fiable), fallback sur IP si non authentifié.
-    // Limite : 10 req/min par sujet (configurable dans lib/rateLimit/chatRateLimit.ts).
-    // Note : le userId n'est pas encore connu ici → utilisation de l'IP au niveau route.
-    // Une fois l'auth résolue, le rate limit est re-vérifié sur userId dans enforceDailyQuota.
-    {
-      const ip = getRequestIp(req)
-      const rl = checkChatRateLimit(ip)
-      if (!rl.allowed) {
-        log('warn', 'rate limit exceeded', { ip, used: rl.used, resetAt: rl.resetAt })
-        return NextResponse.json(
-          { error: 'Trop de requêtes. Réessaie dans quelques instants.' },
-          {
-            status: 429,
-            headers: {
-              'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
-              'X-RateLimit-Limit': String(rl.limit),
-              'X-RateLimit-Remaining': '0',
-              'X-RateLimit-Reset': String(rl.resetAt),
-            },
-          },
-        )
-      }
+    const temporaryPlan = getTemporaryAccessOverridePlan()
+    if (temporaryPlan) {
+      log('warn', 'temporary access override enabled', { plan: temporaryPlan })
+    } else {
+      validateEnv(REQUIRED_ENV)
     }
 
     // ── Parallélisation (BLOC 5) ────────────────────────────────────────────
@@ -979,6 +1011,32 @@ export async function POST(req: NextRequest) {
       (body as Record<string, unknown>).requestType === 'micro_month'
         ? ((body as Record<string, unknown>).requestType as 'micro_profile' | 'micro_year' | 'micro_month')
         : 'chat'
+    const isMicroReadingRequest = requestType !== 'chat'
+
+    // ── Rate limiting IP ───────────────────────────────────────────────────
+    // Les micro-lectures sont déclenchées automatiquement en rafale
+    // (profil -> année -> mois). Elles ne doivent pas être bloquées par le
+    // rate-limit de messages manuels, sinon l'onboarding s'arrête après la
+    // première ou deuxième micro-lecture.
+    if (!isMicroReadingRequest) {
+      const ip = getRequestIp(req)
+      const rl = checkChatRateLimit(ip)
+      if (!rl.allowed) {
+        log('warn', 'rate limit exceeded', { ip, used: rl.used, resetAt: rl.resetAt })
+        return NextResponse.json(
+          { error: 'Trop de requêtes. Réessaie dans quelques instants.' },
+          {
+            status: 429,
+            headers: {
+              'Retry-After': String(Math.ceil((rl.resetAt - Date.now()) / 1000)),
+              'X-RateLimit-Limit': String(rl.limit),
+              'X-RateLimit-Remaining': '0',
+              'X-RateLimit-Reset': String(rl.resetAt),
+            },
+          },
+        )
+      }
+    }
 
     const sanitizedMessages = limitHistory(sanitizeMessages((body as Record<string, unknown>).messages))
     const lastUserMessage = [...sanitizedMessages].reverse().find((m) => m.role === 'user')?.content?.trim() ?? ''
@@ -1023,8 +1081,15 @@ export async function POST(req: NextRequest) {
 
     // Récupère le résultat de la Promise lancée en parallèle avec req.json().
     // Si resolveEffectivePlan a déjà fini (corps long à parser), await est immédiat.
-    const { plan: effectivePlan, userId } = await planPromise
-    log('info', 'effective plan resolved', { effectivePlan, userId })
+    const resolvedPlan = await planPromise
+    const temporaryRequestPlan = getTemporaryRequestPlan(bodyRecord)
+    const effectivePlan = temporaryRequestPlan ?? resolvedPlan.plan
+    const userId = temporaryRequestPlan ? null : resolvedPlan.userId
+    log('info', 'effective plan resolved', {
+      effectivePlan,
+      userId,
+      debugPlan: temporaryRequestPlan,
+    })
 
     // ── PROTECTION EXTRÊME (BLOC 7 — dernier recours) ─────────────────────
     // Atteint uniquement si isExtremeLoad() est vrai ET que la queue elle-même
@@ -1056,7 +1121,7 @@ export async function POST(req: NextRequest) {
     // applique un cooldown minimum entre deux requêtes consécutives du même utilisateur,
     // calibré selon le plan (free=10s, essential=5s, premium=3s, practitioner=2s).
     // La première couche (checkChatRateLimit sur IP) a déjà été vérifiée plus haut.
-    {
+    if (!isMicroReadingRequest) {
       const ip = getRequestIp(req)
       const userRl = await _rateLimiter.check({ userId, ip, plan: effectivePlan })
       if (!userRl.allowed) {
@@ -1251,7 +1316,7 @@ export async function POST(req: NextRequest) {
       reasons: preQuotaDecision.reasonCodes,
     })
 
-    const cacheKey = buildCacheKey(userId, lastUserMessage, normalizedBirthData)
+    const cacheKey = buildCacheKey(userId, effectivePlan, lastUserMessage, normalizedBirthData)
     const cached = await getCache(cacheKey)
     if (cached) {
       const cachedResponse = buildConsistentResponse(withTrace(cached as ChatResponsePayload, preQuotaTrace), {
@@ -1387,14 +1452,174 @@ export async function POST(req: NextRequest) {
       return await preQuotaHandler()
     }
 
-    const quota = await enforceDailyQuota({
-      req,
-      userId,
-      plan: effectivePlan,
-      feature: 'chat_api',
-    })
+    const quota = isMicroReadingRequest
+      ? {
+          blocked: false as const,
+          used: 0,
+          limit: null,
+          remaining: null,
+          resetAt: null,
+          windowStartedAt: null,
+        }
+      : await enforceDailyQuota({
+          req,
+          userId,
+          plan: effectivePlan,
+          feature: 'chat_api',
+        })
 
     log('debug', 'quota', quota as any)
+
+    if (quota.blocked && quota.limit !== null) {
+      log('warn', 'quota blocked before n8n delegation', { userId, plan: effectivePlan, used: quota.used })
+      const quotaResponse = buildQuotaErrorResponse({
+        plan: effectivePlan,
+        used: quota.used,
+        limit: quota.limit,
+        resetAt: quota.resetAt,
+        messages: sanitizedMessages,
+      })
+      log('info', 'response normalized', {
+        branch: 'quota',
+        ...getNormalizationDiagnostics(quotaResponse),
+      })
+      return NextResponse.json(quotaResponse, { status: 429 })
+    }
+
+    if (isN8nChatEnabled()) {
+      failureStage = 'n8n_chat_webhook'
+      log('info', 'branch chosen', { branch: 'n8n_chat_webhook' })
+
+      try {
+        const n8nResponse = await callN8nChatWebhook({
+          source: 'hexastra-web',
+          requestId,
+          userId,
+          plan: effectivePlan,
+          responseDepth,
+          readingPlan: buildReadingPlanContract(effectivePlan),
+          requestType,
+          conversationId: requestedApiConversationId,
+          language: requestedLanguage,
+          messages: sanitizedMessages,
+          lastUserMessage,
+          birthData: normalizedBirthData,
+          partnerBirthData: normalizeBirthData(bodyRecord.partnerBirthData),
+          practitionerUsage: normalizedPractitionerUsage,
+          contextType: normalizedContextType,
+          selectedMenuKey: requestedSelectedMenuKey,
+          selectedSubmenuKey: requestedSelectedSubmenuKey,
+          uiAction: normalizedUiAction,
+          journeyEnabled,
+          analysisMode: requestedAnalysisMode,
+          renderMode: requestedRenderMode,
+          userIntentKey: requestedUserIntentKey,
+          evolutionProfile: requestedEvolutionProfile,
+          quota: {
+            used: quota.used,
+            limit: quota.limit,
+            remaining: quota.remaining,
+            resetAt: quota.resetAt,
+            windowStartedAt: quota.windowStartedAt,
+          },
+        })
+
+        const normalizedN8nResponse = buildConsistentResponse(n8nResponse as ChatResponsePayload, {
+          type: 'conversation',
+          plan: effectivePlan,
+          mode: effectivePlan,
+          conversationId: requestedConversationId ?? undefined,
+          flowState: { step: 'conversation', completed: true },
+          menu: DEFAULT_EMPTY_MENU,
+        })
+
+        const assistantReply =
+          typeof normalizedN8nResponse.message === 'string'
+            ? normalizedN8nResponse.message
+            : typeof normalizedN8nResponse.reply === 'string'
+              ? normalizedN8nResponse.reply
+              : typeof normalizedN8nResponse.content === 'string'
+                ? normalizedN8nResponse.content
+                : ''
+
+        const evolutionDecision = updateUserEvolutionProfile({
+          userMessage: lastUserMessage,
+          assistantResponse: assistantReply,
+          currentProfile: (requestedEvolutionProfile as UserEvolutionProfile | null) ?? null,
+        })
+
+        log('info', 'response normalized', {
+          branch: 'n8n_chat_webhook',
+          ...getNormalizationDiagnostics(normalizedN8nResponse),
+        })
+
+        return NextResponse.json(
+          {
+            ...normalizedN8nResponse,
+            plan: effectivePlan,
+            mode: effectivePlan,
+            updatedEvolutionProfile:
+              normalizedN8nResponse.updatedEvolutionProfile ??
+              (evolutionDecision.shouldUpdate
+                ? evolutionDecision.nextProfile
+                : (requestedEvolutionProfile ?? null)),
+            metadata: {
+              ...((normalizedN8nResponse.metadata as Record<string, unknown> | undefined) ?? {}),
+              automation: 'n8n',
+              quota: {
+                used: quota.used,
+                limit: quota.limit,
+                remaining: quota.remaining,
+                resetAt: quota.resetAt,
+                windowStartedAt: quota.windowStartedAt,
+              },
+              responseDepth,
+              journeyEnabled,
+            },
+          },
+          { status: 200 }
+        )
+      } catch (error) {
+        recordError()
+        log('error', 'n8n chat webhook failed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+        captureError(error, {
+          path: '/api/chat',
+          requestId,
+          extra: {
+            stage: failureStage,
+            n8nConfigured: true,
+          },
+        })
+
+        const errorResponse = buildConsistentResponse(
+          {
+            message: "L'automatisation du chat n8n n'a pas répondu correctement. Vérifie le workflow n8n puis réessaie.",
+            type: 'error',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? randomUUID(),
+            flowState: { step: 'error', completed: false },
+            menu: DEFAULT_EMPTY_MENU,
+            metadata: {
+              automation: 'n8n',
+              shouldPersistMemory: false,
+            },
+          },
+          {
+            type: 'error',
+            plan: effectivePlan,
+            mode: effectivePlan,
+            conversationId: requestedConversationId ?? undefined,
+            flowState: { step: 'error', completed: false },
+            menu: DEFAULT_EMPTY_MENU,
+          }
+        )
+
+        return NextResponse.json(errorResponse, { status: 502 })
+      }
+    }
 
     failureStage = 'post_quota_orchestration'
     const postQuotaEvaluation = evaluateOrchestration({

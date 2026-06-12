@@ -35,7 +35,8 @@ export default function ChatShell({
         minHeight: '100vh',
         overflow: 'hidden',
         position: 'relative',
-        background: 'linear-gradient(180deg,#fbfdfb 0%,#f7faf6 48%,#f1f6f1 100%)',
+        background:
+          'linear-gradient(115deg, rgba(167,0,30,0.105), transparent 28%), linear-gradient(245deg, rgba(122,169,92,0.075), transparent 31%), linear-gradient(180deg,#120911 0%,#1E0F1C 48%,#080407 100%)',
       }}
     >
       {!desktopLeft && showLeft && (
@@ -84,7 +85,8 @@ export default function ChatShell({
               bottom: 0,
               zIndex: 19,
               padding: '10px 28px 20px',
-              background: 'linear-gradient(180deg, rgba(247,250,246,0), rgba(247,250,246,0.88) 18%, rgba(247,250,246,0.98) 100%)',
+              background:
+                'linear-gradient(180deg, rgba(18,9,17,0), rgba(18,9,17,0.80) 18%, rgba(8,4,7,0.97) 100%)',
               backdropFilter: 'blur(14px)',
               WebkitBackdropFilter: 'blur(14px)',
             }}
@@ -116,7 +118,7 @@ function Drawer({
         position: 'fixed',
         inset: 0,
         zIndex: 60,
-        background: 'rgba(18, 30, 23, 0.18)',
+        background: 'rgba(8, 4, 7, 0.68)',
         backdropFilter: 'blur(10px)',
       }}
       onClick={onClose}

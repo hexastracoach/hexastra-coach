@@ -9,6 +9,7 @@ import Composer from './Composer'
 import LeftSidebar from './LeftSidebar'
 import MessageList from './MessageList'
 import WelcomeHero from './WelcomeHero'
+import DailyInsight from './DailyInsight'
 import BirthDataInlineForm from './BirthDataInlineForm'
 import PractitionerUsageStep from './PractitionerUsageStep'
 import RenderModeStep from './RenderModeStep'
@@ -111,6 +112,72 @@ import type {
   HexastraMenuItem,
 } from '@/lib/hexastra/types'
 
+function getTemporaryAccessOverridePlan(): PlanKey | null {
+  const normalized = (process.env.NEXT_PUBLIC_HEXASTRA_ACCESS_OVERRIDE ?? '').trim().toLowerCase()
+
+  if (!normalized || normalized === '0' || normalized === 'false' || normalized === 'off') return null
+  if (normalized === 'essential') return 'essential'
+  if (normalized === 'premium') return 'premium'
+  if (normalized === 'practitioner' || normalized === 'all' || normalized === 'true') return 'practitioner'
+
+  return null
+}
+
+function normalizeDebugPlan(value: string | null): PlanKey | null {
+  const normalized = (value ?? '').trim().toLowerCase()
+  if (normalized === 'free' || normalized === 'gratuit') return 'free'
+  if (normalized === 'essential' || normalized === 'essentiel') return 'essential'
+  if (normalized === 'premium') return 'premium'
+  if (normalized === 'practitioner' || normalized === 'praticien') return 'practitioner'
+  return null
+}
+
+function readResponseBlockText(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const text = value.trim()
+    return text || null
+  }
+
+  if (!value || typeof value !== 'object') return null
+
+  const record = value as Record<string, unknown>
+  const text =
+    typeof record.content === 'string' && record.content.trim()
+      ? record.content.trim()
+      : typeof record.message === 'string' && record.message.trim()
+        ? record.message.trim()
+        : typeof record.reply === 'string' && record.reply.trim()
+          ? record.reply.trim()
+          : ''
+
+  return text || null
+}
+
+function getApiResponseBlocks(data: HexastraApiResponse | null | undefined): string[] {
+  if (!data || typeof data !== 'object') return []
+
+  const candidates: unknown[] = [data.blocks, data.chunks, data.messages]
+
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue
+
+    const blocks = candidate
+      .map(readResponseBlockText)
+      .filter((text): text is string => Boolean(text))
+
+    if (blocks.length > 0) return blocks
+  }
+
+  return []
+}
+
+function attachDebugPlan<T extends Record<string, unknown>>(
+  payload: T,
+  debugPlan: PlanKey | null,
+): T & { debugPlan?: PlanKey } {
+  return debugPlan ? { ...payload, debugPlan } : payload
+}
+
 type ChatApiMetadata = Record<string, unknown> & {
   contextType?: ContextType
   selectedMenuKey?: string | null
@@ -157,7 +224,7 @@ function IconMenu() {
   )
 }
 
-const API_TIMEOUT_MS = 30000
+const API_TIMEOUT_MS = 120000
 const CONVERSATION_STORAGE_KEY = 'hexastra_conversation_id'
 const USER_MEMORY_STORAGE_KEY = 'hexastra.userMemory'
 const CACHE_LIMIT = 50
@@ -398,6 +465,8 @@ function birthDataFromProfile(profile: Record<string, unknown> | null | undefine
 export default function ChatPageClient() {
   const searchParams = useSearchParams()
   const supabase = createClient()
+  const debugPlan = normalizeDebugPlan(searchParams.get('debugPlan'))
+  const temporaryAccessPlan = debugPlan ?? getTemporaryAccessOverridePlan()
   const chatLanguage = useChatLanguage()
   const { t } = useTranslation()
   const entrySource = searchParams.get('source') ?? 'direct'
@@ -438,7 +507,7 @@ export default function ChatPageClient() {
   const [partnerBirthData, setPartnerBirthData] = useState<BirthData>(EMPTY_BIRTH_DATA)
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
 
-  const [userPlan, setUserPlan] = useState<PlanKey>('free')
+  const [userPlan, setUserPlan] = useState<PlanKey>(temporaryAccessPlan ?? 'free')
   const [planLoaded, setPlanLoaded] = useState(false)
 
   const [practitionerUsage, setPractitionerUsage] = useState<PractitionerUsage>(null)
@@ -450,6 +519,7 @@ export default function ChatPageClient() {
     yearKey: null,
     monthKey: null,
   })
+  const [queuedMicroRequest, setQueuedMicroRequest] = useState<RequestType | null>(null)
   const [birthAutoIntroCompleted, setBirthAutoIntroCompleted] = useState(false)
   const [autoBirthIntroPending, setAutoBirthIntroPending] = useState(false)
   const [showInlineBirthForm, setShowInlineBirthForm] = useState(false)
@@ -537,6 +607,48 @@ export default function ChatPageClient() {
     [userPlan]
   )
 
+  const buildAssistantMessagesFromResponse = useCallback(
+    ({
+      data,
+      fallbackReply,
+      requestMessage,
+      isReading,
+      depthLevel,
+    }: {
+      data: HexastraApiResponse | null | undefined
+      fallbackReply: string
+      requestMessage: string
+      isReading: boolean
+      depthLevel: string
+    }): Msg[] => {
+      const rawBlocks = getApiResponseBlocks(data)
+      const blocks = rawBlocks.length > 0 ? rawBlocks : [fallbackReply]
+      const baseId = Date.now()
+
+      return blocks
+        .map((block, index) => {
+          const content = formatAssistantReply(block, {
+            intent: ((data?.metadata ?? {}) as ChatApiMetadata).intentDetected,
+            userMessage: requestMessage,
+            isReading,
+            depthLevel,
+          }).trim()
+
+          if (!content) return null
+
+          return {
+            id: `${baseId}-assistant-${index}`,
+            role: 'assistant' as const,
+            content,
+            created_at: new Date(baseId + index).toISOString(),
+            isReading,
+          }
+        })
+        .filter((message): message is Msg => Boolean(message))
+    },
+    [formatAssistantReply],
+  )
+
   const userMessages = useMemo(
     () => messages.filter((message) => message.role === 'user'),
     [messages]
@@ -594,18 +706,18 @@ export default function ChatPageClient() {
     !isTyping
   const headerTitle = isWelcome
     ? isEnglishChat
-      ? 'Guided clarity'
-      : 'Clarté guidée'
+      ? 'Hexastra supports you'
+      : 'Hexastra t’accompagne'
     : isTyping
       ? isEnglishChat
-        ? 'Analysis in progress'
-        : 'Analyse en cours'
+        ? 'Hexastra supports you'
+        : 'Hexastra t’accompagne'
       : isEnglishChat
-        ? 'Conversation'
-        : 'Conversation'
+        ? 'Hexastra supports you'
+        : 'Hexastra t’accompagne'
   const headerSubtitle = isEnglishChat
-    ? 'A direct reading to help you decide more clearly.'
-    : 'Une lecture directe pour t’aider à décider plus clairement.'
+    ? 'A direct reading to help you see clearly.'
+    : 'Une lecture directe pour t’aider à voir clair.'
 
   const isReadingFlowStep = useCallback((step?: string | null) => {
     if (!step) return false
@@ -853,7 +965,7 @@ export default function ChatPageClient() {
       contextType: ContextType
       menuKey?: string | null
       submenuKey?: string | null
-      uiAction: 'select_menu_item' | 'select_submenu_item' | 'open_menu' | 'restart_flow'
+      uiAction: 'select_menu_item' | 'select_submenu_item' | 'open_menu' | 'restart_flow' | 'send_message'
     }) => {
       if (isTyping) return
 
@@ -882,7 +994,7 @@ export default function ChatPageClient() {
       setMessages(nextConversation)
       setIsTyping(true)
 
-      const payload = buildChatPayload({
+      const payload = attachDebugPlan(buildChatPayload({
         requestType: 'chat',
         plan: userPlan,
         birthData: birthDataRef.current,
@@ -899,7 +1011,7 @@ export default function ChatPageClient() {
         journeyEnabled,
         analysisMode,
         renderMode,
-      })
+      }), debugPlan)
 
       try {
         const data = await postChatPayload(payload)
@@ -907,22 +1019,17 @@ export default function ChatPageClient() {
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const reply = applyApiResponse(data)
         const depthLevel = detectUserDepthLevel(requestMessage, messages, userPlan)
-        const finalReply = formatAssistantReply(reply, {
-          intent: ((data?.metadata ?? {}) as ChatApiMetadata).intentDetected,
-          userMessage: requestMessage,
+        const assistantMessages = buildAssistantMessagesFromResponse({
+          data,
+          fallbackReply: reply,
+          requestMessage,
           isReading,
           depthLevel,
         })
 
         setMessages([
           ...nextConversation,
-          {
-            id: `${Date.now()}-assistant`,
-            role: 'assistant',
-            content: finalReply,
-            created_at: new Date().toISOString(),
-            isReading,
-          },
+          ...assistantMessages,
         ])
       } catch (error) {
         if (requestSeq !== requestSequenceRef.current) return
@@ -961,7 +1068,9 @@ export default function ChatPageClient() {
       postChatPayload,
       journeyEnabled,
       isReadingFlowStep,
+      buildAssistantMessagesFromResponse,
       formatAssistantReply,
+      debugPlan,
     ]
   )
 
@@ -969,6 +1078,19 @@ export default function ChatPageClient() {
     let mounted = true
 
     async function loadUser() {
+      if (temporaryAccessPlan) {
+        setAuthUserId(null)
+        setUserPlan(temporaryAccessPlan)
+        setPlanLoaded(true)
+        setStorageScopeReady(true)
+        setEvolutionProfile((prev) => {
+          const updated = { ...(prev ?? {}), plan: temporaryAccessPlan }
+          saveEvolutionProfile(updated, null)
+          return updated
+        })
+        return
+      }
+
       const { data, error } = await supabase.auth.getUser()
       if (!mounted) return
 
@@ -1017,7 +1139,7 @@ export default function ChatPageClient() {
     return () => {
       mounted = false
     }
-  }, [supabase])
+  }, [supabase, temporaryAccessPlan])
 
   // Pré-charger le menu initial dès que le plan est connu
   useEffect(() => {
@@ -1078,7 +1200,7 @@ export default function ChatPageClient() {
 
   // Reload conversation history from Supabase after a page refresh
   useEffect(() => {
-    if (!conversationId || messages.length > 0) return
+    if (!authUserId || !conversationId || messages.length > 0) return
     readConversationMessages(supabase, conversationId).then((rows) => {
       if (rows.length === 0) return
       setMessages(
@@ -1091,7 +1213,7 @@ export default function ChatPageClient() {
       )
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId])
+  }, [authUserId, conversationId])
 
   useEffect(() => {
     if (!storageScopeReady) return
@@ -1313,6 +1435,8 @@ export default function ChatPageClient() {
       return
     }
 
+    if (isTyping) return
+
     // Évite de bloquer l'UI au chargement. Exception: juste après l'envoi
     // du formulaire de naissance, on autorise la séquence micro complète.
     if (isWelcome && !forceMicroBootstrapRef.current) return
@@ -1322,7 +1446,17 @@ export default function ChatPageClient() {
 
     void triggerMicroReading(pendingMicroRequestType)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isWelcome, pendingMicroRequestType])
+  }, [autoBirthIntroPending, isTyping, isWelcome, pendingMicroRequestType, step])
+
+  useEffect(() => {
+    if (!queuedMicroRequest || isTyping) return
+
+    const next = queuedMicroRequest
+    setQueuedMicroRequest(null)
+    microTriggerRef.current = null
+    void triggerMicroReading(next, true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTyping, queuedMicroRequest])
 
   useEffect(() => {
     if (step === 'conversation_ready') {
@@ -1388,24 +1522,26 @@ export default function ChatPageClient() {
       handleBirthDataChange(normalized)
       handlePartnerBirthDataChange(normalizedPartner)
 
-      // Sync with Supabase only for authenticated users. Guests keep local progress.
-      if (authUserId) {
-        console.log('[BIRTH_FORM] birth data saved to localStorage, syncing to Supabase', {
-          userId: authUserId,
-          firstName: normalized.firstName,
-          birthDate: normalized.birthDate,
-          birthCity: normalized.birthCity,
-          hasLat: !!normalized.birthLat,
-          hasLng: !!normalized.birthLng,
-        })
-        fetch('/api/profile/birth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(normalized),
-        }).catch((err) => {
-          console.warn('[BIRTH_FORM] Supabase sync failed (non-critical)', err)
-        })
-      }
+      // Authenticated users are persisted server-side. In local/temporary access,
+      // this still lets the birth webhook trigger n8n with savedMode=local_only.
+      console.log('[BIRTH_FORM] birth data saved to localStorage, syncing birth endpoint', {
+        userId: authUserId,
+        firstName: normalized.firstName,
+        birthDate: normalized.birthDate,
+        birthCity: normalized.birthCity,
+        hasLat: !!normalized.birthLat,
+        hasLng: !!normalized.birthLng,
+      })
+      fetch('/api/profile/birth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          birthData: normalized,
+          partnerBirthData: normalizedPartner,
+        }),
+      }).catch((err) => {
+        console.warn('[BIRTH_FORM] birth sync/webhook failed (non-critical)', err)
+      })
 
       if (normalized.firstName) {
         setEvolutionProfile((prev) => {
@@ -1538,8 +1674,8 @@ export default function ChatPageClient() {
     [sidebarIntentKey, chatLanguage, persistReadings, readings]
   )
 
-  async function triggerMicroReading(requestType: RequestType) {
-    if (isTyping) return
+  async function triggerMicroReading(requestType: RequestType, force = false) {
+    if (isTyping && !force) return
     setIsTyping(true)
     const requestSeq = ++requestSequenceRef.current
 
@@ -1560,7 +1696,7 @@ export default function ChatPageClient() {
 
     const historyMsgs: ChatMessage[] = []
 
-    const payload = buildChatPayload({
+    const payload = attachDebugPlan(buildChatPayload({
       requestType,
       plan: userPlan,
       birthData,
@@ -1577,7 +1713,7 @@ export default function ChatPageClient() {
       analysisMode,
       renderMode,
       userIntentKey: sidebarIntentKey,
-    })
+    }), debugPlan)
 
     try {
       const data = await postChatPayload(payload)
@@ -1607,6 +1743,14 @@ export default function ChatPageClient() {
         ]
       })
 
+      const shouldChainMicroReadings = autoBirthIntroPending || forceMicroBootstrapRef.current
+      const nextMicroRequest: RequestType | null =
+        shouldChainMicroReadings && requestType === 'micro_profile'
+          ? 'micro_year'
+          : shouldChainMicroReadings && requestType === 'micro_year'
+            ? 'micro_month'
+            : null
+
       setMicroReadings((prev) => {
         let next: MicroReadings
 
@@ -1614,9 +1758,23 @@ export default function ChatPageClient() {
         else if (requestType === 'micro_year') next = markYearDone(prev, storageScope)
         else next = markMonthDone(prev, storageScope)
 
-        microTriggerRef.current = null
+        if (nextMicroRequest) {
+          microTriggerRef.current =
+            nextMicroRequest === 'micro_year' ? 'micro_year_pending' : 'micro_month_pending'
+        } else {
+          microTriggerRef.current = null
+        }
         return next
       })
+
+      if (nextMicroRequest) {
+        setQueuedMicroRequest(nextMicroRequest)
+      } else if (requestType === 'micro_month') {
+        forceMicroBootstrapRef.current = false
+        setAutoBirthIntroPending(false)
+        setBirthAutoIntroCompleted(true)
+        markBirthAutoIntroCompleted(storageScope)
+      }
     } catch (error) {
       if (requestSeq !== requestSequenceRef.current) return
       console.error('[triggerMicroReading] failed', error)
@@ -1833,7 +1991,7 @@ export default function ChatPageClient() {
         },
       ]
 
-      const payload = buildChatPayload({
+      const payload = attachDebugPlan(buildChatPayload({
         requestType: 'chat',
         plan: userPlan,
         birthData: currentBirthData,
@@ -1851,7 +2009,7 @@ export default function ChatPageClient() {
         analysisMode,
         renderMode,
         userIntentKey: sidebarIntentKey,
-      })
+      }), debugPlan)
       const requestSeq = ++requestSequenceRef.current
 
       try {
@@ -1860,22 +2018,15 @@ export default function ChatPageClient() {
         const reply = applyApiResponse(data)
         const isReading = isReadingFlowStep(data?.flowState?.step)
         const depthLevel = detectUserDepthLevel(requestContent, messages, userPlan)
-        const finalReply = formatAssistantReply(reply, {
-          intent: ((data?.metadata ?? {}) as ChatApiMetadata).intentDetected,
-          userMessage: requestContent,
+        const assistantMessages = buildAssistantMessagesFromResponse({
+          data,
+          fallbackReply: reply,
+          requestMessage: requestContent,
           isReading,
           depthLevel,
         })
 
-        const assistantMessage: Msg = {
-          id: `${Date.now()}-assistant`,
-          role: 'assistant',
-          content: finalReply,
-          created_at: new Date().toISOString(),
-          isReading,
-        }
-
-        const final = [...nextConversation, assistantMessage]
+        const final = [...nextConversation, ...assistantMessages]
         setMessages(final)
         setIsTyping(false)
 
@@ -1933,6 +2084,7 @@ export default function ChatPageClient() {
       postChatPayload,
       journeyEnabled,
       isReadingFlowStep,
+      buildAssistantMessagesFromResponse,
       formatAssistantReply,
       sendStructuredAction,
       menuItems,
@@ -1940,6 +2092,7 @@ export default function ChatPageClient() {
       activeContextFrame,
       storageScope,
       userMessages,
+      debugPlan,
     ]
   )
 
@@ -2145,9 +2298,27 @@ export default function ChatPageClient() {
 
           <div className="hx-app-feed hx-scroll-soft">
             <div className={`hx-app-feed-inner${isWelcome ? ' hx-welcome-feed' : ''}`}>
+              {!isWelcome && <DailyInsight compact />}
+
               {isWelcome ? (
                 <div className="hx-welcome-feed-center">
-                  <WelcomeHero onPrompt={(value) => void handleSend(value)} />
+                  <WelcomeHero
+                    onPrompt={(value) => {
+                      if (typeof value === 'string') {
+                        void handleSend(value)
+                        return
+                      }
+
+                      void sendStructuredAction({
+                        message: value.message,
+                        displayMessage: value.displayMessage,
+                        contextType: 'science',
+                        menuKey: 'science',
+                        submenuKey: null,
+                        uiAction: 'send_message',
+                      })
+                    }}
+                  />
                 </div>
               ) : (
                 <MessageList

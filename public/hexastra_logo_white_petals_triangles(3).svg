@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">
+<style>
+.gold{stroke:#d8aa63;stroke-width:4;fill:none}
+.white{stroke:#ffffff;stroke-width:4;fill:none}
+</style>
+<circle class="gold" cx="500" cy="500" r="420"/>
+<circle class="gold" cx="500" cy="500" r="405"/>
+<circle class="white" cx="500" cy="500" r="120"/>
+<circle class="white" cx="500" cy="380" r="120"/>
+<circle class="white" cx="603.9" cy="440" r="120"/>
+<circle class="white" cx="603.9" cy="560" r="120"/>
+<circle class="white" cx="500" cy="620" r="120"/>
+<circle class="white" cx="396.1" cy="560" r="120"/>
+<circle class="white" cx="396.1" cy="440" r="120"/>
+<polygon class="white" points="500,240 725,630 275,630"/>
+<polygon class="white" points="500,760 725,370 275,370"/>
+</svg>

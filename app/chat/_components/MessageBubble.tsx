@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import { Check, Files, Share2, Sparkles } from 'lucide-react'
 import { type Msg } from '../_lib/chat'
 
 type Props = {
@@ -16,89 +17,27 @@ function formatTime(value?: string) {
   return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
-function splitReadingSections(content: string) {
-  const segments = content.split(/\n[─—-]{6,}\n/g)
-  if (segments.length < 2) return null
+function getParagraphBlocks(text: string) {
+  const lines = text.split('\n')
+  const paragraphs: string[][] = []
+  let current: string[] = []
 
-  const main = segments[0].trim()
-  const closure = segments[1]?.trim()
-  const suggestions = segments.slice(2).join('\n').trim()
+  for (const line of lines) {
+    if (line.trim() === '') {
+      if (current.length > 0) {
+        paragraphs.push(current)
+        current = []
+      }
+    } else {
+      current.push(line)
+    }
+  }
 
-  return { main, closure, suggestions }
-}
+  if (current.length > 0) paragraphs.push(current)
 
-function CopyIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <rect x="6.5" y="4.5" width="9" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" />
-      <path
-        d="M4.5 12.5V6.5C4.5 5.39543 5.39543 4.5 6.5 4.5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M7.5 10.25L12.75 5.25"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M9.75 5.25H12.75V8.25"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M8 6.5H6.75C5.64543 6.5 4.75 7.39543 4.75 8.5V12.75C4.75 13.8546 5.64543 14.75 6.75 14.75H11.5C12.6046 14.75 13.5 13.8546 13.5 12.75V11.5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
-function RetryIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M15.25 10A5.25 5.25 0 1 1 13.4 6.03"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M13.25 3.75V6.25H15.75"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
-      <path
-        d="M5.5 10.25L8.5 13.25L14.5 6.75"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
+  return paragraphs.length > 1
+    ? paragraphs
+    : lines.filter((line) => line.trim()).map((line) => [line])
 }
 
 export default function MessageBubble({ message, lastUserMessage, onRetry }: Props) {
@@ -108,10 +47,6 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
     !message.isReading &&
     (message.id.includes('birth-saved') || message.id.includes('journey'))
   const timeLabel = formatTime(message.created_at)
-  const readingSections = useMemo(
-    () => (message.isReading ? splitReadingSections(message.content) : null),
-    [message.content, message.isReading]
-  )
   const [copied, setCopied] = useState(false)
   const [shared, setShared] = useState(false)
 
@@ -127,10 +62,15 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
 
   const handleShare = async () => {
     try {
+      const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
       if (navigator.share) {
-        await navigator.share({ text: message.content })
+        await navigator.share({
+          title: 'Guidance Hexastra',
+          text: message.content,
+          url: shareUrl,
+        })
       } else {
-        await navigator.clipboard.writeText(message.content)
+        await navigator.clipboard.writeText(shareUrl || message.content)
       }
       setShared(true)
       setTimeout(() => setShared(false), 1800)
@@ -144,23 +84,7 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
   }
 
   const renderBlocks = (text: string) => {
-    const lines = text.split('\n')
-
-    // Group consecutive non-empty lines as paragraphs; empty lines = separator
-    const paragraphs: string[][] = []
-    let current: string[] = []
-    for (const line of lines) {
-      if (line.trim() === '') {
-        if (current.length > 0) { paragraphs.push(current); current = [] }
-      } else {
-        current.push(line)
-      }
-    }
-    if (current.length > 0) paragraphs.push(current)
-
-    // If no paragraph separation found, treat each line as its own block
-    const blocks: string[][] =
-      paragraphs.length > 1 ? paragraphs : lines.filter((l) => l.trim()).map((l) => [l])
+    const blocks = getParagraphBlocks(text)
 
     if (blocks.length <= 1 && blocks[0]?.length <= 1) {
       return <div className="hx-bubble-text">{text}</div>
@@ -168,11 +92,14 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
 
     return (
       <div className="hx-bubble-blocks">
-        {blocks.map((block, i) => (
-          <p key={i} className="hx-bubble-block">
-            {block.map((line, j) => (
-              <span key={j} className={line.trimStart().startsWith('\u2192 ') ? 'hx-bubble-arrow-label' : ''}>
-                {j > 0 && <br />}
+        {blocks.map((block, blockIndex) => (
+          <p key={blockIndex} className="hx-bubble-block">
+            {block.map((line, lineIndex) => (
+              <span
+                key={lineIndex}
+                className={line.trimStart().startsWith('\u2192 ') ? 'hx-bubble-arrow-label' : ''}
+              >
+                {lineIndex > 0 && <br />}
                 {line}
               </span>
             ))}
@@ -182,24 +109,54 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
     )
   }
 
-  const renderContent = () => {
-    if (!readingSections) {
-      return renderBlocks(message.content)
-    }
-
-    return (
-      <div className="hx-bubble-sections">
-        {renderBlocks(readingSections.main)}
-        <div className="hx-bubble-divider" />
-        <div className="hx-bubble-closure">{readingSections.closure}</div>
-        {readingSections.suggestions && (
-          <>
-            <div className="hx-bubble-divider" />
-            <div className="hx-bubble-text hx-bubble-suggestions">{readingSections.suggestions}</div>
-          </>
-        )}
+  const renderGuidanceCard = (text: string) => (
+    <div className="hx-guidance-card" style={{ position: 'relative', overflow: 'hidden' }}>
+      <div
+        className="hx-guidance-watermark-layer"
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+        }}
+      >
+        <img
+          src="/hexastra_logo_white_petals_triangles(3).svg"
+          alt=""
+          className="hx-guidance-watermark"
+          draggable={false}
+          style={{
+            position: 'static',
+            width: '62%',
+            maxWidth: 420,
+            height: 'auto',
+            opacity: 0.07,
+            mixBlendMode: 'screen',
+            filter: 'blur(0.2px) drop-shadow(0 0 28px rgba(216, 181, 109, 0.16))',
+            transform: 'none',
+          }}
+        />
       </div>
-    )
+
+      <div className="hx-guidance-content-layer" style={{ position: 'relative', zIndex: 2 }}>
+        <div className="hx-guidance-card-header">
+          <span className="hx-guidance-card-icon" aria-hidden="true">
+            <img src="/hexastra_logo_white_petals_triangles(2).svg" alt="" draggable={false} />
+          </span>
+          <span>GUIDANCE HEXASTRA</span>
+        </div>
+
+        <div className="hx-guidance-free-content">{renderBlocks(text)}</div>
+      </div>
+    </div>
+  )
+
+  const renderContent = () => {
+    return isUser || isStatusCard ? renderBlocks(message.content) : renderGuidanceCard(message.content)
   }
 
   return (
@@ -222,29 +179,29 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
             className="hx-action-btn"
             onClick={handleCopy}
             type="button"
-            aria-label="Copier la lecture"
-            title="Copier la lecture"
+            aria-label="Conserver cette guidance"
+            title="Conserver cette guidance"
           >
-            {copied ? <CheckIcon /> : <CopyIcon />}
+            {copied ? <Check size={19} strokeWidth={1.9} /> : <Files size={19} strokeWidth={1.8} />}
           </button>
           <button
             className="hx-action-btn"
             onClick={handleShare}
             type="button"
-            aria-label="Partager la lecture"
-            title="Partager la lecture"
+            aria-label="Partager cette lecture"
+            title="Partager cette lecture"
           >
-            {shared ? <CheckIcon /> : <ShareIcon />}
+            {shared ? <Check size={19} strokeWidth={1.9} /> : <Share2 size={19} strokeWidth={1.8} />}
           </button>
           <button
             className="hx-action-btn"
             onClick={handleRetry}
             type="button"
             disabled={!onRetry}
-            aria-label="Relancer la lecture"
-            title="Relancer la lecture"
+            aria-label="Approfondir cette lecture"
+            title="Approfondir cette lecture"
           >
-            <RetryIcon />
+            <Sparkles size={19} strokeWidth={1.8} />
           </button>
         </div>
       )}

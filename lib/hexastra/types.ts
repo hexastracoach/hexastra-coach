@@ -94,6 +94,9 @@ export type HexastraApiResponse = {
   message: string
   reply?: string
   content?: string
+  blocks?: string[]
+  chunks?: string[]
+  messages?: Array<string | { content?: string; message?: string; reply?: string }>
   mode: HexastraMode
   plan: PlanKey
   flowState: HexastraFlowState

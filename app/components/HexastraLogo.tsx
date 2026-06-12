@@ -35,6 +35,7 @@ export default function HexastraLogo({
           width={size}
           height={size}
           priority={priority}
+          loading="eager"
           className="hx-logo-image"
           unoptimized
         />

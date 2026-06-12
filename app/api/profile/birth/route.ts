@@ -14,6 +14,7 @@
  */
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { callN8nBirthWebhook, isN8nBirthWebhookEnabled } from '@/lib/n8n/chatWebhook'
 
 /** Supabase error message patterns that indicate a missing column */
 const COLUMN_MISSING_PATTERNS = [
@@ -27,6 +28,57 @@ const COLUMN_MISSING_PATTERNS = [
 function isColumnMissingError(message: string): boolean {
   const lower = message.toLowerCase()
   return COLUMN_MISSING_PATTERNS.some((pattern) => lower.includes(pattern))
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function normalizePartnerBirthData(value: unknown): Record<string, unknown> | null {
+  const record = asRecord(value)
+  return Object.keys(record).some((key) => {
+    const field = record[key]
+    return typeof field === 'string' ? field.trim().length > 0 : field !== null && field !== undefined
+  })
+    ? record
+    : null
+}
+
+async function notifyBirthWebhook(params: {
+  userId: string | null
+  savedMode: 'full' | 'core_only' | 'local_only'
+  updatedFields: string[]
+  birthData: Record<string, unknown>
+  partnerBirthData: Record<string, unknown> | null
+}) {
+  if (!isN8nBirthWebhookEnabled()) return
+
+  try {
+    await callN8nBirthWebhook({
+      source: 'hexastra-web',
+      event: 'birth_profile_saved',
+      userId: params.userId,
+      savedMode: params.savedMode,
+      updatedFields: params.updatedFields,
+      birthData: params.birthData,
+      partnerBirthData: params.partnerBirthData,
+      savedAt: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.warn('[BIRTH_DATA] n8n birth webhook failed (non-critical)', {
+      userId: params.userId,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
+function getSubmittedFieldNames(record: Record<string, unknown>) {
+  return Object.keys(record).filter((key) => {
+    const value = record[key]
+    return typeof value === 'string' ? value.trim().length > 0 : value !== null && value !== undefined
+  })
 }
 
 export async function GET() {
@@ -68,16 +120,50 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const body = await req.json()
+    const bodyRecord = asRecord(body)
+    const birthDataRecord = asRecord(bodyRecord.birthData)
+    const primaryBirthData = Object.keys(birthDataRecord).length > 0 ? birthDataRecord : bodyRecord
+    const partnerBirthData = normalizePartnerBirthData(bodyRecord.partnerBirthData)
 
-    if (!user?.id) {
-      return NextResponse.json({ ok: false, reason: 'unauthenticated' }, { status: 401 })
+    let userId: string | null = null
+    let supabase: Awaited<ReturnType<typeof createClient>> | null = null
+
+    try {
+      supabase = await createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      userId = user?.id ?? null
+    } catch (err) {
+      console.warn('[BIRTH_DATA] auth lookup failed, continuing in local_only mode', {
+        error: err instanceof Error ? err.message : String(err),
+      })
     }
 
-    const body = await req.json()
+    if (!userId || !supabase) {
+      const updatedFields = getSubmittedFieldNames(primaryBirthData)
+
+      if (updatedFields.length === 0) {
+        console.warn('[BIRTH_DATA] no valid local fields to notify')
+        return NextResponse.json({ ok: false, reason: 'no_fields' })
+      }
+
+      await notifyBirthWebhook({
+        userId: null,
+        savedMode: 'local_only',
+        updatedFields,
+        birthData: primaryBirthData,
+        partnerBirthData,
+      })
+
+      return NextResponse.json({
+        ok: true,
+        updated: updatedFields.length,
+        mode: 'local_only',
+      })
+    }
+
     const {
       firstName,
       birthDate,
@@ -89,7 +175,7 @@ export async function POST(req: Request) {
       birthLat,
       birthLng,
       gender,
-    } = body as {
+    } = primaryBirthData as {
       firstName?: string
       birthDate?: string
       birthTime?: string
@@ -134,12 +220,12 @@ export async function POST(req: Request) {
     const allUpdates = { ...coreUpdates, ...extendedUpdates }
 
     if (Object.keys(allUpdates).length === 0) {
-      console.warn('[BIRTH_DATA] no valid fields to save', { userId: user.id })
+      console.warn('[BIRTH_DATA] no valid fields to save', { userId })
       return NextResponse.json({ ok: false, reason: 'no_fields' })
     }
 
     console.log('[BIRTH_DATA] saving to profiles', {
-      userId: user.id,
+      userId,
       fields: Object.keys(allUpdates),
       coreFields: Object.keys(coreUpdates),
       extendedFields: Object.keys(extendedUpdates),
@@ -149,12 +235,19 @@ export async function POST(req: Request) {
     const { error: fullError } = await supabase
       .from('profiles')
       .update(allUpdates)
-      .eq('id', user.id)
+      .eq('id', userId)
 
     if (!fullError) {
       console.log('[BIRTH_DATA] saved ok (full)', {
-        userId: user.id,
+        userId,
         fields: Object.keys(allUpdates),
+      })
+      await notifyBirthWebhook({
+        userId,
+        savedMode: 'full',
+        updatedFields: Object.keys(allUpdates),
+        birthData: primaryBirthData,
+        partnerBirthData,
       })
       return NextResponse.json({ ok: true, updated: Object.keys(allUpdates).length, mode: 'full' })
     }
@@ -162,7 +255,7 @@ export async function POST(req: Request) {
     // Attempt 2: if extended fields caused a column_missing error, retry core only.
     if (isColumnMissingError(fullError.message) && Object.keys(coreUpdates).length > 0) {
       console.warn('[BIRTH_DATA] extended columns missing — migration 20260320 not applied', {
-        userId: user.id,
+        userId,
         dbError: fullError.message,
         missingFields: Object.keys(extendedUpdates),
         hint: 'Run: supabase db push OR apply migration 20260320_birth_extended_fields.sql manually',
@@ -171,13 +264,20 @@ export async function POST(req: Request) {
       const { error: coreError } = await supabase
         .from('profiles')
         .update(coreUpdates)
-        .eq('id', user.id)
+        .eq('id', userId)
 
       if (!coreError) {
         console.log('[BIRTH_DATA] saved ok (core only — extended columns missing)', {
-          userId: user.id,
+          userId,
           savedFields: Object.keys(coreUpdates),
           skippedFields: Object.keys(extendedUpdates),
+        })
+        await notifyBirthWebhook({
+          userId,
+          savedMode: 'core_only',
+          updatedFields: Object.keys(coreUpdates),
+          birthData: primaryBirthData,
+          partnerBirthData,
         })
         return NextResponse.json({
           ok: true,
@@ -189,7 +289,7 @@ export async function POST(req: Request) {
 
       // Core also failed — genuine DB error.
       console.error('[BIRTH_DATA] core update also failed', {
-        userId: user.id,
+        userId,
         error: coreError.message,
       })
       return NextResponse.json({ ok: false, reason: 'db_error', detail: coreError.message }, { status: 500 })
@@ -197,7 +297,7 @@ export async function POST(req: Request) {
 
     // Non-column error on full update.
     console.error('[BIRTH_DATA] profiles update failed', {
-      userId: user.id,
+      userId,
       error: fullError.message,
       isColumnMissing: isColumnMissingError(fullError.message),
     })

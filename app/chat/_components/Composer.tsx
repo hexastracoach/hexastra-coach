@@ -22,6 +22,23 @@ type Props = {
   onFusionEntry?: (prompt: string) => void
 }
 
+const PLACEHOLDERS = {
+  fr: [
+    "Qu'est-ce qui te traverse aujourd'hui ?",
+    "Parle-moi de ce qui tourne dans ta t\u00eate.",
+    "Qu'est-ce qui te p\u00e8se en ce moment ?",
+    "Qu'est-ce qui te bloque aujourd'hui ?",
+    'Que cherches-tu \u00e0 comprendre ?',
+  ],
+  en: [
+    'What is moving through you today?',
+    'Tell me what keeps turning in your mind.',
+    'What feels heavy right now?',
+    'What feels blocked today?',
+    'What are you trying to understand?',
+  ],
+}
+
 function getStatusLabel({
   lang,
   focused,
@@ -103,6 +120,7 @@ export default function Composer({
   const [focused, setFocused] = useState(false)
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
+  const [placeholderIndex, setPlaceholderIndex] = useState(0)
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -114,6 +132,14 @@ export default function Composer({
     textareaRef.current.style.height = 'auto'
     textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`
   }, [value])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setPlaceholderIndex((current) => current + 1)
+    }, 7200)
+
+    return () => window.clearInterval(timer)
+  }, [])
 
   async function startRecording() {
     try {
@@ -165,13 +191,12 @@ export default function Composer({
   }
 
   const canSend = value.trim().length > 0 && !disabled && !transcribing
+  const placeholderOptions = lang.startsWith('en') ? PLACEHOLDERS.en : PLACEHOLDERS.fr
   const placeholder = transcribing
     ? lang.startsWith('en')
       ? 'Transcribing your message...'
       : 'Je transcris votre message...'
-    : lang.startsWith('en')
-      ? 'Ask your question'
-      : 'Pose ta question'
+    : placeholderOptions[placeholderIndex % placeholderOptions.length]
   const statusLabel = getStatusLabel({
     lang,
     focused,
