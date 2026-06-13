@@ -2,7 +2,7 @@
   "name": "hexastracoach",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.15.4",
+  "packageManager": "npm@10.8.2"
   "engines": {
     "node": "20.x"
   },
