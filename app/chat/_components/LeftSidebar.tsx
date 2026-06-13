@@ -1,5 +1,5 @@
 'use client'
-
+import React from "react";
 import Link from 'next/link'
 import type { Reading } from '../_lib/chat'
 import { useTranslation } from '@/lib/i18n/useTranslation'
@@ -87,7 +87,7 @@ function IconInnerState() {
   )
 }
 
-const INTENT_ICONS: Record<UserIntentKey, () => JSX.Element> = {
+const INTENT_ICONS: Record<UserIntentKey, React.ComponentType> = {
   understand_situation: IconUnderstand,
   make_decision: IconDecision,
   relationships: IconRelationships,
