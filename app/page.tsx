@@ -543,10 +543,10 @@ const problemIcons: LucideIcon[] = [Sparkles, Compass, ShieldCheck]
 const benefitIcons: LucideIcon[] = [Target, Sparkles, MessageSquare, BadgeCheck]
 
 const primaryButtonClass =
-  'inline-flex items-center justify-center gap-2 rounded-full bg-[#D8B56D] px-6 py-3 text-sm font-semibold text-[#1E0F1C] shadow-[0_16px_42px_rgba(216,181,109,0.20)] transition hover:-translate-y-0.5 hover:bg-[#E2E9C0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D8B56D] focus-visible:ring-offset-2 focus-visible:ring-offset-[#12080D]'
+  'inline-flex items-center justify-center gap-2 rounded-full bg-[#C8A977] px-6 py-3 text-sm font-semibold text-[#2E2A26] shadow-[0_16px_36px_rgba(200,169,119,0.22)] transition hover:-translate-y-0.5 hover:bg-[#E9D7BE] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A977] focus-visible:ring-offset-2 focus-visible:ring-offset-[#F8F6F1]'
 
 const softButtonClass =
-  'inline-flex items-center justify-center gap-2 rounded-full border border-[#D8B56D]/18 bg-[#F4E8C8]/[0.045] px-5 py-3 text-sm font-medium text-[#F4E8C8]/78 transition hover:border-[#D8B56D]/34 hover:bg-[#F4E8C8]/[0.08] hover:text-[#F4E8C8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D8B56D]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#12080D]'
+  'inline-flex items-center justify-center gap-2 rounded-full border border-[#C8A977]/25 bg-white/70 px-5 py-3 text-sm font-medium text-[#2E2A26]/80 shadow-[0_12px_28px_rgba(46,42,38,0.06)] transition hover:border-[#C8A977]/45 hover:bg-[#E9D7BE]/45 hover:text-[#2E2A26] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8A977]/35 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F8F6F1]'
 
 export default function HomePage() {
   const { lang, setLang } = useTranslation()
@@ -613,9 +613,9 @@ export default function HomePage() {
   }
 
   return (
-    <main className="hx-home-warm min-h-screen bg-[#0B0709] text-[#F4E8C8]">
+    <main className="hx-home-warm min-h-screen bg-[#F8F6F1] text-[#2E2A26]">
       <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(88,226,194,0.18),_transparent_28%),linear-gradient(180deg,_#061017_0%,_#08121b_54%,_#071018_100%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(233,215,190,0.58),_transparent_30%),radial-gradient(circle_at_85%_12%,_rgba(154,184,200,0.22),_transparent_32%),linear-gradient(180deg,_#F8F6F1_0%,_#EFE9DF_100%)]" />
         <div className="pointer-events-none absolute left-1/2 top-20 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-300/8 blur-3xl" />
 
         <header className="relative z-20 mx-auto flex max-w-6xl items-center justify-between px-6 py-5 lg:px-8">
@@ -654,7 +654,7 @@ export default function HomePage() {
                     type="button"
                     onClick={() => setLang(code)}
                     className={`rounded-full px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] transition ${
-                      active ? 'bg-[#D8B56D] text-[#1E0F1C]' : 'text-[#F4E8C8]/52 hover:text-[#F4E8C8]'
+                      active ? 'bg-[#C8A977] text-[#2E2A26]' : 'text-[#6F675F]/70 hover:text-[#2E2A26]'
                     }`}
                   >
                     {code}
@@ -715,7 +715,7 @@ export default function HomePage() {
                       type="button"
                       onClick={() => setLang(code)}
                       className={`flex-1 rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition ${
-                        active ? 'bg-[#D8B56D] text-[#1E0F1C]' : 'text-[#F4E8C8]/52 hover:text-[#F4E8C8]'
+                        active ? 'bg-[#C8A977] text-[#2E2A26]' : 'text-[#6F675F]/70 hover:text-[#2E2A26]'
                       }`}
                     >
                       {code}
@@ -800,7 +800,7 @@ export default function HomePage() {
         </section>
       </div>
 
-      <section className="border-t border-white/6 bg-[#08121a]">
+      <section className="border-t border-[#C8A977]/20 bg-[#F8F6F1]">
         <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
           <div className="max-w-3xl">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
@@ -880,7 +880,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-white/6 bg-[#09141d]">
+      <section className="border-t border-[#C8A977]/20 bg-[#F8F6F1]">
         <div className="mx-auto max-w-[600px] px-6 py-24 text-center lg:px-8 lg:py-28">
           <h2 className="font-sora text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
             {copy.systems.title}
@@ -897,7 +897,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-white/6 bg-[#09141d]">
+      <section className="border-t border-[#C8A977]/20 bg-[#F8F6F1]">
         <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
@@ -961,7 +961,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="bg-[#08121a]">
+      <section className="bg-[#F8F6F1]">
         <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
@@ -989,7 +989,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="plans" className="scroll-mt-24 border-t border-white/6 bg-[#09141d]">
+      <section id="plans" className="scroll-mt-24 border-t border-[#C8A977]/20 bg-[#F8F6F1]">
         <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
@@ -1062,7 +1062,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-white/6 bg-[#061017]">
+      <section className="border-t border-[#C8A977]/20 bg-[#F8F6F1]">
         <div className="mx-auto max-w-5xl px-6 py-20 text-center lg:px-8">
           <div className="rounded-[2.3rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] px-6 py-12 shadow-[0_25px_100px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:px-10">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/78">
@@ -1088,7 +1088,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="border-t border-white/6 bg-[#050d14]">
+      <footer className="border-t border-[#C8A977]/20 bg-[#EFE9DF]">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8 text-sm text-white/54 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
             <div className="font-sora text-base font-semibold text-white">Hexastra Coach</div>

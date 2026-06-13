@@ -79,8 +79,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
-        <meta name="theme-color" content="#2C1F1A" />
-        <meta name="msapplication-TileColor" content="#2C1F1A" />
+        <meta name="theme-color" content="#F8F6F1" />
+        <meta name="msapplication-TileColor" content="#F8F6F1" />
       </head>
       <body>
         <I18nProvider>{children}</I18nProvider>

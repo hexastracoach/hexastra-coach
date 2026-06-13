@@ -34,7 +34,7 @@ export default function ChatHeader({
         padding: '16px 28px 12px',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        background: 'linear-gradient(180deg, rgba(30,15,28,0.88), rgba(18,9,17,0.66))',
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.86), rgba(248,246,241,0.70))',
         borderBottom: `1px solid ${DS.line}`,
       }}
     >
@@ -89,7 +89,7 @@ export default function ChatHeader({
             gap: 6,
             padding: 6,
             borderRadius: 999,
-            background: 'rgba(226,233,192,0.055)',
+            background: 'rgba(255,255,255,0.62)',
             border: `1px solid ${DS.line}`,
             boxShadow: DS.shadowSoft,
           }}
@@ -105,7 +105,7 @@ export default function ChatHeader({
                   borderRadius: 999,
                   border: 'none',
                   background: active ? DS.gradient : 'transparent',
-                  color: active ? '#E2E9C0' : DS.textSoft,
+                  color: active ? '#2E2A26' : DS.textSoft,
                   fontWeight: active ? 700 : 600,
                   fontSize: 13,
                   boxShadow: active ? '0 10px 26px rgba(167,0,30,0.24)' : 'none',
@@ -129,7 +129,7 @@ export default function ChatHeader({
 
 const ghostButtonStyle: React.CSSProperties = {
   border: `1px solid ${DS.line}`,
-  background: 'rgba(226,233,192,0.055)',
+  background: 'rgba(255,255,255,0.68)',
   color: DS.text,
   borderRadius: 999,
   padding: '10px 14px',

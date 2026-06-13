@@ -44,11 +44,11 @@ function HexLogo({ size = 24 }: { size?: number }) {
 function Card({ children, className = '', highlight = false }: any) {
   return (
     <div style={{
-      background: '#14100C',
+      background: 'rgba(255,255,255,0.78)',
       border: `1px solid ${highlight ? 'rgba(198,163,95,0.35)' : 'rgba(198,163,95,0.20)'}`,
       borderRadius: 'clamp(18px, 5vw, 24px)',
       overflow: 'hidden',
-      boxShadow: highlight ? '0 0 0 1px rgba(198,163,95,0.1), 0 20px 50px rgba(0,0,0,0.4)' : '0 8px 28px rgba(0,0,0,0.3)',
+      boxShadow: highlight ? '0 0 0 1px rgba(198,163,95,0.14), 0 18px 45px rgba(46,42,38,0.10)' : '0 14px 34px rgba(46,42,38,0.08)',
     }} className={className}>
       {children}
     </div>
@@ -57,8 +57,8 @@ function Card({ children, className = '', highlight = false }: any) {
 function CardH({ title, sub }: { title: string; sub?: string }) {
   return (
     <div style={{ padding: 'clamp(16px, 5vw, 22px) clamp(16px, 5vw, 22px) 0' }}>
-      <div style={{ color: '#F3EFEA', fontFamily: "'Playfair Display', serif", fontSize: 'clamp(16px, 4.8vw, 17px)', fontWeight: 500 }}>{title}</div>
-      {sub && <div style={{ color: 'rgba(243,239,234,0.60)', fontFamily: "'Inter', sans-serif", fontSize: '12px', marginTop: '3px' }}>{sub}</div>}
+      <div style={{ color: '#2E2A26', fontFamily: "'Playfair Display', serif", fontSize: 'clamp(16px, 4.8vw, 17px)', fontWeight: 500 }}>{title}</div>
+      {sub && <div style={{ color: 'rgba(111,103,95,0.78)', fontFamily: "'Inter', sans-serif", fontSize: '12px', marginTop: '3px' }}>{sub}</div>}
     </div>
   )
 }
@@ -66,7 +66,7 @@ function CardB({ children }: any) {
   return <div style={{ padding: '14px clamp(16px, 5vw, 22px) clamp(18px, 5vw, 22px)' }}>{children}</div>
 }
 function Sep() {
-  return <div style={{ height: '1px', background: 'rgba(243,239,234,0.08)', margin: '12px 0' }} />
+  return <div style={{ height: '1px', background: 'rgba(200,169,119,0.18)', margin: '12px 0' }} />
 }
 
 /* ── Gauge ── */
@@ -75,13 +75,13 @@ function Gauge({ label, score, hint }: Gauge) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span style={{ color: '#F3EFEA', fontFamily: "'Inter', sans-serif", fontSize: '13px' }}>{label}</span>
-        <span style={{ color: 'rgba(243,239,234,0.55)', fontFamily: "'DM Mono', monospace", fontSize: '11px' }}>{s}/100</span>
+        <span style={{ color: '#2E2A26', fontFamily: "'Inter', sans-serif", fontSize: '13px' }}>{label}</span>
+        <span style={{ color: 'rgba(111,103,95,0.72)', fontFamily: "'DM Mono', monospace", fontSize: '11px' }}>{s}/100</span>
       </div>
-      <div style={{ height: '6px', borderRadius: '100px', background: 'rgba(243,239,234,0.08)', overflow: 'hidden' }}>
+      <div style={{ height: '6px', borderRadius: '100px', background: 'rgba(200,169,119,0.18)', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${s}%`, borderRadius: '100px', background: 'linear-gradient(90deg, rgba(198,163,95,0.4), rgba(198,163,95,0.9))', transition: 'width 1s ease' }} />
       </div>
-      <div style={{ color: 'rgba(243,239,234,0.58)', fontFamily: "'Inter', sans-serif", fontSize: '12px', lineHeight: 1.5 }}>{hint}</div>
+      <div style={{ color: 'rgba(111,103,95,0.78)', fontFamily: "'Inter', sans-serif", fontSize: '12px', lineHeight: 1.5 }}>{hint}</div>
     </div>
   )
 }
@@ -105,7 +105,12 @@ export default function DashboardPage() {
   const p = s?.profile ?? {}
 
   return (
-    <main style={{ minHeight: '100vh', background: '#0E0B08', padding: '0' }}>
+    <main style={{
+      minHeight: '100vh',
+      background: 'radial-gradient(circle at 14% 0%, rgba(233,215,190,0.58), transparent 30%), radial-gradient(circle at 86% 12%, rgba(154,184,200,0.22), transparent 32%), linear-gradient(180deg,#F8F6F1 0%,#EFE9DF 100%)',
+      color: '#2E2A26',
+      padding: '0'
+    }}>
       <style>{DASH_CSS}</style>
 
       {/* ── Nav ── */}
@@ -274,36 +279,36 @@ const DASH_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400;1,500&family=Inter:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 *{box-sizing:border-box}
 a{text-decoration:none;color:inherit}
-.db-nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px clamp(14px,4vw,40px);background:rgba(14,11,8,.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(198,163,95,.18)}
-.db-logo{display:flex;align-items:center;gap:9px;font-family:'Playfair Display',serif;font-size:17px;color:#F3EFEA}
+.db-nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px clamp(14px,4vw,40px);background:rgba(255,255,255,.78);backdrop-filter:blur(20px);border-bottom:1px solid rgba(198,163,95,.20);box-shadow:0 14px 34px rgba(46,42,38,.06)}
+.db-logo{display:flex;align-items:center;gap:9px;font-family:'Playfair Display',serif;font-size:17px;color:#2E2A26}
 .db-logo em{font-style:italic;color:#C6A35F}
 .db-nav-links{display:flex;gap:clamp(12px,2vw,24px);flex-wrap:wrap;justify-content:flex-end}
-.db-nl{font-family:'Inter',sans-serif;font-size:13px;color:rgba(243,239,234,.6);transition:color .2s}
+.db-nl{font-family:'Inter',sans-serif;font-size:13px;color:rgba(111,103,95,.78);transition:color .2s}
 .db-nl:hover,.db-nl-on{color:#C6A35F}
 .db-page{width:min(100%,1200px);margin:0 auto;padding:clamp(18px,5vw,40px) clamp(14px,5vw,40px) clamp(56px,10vw,80px)}
 .db-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:32px;flex-wrap:wrap}
-.db-h1{font-family:'Playfair Display',serif;font-size:clamp(24px,7vw,32px);line-height:1.08;font-weight:500;color:#F3EFEA;margin-bottom:6px}
-.db-sub{font-family:'Inter',sans-serif;font-size:14px;color:rgba(243,239,234,.6)}
-.db-loading{display:flex;align-items:center;gap:12px;color:rgba(243,239,234,.6);font-family:'Inter',sans-serif;font-size:14px;padding:60px 0}
+.db-h1{font-family:'Playfair Display',serif;font-size:clamp(24px,7vw,32px);line-height:1.08;font-weight:500;color:#2E2A26;margin-bottom:6px}
+.db-sub{font-family:'Inter',sans-serif;font-size:14px;color:rgba(111,103,95,.78)}
+.db-loading{display:flex;align-items:center;gap:12px;color:rgba(111,103,95,.78);font-family:'Inter',sans-serif;font-size:14px;padding:60px 0}
 .db-spinner{width:18px;height:18px;border:2px solid rgba(198,163,95,.2);border-top-color:#C6A35F;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
 .db-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:20px;align-items:start}
 .db-main,.db-side{display:flex;flex-direction:column;gap:18px}
-.db-text{font-family:'Inter',sans-serif;font-size:13.5px;font-weight:300;color:rgba(243,239,234,.82);line-height:1.8}
-.db-muted{font-family:'Inter',sans-serif;font-size:12.5px;color:rgba(243,239,234,.5);line-height:1.65}
+.db-text{font-family:'Inter',sans-serif;font-size:13.5px;font-weight:300;color:rgba(46,42,38,.84);line-height:1.8}
+.db-muted{font-family:'Inter',sans-serif;font-size:12.5px;color:rgba(111,103,95,.72);line-height:1.65}
 .db-link{font-family:'Inter',sans-serif;font-size:13px;color:#C6A35F;transition:opacity .2s;overflow-wrap:anywhere}
 .db-link:hover{opacity:.75}
 .db-tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;color:#C6A35F;background:rgba(198,163,95,.1);border:1px solid rgba(198,163,95,.22);border-radius:100px;padding:3px 11px}
 .db-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
 .db-row>div{min-width:0}
-.db-row-title{font-family:'Inter',sans-serif;font-size:13px;color:#F3EFEA;line-height:1.4;overflow-wrap:anywhere}
-.db-row-sub{font-family:'DM Mono',monospace;font-size:10px;color:rgba(243,239,234,.5);margin-top:2px;letter-spacing:.05em}
-.db-profile-name{font-family:'Playfair Display',serif;font-size:18px;font-weight:500;color:#F3EFEA}
+.db-row-title{font-family:'Inter',sans-serif;font-size:13px;color:#2E2A26;line-height:1.4;overflow-wrap:anywhere}
+.db-row-sub{font-family:'DM Mono',monospace;font-size:10px;color:rgba(111,103,95,.70);margin-top:2px;letter-spacing:.05em}
+.db-profile-name{font-family:'Playfair Display',serif;font-size:18px;font-weight:500;color:#2E2A26}
 .db-gauges{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.btn-gold-sm{display:inline-flex;min-height:44px;align-items:center;justify-content:center;padding:10px 20px;background:#C6A35F;color:#0E0B08;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;border:none;border-radius:50px;cursor:pointer;text-decoration:none;box-shadow:0 4px 18px rgba(198,163,95,.28);transition:all .2s;white-space:normal;text-align:center}
+.btn-gold-sm{display:inline-flex;min-height:44px;align-items:center;justify-content:center;padding:10px 20px;background:#C6A35F;color:#2E2A26;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;border:none;border-radius:50px;cursor:pointer;text-decoration:none;box-shadow:0 10px 24px rgba(198,163,95,.22);transition:all .2s;white-space:normal;text-align:center}
 .btn-gold-sm:hover{background:#d4b26e;transform:translateY(-1px)}
-.btn-ghost-sm{display:inline-flex;min-height:44px;align-items:center;justify-content:center;padding:10px 20px;background:transparent;color:rgba(243,239,234,.7);font-family:'Inter',sans-serif;font-size:13px;font-weight:400;border:1px solid rgba(243,239,234,.2);border-radius:50px;cursor:pointer;text-decoration:none;transition:all .2s;white-space:normal;text-align:center}
-.btn-ghost-sm:hover{border-color:rgba(243,239,234,.42);color:#F3EFEA}
+.btn-ghost-sm{display:inline-flex;min-height:44px;align-items:center;justify-content:center;padding:10px 20px;background:rgba(255,255,255,.58);color:rgba(46,42,38,.78);font-family:'Inter',sans-serif;font-size:13px;font-weight:400;border:1px solid rgba(198,163,95,.25);border-radius:50px;cursor:pointer;text-decoration:none;transition:all .2s;white-space:normal;text-align:center}
+.btn-ghost-sm:hover{border-color:rgba(198,163,95,.42);color:#2E2A26}
 @media(max-width:900px){
   .db-nav{padding:12px 18px}.db-nav-links{display:none}
   .db-page{padding:24px 18px 60px}

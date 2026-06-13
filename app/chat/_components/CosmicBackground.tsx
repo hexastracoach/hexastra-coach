@@ -13,7 +13,7 @@ export default function CosmicBackground() {
         overflow: 'hidden',
         zIndex: 0,
         background:
-          'radial-gradient(circle at 50% 0%, rgba(167,0,30,0.18), transparent 34%), radial-gradient(circle at 82% 16%, rgba(122,169,92,0.12), transparent 28%), linear-gradient(180deg, #120911 0%, #1E0F1C 46%, #080407 100%)',
+          'radial-gradient(circle at 50% 0%, rgba(233,215,190,0.54), transparent 34%), radial-gradient(circle at 82% 16%, rgba(154,184,200,0.24), transparent 28%), linear-gradient(180deg, #F8F6F1 0%, #EFE9DF 100%)',
       }}
     >
       <div className="hx-stars" style={{ opacity: 0.9 }} />
@@ -23,7 +23,7 @@ export default function CosmicBackground() {
           position: 'absolute',
           inset: 0,
           background:
-            'radial-gradient(ellipse at 18% 20%, rgba(167,0,30,0.14), transparent 42%), radial-gradient(ellipse at 82% 16%, rgba(122,169,92,0.10), transparent 34%), radial-gradient(ellipse at 52% 78%, rgba(149,81,73,0.14), transparent 36%)',
+            'radial-gradient(ellipse at 18% 20%, rgba(200,169,119,0.18), transparent 42%), radial-gradient(ellipse at 82% 16%, rgba(154,184,200,0.16), transparent 34%), radial-gradient(ellipse at 52% 78%, rgba(184,199,177,0.18), transparent 36%)',
         }}
       />
 
@@ -49,7 +49,7 @@ export default function CosmicBackground() {
           style={{
             width: 'min(1120px, 86vw)',
             height: 'auto',
-            filter: 'drop-shadow(0 0 80px rgba(167,0,30,0.16)) blur(0.4px) saturate(0.88)',
+            filter: 'drop-shadow(0 0 80px rgba(200,169,119,0.20)) blur(0.4px) saturate(0.82)',
           }}
         />
       </div>
@@ -59,7 +59,7 @@ export default function CosmicBackground() {
           position: 'absolute',
           inset: 0,
           background:
-            'linear-gradient(90deg, rgba(226,233,192,0.035) 1px, transparent 1px), linear-gradient(0deg, rgba(122,169,92,0.028) 1px, transparent 1px), radial-gradient(circle at center, transparent 0%, rgba(30,15,28,0.18) 56%, rgba(8,4,7,0.58) 100%)',
+            'linear-gradient(90deg, rgba(200,169,119,0.10) 1px, transparent 1px), linear-gradient(0deg, rgba(154,184,200,0.08) 1px, transparent 1px), radial-gradient(circle at center, transparent 0%, rgba(248,246,241,0.12) 56%, rgba(239,233,223,0.36) 100%)',
           backgroundSize: '64px 64px, 64px 64px, auto',
         }}
       />

@@ -131,7 +131,7 @@ export default function LeftSidebar({
   })()
 
   return (
-    <div className="flex h-full flex-col border-r border-white/[0.06] bg-[#040d16]/75 text-slate-100 backdrop-blur-2xl">
+    <div className="hx-left-sidebar flex h-full flex-col border-r border-white/[0.06] bg-[#040d16]/75 text-slate-100 backdrop-blur-2xl">
 
       {/* Brand */}
       <div className="px-4 pb-3 pt-5">
