@@ -3,6 +3,9 @@ import './globals.css'
 import I18nProvider from '@/lib/i18n/I18nProvider'
 
 export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
   interactiveWidget: 'resizes-content',
 }
 
