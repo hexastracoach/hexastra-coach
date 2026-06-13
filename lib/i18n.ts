@@ -140,7 +140,7 @@ export const translations: Record<Lang, any> = {
           key: 'essentiel',
           tag: 'Essentiel',
           name: 'Essentiel',
-          price: '9',
+          price: '9,90',
           per: '/mois',
           desc: 'Les fondamentaux pour avancer avec clarte au quotidien.',
           features: [
@@ -159,7 +159,7 @@ export const translations: Record<Lang, any> = {
           key: 'premium',
           tag: 'Premium',
           name: 'Premium',
-          price: '19',
+          price: '19,90',
           per: '/mois',
           desc: 'Votre lecture personnelle complete, aussi profonde que vous le souhaitez.',
           features: [
@@ -179,7 +179,7 @@ export const translations: Record<Lang, any> = {
           key: 'praticien',
           tag: 'Professionnel',
           name: 'Praticien',
-          price: '49',
+          price: '29,90',
           per: '/mois',
           desc: 'Pour les coachs et therapeutes qui integrent HexAstra dans leur pratique.',
           features: [
@@ -203,7 +203,7 @@ export const translations: Record<Lang, any> = {
       title3: 'Avancez avec clarte.',
       sub: 'Pret en 2 minutes. Gratuit pour commencer.',
       btn: 'Commencer ma lecture',
-      note: 'Essentiel 9 EUR/mois - Premium 19 EUR/mois - Praticien 49 EUR/mois - Sans engagement',
+      note: 'Essentiel 9,90 EUR/mois - Premium 19,90 EUR/mois - Praticien 29,90 EUR/mois - Sans engagement',
     },
     footer: {
       copy: '2026 HexAstra - Intelligence personnelle par IA',
@@ -355,7 +355,7 @@ export const translations: Record<Lang, any> = {
           key: 'essentiel',
           tag: 'Essential',
           name: 'Essential',
-          price: '9',
+          price: '9.90',
           per: '/month',
           desc: 'The fundamentals to move forward with clarity every day.',
           features: [
@@ -374,7 +374,7 @@ export const translations: Record<Lang, any> = {
           key: 'premium',
           tag: 'Premium',
           name: 'Premium',
-          price: '19',
+          price: '19.90',
           per: '/month',
           desc: 'Your full personal reading, as deep as you want to go.',
           features: [
@@ -394,7 +394,7 @@ export const translations: Record<Lang, any> = {
           key: 'praticien',
           tag: 'Professional',
           name: 'Practitioner',
-          price: '49',
+          price: '29.90',
           per: '/month',
           desc: 'For coaches and therapists integrating HexAstra into their practice.',
           features: [
@@ -418,7 +418,7 @@ export const translations: Record<Lang, any> = {
       title3: 'Move forward with clarity.',
       sub: 'Takes 2 minutes. Free to start.',
       btn: 'Start my reading',
-      note: 'Essential EUR 9/mo - Premium EUR 19/mo - Practitioner EUR 49/mo - No commitment',
+      note: 'Essential EUR 9.90/mo - Premium EUR 19.90/mo - Practitioner EUR 29.90/mo - No commitment',
     },
     footer: {
       copy: '2026 HexAstra - Personal intelligence by AI',

@@ -93,7 +93,7 @@ export function usePlansUI(): PlanUiData[] {
       {
         key: 'free',
         label: t('pricing.freeLabel'),
-        price: '0€',
+        price: '0 EUR',
         period: t('pricing.period'),
         desc: copy.freeDesc,
         features: copy.freeFeatures,
@@ -103,7 +103,7 @@ export function usePlansUI(): PlanUiData[] {
       {
         key: 'essential',
         label: t('pricing.essentialLabel'),
-        price: '9€',
+        price: '9,90 EUR',
         period: t('pricing.period'),
         desc: copy.essentialDesc,
         features: copy.essentialFeatures,
@@ -113,7 +113,7 @@ export function usePlansUI(): PlanUiData[] {
       {
         key: 'premium',
         label: t('pricing.premiumLabel'),
-        price: '19€',
+        price: '19,90 EUR',
         period: t('pricing.period'),
         desc: copy.premiumDesc,
         features: copy.premiumFeatures,
@@ -125,7 +125,7 @@ export function usePlansUI(): PlanUiData[] {
       {
         key: 'practitioner',
         label: t('pricing.practitionerLabel'),
-        price: '49€',
+        price: '29,90 EUR',
         period: t('pricing.period'),
         desc: copy.practitionerDesc,
         features: copy.practitionerFeatures,

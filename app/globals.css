@@ -14484,3 +14484,207 @@ body,
     max-width: calc(100dvw - 74px) !important;
   }
 }
+
+/* LANDING + PRICING -- WARM HEXASTRA ALIGNMENT */
+.hx-home-warm {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(177, 18, 38, 0.18), transparent 30%),
+    radial-gradient(circle at 86% 36%, rgba(122, 169, 92, 0.10), transparent 26%),
+    linear-gradient(180deg, #12080d 0%, #0b0709 48%, #080507 100%) !important;
+  color: #f4e8c8;
+}
+
+.hx-home-warm > .relative > .pointer-events-none.absolute.inset-0 {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(216, 181, 109, 0.20), transparent 22%),
+    radial-gradient(circle at 18% 24%, rgba(177, 18, 38, 0.18), transparent 30%),
+    radial-gradient(circle at 86% 42%, rgba(122, 169, 92, 0.08), transparent 28%),
+    linear-gradient(180deg, #12080d 0%, #0b0709 58%, #080507 100%) !important;
+}
+
+.hx-home-warm > .relative > .pointer-events-none.left-1\/2 {
+  background: rgba(216, 181, 109, 0.14) !important;
+}
+
+.hx-home-warm section,
+.hx-home-warm footer {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(177, 18, 38, 0.12), transparent 30%),
+    radial-gradient(circle at 88% 100%, rgba(216, 181, 109, 0.08), transparent 32%),
+    linear-gradient(180deg, #12080d 0%, #0b0709 100%) !important;
+  border-color: rgba(216, 181, 109, 0.12) !important;
+  color: #f4e8c8 !important;
+}
+
+.hx-home-warm [class*="text-white"],
+.hx-home-warm [class*="text-slate"],
+.hx-home-warm [class*="text-[#12202a]"],
+.hx-home-warm [class*="text-[#0b4d47]"],
+.hx-home-warm [class*="text-[#0f766e]"] {
+  color: rgba(244, 232, 200, 0.88) !important;
+}
+
+.hx-home-warm h1,
+.hx-home-warm h2,
+.hx-home-warm h3,
+.hx-home-warm [class*="font-sora"] {
+  color: #f4e8c8 !important;
+}
+
+.hx-home-warm p,
+.hx-home-warm li,
+.hx-home-warm [class*="leading-"] {
+  color: rgba(185, 169, 138, 0.92) !important;
+}
+
+.hx-home-warm [class*="text-emerald"] {
+  color: rgba(216, 181, 109, 0.92) !important;
+}
+
+.hx-home-warm [class*="bg-emerald"],
+.hx-home-warm [class*="bg-white"] {
+  background:
+    linear-gradient(155deg, rgba(38, 18, 28, 0.76), rgba(18, 8, 13, 0.76)),
+    radial-gradient(circle at 16% 0%, rgba(216, 181, 109, 0.12), transparent 44%) !important;
+}
+
+.hx-home-warm [class*="border-emerald"],
+.hx-home-warm [class*="border-white"],
+.hx-home-warm [class*="border-slate"] {
+  border-color: rgba(216, 181, 109, 0.16) !important;
+}
+
+.hx-home-warm article,
+.hx-home-warm [class*="rounded-[1.7rem]"],
+.hx-home-warm [class*="rounded-[1.85rem]"],
+.hx-home-warm [class*="rounded-[2.3rem]"],
+.hx-home-warm [class*="rounded-[2rem]"] {
+  background:
+    linear-gradient(155deg, rgba(38, 18, 28, 0.76), rgba(18, 8, 13, 0.74)),
+    radial-gradient(circle at 18% 0%, rgba(216, 181, 109, 0.10), transparent 42%),
+    radial-gradient(circle at 90% 110%, rgba(177, 18, 38, 0.12), transparent 46%) !important;
+  border-color: rgba(216, 181, 109, 0.15) !important;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(244, 232, 200, 0.07) !important;
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.hx-home-warm a[class*="bg-[#D8B56D]"],
+.hx-home-warm button[class*="bg-[#D8B56D]"] {
+  color: #1e0f1c !important;
+}
+
+.hx-home-warm [class*="bg-[#D8B56D]"] svg,
+.hx-home-warm [class*="bg-[#D8B56D]"] span {
+  color: #1e0f1c !important;
+}
+
+.hx-home-warm [class*="bg-[#D8B56D]"]:hover {
+  background: #e2e9c0 !important;
+}
+
+.hx-home-warm [class*="bg-emerald-200"] {
+  background: #d8b56d !important;
+  color: #1e0f1c !important;
+}
+
+.hx-home-warm .text-sm,
+.hx-home-warm .text-xs,
+.hx-home-warm .text-\[11px\] {
+  color: rgba(244, 232, 200, 0.74) !important;
+}
+
+.hx-home-warm .rounded-full {
+  border-color: rgba(216, 181, 109, 0.18) !important;
+}
+
+.hx-pricing-page {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(177, 18, 38, 0.18), transparent 32%),
+    radial-gradient(circle at 86% 42%, rgba(122, 169, 92, 0.09), transparent 30%),
+    linear-gradient(180deg, #12080d 0%, #0b0709 100%) !important;
+  color: #f4e8c8 !important;
+}
+
+.hx-pricing-page .hx-bg-space,
+.hx-pricing-page .hx-bg-space.is-hero {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(216, 181, 109, 0.16), transparent 26%),
+    radial-gradient(circle at 20% 26%, rgba(177, 18, 38, 0.16), transparent 28%),
+    radial-gradient(circle at 82% 44%, rgba(122, 169, 92, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(18, 8, 13, 0.94) 0%, rgba(11, 7, 9, 0.98) 100%) !important;
+}
+
+.hx-pricing-header,
+.hx-pricing-wrap,
+.hx-pricing-free-row,
+.hx-pricing-overview-card {
+  background:
+    linear-gradient(155deg, rgba(38, 18, 28, 0.78), rgba(18, 8, 13, 0.78)),
+    radial-gradient(circle at 16% 0%, rgba(216, 181, 109, 0.10), transparent 44%) !important;
+  border-color: rgba(216, 181, 109, 0.16) !important;
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(244, 232, 200, 0.08) !important;
+}
+
+.hx-pricing-overview-card.is-highlighted {
+  border-color: rgba(216, 181, 109, 0.34) !important;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.40),
+    0 0 42px rgba(216, 181, 109, 0.12),
+    inset 0 1px 0 rgba(244, 232, 200, 0.10) !important;
+}
+
+.hx-pricing-page .hx-home-kicker,
+.hx-pricing-badge,
+.hx-pricing-feature-glyph {
+  color: rgba(216, 181, 109, 0.94) !important;
+}
+
+.hx-pricing-overview-title,
+.hx-pricing-overview-card-label,
+.hx-pricing-price-amount,
+.hx-pricing-free-label,
+.hx-home-brand-title {
+  color: #f4e8c8 !important;
+}
+
+.hx-pricing-overview-copy,
+.hx-pricing-tagline,
+.hx-pricing-feature-item,
+.hx-pricing-free-desc,
+.hx-pricing-price-period,
+.hx-pricing-legal,
+.hx-home-brand-subtitle {
+  color: rgba(185, 169, 138, 0.90) !important;
+}
+
+.hx-pricing-cta-btn,
+.hx-pricing-cta-btn.is-primary {
+  background: #d8b56d !important;
+  border-color: rgba(216, 181, 109, 0.34) !important;
+  color: #1e0f1c !important;
+  box-shadow: 0 18px 44px rgba(216, 181, 109, 0.18) !important;
+}
+
+.hx-pricing-cta-btn:hover,
+.hx-pricing-cta-btn.is-primary:hover {
+  background: #e2e9c0 !important;
+  color: #1e0f1c !important;
+}
+
+.hx-pricing-back-link,
+.hx-pricing-compare-link {
+  color: rgba(244, 232, 200, 0.74) !important;
+  border-color: rgba(216, 181, 109, 0.16) !important;
+  background: rgba(244, 232, 200, 0.04) !important;
+}
+
+.hx-pricing-back-link:hover,
+.hx-pricing-compare-link:hover {
+  color: #f4e8c8 !important;
+  border-color: rgba(216, 181, 109, 0.32) !important;
+}

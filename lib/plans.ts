@@ -104,7 +104,7 @@ export const PLANS_UI: PlanUiData[] = [
   {
     key: 'essential',
     label: 'Essentiel',
-    price: '9 EUR',
+    price: '9,90 EUR',
     period: '/mois',
     desc: 'Pour continuer quand vous voulez, avec des reponses plus directes et concises.',
     features: [
@@ -119,7 +119,7 @@ export const PLANS_UI: PlanUiData[] = [
   {
     key: 'premium',
     label: 'Premium',
-    price: '19 EUR',
+    price: '19,90 EUR',
     period: '/mois',
     desc: 'Pour aller plus loin avec plus de profondeur, de precision et de recul.',
     features: [
@@ -136,7 +136,7 @@ export const PLANS_UI: PlanUiData[] = [
   {
     key: 'practitioner',
     label: 'Praticien',
-    price: '49 EUR',
+    price: '29,90 EUR',
     period: '/mois',
     desc: 'Pour les usages avances et les futures fonctions professionnelles.',
     features: [
