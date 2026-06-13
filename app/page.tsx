@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { trackHexastraFunnel } from '@/lib/analytics/hexastraFunnel'
 import { useTranslation } from '@/lib/i18n/useTranslation'
+import { getPlanCheckoutHref } from '@/lib/plans'
 import type { PlanKey } from '@/types/subscription'
 
 type InfoCard = {
@@ -127,6 +128,10 @@ type CopyBundle = {
 }
 
 const CTA_HREF = '/chat'
+
+function getLandingPlanHref(plan: PlanKey) {
+  return plan === 'free' ? CTA_HREF : getPlanCheckoutHref(plan)
+}
 
 const FR_COPY: CopyBundle = {
   header: {
@@ -1043,7 +1048,7 @@ export default function HomePage() {
 
                 <div className="mt-8">
                   <Link
-                    href={CTA_HREF}
+                    href={getLandingPlanHref(plan.key)}
                     className={plan.highlighted ? primaryButtonClass : softButtonClass}
                     onClick={() => handleChatCtaClick('plans', plan.key)}
                   >

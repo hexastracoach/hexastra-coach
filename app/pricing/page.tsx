@@ -5,12 +5,15 @@ import HexastraLogo from '@/app/components/HexastraLogo'
 import PremiumBackground from '@/app/components/PremiumBackground'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { usePlansUI } from '@/lib/usePlansUI'
+import { getPlanCheckoutHref } from '@/lib/plans'
 
 export default function PricingPage() {
   const { t, lang } = useTranslation()
   const plans = usePlansUI()
   const freePlan = plans.find((plan) => plan.key === 'free')
   const paidPlans = plans.filter((plan) => plan.key !== 'free')
+  const getPricingPlanHref = (plan: (typeof plans)[number]) =>
+    plan.key === 'free' ? plan.href : getPlanCheckoutHref(plan.key)
   const overviewTitle =
     lang === 'en'
       ? 'Start free. Go deeper only when you need more clarity.'
@@ -91,7 +94,7 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <Link href={plan.href} className={`hx-pricing-cta-btn${plan.highlighted ? ' is-primary' : ''}`}>
+                <Link href={getPricingPlanHref(plan)} className={`hx-pricing-cta-btn${plan.highlighted ? ' is-primary' : ''}`}>
                   {plan.cta}
                 </Link>
               </article>
