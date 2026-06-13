@@ -13111,3 +13111,585 @@ select {
     padding: 11px;
   }
 }
+
+/* HEXASTRA -- RESPONSIVE HARDENING
+   Mobile-first safety layer for app pages, chat and premium surfaces. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body,
+#__next,
+.hx-chat-page,
+.hx-auth-page,
+.hx-account-page,
+.hx-static-page,
+.hx-pricing-page {
+  min-width: 0;
+}
+
+.hx-pricing-feature-item,
+.hx-pricing-tagline,
+.hx-pricing-overview-copy,
+.hx-pricing-overview-card,
+.hx-pricing-free-row,
+.hx-account-row,
+.hx-static-lead,
+.hx-static-contact-text,
+.hx-birth-inline-form,
+.hx-chat-bubble,
+.hx-guidance-free-content,
+.hx-composer-textarea,
+.hx-science-choice,
+.hx-premium-lock-inner {
+  overflow-wrap: anywhere;
+}
+
+.hx-pricing-cta-btn,
+.hx-account-btn,
+.hx-auth-submit,
+.hx-static-cta,
+.hx-birth-inline-submit,
+.hx-premium-lock-btn,
+.hx-inline-birth button,
+.hx-science-choice {
+  min-height: 44px;
+}
+
+.hx-auth-card,
+.hx-account-card,
+.hx-static-main,
+.hx-pricing-wrap,
+.hx-pricing-overview-wrap,
+.hx-inline-birth,
+.hx-birth-inline-form,
+.hx-premium-lock-inner,
+.hx-modal-card {
+  max-width: min(100%, var(--hx-max-width, 1200px));
+}
+
+@media (max-width: 1024px) {
+  .hx-app-layout,
+  .hx-app-main {
+    width: 100%;
+    min-width: 0;
+    max-width: 100vw;
+  }
+
+  .hx-app-sidebar {
+    width: min(292px, 86vw);
+  }
+
+  .hx-app-feed {
+    padding-inline: clamp(10px, 2.6vw, 16px);
+  }
+
+  .hx-app-feed-inner {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .hx-message-stack,
+  .hx-chat-bubble.is-assistant,
+  .hx-app-composer-wrap,
+  .hx-composer-wrap {
+    width: min(100%, 720px);
+  }
+
+  .hx-chat-bubble.is-user {
+    max-width: min(100%, 620px);
+  }
+
+  .hx-pricing-content {
+    justify-content: flex-start;
+    padding-top: clamp(36px, 8vw, 60px);
+  }
+
+  .hx-pricing-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .hx-chat-page {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .hx-app-layout,
+  .hx-app-main {
+    width: 100%;
+    min-width: 0;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .hx-chat-mobile-sheet {
+    width: min(320px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+  }
+
+  .hx-app-topbar {
+    min-height: 58px;
+    padding: 9px 12px;
+  }
+
+  .hx-app-topbar .hx-icon-btn,
+  .hx-nav-lang {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .hx-app-feed {
+    padding: 10px clamp(10px, 4vw, 16px) 0;
+  }
+
+  .hx-app-feed-inner,
+  .hx-app-feed-inner.hx-welcome-feed,
+  .hx-welcome-feed-center,
+  .hx-welcome-hero {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .hx-welcome-feed-center {
+    min-height: auto;
+    padding-inline: 0;
+    padding-bottom: 148px;
+  }
+
+  .hx-welcome-hero {
+    padding-inline: 0;
+  }
+
+  .hx-welcome-glow {
+    width: min(420px, 96vw);
+    height: min(420px, 96vw);
+  }
+
+  .hx-welcome-hero .hx-welcome-title,
+  .hx-welcome-title,
+  .hx-welcome-title-single-line {
+    width: auto !important;
+    max-width: 96vw !important;
+    white-space: nowrap !important;
+    text-wrap: nowrap !important;
+    overflow-wrap: normal;
+  }
+
+  .hx-welcome-subtitle {
+    max-width: min(100%, 340px);
+  }
+
+  .hx-welcome-chips,
+  .hx-science-picker {
+    width: min(100%, 360px) !important;
+  }
+
+  .hx-science-picker {
+    max-height: min(46dvh, 360px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .hx-science-choice {
+    min-width: 0;
+  }
+
+  .hx-message-stack {
+    width: 100%;
+    max-width: 100%;
+    padding-bottom: 150px;
+  }
+
+  .hx-bubble-row,
+  .hx-chat-bubble,
+  .hx-chat-message,
+  .hx-guidance-card {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .hx-chat-bubble.is-assistant,
+  .hx-chat-bubble.is-user {
+    width: auto;
+    max-width: 100%;
+  }
+
+  .hx-bubble-actions {
+    margin-left: 0;
+    padding-left: 40px;
+    flex-wrap: wrap;
+  }
+
+  .hx-app-bottom {
+    width: 100%;
+    padding: 10px clamp(10px, 4vw, 16px) max(12px, env(safe-area-inset-bottom, 12px));
+  }
+
+  .hx-app-composer-wrap,
+  .hx-composer-wrap,
+  .hx-composer-shell,
+  .hx-composer-box {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .hx-composer-box {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .hx-composer-actions-left,
+  .hx-composer-actions-right {
+    flex-shrink: 0;
+  }
+
+  .hx-composer-textarea {
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .hx-inline-birth,
+  .hx-bootstrap-overlay > *,
+  .hx-premium-lock-inner {
+    width: 100%;
+    max-width: calc(100vw - 24px);
+    border-radius: 24px !important;
+  }
+
+  .hx-pricing-header,
+  .hx-static-header,
+  .hx-account-header {
+    padding-inline: clamp(14px, 5vw, 22px);
+  }
+
+  .hx-pricing-content,
+  .hx-account-main,
+  .hx-static-main {
+    padding-inline: clamp(14px, 5vw, 22px);
+  }
+
+  .hx-pricing-wrap,
+  .hx-pricing-overview-wrap,
+  .hx-auth-card,
+  .hx-account-card {
+    width: 100%;
+    border-radius: clamp(22px, 7vw, 30px);
+    padding-inline: clamp(18px, 6vw, 28px);
+  }
+
+  .hx-pricing-overview-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .hx-pricing-free-row,
+  .hx-pricing-free-side,
+  .hx-account-actions,
+  .hx-account-header-right {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hx-pricing-free-side,
+  .hx-account-actions {
+    width: 100%;
+  }
+
+  .hx-pricing-cta-btn,
+  .hx-account-btn,
+  .hx-auth-submit,
+  .hx-static-cta {
+    width: 100%;
+  }
+
+  .hx-pricing-price-row,
+  .hx-pricing-free-price {
+    flex-wrap: wrap;
+  }
+
+  .hx-static-footer-inner,
+  .hx-static-footer-links {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 380px) {
+  .hx-welcome-hero .hx-welcome-title,
+  .hx-welcome-title {
+    font-size: clamp(1.36rem, 6.8vw, 1.62rem) !important;
+  }
+
+  .hx-welcome-orb {
+    width: clamp(112px, 34vw, 132px);
+  }
+
+  .hx-composer-action-btn,
+  .hx-composer-right-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .hx-composer-box {
+    padding: 8px;
+  }
+
+  .hx-action-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* HEXASTRA CHAT -- MOBILE-FIRST FINISH
+   Final lock for the chat experience after older layered overrides. */
+.hx-app-feed,
+.hx-app-feed-inner,
+.hx-message-stack,
+.hx-bubble-row,
+.hx-bubble-content,
+.hx-guidance-card,
+.hx-composer-shell,
+.hx-composer-box {
+  min-width: 0;
+}
+
+.hx-science-picker {
+  position: relative;
+  z-index: 20;
+}
+
+.hx-guidance-free-content {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .hx-app-topbar {
+    width: 100%;
+    min-height: 58px !important;
+  }
+
+  .hx-app-feed {
+    overflow-x: hidden;
+    padding-inline: clamp(10px, 4vw, 16px) !important;
+  }
+
+  .hx-app-feed-inner {
+    padding-inline: 0 !important;
+  }
+
+  .hx-welcome-feed {
+    min-height: 0 !important;
+    align-items: flex-start !important;
+  }
+
+  .hx-welcome-feed-center {
+    justify-content: flex-start !important;
+    padding-top: clamp(16px, 5dvh, 34px) !important;
+    padding-bottom: clamp(142px, 24dvh, 184px) !important;
+  }
+
+  .hx-welcome-orb {
+    width: clamp(120px, 34vw, 154px) !important;
+    margin-bottom: 18px !important;
+  }
+
+  .hx-welcome-badge {
+    margin-bottom: 18px !important;
+  }
+
+  .hx-welcome-hero .hx-welcome-title,
+  .hx-welcome-title {
+    max-width: 96vw !important;
+    font-size: clamp(1.52rem, 7.1vw, 2.16rem) !important;
+    line-height: 1.08 !important;
+    letter-spacing: 0 !important;
+  }
+
+  .hx-welcome-title-single-line {
+    max-width: 96vw !important;
+  }
+
+  .hx-welcome-subtitle {
+    max-width: min(100%, 340px) !important;
+    padding-inline: 6px;
+    font-size: 0.95rem !important;
+    line-height: 1.55 !important;
+  }
+
+  .hx-welcome-chips {
+    width: min(100%, 360px) !important;
+    margin-top: 24px !important;
+    gap: 10px !important;
+  }
+
+  .hx-welcome-chip,
+  .hx-emotion-card {
+    min-height: 96px !important;
+    padding: 16px 17px !important;
+    border-radius: 24px !important;
+  }
+
+  .hx-emotion-card-title {
+    font-size: 0.96rem;
+    line-height: 1.25;
+  }
+
+  .hx-emotion-card-description {
+    font-size: 0.84rem;
+    line-height: 1.45;
+  }
+
+  .hx-science-picker {
+    width: min(100%, 360px) !important;
+    max-height: min(48dvh, 368px) !important;
+    margin-top: 20px !important;
+    padding: 12px !important;
+    overflow-y: auto;
+    border-radius: 24px !important;
+  }
+
+  .hx-science-picker-header {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    align-items: center !important;
+    column-gap: 10px !important;
+    row-gap: 4px !important;
+  }
+
+  .hx-science-picker-heading {
+    min-width: 0;
+  }
+
+  .hx-science-picker-kicker {
+    white-space: normal !important;
+    letter-spacing: 0.1em;
+  }
+
+  .hx-science-picker-title {
+    font-size: 0.9rem;
+  }
+
+  .hx-science-picker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  .hx-science-choice {
+    min-height: 64px !important;
+    justify-content: center;
+    padding: 11px !important;
+    border-radius: 18px !important;
+  }
+
+  .hx-science-choice-name {
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+  }
+
+  .hx-message-stack {
+    width: 100% !important;
+    gap: 18px;
+    padding: 8px 0 150px !important;
+  }
+
+  .hx-bubble-sender {
+    max-width: 100%;
+    padding-inline: 4px;
+  }
+
+  .hx-chat-bubble.is-assistant {
+    padding: 22px 18px !important;
+    border-radius: 26px !important;
+    line-height: 1.76 !important;
+  }
+
+  .hx-chat-bubble.is-user {
+    max-width: min(100%, 92vw) !important;
+    padding: 15px 16px !important;
+    border-radius: 24px !important;
+  }
+
+  .hx-guidance-content-layer {
+    gap: 17px !important;
+  }
+
+  .hx-guidance-card-header {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .hx-guidance-free-content .hx-bubble-block,
+  .hx-guidance-free-content .hx-bubble-text {
+    font-size: 0.94rem;
+    line-height: 1.76 !important;
+  }
+
+  .hx-chat-typing-shell {
+    width: min(100%, 360px);
+    max-width: 100%;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    border-radius: 24px !important;
+  }
+
+  .hx-chat-typing-copy,
+  .hx-chat-typing-text {
+    min-width: 0;
+  }
+
+  .hx-chat-typing-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: 0.83rem;
+  }
+
+  .hx-composer-box {
+    min-height: 64px !important;
+    border-radius: 24px !important;
+    gap: 8px !important;
+  }
+
+  .hx-composer-actions-left {
+    gap: 6px;
+  }
+
+  .hx-composer-textarea {
+    min-height: 26px !important;
+    padding-block: 5px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .hx-welcome-hero .hx-welcome-title,
+  .hx-welcome-title {
+    font-size: clamp(1.34rem, 6.6vw, 1.52rem) !important;
+  }
+
+  .hx-welcome-subtitle {
+    font-size: 0.88rem !important;
+  }
+
+  .hx-science-picker-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .hx-science-choice {
+    min-height: 50px !important;
+  }
+
+  .hx-chat-typing-shell {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .hx-chat-typing-dots {
+    display: none;
+  }
+}

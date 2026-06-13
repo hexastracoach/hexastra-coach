@@ -169,18 +169,8 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
           className="hx-science-picker"
           role="region"
           aria-label="Choisir une science"
-          style={{ position: 'relative', zIndex: 20, width: 'min(860px, 100%)', marginTop: 38, padding: 14 }}
         >
-          <div
-            className="hx-science-picker-header"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'auto 1fr',
-              alignItems: 'center',
-              gap: '8px 12px',
-              marginBottom: 12,
-            }}
-          >
+          <div className="hx-science-picker-header">
             <button
               type="button"
               className="hx-science-back"
@@ -194,14 +184,7 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
               <span className="hx-science-picker-title">Choisis ce que tu veux explorer.</span>
             </div>
           </div>
-          <div
-            className="hx-science-picker-grid"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(104px, 1fr))',
-              gap: 8,
-            }}
-          >
+          <div className="hx-science-picker-grid">
             {scienceChoices.map((choice) => (
               <button
                 key={choice.focus}
@@ -210,7 +193,6 @@ export default function WelcomeHero({ onPrompt }: WelcomeHeroProps) {
                 aria-label={`${choice.label}: ${choice.description}`}
                 title={choice.description}
                 onClick={() => handleScienceChoice(choice)}
-                style={{ minHeight: 58, padding: '10px 11px', borderRadius: 16 }}
               >
                 <span className="hx-science-choice-name">{choice.label}</span>
                 <span className="hx-science-choice-description" style={{ display: 'none' }}>

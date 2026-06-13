@@ -46,7 +46,7 @@ function Card({ children, className = '', highlight = false }: any) {
     <div style={{
       background: '#14100C',
       border: `1px solid ${highlight ? 'rgba(198,163,95,0.35)' : 'rgba(198,163,95,0.20)'}`,
-      borderRadius: '18px',
+      borderRadius: 'clamp(18px, 5vw, 24px)',
       overflow: 'hidden',
       boxShadow: highlight ? '0 0 0 1px rgba(198,163,95,0.1), 0 20px 50px rgba(0,0,0,0.4)' : '0 8px 28px rgba(0,0,0,0.3)',
     }} className={className}>
@@ -56,14 +56,14 @@ function Card({ children, className = '', highlight = false }: any) {
 }
 function CardH({ title, sub }: { title: string; sub?: string }) {
   return (
-    <div style={{ padding: '18px 22px 0' }}>
-      <div style={{ color: '#F3EFEA', fontFamily: "'Playfair Display', serif", fontSize: '17px', fontWeight: 500 }}>{title}</div>
+    <div style={{ padding: 'clamp(16px, 5vw, 22px) clamp(16px, 5vw, 22px) 0' }}>
+      <div style={{ color: '#F3EFEA', fontFamily: "'Playfair Display', serif", fontSize: 'clamp(16px, 4.8vw, 17px)', fontWeight: 500 }}>{title}</div>
       {sub && <div style={{ color: 'rgba(243,239,234,0.60)', fontFamily: "'Inter', sans-serif", fontSize: '12px', marginTop: '3px' }}>{sub}</div>}
     </div>
   )
 }
 function CardB({ children }: any) {
-  return <div style={{ padding: '14px 22px 20px' }}>{children}</div>
+  return <div style={{ padding: '14px clamp(16px, 5vw, 22px) clamp(18px, 5vw, 22px)' }}>{children}</div>
 }
 function Sep() {
   return <div style={{ height: '1px', background: 'rgba(243,239,234,0.08)', margin: '12px 0' }} />
@@ -274,39 +274,50 @@ const DASH_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,400;1,500&family=Inter:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 *{box-sizing:border-box}
 a{text-decoration:none;color:inherit}
-.db-nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:14px 40px;background:rgba(14,11,8,.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(198,163,95,.18)}
+.db-nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px clamp(14px,4vw,40px);background:rgba(14,11,8,.92);backdrop-filter:blur(20px);border-bottom:1px solid rgba(198,163,95,.18)}
 .db-logo{display:flex;align-items:center;gap:9px;font-family:'Playfair Display',serif;font-size:17px;color:#F3EFEA}
 .db-logo em{font-style:italic;color:#C6A35F}
-.db-nav-links{display:flex;gap:24px}
+.db-nav-links{display:flex;gap:clamp(12px,2vw,24px);flex-wrap:wrap;justify-content:flex-end}
 .db-nl{font-family:'Inter',sans-serif;font-size:13px;color:rgba(243,239,234,.6);transition:color .2s}
 .db-nl:hover,.db-nl-on{color:#C6A35F}
-.db-page{max-width:1200px;margin:0 auto;padding:40px 40px 80px}
+.db-page{width:min(100%,1200px);margin:0 auto;padding:clamp(18px,5vw,40px) clamp(14px,5vw,40px) clamp(56px,10vw,80px)}
 .db-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:32px;flex-wrap:wrap}
-.db-h1{font-family:'Playfair Display',serif;font-size:28px;font-weight:500;color:#F3EFEA;margin-bottom:6px}
+.db-h1{font-family:'Playfair Display',serif;font-size:clamp(24px,7vw,32px);line-height:1.08;font-weight:500;color:#F3EFEA;margin-bottom:6px}
 .db-sub{font-family:'Inter',sans-serif;font-size:14px;color:rgba(243,239,234,.6)}
 .db-loading{display:flex;align-items:center;gap:12px;color:rgba(243,239,234,.6);font-family:'Inter',sans-serif;font-size:14px;padding:60px 0}
 .db-spinner{width:18px;height:18px;border:2px solid rgba(198,163,95,.2);border-top-color:#C6A35F;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
-.db-grid{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
+.db-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:20px;align-items:start}
 .db-main,.db-side{display:flex;flex-direction:column;gap:18px}
 .db-text{font-family:'Inter',sans-serif;font-size:13.5px;font-weight:300;color:rgba(243,239,234,.82);line-height:1.8}
 .db-muted{font-family:'Inter',sans-serif;font-size:12.5px;color:rgba(243,239,234,.5);line-height:1.65}
-.db-link{font-family:'Inter',sans-serif;font-size:13px;color:#C6A35F;transition:opacity .2s}
+.db-link{font-family:'Inter',sans-serif;font-size:13px;color:#C6A35F;transition:opacity .2s;overflow-wrap:anywhere}
 .db-link:hover{opacity:.75}
 .db-tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;color:#C6A35F;background:rgba(198,163,95,.1);border:1px solid rgba(198,163,95,.22);border-radius:100px;padding:3px 11px}
-.db-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.db-row-title{font-family:'Inter',sans-serif;font-size:13px;color:#F3EFEA;line-height:1.4}
+.db-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.db-row>div{min-width:0}
+.db-row-title{font-family:'Inter',sans-serif;font-size:13px;color:#F3EFEA;line-height:1.4;overflow-wrap:anywhere}
 .db-row-sub{font-family:'DM Mono',monospace;font-size:10px;color:rgba(243,239,234,.5);margin-top:2px;letter-spacing:.05em}
 .db-profile-name{font-family:'Playfair Display',serif;font-size:18px;font-weight:500;color:#F3EFEA}
 .db-gauges{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.btn-gold-sm{display:inline-flex;align-items:center;padding:9px 20px;background:#C6A35F;color:#0E0B08;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;border:none;border-radius:50px;cursor:pointer;text-decoration:none;box-shadow:0 4px 18px rgba(198,163,95,.28);transition:all .2s;white-space:nowrap}
+.btn-gold-sm{display:inline-flex;min-height:44px;align-items:center;justify-content:center;padding:10px 20px;background:#C6A35F;color:#0E0B08;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;border:none;border-radius:50px;cursor:pointer;text-decoration:none;box-shadow:0 4px 18px rgba(198,163,95,.28);transition:all .2s;white-space:normal;text-align:center}
 .btn-gold-sm:hover{background:#d4b26e;transform:translateY(-1px)}
-.btn-ghost-sm{display:inline-flex;align-items:center;padding:9px 20px;background:transparent;color:rgba(243,239,234,.7);font-family:'Inter',sans-serif;font-size:13px;font-weight:400;border:1px solid rgba(243,239,234,.2);border-radius:50px;cursor:pointer;text-decoration:none;transition:all .2s;white-space:nowrap}
+.btn-ghost-sm{display:inline-flex;min-height:44px;align-items:center;justify-content:center;padding:10px 20px;background:transparent;color:rgba(243,239,234,.7);font-family:'Inter',sans-serif;font-size:13px;font-weight:400;border:1px solid rgba(243,239,234,.2);border-radius:50px;cursor:pointer;text-decoration:none;transition:all .2s;white-space:normal;text-align:center}
 .btn-ghost-sm:hover{border-color:rgba(243,239,234,.42);color:#F3EFEA}
 @media(max-width:900px){
-  .db-nav{padding:12px 20px}.db-nav-links{display:none}
-  .db-page{padding:24px 20px 60px}
+  .db-nav{padding:12px 18px}.db-nav-links{display:none}
+  .db-page{padding:24px 18px 60px}
   .db-grid{grid-template-columns:1fr}
   .db-gauges{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+  .db-nav{padding:12px 14px}
+  .db-logo{font-size:15px}
+  .db-page{padding:20px 14px 56px}
+  .db-header{gap:14px;margin-bottom:22px}
+  .db-header .btn-gold-sm{width:100%}
+  .db-row{align-items:flex-start;flex-direction:column}
+  .db-row .db-link{min-height:36px;display:inline-flex;align-items:center}
+  .btn-gold-sm,.btn-ghost-sm{width:100%}
 }
 `
