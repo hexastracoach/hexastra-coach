@@ -14286,3 +14286,201 @@ body,
     padding: 0 !important;
   }
 }
+
+/* HEXASTRA CHAT -- OVERFLOW + DRAWER FINISH
+   Defensive rules for mobile browsers that keep a wider layout viewport. */
+html,
+body,
+.hx-chat-page,
+.hx-app-layout,
+.hx-app-main {
+  max-width: 100dvw !important;
+  overflow-x: clip !important;
+}
+
+.hx-chat-page {
+  width: 100dvw !important;
+}
+
+.hx-app-main {
+  width: 100% !important;
+}
+
+.hx-app-topbar {
+  box-sizing: border-box !important;
+  width: min(1080px, calc(100dvw - 28px)) !important;
+  max-width: calc(100dvw - 28px) !important;
+  margin: 14px auto 0 !important;
+}
+
+.hx-app-topbar > * {
+  min-width: 0 !important;
+}
+
+.hx-welcome-chips {
+  width: min(760px, calc(100dvw - 32px)) !important;
+  max-width: calc(100dvw - 32px) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  justify-content: center !important;
+  justify-items: center !important;
+  align-items: stretch !important;
+}
+
+.hx-welcome-chip,
+.hx-emotion-card {
+  width: 100% !important;
+  max-width: 260px !important;
+  min-height: 122px !important;
+  max-height: none !important;
+}
+
+.hx-chat-mobile-sheet,
+.hx-chat-mobile-sheet-left {
+  box-sizing: border-box !important;
+}
+
+.hx-chat-mobile-sheet > div {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.hx-chat-mobile-sheet > div > div:last-child {
+  flex-shrink: 0 !important;
+  padding-bottom: max(28px, env(safe-area-inset-bottom, 28px)) !important;
+}
+
+@media (max-width: 768px) {
+  .hx-app-topbar {
+    width: calc(100dvw - 16px) !important;
+    max-width: calc(100dvw - 16px) !important;
+    margin: 8px auto 0 !important;
+    border-radius: 20px !important;
+    grid-template-columns: minmax(0, 1fr) 52px !important;
+    padding: 6px 8px !important;
+  }
+
+  .hx-app-topbar > .flex:first-child {
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .hx-app-topbar .hx-icon-btn {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+  }
+
+  .hx-app-topbar .hx-nav-lang {
+    width: 50px !important;
+    min-width: 50px !important;
+    max-width: 50px !important;
+  }
+
+  .hx-nav-lang .hx-lang-trigger {
+    width: 50px !important;
+    padding: 5px !important;
+    justify-content: center !important;
+  }
+
+  .hx-nav-lang .hx-lang-mark {
+    min-width: 34px !important;
+  }
+
+  .hx-nav-lang .hx-lang-chevron {
+    display: none !important;
+  }
+
+  .hx-welcome-chips {
+    display: grid !important;
+    grid-template-columns: minmax(0, min(100%, 340px)) !important;
+    width: min(100%, 340px) !important;
+    max-width: calc(100dvw - 28px) !important;
+    margin: 18px auto 0 !important;
+    padding: 0 0 8px !important;
+    overflow: visible !important;
+    gap: 12px !important;
+  }
+
+  .hx-welcome-chip,
+  .hx-emotion-card {
+    width: 100% !important;
+    max-width: 340px !important;
+    min-height: 126px !important;
+    max-height: 150px !important;
+    padding: 16px 18px !important;
+    justify-self: center !important;
+  }
+
+  .hx-chat-mobile-sheet,
+  .hx-chat-mobile-sheet-left {
+    width: min(286px, calc(100dvw - 86px)) !important;
+    max-width: calc(100dvw - 86px) !important;
+    height: calc(var(--vvh, 100dvh) - 18px) !important;
+    max-height: calc(var(--vvh, 100dvh) - 18px) !important;
+    border-radius: 0 22px 22px 0 !important;
+  }
+
+  .hx-chat-mobile-sheet > div > div:first-child {
+    padding-top: 16px !important;
+    padding-bottom: 10px !important;
+  }
+
+  .hx-chat-mobile-sheet > div > div:last-child {
+    padding-top: 8px !important;
+    padding-bottom: 46px !important;
+  }
+
+  .hx-chat-mobile-sheet a[href="/account"] {
+    min-height: 54px !important;
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .hx-app-topbar {
+    width: calc(100dvw - 12px) !important;
+    max-width: calc(100dvw - 12px) !important;
+    grid-template-columns: minmax(0, 1fr) 46px !important;
+    padding-inline: 6px !important;
+  }
+
+  .hx-app-topbar > .flex:first-child {
+    grid-template-columns: 38px minmax(0, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .hx-app-topbar .hx-icon-btn {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+  }
+
+  .hx-app-topbar .hx-nav-lang,
+  .hx-nav-lang .hx-lang-trigger {
+    width: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+  }
+
+  .hx-welcome-chips {
+    width: min(100%, 320px) !important;
+    max-width: calc(100dvw - 24px) !important;
+  }
+
+  .hx-welcome-chip,
+  .hx-emotion-card {
+    max-width: 320px !important;
+    min-height: 112px !important;
+    padding: 14px 15px !important;
+  }
+
+  .hx-chat-mobile-sheet,
+  .hx-chat-mobile-sheet-left {
+    width: min(266px, calc(100dvw - 74px)) !important;
+    max-width: calc(100dvw - 74px) !important;
+  }
+}
