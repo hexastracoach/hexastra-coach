@@ -13693,3 +13693,329 @@ body,
     display: none;
   }
 }
+
+/* HEXASTRA CHAT -- RESPONSIVE HOTFIX
+   Keeps the welcome screen usable on short mobile/desktop viewports. */
+.hx-app-layout,
+.hx-app-main {
+  height: var(--vvh, 100dvh) !important;
+  max-height: var(--vvh, 100dvh) !important;
+}
+
+.hx-app-feed:has(.hx-welcome-feed) {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: none;
+}
+
+.hx-app-feed:has(.hx-welcome-feed)::-webkit-scrollbar {
+  display: none;
+}
+
+.hx-welcome-feed,
+.hx-welcome-feed-center {
+  min-height: 0 !important;
+}
+
+.hx-welcome-feed-center {
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  padding-top: clamp(28px, 5dvh, 54px) !important;
+  padding-bottom: clamp(116px, 17dvh, 160px) !important;
+}
+
+.hx-welcome-hero {
+  gap: 0 !important;
+  padding-top: 0 !important;
+}
+
+.hx-welcome-orb {
+  width: clamp(118px, 13vw, 168px) !important;
+  margin-bottom: 16px !important;
+}
+
+.hx-welcome-badge {
+  margin-bottom: 14px !important;
+}
+
+.hx-welcome-hero .hx-welcome-title,
+.hx-welcome-title {
+  font-size: clamp(2.7rem, 5.2vw, 4.8rem) !important;
+  line-height: 1.02 !important;
+}
+
+.hx-welcome-subtitle {
+  margin-top: 14px !important;
+}
+
+.hx-welcome-chips {
+  margin-top: 26px !important;
+}
+
+.hx-welcome-chip,
+.hx-emotion-card {
+  min-height: 88px !important;
+}
+
+.hx-app-bottom {
+  padding-top: 8px !important;
+}
+
+.hx-app-composer-wrap,
+.hx-composer-wrap {
+  width: min(760px, 100%) !important;
+}
+
+.hx-composer-box {
+  min-height: 62px !important;
+  padding: 10px 12px !important;
+}
+
+.hx-composer-textarea {
+  min-height: 24px !important;
+  max-height: 72px !important;
+  overflow-y: auto !important;
+}
+
+.hx-chat-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 90 !important;
+  overflow: hidden !important;
+}
+
+.hx-chat-mobile-sheet,
+.hx-chat-mobile-sheet-left {
+  position: fixed !important;
+  inset: 0 auto 0 0 !important;
+  width: min(292px, 82vw) !important;
+  max-width: calc(100vw - 48px) !important;
+  height: var(--vvh, 100dvh) !important;
+  max-height: var(--vvh, 100dvh) !important;
+  border-radius: 0 24px 24px 0 !important;
+  overflow: hidden !important;
+}
+
+.hx-chat-mobile-sheet > div {
+  background:
+    linear-gradient(180deg, rgba(18, 8, 13, 0.98), rgba(11, 7, 9, 0.96)),
+    radial-gradient(circle at 0% 0%, rgba(216, 181, 109, 0.08), transparent 34%) !important;
+  color: var(--hx-cabinet-ivory) !important;
+}
+
+@media (max-width: 768px) {
+  .hx-app-topbar {
+    min-height: 56px !important;
+    padding: 7px 10px !important;
+  }
+
+  .hx-app-topbar .hx-icon-btn {
+    width: 46px !important;
+    height: 46px !important;
+    min-width: 46px !important;
+    min-height: 46px !important;
+    border-radius: 16px !important;
+  }
+
+  .hx-app-topbar .hx-nav-lang {
+    min-height: 42px !important;
+    border-radius: 16px !important;
+  }
+
+  .hx-app-topbar p {
+    font-size: 0.92rem !important;
+    line-height: 1.15 !important;
+  }
+
+  .hx-app-feed {
+    padding: 8px clamp(10px, 3.5vw, 14px) 0 !important;
+  }
+
+  .hx-welcome-feed-center {
+    padding-top: clamp(12px, 3dvh, 24px) !important;
+    padding-bottom: clamp(104px, 17dvh, 134px) !important;
+  }
+
+  .hx-welcome-orb {
+    width: clamp(92px, 25vw, 116px) !important;
+    margin-bottom: 10px !important;
+  }
+
+  .hx-welcome-badge {
+    margin-bottom: 10px !important;
+    padding: 5px 12px !important;
+    font-size: 0.68rem !important;
+  }
+
+  .hx-welcome-hero .hx-welcome-title,
+  .hx-welcome-title {
+    max-width: 98vw !important;
+    font-size: clamp(1.82rem, 7.6vw, 2.16rem) !important;
+    line-height: 1.04 !important;
+    white-space: nowrap !important;
+  }
+
+  .hx-welcome-title-single-line {
+    display: inline-block;
+    max-width: 98vw !important;
+    white-space: nowrap !important;
+  }
+
+  .hx-welcome-subtitle {
+    margin-top: 10px !important;
+    max-width: 310px !important;
+    font-size: 0.9rem !important;
+    line-height: 1.45 !important;
+  }
+
+  .hx-welcome-chips {
+    display: flex !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin-top: 18px !important;
+    margin-inline: calc(50% - 50vw) !important;
+    padding: 0 max(14px, env(safe-area-inset-left, 0px)) 6px !important;
+    gap: 10px !important;
+    overflow-x: auto !important;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .hx-welcome-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .hx-welcome-chip,
+  .hx-emotion-card {
+    flex: 0 0 min(78vw, 288px) !important;
+    min-height: 86px !important;
+    padding: 14px 16px !important;
+    scroll-snap-align: center;
+  }
+
+  .hx-emotion-card-title {
+    font-size: 0.94rem !important;
+  }
+
+  .hx-emotion-card-description {
+    font-size: 0.8rem !important;
+    line-height: 1.38 !important;
+  }
+
+  .hx-emotion-card-action {
+    font-size: 0.72rem !important;
+  }
+
+  .hx-science-picker {
+    width: min(100%, 344px) !important;
+    max-height: min(42dvh, 316px) !important;
+    margin-top: 16px !important;
+  }
+
+  .hx-app-bottom {
+    padding: 8px clamp(10px, 3.5vw, 14px) max(8px, env(safe-area-inset-bottom, 8px)) !important;
+    background:
+      linear-gradient(180deg, rgba(11, 7, 9, 0), rgba(11, 7, 9, 0.88) 22%, rgba(11, 7, 9, 0.98)) !important;
+  }
+
+  .hx-app-composer-wrap {
+    gap: 5px !important;
+    padding: 0 !important;
+  }
+
+  .hx-composer-box {
+    min-height: 56px !important;
+    padding: 7px 9px !important;
+    gap: 7px !important;
+    border-radius: 22px !important;
+    align-items: center !important;
+  }
+
+  .hx-composer-actions-left {
+    gap: 5px !important;
+  }
+
+  .hx-composer-action-btn,
+  .hx-composer-right-btn {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    border-radius: 15px !important;
+  }
+
+  .hx-composer-textarea {
+    min-height: 22px !important;
+    max-height: 48px !important;
+    padding-block: 2px !important;
+    font-size: 16px !important;
+    line-height: 1.28 !important;
+    align-self: center !important;
+  }
+
+  .hx-app-disclaimer {
+    font-size: 0.66rem !important;
+    line-height: 1.25 !important;
+  }
+}
+
+@media (max-width: 768px) and (max-height: 670px) {
+  .hx-welcome-feed-center {
+    padding-top: 8px !important;
+    padding-bottom: 94px !important;
+  }
+
+  .hx-welcome-orb {
+    width: clamp(74px, 20vw, 92px) !important;
+    margin-bottom: 7px !important;
+  }
+
+  .hx-welcome-badge {
+    display: none !important;
+  }
+
+  .hx-welcome-hero .hx-welcome-title,
+  .hx-welcome-title {
+    font-size: clamp(1.55rem, 6.4vw, 1.9rem) !important;
+  }
+
+  .hx-welcome-subtitle {
+    display: none !important;
+  }
+
+  .hx-welcome-chips {
+    margin-top: 12px !important;
+  }
+
+  .hx-welcome-chip,
+  .hx-emotion-card {
+    min-height: 72px !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .hx-app-topbar {
+    padding-inline: 8px !important;
+  }
+
+  .hx-app-topbar .hx-icon-btn {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+  }
+
+  .hx-welcome-hero .hx-welcome-title,
+  .hx-welcome-title {
+    font-size: clamp(1.55rem, 7.1vw, 1.82rem) !important;
+  }
+
+  .hx-composer-action-btn,
+  .hx-composer-right-btn {
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+  }
+}
