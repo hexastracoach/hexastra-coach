@@ -68,12 +68,13 @@ export default function LanguageSwitcher({ variant = 'flag', className = '' }: P
         aria-expanded={open}
         aria-label={`Language: ${current.native}`}
       >
-        <span className="hx-lang-flag" aria-hidden="true">{current.flag}</span>
+        {variant === 'flag' ? (
+          <span className="hx-lang-mark" aria-hidden="true">{current.code.toUpperCase()}</span>
+        ) : (
+          <span className="hx-lang-flag" aria-hidden="true">{current.flag}</span>
+        )}
         {variant === 'full' && (
           <span className="hx-lang-label">{current.native}</span>
-        )}
-        {variant === 'flag' && (
-          <span className="hx-lang-code">{current.code.toUpperCase()}</span>
         )}
         <svg className="hx-lang-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
           <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
@@ -94,7 +95,7 @@ export default function LanguageSwitcher({ variant = 'flag', className = '' }: P
                 className={`hx-lang-option${l.code === lang ? ' is-active' : ''}`}
                 onClick={() => select(l.code)}
               >
-                <span className="hx-lang-flag" aria-hidden="true">{l.flag}</span>
+                <span className="hx-lang-mark" aria-hidden="true">{l.code.toUpperCase()}</span>
                 <span className="hx-lang-option-label">{l.native}</span>
               </button>
             </li>

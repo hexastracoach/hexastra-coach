@@ -173,7 +173,7 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
         {renderContent()}
       </div>
 
-      {!isUser && message.isReading && (
+      {!isUser && !isStatusCard && (
         <div className="hx-bubble-actions">
           <button
             className="hx-action-btn"
@@ -183,6 +183,7 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
             title="Conserver cette guidance"
           >
             {copied ? <Check size={19} strokeWidth={1.9} /> : <Files size={19} strokeWidth={1.8} />}
+            <span className="hx-action-label">{copied ? 'Copié' : 'Copier'}</span>
           </button>
           <button
             className="hx-action-btn"
@@ -192,16 +193,18 @@ export default function MessageBubble({ message, lastUserMessage, onRetry }: Pro
             title="Partager cette lecture"
           >
             {shared ? <Check size={19} strokeWidth={1.9} /> : <Share2 size={19} strokeWidth={1.8} />}
+            <span className="hx-action-label">{shared ? 'Partagé' : 'Partager'}</span>
           </button>
           <button
             className="hx-action-btn"
             onClick={handleRetry}
             type="button"
             disabled={!onRetry}
-            aria-label="Approfondir cette lecture"
-            title="Approfondir cette lecture"
+            aria-label="Réessayer cette lecture"
+            title="Réessayer cette lecture"
           >
             <Sparkles size={19} strokeWidth={1.8} />
+            <span className="hx-action-label">Réessayer</span>
           </button>
         </div>
       )}
