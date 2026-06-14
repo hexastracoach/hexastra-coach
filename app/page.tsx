@@ -31,6 +31,11 @@ type StepCard = {
   body: string
 }
 
+type UseCaseCard = {
+  title: string
+  body: string
+}
+
 type Testimonial = {
   quote: string
   author: string
@@ -72,6 +77,12 @@ type CopyBundle = {
     title: string
     subtitle: string
     items: InfoCard[]
+  }
+  useCases: {
+    title: string
+    subtitle: string
+    cta: string
+    items: UseCaseCard[]
   }
   solution: {
     eyebrow: string
@@ -124,6 +135,7 @@ type CopyBundle = {
     contact: string
     privacy: string
     terms: string
+    disclaimer: string
   }
 }
 
@@ -137,24 +149,24 @@ const FR_COPY: CopyBundle = {
   header: {
     how: 'Comment ça marche',
     plans: 'Premium',
-    chat: 'Ouvrir le chat',
+    chat: 'Clarifier ma situation',
   },
   hero: {
-    eyebrow: 'Pour les moments où tout devient flou',
-    title: 'Quand tout se brouille, Hexastra vous aide à voir juste.',
+    eyebrow: 'Coach IA pour les moments où tout devient flou',
+    title: 'Quand vous ne voyez plus clair, Hexastra devient votre GPS intérieur.',
     subtitle:
-      "Vous tournez en rond, vous hésitez, vous sentez que quelque chose se joue sans réussir à le nommer. Décrivez votre situation. Hexastra vous aide à y voir clair et à savoir quoi faire ensuite.",
-    primary: 'Voir clair maintenant',
-    secondary: 'Comment ça marche',
-    trust: 'Entrez dans le chat. Une situation réelle. Une réponse claire.',
+      'Décrivez simplement votre situation. Hexastra vous aide à comprendre ce qui se joue, à retrouver de la clarté et à avancer avec une direction plus juste.',
+    primary: 'Clarifier ma situation',
+    secondary: 'Voir comment ça marche',
+    trust: 'Simple, direct, sans jargon. Une guidance personnalisée en quelques minutes.',
     panelEyebrow: 'Ce que vous obtenez',
-    panelTitle: 'Moins de bruit. Plus de direction.',
+    panelTitle: 'Une lecture claire, utile et directement compréhensible.',
     panelRows: [
-      'Ce qui vous retient vraiment',
-      'Ce qui compte maintenant',
-      'Le prochain pas qui a du sens',
+      'Ce qui se joue vraiment derrière votre situation',
+      'Ce qui mérite votre attention maintenant',
+      'Une direction concrète pour avancer',
     ],
-    panelNote: 'Direct, lisible, utile. Pas de système à apprendre.',
+    panelNote: 'Pas de jargon. Pas de méthode à décoder. Une lecture claire, utile et directement compréhensible.',
   },
   problem: {
     eyebrow: 'Le vrai problème',
@@ -176,11 +188,39 @@ const FR_COPY: CopyBundle = {
       },
     ],
   },
+  useCases: {
+    title: 'Dans quelles situations Hexastra peut vous aider ?',
+    subtitle:
+      "Vous n'avez pas besoin de formuler une question parfaite. Commencez par ce que vous vivez.",
+    cta: 'Poser ma question',
+    items: [
+      {
+        title: 'Relation',
+        body: 'Pourquoi cette relation me fatigue autant ?',
+      },
+      {
+        title: 'Travail',
+        body: 'Est-ce encore la bonne direction pour moi ?',
+      },
+      {
+        title: 'Décision importante',
+        body: 'Quel choix semble le plus juste maintenant ?',
+      },
+      {
+        title: 'Blocage intérieur',
+        body: 'Pourquoi je tourne en rond malgré mes efforts ?',
+      },
+      {
+        title: 'Période de transition',
+        body: 'Comment avancer quand tout bouge autour de moi ?',
+      },
+    ],
+  },
   solution: {
-    eyebrow: 'La reponse',
+    eyebrow: 'La réponse',
     title: 'Hexastra lit la situation, pas seulement la question.',
     body:
-      "Vous racontez ce qui se passe. Hexastra clarifie la tension centrale, ce qui compte vraiment, et la direction la plus juste pour la suite.",
+      'Vous racontez ce qui se passe. Hexastra clarifie la tension centrale, repère ce qui compte vraiment et vous aide à repartir avec une direction plus nette.',
     bullets: [
       'Comprendre ce qui se joue vraiment',
       'Retrouver de la perspective rapidement',
@@ -190,86 +230,86 @@ const FR_COPY: CopyBundle = {
       {
         step: '01',
         title: 'Vous parlez de votre situation',
-        body: 'Un doute, une relation, une decision, un moment ou vous ne voyez plus clair.',
+        body: 'Un doute, une relation, une décision, un moment où vous ne voyez plus clair.',
       },
       {
         step: '02',
         title: 'Hexastra clarifie',
-        body: "Le systeme fait ressortir le point central et ce qui merite vraiment votre attention.",
+        body: 'La lecture fait ressortir le point central et ce qui mérite vraiment votre attention.',
       },
       {
         step: '03',
         title: 'Vous repartez avec un cap',
-        body: 'Une lecture nette. Une direction credible. Plus de calme pour decider.',
+        body: 'Une lecture nette. Une direction crédible. Plus de calme pour décider.',
       },
     ],
   },
   systems: {
     title: 'Une intelligence nourrie par plusieurs approches',
     body:
-      'Hexastra s\u2019appuie sur plusieurs syst\u00e8mes d\u2019analyse reconnus, crois\u00e9s pour r\u00e9v\u00e9ler ce qui compte vraiment dans votre situation.',
+      "Hexastra s'appuie sur plusieurs systèmes d'analyse humaine pour offrir une guidance plus nuancée et personnalisée. Vous n'avez rien à apprendre ni à décoder : la lecture est déjà clarifiée pour vous.",
     support:
-      'Vous n\u2019avez rien \u00e0 d\u00e9coder.\nLa lecture est d\u00e9j\u00e0 clarifi\u00e9e pour vous.',
-    list: 'Astrologie · Human Design · Num\u00e9rologie · Enn\u00e9agramme · Kua',
+      'Un coach spirituel moderne pour le développement personnel, la compréhension de soi, la lecture énergétique et la clarification émotionnelle.',
+    list: 'Astrologie • Human Design • Numérologie • Ennéagramme • Hexagrammes • Kua',
   },
   benefits: {
     eyebrow: 'Ce que cela change',
-    title: 'Vous decidez plus calmement.',
+    title: 'Vous décidez plus calmement.',
     items: [
       {
-        title: 'Decisions plus nettes',
-        body: "Vous avancez avec plus de discernement et moins d'hesitation.",
+        title: 'Décisions plus nettes',
+        body: "Vous avancez avec plus de discernement et moins d'hésitation.",
       },
       {
         title: 'Moins de charge mentale',
-        body: "Vous quittez le bruit interieur pour revenir a l'essentiel.",
+        body: "Vous quittez le bruit intérieur pour revenir à l'essentiel.",
       },
       {
         title: 'Mieux comprendre ce que vous ressentez',
-        body: 'Vous nommez enfin ce qui bloque et ce qui appelle une vraie decision.',
+        body: 'Vous nommez enfin ce qui bloque et ce qui appelle une vraie décision.',
       },
       {
         title: 'Une direction utilisable',
-        body: 'Pas un conseil vague. Une prochaine etape qui a du sens.',
+        body: 'Pas un conseil vague. Une prochaine étape qui a du sens.',
       },
     ],
   },
   differentiation: {
     eyebrow: 'Pourquoi cela fonctionne',
-    title: 'Pas de methode a choisir. Pas de systeme a decoder.',
-    quote: "Vous n'avez pas besoin de comprendre le systeme. Seulement votre situation.",
+    title: 'Pas de méthode à choisir. Pas de système à décoder.',
+    quote: "Vous n'avez pas besoin de comprendre le système. Seulement votre situation.",
     cards: [
       {
-        before: "Plus d'informations a trier",
-        after: 'Plus de clarte',
+        before: "Plus d'informations à trier",
+        after: 'Plus de clarté',
       },
       {
-        before: 'Des resultats a interpreter',
-        after: 'Une direction immediate',
+        before: 'Des résultats à interpréter',
+        after: 'Une direction immédiate',
       },
     ],
   },
   testimonials: {
-    eyebrow: 'En quelques minutes',
-    title: 'Le soulagement vient quand la situation devient lisible.',
+    eyebrow: 'Exemples de questions',
+    title: 'Commencez par ce qui vous traverse vraiment.',
     items: [
       {
         quote:
-          "J'ai arrete de tourner en rond. J'ai compris ce qui me retenait vraiment dans ma relation.",
-        author: 'Camille, 33 ans',
-        context: 'Clarte relationnelle',
+          "Pourquoi je me sens bloqué alors que je fais des efforts ?",
+        author: 'Blocage intérieur',
+        context: 'Clarification émotionnelle',
       },
       {
         quote:
-          "Je pensais hesiter entre deux options pro. En realite, j'essayais surtout de ne pas regarder ce qui m'epuisait.",
-        author: 'Nicolas, 41 ans',
-        context: 'Decision de travail',
+          "Comment savoir si je dois continuer dans cette direction ?",
+        author: 'Décision importante',
+        context: 'Clarté intérieure',
       },
       {
         quote:
-          "Je me sentais confuse depuis des jours. En quelques messages, j'ai senti la pression retomber.",
-        author: 'Sarah, 29 ans',
-        context: 'Confusion emotionnelle',
+          "Qu'est-ce que cette relation réveille vraiment chez moi ?",
+        author: 'Relation',
+        context: 'Compréhension de soi',
       },
     ],
   },
@@ -285,25 +325,25 @@ const FR_COPY: CopyBundle = {
         title: 'Gratuit',
         price: '0 EUR',
         cadence: '/ accès découverte',
-        description: 'Pour ressentir la clarté Hexastra sur une situation simple.',
+        description: 'Découvrez si Hexastra peut réellement vous aider.',
         bullets: ['Accès limité chaque jour', 'Parfait pour essayer', 'Commencez immédiatement'],
-        cta: 'Essayer maintenant',
+        cta: 'Essayer gratuitement',
       },
       {
         key: 'essential',
         title: 'Essentiel',
         price: '9,90 EUR',
         cadence: '/ mois',
-        description: 'Pour un usage fluide et quotidien, avec des réponses claires et concises.',
+        description: 'Pour poser vos questions du quotidien et obtenir une clarté rapide.',
         bullets: ['Usage illimité', 'Guidance directe', 'Pensé pour le quotidien'],
-        cta: 'Continuer avec Essentiel',
+        cta: 'Choisir Essentiel',
       },
       {
         key: 'premium',
         title: 'Premium',
         price: '19,90 EUR',
         cadence: '/ mois',
-        description: 'Pour aller plus loin quand la situation compte vraiment.',
+        description: 'Idéal quand une décision compte vraiment.',
         bullets: ['Analyse plus profonde', 'Plus de nuance', 'Le meilleur choix pour une décision importante'],
         cta: 'Choisir Premium',
         badge: 'Recommandé',
@@ -314,9 +354,9 @@ const FR_COPY: CopyBundle = {
         title: 'Praticien',
         price: '29,90 EUR',
         cadence: '/ mois',
-        description: 'Pour un usage avancé, plus exigeant, et les futurs besoins pro.',
+        description: 'Pour un usage avancé, plus profond et plus structuré.',
         bullets: ['Usage avancé', 'Cadre plus expert', 'Positionnement premium'],
-        cta: 'Voir le niveau avancé',
+        cta: 'Choisir Praticien',
       },
     ],
   },
@@ -325,14 +365,17 @@ const FR_COPY: CopyBundle = {
     title: 'Commencez par votre situation.',
     body:
       'Pas besoin de la question parfaite. Dites simplement ce qui se passe. Hexastra vous aide à voir juste.',
-    cta: 'Ouvrir le chat',
+    cta: 'Recevoir ma guidance',
   },
   footer: {
-    tagline: 'La clarté change tout.',
+    tagline:
+      'Hexastra Coach vous aide à mieux comprendre votre situation grâce à une guidance personnalisée, claire et actionnable.',
     support: 'Support',
     contact: 'Contact',
     privacy: 'Confidentialité',
     terms: 'Conditions',
+    disclaimer:
+      'Hexastra est un outil d’éclairage personnel. Il ne remplace pas un médecin, un psychologue, un avocat ou un conseiller financier.',
   },
 }
 
@@ -340,24 +383,24 @@ const EN_COPY: CopyBundle = {
   header: {
     how: 'How it works',
     plans: 'Premium',
-    chat: 'Open chat',
+    chat: 'Clarify my situation',
   },
   hero: {
-    eyebrow: 'For the moments when everything feels blurred',
-    title: 'When everything feels unclear, Hexastra helps you see what is true.',
+    eyebrow: 'An AI coach for the moments that feel unclear',
+    title: 'When you no longer see clearly, Hexastra becomes your inner GPS.',
     subtitle:
-      "You keep circling, hesitating, and feeling that something important is happening without being able to name it. Describe your situation. Hexastra helps you see clearly and know what to do next.",
-    primary: 'See clearly now',
-    secondary: 'How it works',
-    trust: 'Enter the chat. A real situation. A clear response.',
+      'Simply describe your situation. Hexastra helps you understand what is happening, recover clarity, and move forward with a more accurate direction.',
+    primary: 'Clarify my situation',
+    secondary: 'See how it works',
+    trust: 'Simple, direct, no jargon. Personalized guidance in just a few minutes.',
     panelEyebrow: 'What you get',
-    panelTitle: 'Less noise. More direction.',
+    panelTitle: 'A clear, useful reading you can understand immediately.',
     panelRows: [
-      'What is really holding you back',
-      'What matters right now',
-      'The next move that makes sense',
+      'What is really happening behind your situation',
+      'What deserves your attention right now',
+      'One concrete direction to move forward',
     ],
-    panelNote: 'Direct, readable, useful. No system to learn first.',
+    panelNote: 'No jargon. No method to decode. A clear, useful and immediately understandable reading.',
   },
   problem: {
     eyebrow: 'The real problem',
@@ -379,11 +422,38 @@ const EN_COPY: CopyBundle = {
       },
     ],
   },
+  useCases: {
+    title: 'When can Hexastra help?',
+    subtitle: 'You do not need the perfect question. Start with what you are experiencing.',
+    cta: 'Ask my question',
+    items: [
+      {
+        title: 'Relationship',
+        body: 'Why does this relationship feel so draining?',
+      },
+      {
+        title: 'Work',
+        body: 'Is this still the right direction for me?',
+      },
+      {
+        title: 'Important decision',
+        body: 'Which choice feels most aligned right now?',
+      },
+      {
+        title: 'Inner blockage',
+        body: 'Why do I keep going in circles despite my efforts?',
+      },
+      {
+        title: 'Transition period',
+        body: 'How do I move forward when everything is shifting around me?',
+      },
+    ],
+  },
   solution: {
     eyebrow: 'The response',
     title: 'Hexastra reads the situation, not just the question.',
     body:
-      'You describe what is happening. Hexastra clarifies the central tension, what matters most, and the most grounded direction for what comes next.',
+      'You describe what is happening. Hexastra clarifies the central tension, identifies what really matters, and helps you leave with a clearer direction.',
     bullets: [
       'Understand what is really happening',
       'Recover perspective quickly',
@@ -410,10 +480,10 @@ const EN_COPY: CopyBundle = {
   systems: {
     title: 'An intelligence shaped by multiple approaches',
     body:
-      'Hexastra draws on several established analytical systems, combined to reveal what matters most in your situation.',
+      'Hexastra draws on several human analysis systems to offer more nuanced and personalized guidance. You do not need to learn or decode anything: the reading is already clarified for you.',
     support:
-      'You do not need to decode anything.\nThe reading is already clarified for you.',
-    list: 'Astrology · Human Design · Numerology · Enneagram · Kua',
+      'A modern spiritual coach for personal growth, self-understanding, energetic reading and emotional clarification.',
+    list: 'Astrology • Human Design • Numerology • Enneagram • Hexagrams • Kua',
   },
   benefits: {
     eyebrow: 'What changes',
@@ -453,26 +523,26 @@ const EN_COPY: CopyBundle = {
     ],
   },
   testimonials: {
-    eyebrow: 'In a few minutes',
-    title: 'Relief begins when the situation becomes readable.',
+    eyebrow: 'Question examples',
+    title: 'Start with what you are actually carrying.',
     items: [
       {
         quote:
-          'I stopped going in circles. I understood what was really holding me in that relationship.',
-        author: 'Camille, 33',
-        context: 'Relationship clarity',
+          'Why do I feel blocked even though I am making efforts?',
+        author: 'Inner blockage',
+        context: 'Emotional clarification',
       },
       {
         quote:
-          'I thought I was choosing between two work options. The real issue was what had been draining me for months.',
-        author: 'Nicolas, 41',
-        context: 'Work decision',
+          'How do I know whether I should continue in this direction?',
+        author: 'Important decision',
+        context: 'Inner clarity',
       },
       {
         quote:
-          'I had felt emotionally confused for days. A few messages later, the pressure had dropped.',
-        author: 'Sarah, 29',
-        context: 'Emotional confusion',
+          'What is this relationship really awakening in me?',
+        author: 'Relationship',
+        context: 'Self-understanding',
       },
     ],
   },
@@ -488,25 +558,25 @@ const EN_COPY: CopyBundle = {
         title: 'Free',
         price: 'EUR 0',
         cadence: '/ discovery access',
-        description: 'Feel the Hexastra experience on a simple situation.',
+        description: 'Discover whether Hexastra can truly help you.',
         bullets: ['Limited daily access', 'Perfect to try', 'Start immediately'],
-        cta: 'Try it now',
+        cta: 'Try for free',
       },
       {
         key: 'essential',
         title: 'Essential',
         price: 'EUR 9.90',
         cadence: '/ month',
-        description: 'For fluid everyday use with clear and concise guidance.',
+        description: 'Ask your daily questions and get quick clarity.',
         bullets: ['Unlimited use', 'Direct guidance', 'Built for everyday clarity'],
-        cta: 'Continue with Essential',
+        cta: 'Choose Essential',
       },
       {
         key: 'premium',
         title: 'Premium',
         price: 'EUR 19.90',
         cadence: '/ month',
-        description: 'Go deeper when the situation truly matters.',
+        description: 'Ideal when a decision truly matters.',
         bullets: ['Deeper analysis', 'More nuance', 'The best choice for an important decision'],
         cta: 'Choose Premium',
         badge: 'Recommended',
@@ -517,9 +587,9 @@ const EN_COPY: CopyBundle = {
         title: 'Practitioner',
         price: 'EUR 29.90',
         cadence: '/ month',
-        description: 'For more advanced usage and future professional needs.',
+        description: 'For advanced, deeper and more structured usage.',
         bullets: ['Advanced usage', 'More expert frame', 'Premium positioning'],
-        cta: 'See advanced access',
+        cta: 'Choose Practitioner',
       },
     ],
   },
@@ -528,14 +598,17 @@ const EN_COPY: CopyBundle = {
     title: 'Start with your situation.',
     body:
       'You do not need the perfect question. Just say what is happening. Hexastra helps you see what is true.',
-    cta: 'Open chat',
+    cta: 'Receive my guidance',
   },
   footer: {
-    tagline: 'Clarity changes everything.',
+    tagline:
+      'Hexastra Coach helps you better understand your situation through clear, personalized and actionable guidance.',
     support: 'Support',
     contact: 'Contact',
     privacy: 'Privacy',
     terms: 'Terms',
+    disclaimer:
+      'Hexastra is a personal insight tool. It does not replace a doctor, psychologist, lawyer or financial advisor.',
   },
 }
 
@@ -553,42 +626,7 @@ export default function HomePage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const copy = lang === 'en' ? EN_COPY : FR_COPY
-  const heroDisplay =
-    lang === 'en'
-      ? {
-          eyebrow: 'Clarity for the moments that matter',
-          title: 'Hexastra is your inner GPS.',
-          subtitle:
-            'Understand your situation, see more clearly, and move forward with better decisions.',
-          primary: 'Explore my situation',
-          secondary: 'See how it works',
-          trust: 'Simple, direct, and designed to help you move with clarity.',
-          panelEyebrow: 'What you get',
-          panelTitle: 'A useful reading in just a few minutes.',
-          panelRows: [
-            'What is really happening beneath the surface',
-            'What deserves your attention right now',
-            'One concrete direction for what comes next',
-          ],
-          panelNote: 'No jargon. No system to decode. Just a clear answer.',
-        }
-      : {
-          eyebrow: 'Clarte pour les moments qui comptent',
-          title: 'Hexastra est votre GPS interieur.',
-          subtitle:
-            'Comprenez votre situation, voyez plus clair, et avancez avec de meilleures decisions.',
-          primary: 'Explorer ma situation',
-          secondary: 'Voir comment ca marche',
-          trust: 'Simple, direct, et concu pour vous aider a avancer avec clarte.',
-          panelEyebrow: 'Ce que vous obtenez',
-          panelTitle: 'Une lecture utile en quelques minutes.',
-          panelRows: [
-            'Ce qui se joue vraiment derriere la situation',
-            'Ce qui merite votre attention maintenant',
-            'Une direction concrete pour la suite',
-          ],
-          panelNote: 'Pas de jargon. Pas de methode a decoder. Juste une reponse claire.',
-        }
+  const heroDisplay = copy.hero
   const problemCards = copy.problem.items.map((item, index) => ({
     ...item,
     icon: problemIcons[index],
@@ -832,6 +870,54 @@ export default function HomePage() {
                 </article>
               )
             })}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-[#C8A977]/20 bg-[#F8F6F1]">
+        <div className="mx-auto max-w-6xl px-6 py-20 lg:px-8">
+          <div className="mx-auto max-w-3xl text-center">
+            <h2 className="font-sora text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+              {copy.useCases.title}
+            </h2>
+            <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-white/66 sm:text-lg">
+              {copy.useCases.subtitle}
+            </p>
+          </div>
+
+          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {copy.useCases.items.map((item) => (
+              <Link
+                key={item.title}
+                href={CTA_HREF}
+                onClick={() => handleChatCtaClick(`use_case_${item.title}`)}
+                className="group flex min-h-[180px] flex-col justify-between rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-5 transition duration-300 hover:-translate-y-1 hover:border-[#C8A977]/40 hover:shadow-[0_22px_58px_rgba(46,42,38,0.12)]"
+              >
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-100/78">
+                    {item.title}
+                  </div>
+                  <p className="mt-5 text-base font-semibold leading-7 text-white sm:text-lg">
+                    {item.body}
+                  </p>
+                </div>
+                <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-100 transition group-hover:translate-x-1">
+                  {copy.useCases.cta}
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-10 flex justify-center">
+            <Link
+              href={CTA_HREF}
+              className={primaryButtonClass}
+              onClick={() => handleChatCtaClick('use_cases')}
+            >
+              {copy.useCases.cta}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </section>
@@ -1089,12 +1175,13 @@ export default function HomePage() {
       </section>
 
       <footer className="border-t border-[#C8A977]/20 bg-[#EFE9DF]">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8 text-sm text-white/54 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div>
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-6 py-8 text-sm text-white/54 lg:flex-row lg:items-start lg:justify-between lg:px-8">
+          <div className="max-w-xl">
             <div className="font-sora text-base font-semibold text-white">Hexastra Coach</div>
             <div className="mt-1">{copy.footer.tagline}</div>
+            <div className="mt-3 text-xs leading-6 text-white/44">{copy.footer.disclaimer}</div>
           </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 lg:justify-end">
             <Link href="/support" className="transition hover:text-white">
               {copy.footer.support}
             </Link>

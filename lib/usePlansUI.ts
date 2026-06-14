@@ -18,29 +18,28 @@ type PlanCopy = {
 }
 
 const FR_COPY: PlanCopy = {
-  freeDesc: "Pour essayer Hexastra tout de suite, avec un acces decouverte limite chaque jour.",
+  freeDesc: 'Decouvrez si Hexastra peut reellement vous aider.',
   freeFeatures: [
     'Acces decouverte immediat',
     "Acces au coeur de l'experience",
     'Messages limites par jour',
     'Sans engagement',
   ],
-  essentialDesc: 'Pour continuer quand vous voulez, avec des reponses plus directes et concises.',
+  essentialDesc: 'Pour poser vos questions du quotidien et obtenir une clarte rapide.',
   essentialFeatures: [
     'Usage illimite',
     'Reponses concises et fluides',
     'Aucune coupure dans vos echanges',
     'Ideal pour un usage regulier',
   ],
-  premiumDesc:
-    "Pour obtenir l'analyse la plus profonde, la plus precise et la plus utile sur les situations importantes.",
+  premiumDesc: 'Ideal quand une decision compte vraiment.',
   premiumFeatures: [
     'Analyses plus profondes',
     'Guidance plus precise',
     'Meilleur soutien aux decisions importantes',
     'Le meilleur equilibre entre clarte et profondeur',
   ],
-  practitionerDesc: 'Pour les usages avances et les futures fonctionnalites professionnelles.',
+  practitionerDesc: 'Pour un usage avance, plus profond et plus structure.',
   practitionerFeatures: [
     'Usage avance',
     'Cadre plus expert',
@@ -51,29 +50,28 @@ const FR_COPY: PlanCopy = {
 }
 
 const EN_COPY: PlanCopy = {
-  freeDesc: 'Try Hexastra right away with a limited daily discovery access.',
+  freeDesc: 'Discover whether Hexastra can truly help you.',
   freeFeatures: [
     'Instant discovery access',
     'Access to the core experience',
     'Limited messages per day',
     'No commitment',
   ],
-  essentialDesc: 'Keep going whenever you want, with faster and more concise guidance.',
+  essentialDesc: 'Ask your daily questions and get quick clarity.',
   essentialFeatures: [
     'Unlimited usage',
     'Concise and fluid responses',
     'No interruption in your thread',
     'Ideal for regular personal use',
   ],
-  premiumDesc:
-    'Get the deepest, clearest and most precise analysis when the situation really matters.',
+  premiumDesc: 'Ideal when a decision truly matters.',
   premiumFeatures: [
     'Deeper analysis',
     'More precise guidance',
     'Better support for important decisions',
     'The best balance between clarity and depth',
   ],
-  practitionerDesc: 'For advanced usage and future professional features.',
+  practitionerDesc: 'For advanced, deeper and more structured usage.',
   practitionerFeatures: [
     'Advanced usage',
     'More expert structure',
