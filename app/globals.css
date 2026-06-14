@@ -16844,3 +16844,234 @@ select {
     gap: 10px !important;
   }
 }
+
+/* CHAT COSY COSMIC - adaptive nebula video background */
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background {
+  isolation: isolate;
+}
+
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-video {
+  position: absolute !important;
+  inset: -4% !important;
+  z-index: 1 !important;
+  width: 108% !important;
+  height: 108% !important;
+  object-fit: cover !important;
+  opacity: 0.16 !important;
+  mix-blend-mode: soft-light !important;
+  filter: sepia(0.12) saturate(0.62) brightness(1.18) contrast(0.82) blur(0.3px) !important;
+  transform: scale(1.04) !important;
+}
+
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-space {
+  z-index: 0 !important;
+}
+
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(233, 215, 190, 0.48), transparent 34%),
+    radial-gradient(circle at 84% 14%, rgba(154, 184, 200, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(248, 246, 241, 0.72), rgba(239, 233, 223, 0.84));
+}
+
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-aurora,
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-nebula,
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-grid,
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-stars,
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-canvas-layer,
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-vignette,
+.hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-signal {
+  position: relative;
+  z-index: 3;
+}
+
+@media (max-width: 767px), (prefers-reduced-motion: reduce) {
+  .hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-video {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-space {
+    background:
+      radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.16), transparent 24%),
+      linear-gradient(180deg, rgba(11, 7, 9, 0.10) 0%, rgba(248, 246, 241, 0.44) 48%, rgba(248, 246, 241, 0.92) 100%),
+      url('/background/cassiope.jpg') center top / cover no-repeat !important;
+    opacity: 1 !important;
+    filter: saturate(0.82) sepia(0.08) brightness(1.03) contrast(0.92) !important;
+  }
+
+  .hx-chat-page .hx-bg-root.hx-chat-nebula-background::after {
+    background:
+      radial-gradient(circle at 50% 8%, rgba(233, 215, 190, 0.24), transparent 30%),
+      radial-gradient(circle at 18% 48%, rgba(200, 169, 119, 0.16), transparent 36%),
+      linear-gradient(180deg, rgba(248, 246, 241, 0.08), rgba(248, 246, 241, 0.58) 54%, rgba(248, 246, 241, 0.94) 100%) !important;
+  }
+
+  .hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-aurora,
+  .hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-nebula,
+  .hx-chat-page .hx-bg-root.hx-chat-nebula-background .hx-bg-signal {
+    opacity: 0.08 !important;
+  }
+}
+
+/* CHAT HOME - desktop fit and centered welcome title */
+@media (min-width: 901px) {
+  .hx-chat-page .hx-welcome-feed,
+  .hx-chat-page .hx-welcome-feed-center {
+    display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-inline: auto !important;
+  }
+
+  .hx-chat-page .hx-welcome-feed-center {
+    min-height: calc(100dvh - 104px) !important;
+    padding:
+      clamp(16px, 3.8dvh, 46px)
+      clamp(24px, 4vw, 56px)
+      clamp(138px, 17dvh, 186px) !important;
+  }
+
+  .hx-chat-page .hx-welcome-hero {
+    width: min(100%, 980px) !important;
+    max-width: min(100%, 980px) !important;
+    margin-inline: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  .hx-chat-page .hx-welcome-title {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-inline: auto !important;
+    text-align: center !important;
+  }
+
+  .hx-chat-page .hx-welcome-title-single-line {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-inline: auto !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    font-size: clamp(3.1rem, 5.15vw, 4.8rem) !important;
+    line-height: 1.02 !important;
+  }
+
+  .hx-chat-page .hx-welcome-chips {
+    width: min(820px, 100%) !important;
+    max-width: min(820px, 100%) !important;
+    margin-top: clamp(22px, 3.2dvh, 34px) !important;
+  }
+
+  .hx-chat-page .hx-welcome-chip,
+  .hx-chat-page .hx-emotion-card {
+    min-height: clamp(120px, 15dvh, 148px) !important;
+    padding: clamp(18px, 2.2dvh, 24px) !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1180px) {
+  .hx-chat-page .hx-welcome-hero {
+    width: min(100%, 860px) !important;
+    max-width: min(100%, 860px) !important;
+  }
+
+  .hx-chat-page .hx-welcome-title-single-line {
+    font-size: clamp(2.85rem, 4.85vw, 4.15rem) !important;
+  }
+
+  .hx-chat-page .hx-welcome-chips {
+    width: min(780px, 100%) !important;
+  }
+}
+
+@media (min-width: 901px) and (max-height: 760px) {
+  .hx-chat-page .hx-welcome-feed-center {
+    padding-top: 12px !important;
+    padding-bottom: 126px !important;
+  }
+
+  .hx-chat-page .hx-welcome-orb {
+    width: clamp(116px, 13dvh, 154px) !important;
+    margin-bottom: 12px !important;
+  }
+
+  .hx-chat-page .hx-welcome-badge {
+    margin-bottom: 12px !important;
+  }
+
+  .hx-chat-page .hx-welcome-title-single-line {
+    font-size: clamp(2.7rem, 4.55vw, 4.05rem) !important;
+  }
+
+  .hx-chat-page .hx-welcome-subtitle {
+    margin-top: 10px !important;
+    font-size: clamp(0.94rem, 1.25vw, 1.08rem) !important;
+  }
+
+  .hx-chat-page .hx-welcome-chips {
+    margin-top: 20px !important;
+    gap: 14px !important;
+  }
+
+  .hx-chat-page .hx-welcome-chip,
+  .hx-chat-page .hx-emotion-card {
+    min-height: 112px !important;
+    padding: 18px !important;
+  }
+
+  .hx-chat-page .hx-emotion-card-description {
+    -webkit-line-clamp: 2 !important;
+    display: -webkit-box !important;
+    -webkit-box-orient: vertical !important;
+    overflow: hidden !important;
+  }
+}
+
+@media (min-width: 901px) and (max-height: 660px) {
+  .hx-chat-page .hx-welcome-feed-center {
+    padding-top: 8px !important;
+    padding-bottom: 112px !important;
+  }
+
+  .hx-chat-page .hx-welcome-orb {
+    width: 104px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .hx-chat-page .hx-welcome-badge {
+    margin-bottom: 8px !important;
+  }
+
+  .hx-chat-page .hx-welcome-title-single-line {
+    font-size: clamp(2.35rem, 4vw, 3.35rem) !important;
+  }
+
+  .hx-chat-page .hx-welcome-subtitle {
+    margin-top: 8px !important;
+    line-height: 1.36 !important;
+  }
+
+  .hx-chat-page .hx-welcome-chips {
+    margin-top: 14px !important;
+  }
+
+  .hx-chat-page .hx-welcome-chip,
+  .hx-chat-page .hx-emotion-card {
+    min-height: 94px !important;
+    padding: 14px 16px !important;
+    border-radius: 22px !important;
+  }
+
+  .hx-chat-page .hx-emotion-card-action {
+    margin-top: 8px !important;
+  }
+}

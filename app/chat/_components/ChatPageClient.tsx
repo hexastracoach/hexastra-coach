@@ -2256,7 +2256,7 @@ export default function ChatPageClient() {
 
   return (
     <div className="hx-chat-page">
-      <PremiumBackground />
+      <PremiumBackground enableVideo className="hx-chat-nebula-background" />
 
       {paymentSuccess && (
         <div className="hx-payment-success-banner" role="status">

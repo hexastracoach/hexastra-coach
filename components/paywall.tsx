@@ -256,7 +256,7 @@ export function PricingPage() {
                 <div style={pr.planName}>{plan.name}</div>
                 <div style={pr.planPrice}>
                   <span style={pr.planAmt}>{plan.price}</span>
-                  <span style={pr.planCur}>EUR</span>
+                  <span style={pr.planCur}>€</span>
                   {plan.per && <span style={pr.planPer}>{plan.per}</span>}
                 </div>
                 <p style={pr.planDesc}>{plan.desc}</p>

@@ -140,7 +140,7 @@ export default function LibraryPage() {
                       onClick={e => { e.stopPropagation(); router.push(`/reading/${r.id}`) }}
                       className="hx-lib-upgrade-btn"
                     >
-                      Obtenir PDF + Audio — 19 EUR →
+                      Obtenir PDF + Audio — 19 € →
                     </button>
                   )}
 

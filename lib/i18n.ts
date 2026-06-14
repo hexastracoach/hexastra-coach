@@ -203,7 +203,7 @@ export const translations: Record<Lang, any> = {
       title3: 'Avancez avec clarte.',
       sub: 'Pret en 2 minutes. Gratuit pour commencer.',
       btn: 'Commencer ma lecture',
-      note: 'Essentiel 9,90 EUR/mois - Premium 19,90 EUR/mois - Praticien 29,90 EUR/mois - Sans engagement',
+      note: 'Essentiel 9,90 €/mois - Premium 19,90 €/mois - Praticien 29,90 €/mois - Sans engagement',
     },
     footer: {
       copy: '2026 HexAstra - Intelligence personnelle par IA',
@@ -418,7 +418,7 @@ export const translations: Record<Lang, any> = {
       title3: 'Move forward with clarity.',
       sub: 'Takes 2 minutes. Free to start.',
       btn: 'Start my reading',
-      note: 'Essential EUR 9.90/mo - Premium EUR 19.90/mo - Practitioner EUR 29.90/mo - No commitment',
+      note: 'Essential €9.90/mo - Premium €19.90/mo - Practitioner €29.90/mo - No commitment',
     },
     footer: {
       copy: '2026 HexAstra - Personal intelligence by AI',

@@ -6,18 +6,21 @@ import PremiumStarfield from './PremiumStarfield'
 type Props = {
   hero?: boolean
   className?: string
+  enableVideo?: boolean
 }
 
 export default function PremiumBackground({
   hero = false,
   className = '',
+  enableVideo = false,
 }: Props) {
   const rootRef = useRef<HTMLDivElement | null>(null)
   const [showVideo, setShowVideo] = useState(false)
 
   useEffect(() => {
     /* Video only on desktop — saves bandwidth + GPU on mobile */
-    if (hero) {
+    const videoMedia = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if ((hero || enableVideo) && !videoMedia.matches) {
       setShowVideo(window.innerWidth >= 768)
     }
 
@@ -38,7 +41,7 @@ export default function PremiumBackground({
 
     window.addEventListener('mousemove', handleMove, { passive: true })
     return () => window.removeEventListener('mousemove', handleMove)
-  }, [hero])
+  }, [hero, enableVideo])
 
   return (
     <div

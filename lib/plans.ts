@@ -89,7 +89,7 @@ export const PLANS_UI: PlanUiData[] = [
   {
     key: 'free',
     label: 'Gratuit',
-    price: '0 EUR',
+    price: '0 €',
     period: '/mois',
     desc: 'Decouvrez si Hexastra peut reellement vous aider.',
     features: [
@@ -104,7 +104,7 @@ export const PLANS_UI: PlanUiData[] = [
   {
     key: 'essential',
     label: 'Essentiel',
-    price: '9,90 EUR',
+    price: '9,90 €',
     period: '/mois',
     desc: 'Pour poser vos questions du quotidien et obtenir une clarte rapide.',
     features: [
@@ -119,7 +119,7 @@ export const PLANS_UI: PlanUiData[] = [
   {
     key: 'premium',
     label: 'Premium',
-    price: '19,90 EUR',
+    price: '19,90 €',
     period: '/mois',
     desc: 'Ideal quand une decision compte vraiment.',
     features: [
@@ -136,7 +136,7 @@ export const PLANS_UI: PlanUiData[] = [
   {
     key: 'practitioner',
     label: 'Praticien',
-    price: '29,90 EUR',
+    price: '29,90 €',
     period: '/mois',
     desc: 'Pour un usage avance, plus profond et plus structure.',
     features: [

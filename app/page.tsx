@@ -323,7 +323,7 @@ const FR_COPY: CopyBundle = {
       {
         key: 'free',
         title: 'Gratuit',
-        price: '0 EUR',
+        price: '0 €',
         cadence: '/ accès découverte',
         description: 'Découvrez si Hexastra peut réellement vous aider.',
         bullets: ['Accès limité chaque jour', 'Parfait pour essayer', 'Commencez immédiatement'],
@@ -332,7 +332,7 @@ const FR_COPY: CopyBundle = {
       {
         key: 'essential',
         title: 'Essentiel',
-        price: '9,90 EUR',
+        price: '9,90 €',
         cadence: '/ mois',
         description: 'Pour poser vos questions du quotidien et obtenir une clarté rapide.',
         bullets: ['Usage illimité', 'Guidance directe', 'Pensé pour le quotidien'],
@@ -341,7 +341,7 @@ const FR_COPY: CopyBundle = {
       {
         key: 'premium',
         title: 'Premium',
-        price: '19,90 EUR',
+        price: '19,90 €',
         cadence: '/ mois',
         description: 'Idéal quand une décision compte vraiment.',
         bullets: ['Analyse plus profonde', 'Plus de nuance', 'Le meilleur choix pour une décision importante'],
@@ -352,7 +352,7 @@ const FR_COPY: CopyBundle = {
       {
         key: 'practitioner',
         title: 'Praticien',
-        price: '29,90 EUR',
+        price: '29,90 €',
         cadence: '/ mois',
         description: 'Pour un usage avancé, plus profond et plus structuré.',
         bullets: ['Usage avancé', 'Cadre plus expert', 'Positionnement premium'],
@@ -556,7 +556,7 @@ const EN_COPY: CopyBundle = {
       {
         key: 'free',
         title: 'Free',
-        price: 'EUR 0',
+        price: '€0',
         cadence: '/ discovery access',
         description: 'Discover whether Hexastra can truly help you.',
         bullets: ['Limited daily access', 'Perfect to try', 'Start immediately'],
@@ -565,7 +565,7 @@ const EN_COPY: CopyBundle = {
       {
         key: 'essential',
         title: 'Essential',
-        price: 'EUR 9.90',
+        price: '€9.90',
         cadence: '/ month',
         description: 'Ask your daily questions and get quick clarity.',
         bullets: ['Unlimited use', 'Direct guidance', 'Built for everyday clarity'],
@@ -574,7 +574,7 @@ const EN_COPY: CopyBundle = {
       {
         key: 'premium',
         title: 'Premium',
-        price: 'EUR 19.90',
+        price: '€19.90',
         cadence: '/ month',
         description: 'Ideal when a decision truly matters.',
         bullets: ['Deeper analysis', 'More nuance', 'The best choice for an important decision'],
@@ -585,7 +585,7 @@ const EN_COPY: CopyBundle = {
       {
         key: 'practitioner',
         title: 'Practitioner',
-        price: 'EUR 29.90',
+        price: '€29.90',
         cadence: '/ month',
         description: 'For advanced, deeper and more structured usage.',
         bullets: ['Advanced usage', 'More expert frame', 'Premium positioning'],

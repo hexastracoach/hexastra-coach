@@ -195,7 +195,7 @@ export default function ReadingPage() {
                 </ul>
                 <div className="hx-reading-price-row">
                   <span className="hx-reading-price-num">19</span>
-                  <span className="hx-reading-price-cur">EUR</span>
+                  <span className="hx-reading-price-cur">€</span>
                   <span className="hx-reading-price-note">· achat unique, sans abonnement</span>
                 </div>
                 <button onClick={handlePremium} className="hx-reading-upgrade-btn">
